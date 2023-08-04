@@ -44,7 +44,7 @@ ginkgo -r (or ginkgo ./...)
 
 ### Writing Specs
 
-1. Decide whether to use the `testhelpers/observability` package, individual packages such as
+1. Decide whether to use the `testhelpers/observability` (Comming Soon!) package, individual packages such as
    `testhelpers/tempo`, or only support externally provisioned endpoints
 1. Write the specs using [Ginkgo][], and [Gomega][]
 1. Profit
