@@ -35,12 +35,12 @@ go install github.com/onsi/ginkgo/v2/ginkgo
 ginkgo -r (or ginkgo ./...)
 ```
 
-1. Browse the [examples][]
+1. Browse the [example][]
 
 [Go]: https://go.dev/
 [Docker]: https://www.docker.com/
 [Podman]: https://podman.io/
-[examples]: examples/README.md
+[example]: examples/send_simple_trace_test.go
 
 ### Writing Specs
 
