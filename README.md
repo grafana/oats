@@ -4,14 +4,14 @@
 
 1. Flexibility to support qualification of changes to the [OpenTelemetry Collector][], and [Tempo][]
 1. Ability to support OpenTelemetry SDK functionality such as [sampling][]
-1. Self contained, programmatic provisioning of [Tempo][], the [OpenTelemetry Collecor][], and [Mimir][] with [dockertest][]
+1. Self contained, programmatic provisioning of [Tempo][], the [OpenTelemetry Collector][], and [Prometheus][] with [dockertest][]
 1. Straightforward support for externally provisioned 
 1. Highlight the use of [Ginkgo][], and [Gomega][]
 1. Have a cute name
 
 [Tempo]: https://github.com/grafana/tempo
 [OpenTelemetry Collector]: https://github.com/open-telemetry/opentelemetry-collector
-[Mimir]: https://github.com/grafana/mimir
+[Prometheus]: https://github.com/prometheus/prometheus
 [dockertest]: https://github.com/ory/dockertest
 [sampling]: https://opentelemetry.io/docs/instrumentation/go/sampling/
 [Ginkgo]: https://onsi.github.io/ginkgo/
