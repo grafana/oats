@@ -3,7 +3,7 @@ package harness
 import (
 	"context"
 
-	"github.com/grafana/app-o11y-testkit/internal/util"
+	"github.com/grafana/oats/testkit/internal/util"
 	"github.com/onsi/ginkgo/v2"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/connector"

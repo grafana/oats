@@ -4,8 +4,8 @@ import (
 	"context"
 	"embed"
 
-	"github.com/grafana/app-o11y-testkit/internal/harness"
-	"github.com/grafana/app-o11y-testkit/internal/util"
+	"github.com/grafana/oats/testkit/internal/harness"
+	"github.com/grafana/oats/testkit/internal/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/connector/servicegraphconnector"
