@@ -1,4 +1,4 @@
-module github.com/grafana/app-o11y-testkit
+module github.com/grafana/oats/testkit
 
 go 1.20
 
