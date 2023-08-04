@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/grafana/opentelemetry-acceptance-tests/internal/testhelpers/common"
-	"github.com/grafana/opentelemetry-acceptance-tests/internal/testhelpers/otelcollector"
-	"github.com/grafana/opentelemetry-acceptance-tests/internal/testhelpers/tempo"
+	"github.com/grafana/oats/internal/testhelpers/common"
+	"github.com/grafana/oats/internal/testhelpers/otelcollector"
+	"github.com/grafana/oats/internal/testhelpers/prometheus"
+	"github.com/grafana/oats/internal/testhelpers/tempo"
 	"go.opentelemetry.io/otel/sdk/resource"
 
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
@@ -19,6 +20,7 @@ import (
 
 var localTempoEndpoint *tempo.LocalEndpoint
 var localCollectorEndpoint *otelcollector.LocalEndpoint
+var localPromEndpoint *prometheus.LocalEndpoint
 var sharedNetworkName string
 
 var _ = Describe("sending a simple trace to Tempo through the OpenTelemetry Collector", Ordered, Serial, func() {
@@ -33,7 +35,13 @@ var _ = Describe("sending a simple trace to Tempo through the OpenTelemetry Coll
 		_, err = common.ContainerNetwork(sharedNetworkName)
 		Expect(err).ToNot(HaveOccurred(), "expected no error creating a shared container network")
 
-		localTempoEndpoint, err = tempo.NewLocalEndpoint(ctx, sharedNetworkName)
+		localPromEndpoint, err = prometheus.NewLocalEndpoint(ctx, sharedNetworkName)
+		Expect(err).ToNot(HaveOccurred(), "expected no error creating a local Prometheus endpoint")
+
+		promAddress, err := localPromEndpoint.Start(ctx)
+		Expect(err).ToNot(HaveOccurred(), "expected no error starting the local Prometheus endpoint")
+
+		localTempoEndpoint, err = tempo.NewLocalEndpoint(ctx, sharedNetworkName, promAddress)
 		Expect(err).ToNot(HaveOccurred(), "expected no error creating a local Tempo endpoint")
 
 		_, err = localTempoEndpoint.Start(ctx)
@@ -42,7 +50,7 @@ var _ = Describe("sending a simple trace to Tempo through the OpenTelemetry Coll
 		traceEndpoint, err := localTempoEndpoint.TraceEndpoint(ctx)
 		Expect(err).ToNot(HaveOccurred(), "expected no error getting the Tempo trace ingestion endpoint")
 
-		localCollectorEndpoint, err = otelcollector.NewLocalEndpoint(ctx, sharedNetworkName, traceEndpoint)
+		localCollectorEndpoint, err = otelcollector.NewLocalEndpoint(ctx, sharedNetworkName, traceEndpoint, promAddress)
 		Expect(err).ToNot(HaveOccurred(), "expected no error creating a local OpenTelemetry collector endpoint")
 
 		_, err = localCollectorEndpoint.Start(ctx)
@@ -61,6 +69,11 @@ var _ = Describe("sending a simple trace to Tempo through the OpenTelemetry Coll
 		if localTempoEndpoint != nil {
 			cleanupErr = localTempoEndpoint.Stop(ctx)
 			Expect(cleanupErr).ToNot(HaveOccurred(), "expected no error stopping the local Tempo endpoint")
+		}
+
+		if localPromEndpoint != nil {
+			cleanupErr = localPromEndpoint.Stop(ctx)
+			Expect(cleanupErr).ToNot(HaveOccurred(), "expected no error stopping the local Prometheus endpoint")
 		}
 
 		if sharedNetworkName != "" {

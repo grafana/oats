@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/grafana/opentelemetry-acceptance-tests/internal/testhelpers/common"
+	"github.com/grafana/oats/internal/testhelpers/common"
+	"github.com/grafana/oats/internal/testhelpers/prometheus"
 	"go.opentelemetry.io/otel/sdk/resource"
 
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
@@ -16,7 +17,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/grafana/opentelemetry-acceptance-tests/internal/testhelpers/tempo"
+	"github.com/grafana/oats/internal/testhelpers/tempo"
 )
 
 var _ = Describe("provisioning Tempo locally using Docker", Label("integration", "docker", "slow"), func() {
@@ -34,7 +35,15 @@ var _ = Describe("provisioning Tempo locally using Docker", Label("integration",
 
 			defer common.DestroyContainerNetwork(sharedNetworkName)
 
-			endpoint, err := tempo.NewLocalEndpoint(ctx, sharedNetworkName)
+			promEndpoint, err := prometheus.NewLocalEndpoint(ctx, sharedNetworkName)
+			Expect(err).ToNot(HaveOccurred(), "expected no error creating a local Prometheus endpoint")
+
+			promAddress, err := promEndpoint.Start(ctx)
+			Expect(err).ToNot(HaveOccurred(), "expected no error starting the local Prometheus endpoint")
+
+			defer promEndpoint.Stop(ctx)
+
+			endpoint, err := tempo.NewLocalEndpoint(ctx, sharedNetworkName, promAddress)
 			Expect(err).ToNot(HaveOccurred(), "expected no error creating a local Tempo endpoint")
 
 			endpointURL, err := endpoint.Start(ctx)
@@ -52,7 +61,7 @@ var _ = Describe("provisioning Tempo locally using Docker", Label("integration",
 			respBytes, err := io.ReadAll(resp.Body)
 			Expect(err).ToNot(HaveOccurred(), "expected no error reading a Tempo status response")
 
-			Expect(string(respBytes)).To(ContainSubstring("tempo, version 2.1.1"), "we actually hope the opposite")
+			Expect(string(respBytes)).To(ContainSubstring("tempo, version 2.1.1"), "expected to get the Tempo version from the status endpoint")
 		})
 
 		It("provides an OpenTelemetry TraceProvider for sending trace data, and an endpoint for returning a trace by ID", func() {
@@ -68,7 +77,15 @@ var _ = Describe("provisioning Tempo locally using Docker", Label("integration",
 
 			defer common.DestroyContainerNetwork(sharedNetworkName)
 
-			endpoint, err := tempo.NewLocalEndpoint(ctx, sharedNetworkName)
+			promEndpoint, err := prometheus.NewLocalEndpoint(ctx, sharedNetworkName)
+			Expect(err).ToNot(HaveOccurred(), "expected no error creating a local Prometheus endpoint")
+
+			promAddress, err := promEndpoint.Start(ctx)
+			Expect(err).ToNot(HaveOccurred(), "expected no error starting the local Prometheus endpoint")
+
+			defer promEndpoint.Stop(ctx)
+
+			endpoint, err := tempo.NewLocalEndpoint(ctx, sharedNetworkName, promAddress)
 			Expect(err).ToNot(HaveOccurred(), "expected no error creating a local Tempo endpoint")
 
 			_, err = endpoint.Start(ctx)

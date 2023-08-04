@@ -12,7 +12,7 @@ import (
 
 	_ "embed"
 
-	"github.com/grafana/opentelemetry-acceptance-tests/internal/testhelpers/common"
+	"github.com/grafana/oats/internal/testhelpers/common"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -33,7 +33,7 @@ var otelCollectorDockerfileBytes []byte
 //go:embed otelcol-builder-manifest.yaml
 var builderManifestBytes []byte
 
-func NewLocalEndpoint(ctx context.Context, networkName string, traceEndpoint *common.LocalEndpointAddress) (*LocalEndpoint, error) {
+func NewLocalEndpoint(ctx context.Context, networkName string, traceEndpoint *common.LocalEndpointAddress, promEndpoint *common.LocalEndpointAddress) (*LocalEndpoint, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -73,6 +73,7 @@ func NewLocalEndpoint(ctx context.Context, networkName string, traceEndpoint *co
 
 	configData := &ConfigTemplateData{
 		TempoEndpoint:          traceEndpoint.ContainerEndpoint,
+		PrometheusEndpoint:     promEndpoint.ContainerEndpoint,
 		FileExporterOutputPath: "/etc/file-exporter-output.jsonl",
 		HealthCheckPort:        strings.ReplaceAll(HealthCheckContainerPort, TCPSuffix, ""),
 	}
@@ -111,6 +112,7 @@ func NewLocalEndpoint(ctx context.Context, networkName string, traceEndpoint *co
 		mutex:                  &sync.Mutex{},
 		networkName:            networkName,
 		traceEndpoint:          traceEndpoint,
+		prometheusEndpoint:     promEndpoint,
 		collectorConfigPath:    collectorConfigPath,
 		fileExporterOutputPath: fileExporterOutputPath,
 		stopped:                true,
@@ -120,16 +122,15 @@ func NewLocalEndpoint(ctx context.Context, networkName string, traceEndpoint *co
 }
 
 type LocalEndpoint struct {
-	mutex *sync.Mutex
+	mutex   *sync.Mutex
+	stopped bool
 
-	container     *dockertest.Resource
-	networkName   string
-	traceEndpoint *common.LocalEndpointAddress
-
+	container              *dockertest.Resource
+	networkName            string
 	collectorConfigPath    string
 	fileExporterOutputPath string
-
-	stopped bool
+	traceEndpoint          *common.LocalEndpointAddress
+	prometheusEndpoint     *common.LocalEndpointAddress
 }
 
 func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress, error) {

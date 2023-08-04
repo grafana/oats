@@ -1,4 +1,4 @@
-module github.com/grafana/opentelemetry-acceptance-tests
+module github.com/grafana/oats
 
 go 1.19
 

@@ -1,28 +1,26 @@
 package tempo
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/user"
+	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 
 	_ "embed"
 
-	"github.com/grafana/opentelemetry-acceptance-tests/internal/testhelpers/common"
+	"github.com/grafana/oats/internal/testhelpers/common"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
-
-//go:embed tempo.yaml
-var defaultTempoConfig []byte
 
 const (
 	HTTPContainerPort     = "3200/tcp"
@@ -31,7 +29,7 @@ const (
 	HTTPOtelContainerPort = "4318/tcp"
 )
 
-func NewLocalEndpoint(ctx context.Context, networkName string) (*LocalEndpoint, error) {
+func NewLocalEndpoint(ctx context.Context, networkName string, promEndpoint *common.LocalEndpointAddress) (*LocalEndpoint, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -53,18 +51,39 @@ func NewLocalEndpoint(ctx context.Context, networkName string) (*LocalEndpoint, 
 
 	tempoConfig, err := os.CreateTemp("", "tempo-config")
 	if err != nil {
-		os.RemoveAll(tempoDataDir)
+		_ = os.RemoveAll(tempoDataDir)
 
 		return nil, err
 	}
 
-	defaultTempoConfigReader := bytes.NewReader(defaultTempoConfig)
-
-	_, err = io.Copy(tempoConfig, defaultTempoConfigReader)
+	httpListenPort, err := strconv.Atoi(strings.ReplaceAll(HTTPContainerPort, common.TCPSuffix, ""))
 	if err != nil {
-		tempoConfig.Close()
-		os.RemoveAll(tempoDataDir)
-		os.Remove(tempoConfig.Name())
+		_ = tempoConfig.Close()
+		_ = os.Remove(tempoConfig.Name())
+		_ = os.RemoveAll(tempoDataDir)
+
+		return nil, err
+	}
+
+	configData := &ConfigTemplateData{
+		HTTPListenPort:     httpListenPort,
+		PrometheusEndpoint: fmt.Sprintf("http://%s", promEndpoint.ContainerEndpoint),
+	}
+
+	configTemplate, err := template.New("tempo-config").Parse(ConfigTemplate)
+	if err != nil {
+		_ = tempoConfig.Close()
+		_ = os.Remove(tempoConfig.Name())
+		_ = os.RemoveAll(tempoDataDir)
+
+		return nil, err
+	}
+
+	err = configTemplate.Execute(tempoConfig, configData)
+	if err != nil {
+		_ = tempoConfig.Close()
+		_ = os.RemoveAll(tempoDataDir)
+		_ = os.Remove(tempoConfig.Name())
 
 		return nil, err
 	}
@@ -73,33 +92,33 @@ func NewLocalEndpoint(ctx context.Context, networkName string) (*LocalEndpoint, 
 
 	err = tempoConfig.Close()
 	if err != nil {
-		os.RemoveAll(tempoDataDir)
-		os.Remove(tempoConfig.Name())
+		_ = os.RemoveAll(tempoDataDir)
+		_ = os.Remove(tempoConfig.Name())
 
 		return nil, err
 	}
 
 	endpoint := &LocalEndpoint{
-		mutex:       &sync.Mutex{},
-		dataDir:     tempoDataDir,
-		configPath:  configPath,
-		networkName: networkName,
-		stopped:     true,
+		mutex:              &sync.Mutex{},
+		dataDir:            tempoDataDir,
+		configPath:         configPath,
+		networkName:        networkName,
+		prometheusEndpoint: promEndpoint,
+		stopped:            true,
 	}
 
 	return endpoint, nil
 }
 
 type LocalEndpoint struct {
-	mutex *sync.Mutex
-
-	container   *dockertest.Resource
-	networkName string
-
-	configPath string
-	dataDir    string
-
+	mutex   *sync.Mutex
 	stopped bool
+
+	container          *dockertest.Resource
+	networkName        string
+	prometheusEndpoint *common.LocalEndpointAddress
+	configPath         string
+	dataDir            string
 }
 
 func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress, error) {
@@ -173,9 +192,25 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 			return
 		}
 
+		promUrl := fmt.Sprintf("http://%s/-/healthy", e.prometheusEndpoint.HostEndpoint)
+
+		promResp, getPromHealthyErr := http.Get(promUrl)
+		if getPromHealthyErr != nil {
+			errsChan <- fmt.Errorf("determining if Prometheus is healthy: %s", getPromHealthyErr)
+			return
+		}
+
+		if promResp.StatusCode != http.StatusOK {
+			errsChan <- fmt.Errorf("expected HTTP status 200, but got: %d", promResp.StatusCode)
+			return
+		}
+
+		defer promResp.Body.Close()
+
 		currentUser, getCurrentUserErr := user.Current()
 		if getCurrentUserErr != nil {
 			errsChan <- fmt.Errorf("getting current user: %s", getCurrentUserErr)
+			return
 		}
 
 		options := &dockertest.RunOptions{

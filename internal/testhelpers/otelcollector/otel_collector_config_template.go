@@ -13,6 +13,10 @@ exporters:
       insecure: true
   file:
     path: {{ .FileExporterOutputPath }} 
+  prometheusremotewrite:
+    endpoint: "http://{{- .PrometheusEndpoint -}}/api/v1/push"
+    tls:
+      insecure: true
 
 extensions:
   health_check:
@@ -24,6 +28,9 @@ service:
     traces:
       receivers: [otlp]
       exporters: [otlp, file]
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheusremotewrite]
 
   extensions: [health_check]
 
@@ -31,6 +38,7 @@ service:
 
 type ConfigTemplateData struct {
 	TempoEndpoint          string
+	PrometheusEndpoint     string
 	FileExporterOutputPath string
 	HealthCheckPort        string
 }
