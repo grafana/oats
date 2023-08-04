@@ -1,13 +1,17 @@
-# testkit
+# TestKit
 
-The testkit is collection of test suites and utilities intended to provide verification for the App O11y data ingestion pipeline.
+TestKit is a collection of test suites and utilities intended to provide verification for the App O11y data ingestion pipeline.
+The purpose of this module is to create unit-style test suites that can run without external dependencies. Unit testing specific
+components directly allows debugging of components under test with ease.
+
+## Data Model
 
 See the following resources for more information.
 
 - [Design Doc: Service Graph and RED Metrics data model / Ingestion pipeline data model]
 - [Data Model Doc: RED and Service Graph Metrics]
 
-## Running tests
+## Running Tests
 
 The test suites are built using the [Ginkgo Testing Framework]. Install the ginkgo executable before running
 
