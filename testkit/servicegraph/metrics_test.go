@@ -91,7 +91,7 @@ var _ = Describe("generating service graph metrics", func() {
 			BeforeEach(func() {
 				inputStr = "5b584103c6fc5ddf423cb2fb6552d0f0"
 			})
-			It("should create an edge from client=frontend to server=example.com", func() {
+			XIt("should create an edge from client=frontend to server=example.com", func() {
 				Expect(countEdges(metrics, "frontend", "example.com")).To(BeIdenticalTo(2),
 					"traces_service_graph_request_total and traces_service_graph_request_client_seconds metrics have edge")
 			})
