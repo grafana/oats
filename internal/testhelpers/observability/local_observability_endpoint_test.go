@@ -1,4 +1,4 @@
-package examples_test
+package observability_test
 
 import (
 	"context"
@@ -36,7 +36,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 		}
 	})
 
-	Describe("observability.LocalEndpoint", func() {
+	Describe("LocalEndpoint", func() {
 		It("provides an OpenTelemetry TraceProvider for sending traces", func() {
 			ctx := context.Background()
 
@@ -44,26 +44,26 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				resource.Default(),
 				resource.NewWithAttributes(
 					"", // use the SchemaURL from the default resource
-					semconv.ServiceName("LocalObservabilityEndpointExample"),
+					semconv.ServiceName("LocalObservabilityEndpointTest"),
 				),
 			)
 
 			Expect(err).ToNot(HaveOccurred(), "expected no error creating an OpenTelemetry resource")
 
 			traceProvider, err := localEndpoint.TracerProvider(ctx, r)
-			Expect(err).ToNot(HaveOccurred(), "expected no error getting a tracer provider from the local observability endpoint")
+			Expect(err).ToNot(HaveOccurred(), "expected no error getting a trace provider from the local observability endpoint")
 
 			defer traceProvider.Shutdown(ctx)
 
-			tracer := traceProvider.Tracer("LocalObservabilityEndpointExampleTracer")
+			tracer := traceProvider.Tracer("LocalObservabilityEndpointTestTracer")
 
-			parentCtx, parentSpan := tracer.Start(ctx, "local-observability-endpoint-example-parent")
+			parentCtx, parentSpan := tracer.Start(ctx, "local-observability-endpoint-test-parent")
 
-			const eventMessage = "taking a little siesta"
+			const eventMessage = "taking a little nickerchen"
 
 			// create a closure over the tracer, parent context, and event message
 			helloOtelExample := func() {
-				_, childSpan := tracer.Start(parentCtx, "hello-observability-example")
+				_, childSpan := tracer.Start(parentCtx, "hello-observability-test")
 				defer childSpan.End()
 
 				childSpan.AddEvent(eventMessage)
@@ -87,6 +87,14 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 
 			Expect(string(fetchedTrace)).ToNot(BeEmpty(), "expected a non empty response from the local observability endpoint when getting an exported trace by ID")
 			Expect(string(fetchedTrace)).To(ContainSubstring(eventMessage), "expected the event message to be contained in the returned trace")
+		})
+
+		XIt("provides something to send metrics", func() {
+			Fail("test not written")
+		})
+
+		XIt("provides something to send logs", func() {
+			Fail("test not written")
 		})
 	})
 })

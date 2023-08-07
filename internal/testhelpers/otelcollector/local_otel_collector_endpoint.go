@@ -385,11 +385,11 @@ func (e *LocalEndpoint) TracerProvider(ctx context.Context, r *resource.Resource
 	}
 
 	if e.stopped {
-		return nil, fmt.Errorf("refusing to return trace endpoint for stopped endpoint")
+		return nil, fmt.Errorf("refusing to return OpenTelemetry TracerProvider for stopped endpoint")
 	}
 
 	if e.container == nil {
-		return nil, fmt.Errorf("cannot return trace endpoint with nil OpenTelemetry Collector container")
+		return nil, fmt.Errorf("cannot return OpenTelemetry TracerProvider with nil OpenTelemetry Collector container")
 	}
 
 	containerPort := e.container.GetPort(GRPCContainerPort)
@@ -412,4 +412,48 @@ func (e *LocalEndpoint) TracerProvider(ctx context.Context, r *resource.Resource
 	)
 
 	return traceProvider, nil
+}
+
+func (e *LocalEndpoint) OTLPEndpoint(ctx context.Context) (*common.LocalEndpointAddress, error) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	if e.stopped {
+		return nil, fmt.Errorf("refusing to return OTLP endpoint for stopped endpoint")
+	}
+
+	if e.container == nil {
+		return nil, fmt.Errorf("cannot return trace endpoint with nil OpenTelemetry Collector container")
+	}
+
+	containerNetwork, err := common.ContainerNetwork(e.networkName)
+	if err != nil {
+		return nil, fmt.Errorf("getting container network:% s", err)
+	}
+
+	containerNetworkIP := e.container.GetIPInNetwork(containerNetwork)
+	if containerNetworkIP == "" {
+		return nil, fmt.Errorf("got no IP for Tempo container on the shared container network")
+	}
+
+	containerPort := e.container.GetPort(GRPCContainerPort)
+	if containerPort == "" {
+		return nil, fmt.Errorf("got no container gRPC port for the OpenTelemetry Collector container")
+	}
+
+	hostEndpoint := e.container.GetHostPort(GRPCContainerPort)
+	if hostEndpoint == "" {
+		return nil, fmt.Errorf("got no host gRPC OpenTelemetry host endpoint for OpenTelemetry Collector container")
+	}
+
+	endpointAddress := &common.LocalEndpointAddress{
+		HostEndpoint:      hostEndpoint,
+		ContainerEndpoint: fmt.Sprintf("%s:%s", containerNetworkIP, containerPort),
+	}
+
+	return endpointAddress, nil
 }

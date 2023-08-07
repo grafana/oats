@@ -351,7 +351,7 @@ func (e *LocalEndpoint) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (e *LocalEndpoint) TraceEndpoint(ctx context.Context) (*common.LocalEndpointAddress, error) {
+func (e *LocalEndpoint) OTLPTraceEndpoint(ctx context.Context) (*common.LocalEndpointAddress, error) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -367,26 +367,26 @@ func (e *LocalEndpoint) TraceEndpoint(ctx context.Context) (*common.LocalEndpoin
 		return nil, fmt.Errorf("cannot return trace endpoint with nil Tempo container")
 	}
 
-	existingContainerNetwork, getExistingNetworkErr := common.ContainerNetwork(e.networkName)
-	if getExistingNetworkErr != nil {
-		return nil, fmt.Errorf("getting container network:% s", getExistingNetworkErr)
+	containerNetwork, err := common.ContainerNetwork(e.networkName)
+	if err != nil {
+		return nil, fmt.Errorf("getting container network:% s", err)
 	}
 
-	existingContainerNetworkIP := e.container.GetIPInNetwork(existingContainerNetwork)
-	if existingContainerNetworkIP == "" {
+	containerNetworkIP := e.container.GetIPInNetwork(containerNetwork)
+	if containerNetworkIP == "" {
 		return nil, fmt.Errorf("got no IP for Tempo container on the shared container network")
 	}
 
-	existingContainerPort := strings.ReplaceAll(GRPCOtelContainerPort, common.TCPSuffix, "")
+	containerPort := strings.ReplaceAll(GRPCOtelContainerPort, common.TCPSuffix, "")
 
-	existingContainerHostEndpoint := e.container.GetHostPort(GRPCOtelContainerPort)
-	if existingContainerHostEndpoint == "" {
+	hostEndpoint := e.container.GetHostPort(GRPCOtelContainerPort)
+	if hostEndpoint == "" {
 		return nil, fmt.Errorf("got no host gRPC OpenTelemetry host endpoint for Tempo container")
 	}
 
 	endpointAddress := &common.LocalEndpointAddress{
-		HostEndpoint:      existingContainerHostEndpoint,
-		ContainerEndpoint: fmt.Sprintf("%s:%s", existingContainerNetworkIP, existingContainerPort),
+		HostEndpoint:      hostEndpoint,
+		ContainerEndpoint: fmt.Sprintf("%s:%s", containerNetworkIP, containerPort),
 	}
 
 	return endpointAddress, nil

@@ -51,7 +51,7 @@ var _ = Describe("provisioning an OpenTelemetry Collector locally using Docker",
 
 			defer tempoEndpoint.Stop(ctx)
 
-			traceEndpoint, err := tempoEndpoint.TraceEndpoint(ctx)
+			traceEndpoint, err := tempoEndpoint.OTLPTraceEndpoint(ctx)
 			Expect(err).ToNot(HaveOccurred(), "expected no error getting the endpoint for sending traces to Tempo")
 
 			collectorEndpoint, err := otelcollector.NewLocalEndpoint(ctx, sharedNetworkName, traceEndpoint, promEndpointAddress)
@@ -98,7 +98,7 @@ var _ = Describe("provisioning an OpenTelemetry Collector locally using Docker",
 
 			defer tempoEndpoint.Stop(ctx)
 
-			traceEndpoint, err := tempoEndpoint.TraceEndpoint(ctx)
+			traceEndpoint, err := tempoEndpoint.OTLPTraceEndpoint(ctx)
 			Expect(err).ToNot(HaveOccurred(), "expected no error getting the endpoint for sending traces to Tempo")
 
 			collectorEndpoint, err := otelcollector.NewLocalEndpoint(ctx, sharedNetworkName, traceEndpoint, promEndpointAddress)
