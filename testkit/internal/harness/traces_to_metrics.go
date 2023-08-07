@@ -22,13 +22,13 @@ type TracesToMetrics struct {
 }
 
 // NewTracesToMetrics constructs a new TracesToMetrics test harness.
-func NewTracesToMetrics(t ginkgo.FullGinkgoTInterface, f connector.Factory) (*TracesToMetrics, error) {
-	l := zaptest.NewLogger(t)
+func NewTracesToMetrics(t ginkgo.FullGinkgoTInterface, factory connector.Factory, config component.Config) (*TracesToMetrics, error) {
+	logger := zaptest.NewLogger(t)
 
 	set := connector.CreateSettings{
 		ID: component.NewIDWithName(component.DataTypeTraces, "traces_to_metrics_harness"),
 		TelemetrySettings: component.TelemetrySettings{
-			Logger:         l,
+			Logger:         logger,
 			TracerProvider: trace.NewNoopTracerProvider(),
 			MeterProvider:  noop.NewMeterProvider(),
 			MetricsLevel:   0,
@@ -37,15 +37,18 @@ func NewTracesToMetrics(t ginkgo.FullGinkgoTInterface, f connector.Factory) (*Tr
 		BuildInfo: component.BuildInfo{},
 	}
 
+	if config == nil {
+		config = factory.CreateDefaultConfig()
+	}
 	sink := &consumertest.MetricsSink{}
-	c, err := f.CreateTracesToMetrics(context.TODO(), set, f.CreateDefaultConfig(), sink)
+	connector, err := factory.CreateTracesToMetrics(context.TODO(), set, config, sink)
 	if err != nil {
 		return nil, err
 	}
 
 	// return the harness and start the connector
 	return &TracesToMetrics{
-		Traces:  c,
+		Traces:  connector,
 		Metrics: sink.AllMetrics,
-	}, c.Start(context.TODO(), &util.NoopHost{})
+	}, connector.Start(context.TODO(), &util.NoopHost{})
 }
