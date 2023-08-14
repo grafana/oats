@@ -252,10 +252,10 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 
 			// to update, look at the upstream compose file: https://github.com/grafana/tempo/blob/main/example/docker-compose/local/docker-compose.yaml
 			PortBindings: map[docker.Port][]docker.PortBinding{
-				HTTPContainerPort:     []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostHTTPContainerPort)}}, // the empty for the host port mapping will result in a random port being chosen
-				GRPCContainerPort:     []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostGRPCContainerPort)}},
-				HTTPOtelContainerPort: []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostHTTPOtelContainerPort)}},
-				GRPCOtelContainerPort: []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostGRPCOtelContainerPort)}},
+				HTTPContainerPort:     []docker.PortBinding{{HostPort: hostHTTPContainerPort}},
+				GRPCContainerPort:     []docker.PortBinding{{HostPort: hostGRPCContainerPort}},
+				HTTPOtelContainerPort: []docker.PortBinding{{HostPort: hostHTTPOtelContainerPort}},
+				GRPCOtelContainerPort: []docker.PortBinding{{HostPort: hostGRPCOtelContainerPort}},
 			},
 		}
 

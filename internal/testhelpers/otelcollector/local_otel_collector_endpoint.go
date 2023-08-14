@@ -12,6 +12,7 @@ import (
 
 	_ "embed"
 
+	"github.com/google/uuid"
 	"github.com/grafana/oats/internal/testhelpers/common"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
@@ -255,8 +256,16 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 			return
 		}
 
+		nameUUID, uuidErr := uuid.NewRandom()
+		if uuidErr != nil {
+			errsChan <- uuidErr
+			return
+		}
+
+		containerName := fmt.Sprintf("otelcol-ginkgo%s", nameUUID.String())
+
 		options := &dockertest.RunOptions{
-			Name:     "ginkgo-otelcol",
+			Name:     containerName,
 			Cmd:      []string{"/otelcol", "--config=/etc/otel-collector.yaml"}, // attempting to specify the command manually causes otelcol to fail (╯°□°)╯︵ ┻━┻
 			Networks: []*dockertest.Network{network},
 
@@ -267,8 +276,8 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 
 			// to update, look at the upstream DockerFile: https://github.com/open-telemetry/opentelemetry-collector-releases/blob/main/distributions/otelcol/Dockerfile
 			PortBindings: map[docker.Port][]docker.PortBinding{
-				GRPCContainerPort:        []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostGRPCContainerPort)}}, // the empty for the host port mapping will result in a random port being chosen
-				HealthCheckContainerPort: []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostHealthCheckContainerPort)}},
+				GRPCContainerPort:        []docker.PortBinding{{HostPort: hostGRPCContainerPort}},
+				HealthCheckContainerPort: []docker.PortBinding{{HostPort: hostHealthCheckContainerPort}},
 			},
 		}
 
