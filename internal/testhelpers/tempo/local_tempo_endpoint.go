@@ -213,6 +213,30 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 			return
 		}
 
+		hostHTTPContainerPort, getHostPortErr := common.HostTCPPort()
+		if getHostPortErr != nil {
+			errsChan <- getHostPortErr
+			return
+		}
+
+		hostGRPCContainerPort, getHostPortErr := common.HostTCPPort()
+		if getHostPortErr != nil {
+			errsChan <- getHostPortErr
+			return
+		}
+
+		hostHTTPOtelContainerPort, getHostPortErr := common.HostTCPPort()
+		if getHostPortErr != nil {
+			errsChan <- getHostPortErr
+			return
+		}
+
+		hostGRPCOtelContainerPort, getHostPortErr := common.HostTCPPort()
+		if getHostPortErr != nil {
+			errsChan <- getHostPortErr
+			return
+		}
+
 		options := &dockertest.RunOptions{
 			Repository: "grafana/tempo",
 			Tag:        "2.1.1",
@@ -228,10 +252,10 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 
 			// to update, look at the upstream compose file: https://github.com/grafana/tempo/blob/main/example/docker-compose/local/docker-compose.yaml
 			PortBindings: map[docker.Port][]docker.PortBinding{
-				HTTPContainerPort:     []docker.PortBinding{{HostPort: ""}}, // the empty for the host port mapping will result in a random port being chosen
-				GRPCContainerPort:     []docker.PortBinding{{HostPort: ""}},
-				HTTPOtelContainerPort: []docker.PortBinding{{HostPort: ""}},
-				GRPCOtelContainerPort: []docker.PortBinding{{HostPort: ""}},
+				HTTPContainerPort:     []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostHTTPContainerPort)}}, // the empty for the host port mapping will result in a random port being chosen
+				GRPCContainerPort:     []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostGRPCContainerPort)}},
+				HTTPOtelContainerPort: []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostHTTPOtelContainerPort)}},
+				GRPCOtelContainerPort: []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostGRPCOtelContainerPort)}},
 			},
 		}
 

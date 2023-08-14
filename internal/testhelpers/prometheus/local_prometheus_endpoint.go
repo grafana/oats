@@ -174,6 +174,13 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 		currentUser, getCurrentUserErr := user.Current()
 		if getCurrentUserErr != nil {
 			errsChan <- fmt.Errorf("getting current user: %s", getCurrentUserErr)
+			return
+		}
+
+		promHostPort, getPortErr := common.HostTCPPort()
+		if getPortErr != nil {
+			errsChan <- getPortErr
+			return
 		}
 
 		options := &dockertest.RunOptions{
@@ -196,7 +203,7 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 			},
 
 			PortBindings: map[docker.Port][]docker.PortBinding{
-				ContainerPort: []docker.PortBinding{{HostPort: ""}}, // the empty for the host port mapping will result in a random port being chosen
+				ContainerPort: []docker.PortBinding{{HostPort: fmt.Sprintf("%d", promHostPort)}}, // the empty for the host port mapping will result in a random port being chosen
 			},
 		}
 
