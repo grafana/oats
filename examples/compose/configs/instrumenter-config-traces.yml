@@ -1,0 +1,4 @@
+routes:
+  patterns:
+    - /create-trace
+  unmatch: path
