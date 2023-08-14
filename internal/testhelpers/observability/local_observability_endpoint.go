@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/grafana/oats/observability"
 	"github.com/grafana/oats/internal/testhelpers/common"
 	"github.com/grafana/oats/internal/testhelpers/otelcollector"
 	"github.com/grafana/oats/internal/testhelpers/prometheus"
@@ -21,6 +22,8 @@ func NewLocalEndpoint() *LocalEndpoint {
 
 	return endpoint
 }
+
+var _ observability.Endpoint = &LocalEndpoint{}
 
 type LocalEndpoint struct {
 	mutex   *sync.Mutex

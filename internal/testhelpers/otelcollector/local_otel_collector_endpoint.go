@@ -24,7 +24,6 @@ import (
 const (
 	GRPCContainerPort        = "4317/tcp"
 	HealthCheckContainerPort = "13133/tcp"
-	TCPSuffix                = "/tcp"
 )
 
 //go:embed otelcol.dockerfile
@@ -75,7 +74,7 @@ func NewLocalEndpoint(ctx context.Context, networkName string, traceEndpoint *co
 		TempoEndpoint:          traceEndpoint.ContainerEndpoint,
 		PrometheusEndpoint:     promEndpoint.ContainerEndpoint,
 		FileExporterOutputPath: "/etc/file-exporter-output.jsonl",
-		HealthCheckPort:        strings.ReplaceAll(HealthCheckContainerPort, TCPSuffix, ""),
+		HealthCheckPort:        strings.ReplaceAll(HealthCheckContainerPort, common.TCPSuffix, ""),
 	}
 
 	configTemplate, err := template.New("otel-collector-config").Parse(ConfigTemplate)
@@ -244,6 +243,18 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 			return
 		}
 
+		hostGRPCContainerPort, getPortErr := common.HostTCPPort()
+		if getPortErr != nil {
+			errsChan <- getPortErr
+			return
+		}
+
+		hostHealthCheckContainerPort, getPortErr := common.HostTCPPort()
+		if getPortErr != nil {
+			errsChan <- getPortErr
+			return
+		}
+
 		options := &dockertest.RunOptions{
 			Name:     "ginkgo-otelcol",
 			Cmd:      []string{"/otelcol", "--config=/etc/otel-collector.yaml"}, // attempting to specify the command manually causes otelcol to fail (╯°□°)╯︵ ┻━┻
@@ -256,8 +267,8 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 
 			// to update, look at the upstream DockerFile: https://github.com/open-telemetry/opentelemetry-collector-releases/blob/main/distributions/otelcol/Dockerfile
 			PortBindings: map[docker.Port][]docker.PortBinding{
-				GRPCContainerPort:        []docker.PortBinding{{HostPort: ""}}, // the empty for the host port mapping will result in a random port being chosen
-				HealthCheckContainerPort: []docker.PortBinding{{HostPort: ""}},
+				GRPCContainerPort:        []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostGRPCContainerPort)}}, // the empty for the host port mapping will result in a random port being chosen
+				HealthCheckContainerPort: []docker.PortBinding{{HostPort: fmt.Sprintf("%d", hostHealthCheckContainerPort)}},
 			},
 		}
 
