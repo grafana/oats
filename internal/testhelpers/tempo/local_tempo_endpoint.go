@@ -12,8 +12,6 @@ import (
 	"sync"
 	"text/template"
 
-	_ "embed"
-
 	"github.com/grafana/oats/internal/testhelpers/common"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
