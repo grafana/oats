@@ -111,7 +111,7 @@ var _ = Describe("generating service graph metrics", func() {
 				Expect(util.HasMetric(metrics[0], tracesServiceGraphRequestClientSeconds)).To(BeTrue())
 				Expect(util.HasMetric(metrics[0], tracesServiceGraphRequestFailedTotal)).To(BeTrue())
 
-				// these are not generated with the existing test input
+				// these are not generated with this this input
 				Expect(util.HasMetric(metrics[0], tracesServiceGraphUnpairedSpansTotal)).To(BeFalse())
 				Expect(util.HasMetric(metrics[0], tracesServiceGraphDroppedSpansTotal)).To(BeFalse())
 			})
@@ -122,37 +122,28 @@ var _ = Describe("generating service graph metrics", func() {
 				inputStr = "5b584103c6fc5ddf423cb2fb6552d0f0"
 			})
 			It("should create an edge from client=frontend to server=checkout", func() {
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestTotal, "frontend", "checkout"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestTotal)
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestServerSeconds, "frontend", "checkout"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestServerSeconds)
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestClientSeconds, "frontend", "checkout"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestClientSeconds)
+				Expect(countEdges(metrics, tracesServiceGraphRequestTotal, "frontend", "checkout")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestTotal)
+				Expect(countEdges(metrics, tracesServiceGraphRequestServerSeconds, "frontend", "checkout")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestServerSeconds)
+				Expect(countEdges(metrics, tracesServiceGraphRequestClientSeconds, "frontend", "checkout")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestClientSeconds)
 			})
 			It("should create an edge from client=frontend to server=fraud-detection", func() {
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestTotal, "frontend", "fraud-detection"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestTotal)
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestServerSeconds, "frontend", "fraud-detection"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestServerSeconds)
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestClientSeconds, "frontend", "fraud-detection"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestClientSeconds)
+				Expect(countEdges(metrics, tracesServiceGraphRequestTotal, "frontend", "fraud-detection")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestTotal)
+				Expect(countEdges(metrics, tracesServiceGraphRequestServerSeconds, "frontend", "fraud-detection")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestServerSeconds)
+				Expect(countEdges(metrics, tracesServiceGraphRequestClientSeconds, "frontend", "fraud-detection")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestClientSeconds)
 			})
 			It("should create an edge from client=frontend to server=my_shopping_cart", func() {
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestTotal, "frontend", "my_shopping_cart"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestTotal)
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestServerSeconds, "frontend", "my_shopping_cart"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestServerSeconds)
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestClientSeconds, "frontend", "my_shopping_cart"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestClientSeconds)
+				Expect(countEdges(metrics, tracesServiceGraphRequestTotal, "frontend", "my_shopping_cart")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestTotal)
+				Expect(countEdges(metrics, tracesServiceGraphRequestServerSeconds, "frontend", "my_shopping_cart")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestServerSeconds)
+				Expect(countEdges(metrics, tracesServiceGraphRequestClientSeconds, "frontend", "my_shopping_cart")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestClientSeconds)
 			})
 		})
 
@@ -161,15 +152,12 @@ var _ = Describe("generating service graph metrics", func() {
 				inputStr = "5b584103c6fc5ddf423cb2fb6552d0f0"
 			})
 			It("should create an edge from client=frontend to server=example.com", func() {
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestTotal, "frontend", "example.com"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestTotal)
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestServerSeconds, "frontend", "example.com"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestServerSeconds)
-				Expect(
-					countEdges(metrics, tracesServiceGraphRequestClientSeconds, "frontend", "example.com"),
-				).To(Equal(1), "metric has edge: "+tracesServiceGraphRequestClientSeconds)
+				Expect(countEdges(metrics, tracesServiceGraphRequestTotal, "frontend", "example.com")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestTotal)
+				Expect(countEdges(metrics, tracesServiceGraphRequestServerSeconds, "frontend", "example.com")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestServerSeconds)
+				Expect(countEdges(metrics, tracesServiceGraphRequestClientSeconds, "frontend", "example.com")).
+					To(Equal(1), "metric has edge: "+tracesServiceGraphRequestClientSeconds)
 			})
 		})
 	})
