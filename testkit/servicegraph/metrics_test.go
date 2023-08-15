@@ -50,11 +50,11 @@ var _ = Describe("generating service graph metrics", func() {
 		JustBeforeEach(func() {
 			// create servicegraph connector config
 			var data map[string]any
-			config := servicegraphprocessor.Config{}
 			if err := yaml.Unmarshal(componentConfig, &data); err != nil {
 				Fail("error unmarshaling connector config yaml: " + err.Error())
 			}
 			conf := confmap.NewFromStringMap(data)
+			config := servicegraphprocessor.Config{}
 			if err := conf.Unmarshal(&config); err != nil {
 				Fail("error unmarshaling connector config map: " + err.Error())
 			}
