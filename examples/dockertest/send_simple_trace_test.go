@@ -6,21 +6,23 @@ import (
 
 	"go.opentelemetry.io/otel/sdk/resource"
 
+	"github.com/grafana/oats/observability"
+
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/grafana/oats/internal/testhelpers/observability"
+	impl "github.com/grafana/oats/internal/testhelpers/observability"
 )
 
-var localEndpoint *observability.LocalEndpoint
+var localEndpoint observability.Endpoint
 
 var _ = Describe("provisioning a local observability endpoint with Docker", Ordered, Label("docker", "integration", "slow"), func() {
 	BeforeAll(func() {
 		var ctx context.Context = context.Background()
 
-		localEndpoint = observability.NewLocalEndpoint()
+		localEndpoint = impl.NewLocalEndpoint()
 		Expect(localEndpoint.Start(ctx)).To(Succeed(), "expected no error starting a local observability endpoint")
 	})
 

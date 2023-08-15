@@ -9,4 +9,7 @@ import (
 type Endpoint interface {
 	TracerProvider(context.Context, *resource.Resource) (*trace.TracerProvider, error)
 	GetTraceByID(context.Context, string) ([]byte, error)
+
+	Start(context.Context) error
+	Stop(context.Context) error
 }

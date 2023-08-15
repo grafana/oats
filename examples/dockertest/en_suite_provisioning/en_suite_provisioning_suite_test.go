@@ -4,18 +4,19 @@ import (
 	"context"
 	"testing"
 
-	"github.com/grafana/oats/internal/testhelpers/observability"
+	impl "github.com/grafana/oats/internal/testhelpers/observability"
 
+	 "github.com/grafana/oats/observability"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var localEndpoint *observability.LocalEndpoint
+var localEndpoint observability.Endpoint
 
 var _ = BeforeSuite(func() {
 	var startCtx context.Context = context.Background()
 
-	localEndpoint = observability.NewLocalEndpoint()
+	localEndpoint = impl.NewLocalEndpoint()
 
 	DeferCleanup(func() {
 		var  stopCtx context.Context = context.Background()
