@@ -34,7 +34,7 @@ services:
       METRICS_INTERVAL: "10ms"
       BPF_BATCH_TIMEOUT: "10ms"
       LOG_LEVEL: "DEBUG"
-      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://agent:4018/v1/traces"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://agent:4018"
     depends_on:
       testserver:
         condition: service_started
@@ -67,3 +67,16 @@ services:
       - "3200:3200"
       - "4317:4317"
       - "4318:4318"
+
+  # Mimir -config.file=config-mimir.yaml -server.grpc-listen-port=9096
+  mimir:
+    image: grafana/mimir
+    container_name: hatest-mimir
+    command:
+      - -config.file=/etc/mimir/mimir-config.yaml
+      - -server.grpc-listen-port=9096
+    volumes:
+      - ./configs/:/etc/mimir
+    ports:
+      - "9009:9009"
+      - "9096:9096"
