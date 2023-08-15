@@ -19,6 +19,7 @@ import (
 type TracesToMetrics struct {
 	connector.Traces
 	Metrics func() []pmetric.Metrics
+	Reset   func()
 }
 
 // NewTracesToMetrics constructs a new TracesToMetrics test harness.
@@ -41,14 +42,15 @@ func NewTracesToMetrics(t ginkgo.FullGinkgoTInterface, factory connector.Factory
 		config = factory.CreateDefaultConfig()
 	}
 	sink := &consumertest.MetricsSink{}
-	connector, err := factory.CreateTracesToMetrics(context.TODO(), set, config, sink)
+	c, err := factory.CreateTracesToMetrics(context.TODO(), set, config, sink)
 	if err != nil {
 		return nil, err
 	}
 
 	// return the harness and start the connector
 	return &TracesToMetrics{
-		Traces:  connector,
+		Traces:  c,
 		Metrics: sink.AllMetrics,
-	}, connector.Start(context.TODO(), &util.NoopHost{})
+		Reset:   sink.Reset,
+	}, c.Start(context.TODO(), &util.NoopHost{})
 }

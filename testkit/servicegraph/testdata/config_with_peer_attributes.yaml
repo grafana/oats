@@ -1,9 +1,9 @@
 latency_histogram_buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
 dimensions: [cluster, namespace]
 store:
-  ttl: 1s
+  ttl: 1ms
   max_items: 1000
-cache_loop: 1s
-store_expiration_loop: 1s
+cache_loop: 1ms
+store_expiration_loop: 1ms
 virtual_node_peer_attributes:
   - net.peer.name
