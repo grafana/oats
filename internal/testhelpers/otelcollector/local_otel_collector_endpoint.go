@@ -274,6 +274,11 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 				fmt.Sprintf("%s:/etc/file-exporter-output.jsonl:z", funcConfig.fileExporterOutputPath), // we'd like this file to be available from the host after creating the volume
 			},
 
+			ExposedPorts: []string{
+				GRPCContainerPort,
+				HealthCheckContainerPort,
+			},
+
 			// to update, look at the upstream DockerFile: https://github.com/open-telemetry/opentelemetry-collector-releases/blob/main/distributions/otelcol/Dockerfile
 			PortBindings: map[docker.Port][]docker.PortBinding{
 				GRPCContainerPort:        []docker.PortBinding{{HostPort: hostGRPCContainerPort}},

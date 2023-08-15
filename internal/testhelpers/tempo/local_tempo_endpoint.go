@@ -250,6 +250,13 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 				fmt.Sprintf("%s:/tmp/tempo:z", funcConfig.dataDir),
 			},
 
+			ExposedPorts: []string{
+				HTTPContainerPort,
+				GRPCContainerPort,
+				HTTPOtelContainerPort,
+				GRPCOtelContainerPort,
+			},
+
 			// to update, look at the upstream compose file: https://github.com/grafana/tempo/blob/main/example/docker-compose/local/docker-compose.yaml
 			PortBindings: map[docker.Port][]docker.PortBinding{
 				HTTPContainerPort:     []docker.PortBinding{{HostPort: hostHTTPContainerPort}},
