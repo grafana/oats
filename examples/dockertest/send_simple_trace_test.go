@@ -19,20 +19,16 @@ var localEndpoint *observability.LocalEndpoint
 var _ = Describe("provisioning a local observability endpoint with Docker", Ordered, Label("docker", "integration", "slow"), func() {
 	BeforeAll(func() {
 		var ctx context.Context = context.Background()
-		var startErr error
 
 		localEndpoint = observability.NewLocalEndpoint()
-		startErr = localEndpoint.Start(ctx)
-		Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
+		Expect(localEndpoint.Start(ctx)).To(Succeed(), "expected no error starting a local observability endpoint")
 	})
 
 	AfterAll(func() {
 		var ctx context.Context = context.Background()
-		var stopErr error
 
 		if localEndpoint != nil {
-			stopErr = localEndpoint.Stop(ctx)
-			Expect(stopErr).ToNot(HaveOccurred(), "expected no error stopping the local observability endpoint")
+			Expect(localEndpoint.Stop(ctx)).To(Succeed(), "expected no error stopping the local observability endpoint")
 		}
 	})
 
