@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 
 	"github.com/grafana/oats/observability"
@@ -21,12 +20,13 @@ type PortsConfig struct {
 	TracesGRPCPort     int
 	TracesHTTPPort     int
 	TempoHTTPPort      int
+	MimirHTTPPort      int
 	PrometheusHTTPPort int
 }
 
 type ComposeEndpoint struct {
 	ComposeFilePath string
-	OutputPath      string
+	LogOutputPath   string
 	Env             []string
 	Ports           PortsConfig
 }
@@ -35,11 +35,11 @@ var _ observability.Endpoint = &ComposeEndpoint{}
 
 var compose *Compose
 
-func NewEndpoint(composeFilePath, outputPath string, env []string, ports PortsConfig) *ComposeEndpoint {
+func NewEndpoint(composeFilePath, logOutputPath string, env []string, ports PortsConfig) *ComposeEndpoint {
 	endpoint := &ComposeEndpoint{
 		ComposeFilePath: composeFilePath,
 		Env:             env,
-		OutputPath:      outputPath,
+		LogOutputPath:   logOutputPath,
 		Ports:           ports,
 	}
 
@@ -48,7 +48,16 @@ func NewEndpoint(composeFilePath, outputPath string, env []string, ports PortsCo
 
 func (e *ComposeEndpoint) Start(ctx context.Context) error {
 	var err error
-	compose, err = ComposeSuite("docker-compose-traces.yml", path.Join(e.OutputPath, "test-suite-traces.log"))
+
+	if e.ComposeFilePath == "" {
+		return fmt.Errorf("composeFilePath cannot be empty")
+	}
+
+	if e.LogOutputPath == "" {
+		return fmt.Errorf("logOutputPath cannot be empty")
+	}
+
+	compose, err = ComposeSuite(e.ComposeFilePath, e.LogOutputPath)
 	if err != nil {
 		return err
 	}
@@ -143,9 +152,16 @@ func (e *ComposeEndpoint) SearchTags(ctx context.Context, tags map[string]string
 }
 
 func (e *ComposeEndpoint) RunPromQL(ctx context.Context, promQL string) ([]byte, error) {
-	url := fmt.Sprintf("http://localhost:%d/api/v1/query?query=%s", e.Ports.PrometheusHTTPPort, url.PathEscape(promQL))
+	var u string
+	if e.Ports.MimirHTTPPort != 0 {
+		u = fmt.Sprintf("http://localhost:%d/prometheus/api/v1/query?query=%s", e.Ports.MimirHTTPPort, url.PathEscape(promQL))
+	} else if e.Ports.PrometheusHTTPPort != 0 {
+		u = fmt.Sprintf("http://localhost:%d/api/v1/query?query=%s", e.Ports.PrometheusHTTPPort, url.PathEscape(promQL))
+	} else {
+		return nil, fmt.Errorf("to run PromQL you must configure a MimirHTTPPort or a PrometheusHTTPPort")
+	}
 
-	resp, err := http.Get(url)
+	resp, err := http.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("querying prometheus: %w", err)
 	}
