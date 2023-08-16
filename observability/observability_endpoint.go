@@ -8,7 +8,6 @@ import (
 )
 
 type Endpoint interface {
-	// Traces
 	TracerProvider(context.Context, *resource.Resource) (*trace.TracerProvider, error)
 	GetTraceByID(context.Context, string) ([]byte, error)
 	SearchTags(context.Context, map[string]string) ([]byte, error)
@@ -18,4 +17,8 @@ type Endpoint interface {
 
 	Start(context.Context) error
 	Stop(context.Context) error
+}
+
+type PrometheusAddress interface {
+	PromAddress() string
 }

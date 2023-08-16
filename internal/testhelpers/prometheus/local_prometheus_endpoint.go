@@ -76,11 +76,11 @@ func NewLocalEndpoint(ctx context.Context, networkName string) (*LocalEndpoint, 
 	}
 
 	endpoint := &LocalEndpoint{
-		mutex:         &sync.Mutex{},
-		networkName:   networkName,
-		configPath:    promConfigPath,
-		dataDir:       promDataDir,
-		stopped:       true,
+		mutex:       &sync.Mutex{},
+		networkName: networkName,
+		configPath:  promConfigPath,
+		dataDir:     promDataDir,
+		stopped:     true,
 	}
 
 	return endpoint, nil
@@ -92,6 +92,7 @@ type LocalEndpoint struct {
 	container   *dockertest.Resource
 	networkName string
 
+	myEndpoint    *common.LocalEndpointAddress
 	tempoEndpoint *common.LocalEndpointAddress
 
 	configPath string
@@ -283,6 +284,7 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 
 			e.container = containerResource
 			e.stopped = false
+			e.myEndpoint = endpointAddress
 
 			return endpointAddress, nil
 
@@ -325,6 +327,10 @@ func (e *LocalEndpoint) Stop(ctx context.Context) error {
 	e.stopped = true
 
 	return nil
+}
+
+func (e *LocalEndpoint) PromAddress() string {
+	return e.myEndpoint.HostEndpoint
 }
 
 func (e *LocalEndpoint) PromClient(ctx context.Context) (any, error) {

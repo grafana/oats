@@ -24,6 +24,7 @@ func NewLocalEndpoint() *LocalEndpoint {
 }
 
 var _ observability.Endpoint = &LocalEndpoint{}
+var _ observability.PrometheusAddress = &LocalEndpoint{}
 
 type LocalEndpoint struct {
 	mutex   *sync.Mutex
@@ -33,6 +34,11 @@ type LocalEndpoint struct {
 	tempoEndpoint         *tempo.LocalEndpoint
 	prometheusEndpoint    *prometheus.LocalEndpoint
 	otelCollectorEndpoint *otelcollector.LocalEndpoint
+}
+
+// PromAddress implements observability.PrometheusAddress.
+func (e *LocalEndpoint) PromAddress() string {
+	return e.prometheusEndpoint.PromAddress()
 }
 
 func (e *LocalEndpoint) Start(ctx context.Context) error {
