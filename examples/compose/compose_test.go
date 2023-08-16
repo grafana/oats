@@ -3,6 +3,7 @@ package compose_test
 import (
 	"context"
 	"fmt"
+	"path"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -22,7 +23,12 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 		var ctx context.Context = context.Background()
 		var startErr error
 
-		composeEndpoint = compose.NewEndpoint("", ".", []string{}, compose.PortsConfig{TracesGRPCPort: 4017, TempoHTTPPort: 3200})
+		composeEndpoint = compose.NewEndpoint(
+			path.Join(".", "docker-compose-traces.yml"),
+			path.Join(".", "test-suite-traces.log"),
+			[]string{},
+			compose.PortsConfig{TracesGRPCPort: 4017, TempoHTTPPort: 3200},
+		)
 		startErr = composeEndpoint.Start(ctx)
 		Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
 	})
@@ -217,7 +223,6 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 
 			Expect(string(fetchedTrace)).ToNot(BeEmpty(), "expected a non empty response from the local observability endpoint when getting an exported trace by ID")
 			Expect(string(fetchedTrace)).To(ContainSubstring(eventMessage), "expected the event message to be contained in the returned trace")
-
 		})
 	})
 })
