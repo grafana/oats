@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"path"
+	"strings"
 
 	"github.com/grafana/oats/observability"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -16,9 +18,10 @@ import (
 )
 
 type PortsConfig struct {
-	TracesGRPCPort int
-	TracesHTTPPort int
-	TempoHTTPPort  int
+	TracesGRPCPort     int
+	TracesHTTPPort     int
+	TempoHTTPPort      int
+	PrometheusHTTPPort int
 }
 
 type ComposeEndpoint struct {
@@ -90,13 +93,7 @@ func (e *ComposeEndpoint) TracerProvider(ctx context.Context, r *resource.Resour
 	return traceProvider, nil
 }
 
-func (e *ComposeEndpoint) GetTraceByID(ctx context.Context, id string) ([]byte, error) {
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-
-	url := fmt.Sprintf("http://localhost:%d/api/traces/%s", e.Ports.TempoHTTPPort, id)
-
+func (e *ComposeEndpoint) makeGetRequest(url string) ([]byte, error) {
 	resp, getErr := http.Get(url)
 	if getErr != nil {
 		return nil, getErr
@@ -114,4 +111,51 @@ func (e *ComposeEndpoint) GetTraceByID(ctx context.Context, id string) ([]byte, 
 	}
 
 	return respBytes, nil
+}
+
+func (e *ComposeEndpoint) GetTraceByID(ctx context.Context, id string) ([]byte, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	url := fmt.Sprintf("http://localhost:%d/api/traces/%s", e.Ports.TempoHTTPPort, id)
+	return e.makeGetRequest(url)
+}
+
+func (e *ComposeEndpoint) SearchTags(ctx context.Context, tags map[string]string) ([]byte, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	var tb strings.Builder
+
+	for tag, val := range tags {
+		if tb.Len() != 0 {
+			tb.WriteString("&")
+		}
+		s := tag + "=" + val
+		tb.WriteString(url.QueryEscape(s))
+	}
+
+	url := fmt.Sprintf("http://localhost:%d/api/search?tags=%s", e.Ports.TempoHTTPPort, tb.String())
+
+	return e.makeGetRequest(url)
+}
+
+func (e *ComposeEndpoint) RunPromQL(ctx context.Context, promQL string) ([]byte, error) {
+	url := fmt.Sprintf("http://localhost:%d/api/v1/query?query=%s", e.Ports.PrometheusHTTPPort, url.PathEscape(promQL))
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("querying prometheus: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("can't read response body: %w", err)
+	}
+
+	return body, nil
 }

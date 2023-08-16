@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/grafana/oats/observability"
 	"github.com/grafana/oats/internal/testhelpers/common"
 	"github.com/grafana/oats/internal/testhelpers/otelcollector"
 	"github.com/grafana/oats/internal/testhelpers/prometheus"
 	"github.com/grafana/oats/internal/testhelpers/tempo"
+	"github.com/grafana/oats/observability"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
@@ -192,6 +192,21 @@ func (e *LocalEndpoint) GetTraceByID(ctx context.Context, traceID string) ([]byt
 	return e.tempoEndpoint.GetTraceByID(ctx, traceID)
 }
 
+func (e *LocalEndpoint) SearchTags(ctx context.Context, tags map[string]string) ([]byte, error) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	if e.tempoEndpoint == nil {
+		return nil, fmt.Errorf("cannot search for tags from nil Tempo endpoint")
+	}
+
+	return e.tempoEndpoint.SearchTags(ctx, tags)
+}
+
 func (e *LocalEndpoint) OTLPEndpointAddress(ctx context.Context) (*common.LocalEndpointAddress, error) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
@@ -226,4 +241,8 @@ func (e *LocalEndpoint) ContainerNetwork(ctx context.Context) (string, error) {
 	}
 
 	return e.networkName, nil
+}
+
+func (e *LocalEndpoint) RunPromQL(ctx context.Context, query string) ([]byte, error) {
+	return nil, nil
 }
