@@ -15,6 +15,8 @@ import (
 	"github.com/grafana/oats/internal/testhelpers/common"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
+	"github.com/prometheus/client_golang/api"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
 
 const (
@@ -329,17 +331,18 @@ func (e *LocalEndpoint) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (e *LocalEndpoint) PromAddress() string {
-	return e.myEndpoint.HostEndpoint
-}
-
-func (e *LocalEndpoint) PromClient(ctx context.Context) (any, error) {
+func (e *LocalEndpoint) PromClient(ctx context.Context) (v1.API, error) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
+	promClient, err := api.NewClient(api.Config{
+		Address:      "http://" + e.myEndpoint.HostEndpoint,
+		Client:       &http.Client{},
+		RoundTripper: nil,
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, nil
+	return v1.NewAPI(promClient), nil
 }

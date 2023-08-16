@@ -10,7 +10,6 @@ import (
 	"github.com/grafana/oats/observability"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -45,18 +44,13 @@ var _ = Describe("service graph metrics generation", Ordered, func() {
 		Expect(err).ToNot(HaveOccurred(), "no http error")
 
 		// TODO: move this to the endpoint
-		promClient, err := api.NewClient(api.Config{
-			Address:      localEndpoint.PromAddress(),
-			Client:       &http.Client{},
-			RoundTripper: nil,
-		})
-		Expect(err).ToNot(HaveOccurred(), "expected no error creating prometheus client")
+		v1api, err := localEndpoint.PrometheusClient(ctx)
+		Expect(err).ToNot(HaveOccurred())
 
-		v1api := v1.NewAPI(promClient)
-
+		now := time.Now()
 		r := v1.Range{
-			Start: time.Time{},
-			End:   time.Time{},
+			Start: now.Add(time.Duration(-10) * time.Second),
+			End:   now,
 			Step:  0,
 		}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/oats/internal/testhelpers/prometheus"
 	"github.com/grafana/oats/internal/testhelpers/tempo"
 	"github.com/grafana/oats/observability"
+	"github.com/prometheus/client_golang/api/prometheus/v1"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
@@ -24,7 +25,6 @@ func NewLocalEndpoint() *LocalEndpoint {
 }
 
 var _ observability.Endpoint = &LocalEndpoint{}
-var _ observability.PrometheusAddress = &LocalEndpoint{}
 
 type LocalEndpoint struct {
 	mutex   *sync.Mutex
@@ -36,9 +36,11 @@ type LocalEndpoint struct {
 	otelCollectorEndpoint *otelcollector.LocalEndpoint
 }
 
-// PromAddress implements observability.PrometheusAddress.
-func (e *LocalEndpoint) PromAddress() string {
-	return e.prometheusEndpoint.PromAddress()
+func (e *LocalEndpoint) PrometheusClient(ctx context.Context) (v1.API, error) {
+	if e.prometheusEndpoint == nil {
+		return nil, fmt.Errorf("no prometheus endpoint")
+	}
+	return e.prometheusEndpoint.PromClient(ctx)
 }
 
 func (e *LocalEndpoint) Start(ctx context.Context) error {
