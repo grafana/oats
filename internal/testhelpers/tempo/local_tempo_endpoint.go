@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/user"
 	"strconv"
@@ -459,29 +460,23 @@ func (e *LocalEndpoint) TracerProvider(ctx context.Context, r *resource.Resource
 	return traceProvider, nil
 }
 
-func (e *LocalEndpoint) GetTraceByID(ctx context.Context, id string) ([]byte, error) {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
-
+func (e *LocalEndpoint) ensureValidContainer(ctx context.Context) error {
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return ctx.Err()
 	}
 
 	if e.stopped {
-		return nil, fmt.Errorf("cannot get trace from stopped endpoint")
+		return fmt.Errorf("cannot get trace from stopped endpoint")
 	}
 
 	if e.container == nil {
-		return nil, fmt.Errorf("cannot get trace with nil Tempo container")
+		return fmt.Errorf("cannot get trace with nil Tempo container")
 	}
 
-	containerPort := e.container.GetPort(HTTPContainerPort)
-	if containerPort == "" {
-		return nil, fmt.Errorf("got no container HTTP API port for Tempo")
-	}
+	return nil
+}
 
-	url := fmt.Sprintf("http://localhost:%s/api/traces/%s", containerPort, id)
-
+func (e *LocalEndpoint) makeGetRequest(url string) ([]byte, error) {
 	resp, getErr := http.Get(url)
 	if getErr != nil {
 		return nil, getErr
@@ -499,4 +494,50 @@ func (e *LocalEndpoint) GetTraceByID(ctx context.Context, id string) ([]byte, er
 	}
 
 	return respBytes, nil
+}
+
+func (e *LocalEndpoint) GetTraceByID(ctx context.Context, id string) ([]byte, error) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	if err := e.ensureValidContainer(ctx); err != nil {
+		return nil, err
+	}
+
+	containerPort := e.container.GetPort(HTTPContainerPort)
+	if containerPort == "" {
+		return nil, fmt.Errorf("got no container HTTP API port for Tempo")
+	}
+
+	url := fmt.Sprintf("http://localhost:%s/api/traces/%s", containerPort, id)
+
+	return e.makeGetRequest(url)
+}
+
+func (e *LocalEndpoint) SearchTags(ctx context.Context, tags map[string]string) ([]byte, error) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	if err := e.ensureValidContainer(ctx); err != nil {
+		return nil, err
+	}
+
+	containerPort := e.container.GetPort(HTTPContainerPort)
+	if containerPort == "" {
+		return nil, fmt.Errorf("got no container HTTP API port for Tempo")
+	}
+
+	var tb strings.Builder
+
+	for tag, val := range tags {
+		if tb.Len() != 0 {
+			tb.WriteString("&")
+		}
+		s := tag + "=" + val
+		tb.WriteString(url.QueryEscape(s))
+	}
+
+	url := fmt.Sprintf("http://localhost:%s/api/search?tags=%s", containerPort, tb.String())
+
+	return e.makeGetRequest(url)
 }
