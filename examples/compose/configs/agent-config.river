@@ -25,6 +25,8 @@ otelcol.processor.batch "default" {
 }
 
 otelcol.exporter.prometheus "default" {
+  include_target_info = true
+  include_scope_info = true
   forward_to = [prometheus.remote_write.mimir.receiver]
 }
   

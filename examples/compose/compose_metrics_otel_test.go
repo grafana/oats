@@ -2,6 +2,7 @@ package compose_test
 
 import (
 	"context"
+	"net"
 	"path"
 	"time"
 
@@ -14,19 +15,19 @@ import (
 )
 
 var _ = Describe("provisioning a local observability endpoint with Docker", Ordered, Label("docker", "integration", "slow"), func() {
-	var endpoint *compose.ComposeEndpoint
+	var otelComposeEndpoint *compose.ComposeEndpoint
 
 	BeforeAll(func() {
 		var ctx context.Context = context.Background()
 		var startErr error
 
-		endpoint = compose.NewEndpoint(
-			path.Join(".", "docker-compose-traces.yml"),
-			path.Join(".", "test-suite-metrics.log"),
+		otelComposeEndpoint = compose.NewEndpoint(
+			path.Join(".", "docker-compose-metrics.yml"),
+			path.Join(".", "test-suite-metrics-otel.log"),
 			[]string{},
-			compose.PortsConfig{MimirHTTPPort: 9009},
+			compose.PortsConfig{PrometheusHTTPPort: 9090},
 		)
-		startErr = endpoint.Start(ctx)
+		startErr = otelComposeEndpoint.Start(ctx)
 		Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
 	})
 
@@ -34,8 +35,8 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 		var ctx context.Context = context.Background()
 		var stopErr error
 
-		if endpoint != nil {
-			stopErr = endpoint.Stop(ctx)
+		if otelComposeEndpoint != nil {
+			stopErr = otelComposeEndpoint.Stop(ctx)
 			Expect(stopErr).ToNot(HaveOccurred(), "expected no error stopping the local observability endpoint")
 		}
 	})
@@ -51,14 +52,14 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				err := requests.DoHTTPGet("http://localhost:8080/smoke", 200)
 				g.Expect(err).ToNot(HaveOccurred())
 
-				b, err := endpoint.RunPromQL(ctx, `http_server_duration_count{http_route="/smoke"}`)
+				b, err := otelComposeEndpoint.RunPromQL(ctx, `http_server_duration_count{http_route="/smoke"}`)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(b)).Should(BeNumerically(">", 0))
 
 				pr, err := responses.ParseQueryOutput(b)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(pr)).Should(BeNumerically(">", 0))
-			}).WithTimeout(30*time.Second).Should(Succeed(), "calling /smoke for 30 seconds should cause metrics in Mimir")
+			}).WithTimeout(30*time.Second).Should(Succeed(), "calling /smoke for 30 seconds should cause metrics in Prometheus")
 
 			for i := 0; i < apiCount; i++ {
 				Expect(requests.DoHTTPGet("http://localhost:8080/greeting?delay=30ms&status=204", 204)).ShouldNot(HaveOccurred())
@@ -67,10 +68,11 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 			var pr []responses.Result
 
 			Eventually(ctx, func(g Gomega) {
-				b, err := endpoint.RunPromQL(ctx, `http_server_duration_count{`+
+				b, err := otelComposeEndpoint.RunPromQL(ctx, `http_server_duration_count{`+
 					`http_method="GET",`+
 					`http_status_code="204",`+
-					`job="integration-test/testserver",`+
+					`service_namespace="integration-test",`+
+					`service_name="testserver",`+
 					`http_route="/greeting"}`)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(b)).Should(BeNumerically(">", 0))
@@ -78,12 +80,16 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				pr, err = responses.ParseQueryOutput(b)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(pr)).Should(BeNumerically(">", 0))
-			}).WithTimeout(30*time.Second).Should(Succeed(), "metrics should appear in Mimir with /greeting as http.target")
+			}).WithTimeout(30*time.Second).Should(Succeed(), "metrics should appear in Prometheus with /greeting as http.target")
 
 			Expect(responses.EnoughPromResults(pr)).ToNot(HaveOccurred())
 			count, err := responses.TotalPromCount(pr)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(count).Should(Equal(apiCount))
+
+			res := pr[0]
+			addr := net.ParseIP(res.Metric["net_sock_peer_addr"])
+			Expect(addr).ToNot(BeNil())
 		})
 	})
 })
