@@ -202,6 +202,10 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 				fmt.Sprintf("%s:/tmp/prometheus:z", funcConfig.dataDir),
 			},
 
+			ExposedPorts: []string{
+				ContainerPort,
+			},
+
 			PortBindings: map[docker.Port][]docker.PortBinding{
 				ContainerPort: []docker.PortBinding{{HostPort: promHostPort}},
 			},

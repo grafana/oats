@@ -13,8 +13,6 @@ import (
 	"sync"
 	"text/template"
 
-	_ "embed"
-
 	"github.com/grafana/oats/internal/testhelpers/common"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
@@ -249,6 +247,13 @@ func (e *LocalEndpoint) Start(ctx context.Context) (*common.LocalEndpointAddress
 			Mounts: []string{
 				fmt.Sprintf("%s:/etc/tempo.yaml:z", funcConfig.configPath),
 				fmt.Sprintf("%s:/tmp/tempo:z", funcConfig.dataDir),
+			},
+
+			ExposedPorts: []string{
+				HTTPContainerPort,
+				GRPCContainerPort,
+				HTTPOtelContainerPort,
+				GRPCOtelContainerPort,
 			},
 
 			// to update, look at the upstream compose file: https://github.com/grafana/tempo/blob/main/example/docker-compose/local/docker-compose.yaml
