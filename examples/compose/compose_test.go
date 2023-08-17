@@ -2,7 +2,6 @@ package compose_test
 
 import (
 	"context"
-	"fmt"
 	"path"
 	"time"
 
@@ -16,9 +15,9 @@ import (
 	"github.com/grafana/oats/internal/testhelpers/tempo/responses"
 )
 
-var composeEndpoint *compose.ComposeEndpoint
-
 var _ = Describe("provisioning a local observability endpoint with Docker", Ordered, Label("docker", "integration", "slow"), func() {
+	var composeEndpoint *compose.ComposeEndpoint
+
 	BeforeAll(func() {
 		var ctx context.Context = context.Background()
 		var startErr error
@@ -209,8 +208,6 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 			Expect(err).ToNot(HaveOccurred(), "expected no error flushing the trace provider")
 
 			traceID := parentSpanContext.TraceID()
-
-			fmt.Println("Looking to see if we stored traceID " + traceID.String())
 
 			var fetchedTrace []byte
 
