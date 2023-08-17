@@ -51,7 +51,7 @@ var _ = Describe("service graph metrics generation", Ordered, func() {
 		r := v1.Range{
 			Start: now.Add(time.Duration(-10) * time.Second),
 			End:   now,
-			Step:  0,
+			Step:  time.Minute,
 		}
 
 		value, warnings, err := v1api.QueryRange(ctx, "traces_service_graph_request_total{}", r, v1.WithTimeout(50*time.Millisecond))
