@@ -18,6 +18,11 @@ exporters:
     tls:
       insecure: true
 
+connectors:
+  servicegraph:
+    virtual_node_peer_attributes:
+      - net.peer.name
+
 extensions:
   health_check:
      endpoint: 0.0.0.0:{{- .HealthCheckPort }}
@@ -27,11 +32,14 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [otlp, file]
+      exporters: [otlp, file, servicegraph]
     metrics:
       receivers: [otlp]
       exporters: [prometheusremotewrite]
-
+    metrics/servicegraph:
+      receivers: [servicegraph]
+      exporters: [prometheusremotewrite]
+ 
   extensions: [health_check]
 
 `
