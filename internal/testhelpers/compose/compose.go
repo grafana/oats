@@ -3,10 +3,12 @@ package compose
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -25,6 +27,9 @@ func ComposeSuite(composeFile, logFile string) (*Compose, error) {
 	if err != nil {
 		return nil, err
 	}
+	abs, _ := filepath.Abs(logFile)
+	fmt.Printf("Logging to %s\n", abs)
+
 	return &Compose{
 		Path:   path.Join(composeFile),
 		Logger: logs,
@@ -56,7 +61,9 @@ func (c *Compose) command(args ...string) error {
 	if c.Logger != nil {
 		cmd.Stdout = c.Logger
 		cmd.Stderr = c.Logger
+		fmt.Fprintf(c.Logger, "Running: docker %s\n", cmd.String())
 	}
+
 	return cmd.Run()
 }
 
