@@ -13,9 +13,11 @@ import (
 )
 
 type Compose struct {
-	Path   string
-	Logger io.WriteCloser
-	Env    []string
+	Command     string
+	DefaultArgs []string
+	Path        string
+	Logger      io.WriteCloser
+	Env         []string
 }
 
 func defaultEnv() []string {
@@ -30,10 +32,21 @@ func ComposeSuite(composeFile, logFile string) (*Compose, error) {
 	abs, _ := filepath.Abs(logFile)
 	fmt.Printf("Logging to %s\n", abs)
 
+	command := "docker"
+	defaultArgs := []string{"compose"}
+
+	err = exec.Command("which", "docker-compose").Run()
+	if err == nil {
+		command = "docker-compose"
+		defaultArgs = []string{}
+	}
+
 	return &Compose{
-		Path:   path.Join(composeFile),
-		Logger: logs,
-		Env:    defaultEnv(),
+		Command:     command,
+		DefaultArgs: defaultArgs,
+		Path:        path.Join(composeFile),
+		Logger:      logs,
+		Env:         defaultEnv(),
 	}, nil
 }
 
@@ -54,9 +67,10 @@ func (c *Compose) Remove() error {
 }
 
 func (c *Compose) command(args ...string) error {
-	cmdArgs := []string{"compose", "-f", c.Path}
+	cmdArgs := c.DefaultArgs
+	cmdArgs = append(cmdArgs, "-f", c.Path)
 	cmdArgs = append(cmdArgs, args...)
-	cmd := exec.Command("docker", cmdArgs...)
+	cmd := exec.Command(c.Command, cmdArgs...)
 	cmd.Env = c.Env
 	if c.Logger != nil {
 		cmd.Stdout = c.Logger
