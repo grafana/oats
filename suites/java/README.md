@@ -9,6 +9,13 @@ expected:
   metrics:
     - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
       value: "== 10"
+  dashboards:
+    - path: ../jdbc-dashboard.json
+      panels:
+        - title: Connection pool waiting requests
+          value: "== 0"
+        - title: Connection pool utilization
+          value: "> 0"
 ```
                                                               
 You have to provide the root path of the java distributions example directory to ginkgo 
