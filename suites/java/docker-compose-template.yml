@@ -9,7 +9,7 @@ services:
     command:
       - /bin/bash
       - -c
-      - java -javaagent:grafana-opentelemetry-java.jar -Dgrafana.otlp.debug.logging=true -Dotel.resource.attributes=deployment.environment=production,service.namespace=shop,service.version=1.1 -Dotel.instrumentation.common.default-enabled=true -Dgrafana.otel.instrumentation.enable-unsupported-modules=true -jar /app.jar
+      - java -javaagent:grafana-opentelemetry-java.jar -Dgrafana.otlp.debug.logging=true -Dotel.resource.attributes=deployment.environment=production,service.namespace=shop,service.version=1.1 -Dotel.instrumentation.common.default-enabled=true -Dgrafana.otel.instrumentation.enable-unsupported-modules=true -Dotel.metric.export.interval=500 -jar /app.jar
   grafana:
     image: grafana/grafana:10.0.0
     network_mode: host

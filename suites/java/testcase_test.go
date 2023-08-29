@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -20,15 +21,17 @@ import (
 	"github.com/grafana/oats/internal/testhelpers/requests"
 )
 
+type ExpectedMetrics struct {
+	PromQL string `yaml:"promql"`
+	Value  string `yaml:"value"`
+}
+
 type TestCase struct {
 	name       string
 	exampleDir string
 	projectDir string
 	Expected   struct {
-		Metrics []struct {
-			PromQL string `yaml:"promql"`
-			Value  string `yaml:"value"`
-		}
+		Metrics []ExpectedMetrics `yaml:"metrics"`
 	} `yaml:"expected"`
 }
 
@@ -79,62 +82,89 @@ var _ = Describe("testcases", Ordered, Label("docker", "integration", "slow"), f
 func runTestCase(c TestCase) {
 	var otelComposeEndpoint *compose.ComposeEndpoint
 
-	BeforeAll(func() {
-		var ctx = context.Background()
-		var startErr error
+	Describe(c.name, func() {
+		BeforeAll(func() {
+			var ctx = context.Background()
+			var startErr error
 
-		otelComposeEndpoint = compose.NewEndpoint(
-			generateDockerComposeFile(c),
-			path.Join(".", fmt.Sprintf("testcase-%s.log", c.name)),
-			[]string{},
-			compose.PortsConfig{PrometheusHTTPPort: 9090},
-		)
-		startErr = otelComposeEndpoint.Start(ctx)
-		Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
-	})
+			otelComposeEndpoint = compose.NewEndpoint(
+				generateDockerComposeFile(c),
+				path.Join(".", fmt.Sprintf("testcase-%s.log", c.name)),
+				[]string{},
+				compose.PortsConfig{PrometheusHTTPPort: 9090},
+			)
+			startErr = otelComposeEndpoint.Start(ctx)
+			Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
+		})
 
-	AfterAll(func() {
-		var ctx = context.Background()
-		var stopErr error
+		AfterAll(func() {
+			var ctx = context.Background()
+			var stopErr error
 
-		if otelComposeEndpoint != nil {
-			stopErr = otelComposeEndpoint.Stop(ctx)
-			Expect(stopErr).ToNot(HaveOccurred(), "expected no error stopping the local observability endpoint")
-		}
-	})
-
-	It(c.name, func() {
-		ctx := context.Background()
-		logger := otelComposeEndpoint.Logger()
-
-		t := time.Now()
-
-		Eventually(ctx, func(g Gomega) {
-			verbose := false
-			if time.Since(t) > 10*time.Second {
-				verbose = true
-				t = time.Now()
+			if otelComposeEndpoint != nil {
+				stopErr = otelComposeEndpoint.Stop(ctx)
+				Expect(stopErr).ToNot(HaveOccurred(), "expected no error stopping the local observability endpoint")
 			}
+		})
 
-			if verbose {
-				_, _ = fmt.Fprintf(logger, "waiting for telemetry data\n")
-			}
+		It("should have all data in prometheus", func() {
+			ctx := context.Background()
+			logger := otelComposeEndpoint.Logger()
 
-			err := requests.DoHTTPGet("http://localhost:8080/stock", 200)
-			g.Expect(err).ToNot(HaveOccurred())
+			t := time.Now()
 
-			b, err := otelComposeEndpoint.RunPromQL(ctx, `db_client_connections_max{pool_name="HikariPool-1"}`)
-			if verbose {
-				_, _ = fmt.Fprintf(logger, "prom response %v err=%v\n", string(b), err)
-			}
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(len(b)).Should(BeNumerically(">", 0))
+			Eventually(ctx, func(g Gomega) {
+				verbose := false
+				if time.Since(t) > 10*time.Second {
+					verbose = true
+					t = time.Now()
+				}
 
-			pr, err := responses.ParseQueryOutput(b)
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(len(pr)).Should(BeNumerically(">", 0))
-		}).WithTimeout(300*time.Second).Should(Succeed(), "calling application for 30 seconds should cause metrics in Prometheus")
+				if verbose {
+					_, _ = fmt.Fprintf(logger, "waiting for telemetry data\n")
+				}
+
+				err := requests.DoHTTPGet("http://localhost:8080/stock", 200)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				for _, metric := range c.Expected.Metrics {
+					if metric.PromQL != "" {
+						assertPromQL(g, otelComposeEndpoint, verbose, metric)
+					}
+				}
+
+			}).WithTimeout(30*time.Second).Should(Succeed(), "calling application for 30 seconds should cause metrics in Prometheus")
+		})
 	})
+}
+
+func assertPromQL(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, want ExpectedMetrics) {
+	ctx := context.Background()
+	logger := endpoint.Logger()
+	b, err := endpoint.RunPromQL(ctx, want.PromQL)
+	if verbose {
+		_, _ = fmt.Fprintf(logger, "prom response %v err=%v\n", string(b), err)
+	}
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(len(b)).Should(BeNumerically(">", 0))
+
+	pr, err := responses.ParseQueryOutput(b)
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(len(pr)).Should(BeNumerically(">", 0))
+	_, _ = fmt.Fprintf(logger, "prom response %v err=%v\n", string(b), err)
+
+	s := strings.Split(want.Value, " ")
+	comp := s[0]
+	val, err := strconv.ParseFloat(s[1], 64)
+	if err != nil {
+		g.Expect(err).ToNot(HaveOccurred())
+	}
+	got, err := strconv.ParseFloat(pr[0].Value[1].(string), 64)
+	if err != nil {
+		g.Expect(err).ToNot(HaveOccurred())
+	}
+
+	g.Expect(got).Should(BeNumerically(comp, val))
 }
 
 func readTestCases() []TestCase {
