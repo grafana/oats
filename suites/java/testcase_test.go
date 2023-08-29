@@ -43,40 +43,9 @@ type TemplateVars struct {
 }
 
 var _ = Describe("testcases", Ordered, Label("docker", "integration", "slow"), func() {
-
-	// how a testcase would look like
-	// 1. name = the full path where the oats.yaml file is located
-	// 2. oats.yaml has the following structure:
-	//	- start: run.sh --no-agent (to start the application - maybe also a docker-compose file)
-	//  - calls:
-	//    - url: /smoke
-	//  - expected:
-	//    - metrics:
-	//	    - promql: http_server_duration_count{http_route="/smoke"}
-	//        value: > 0
-	//      - dashboard: jdbc-dashboard.json
-	//        panels:
-	//        - title: "HTTP Server Duration Count"
-	//          value: > 0
-
-	// How to use this test case?
-	// In CI, do the following steps - probably once a day, because it's too slow for PRs:
-	// 1. Check out the oats repo
-	// 2. Install ginkgo
-	// 3. `export TESTCASE_BASE_PATH=/path/to/oats.yaml` (or to a parent directory of oats.yaml)
-	// 4. start ginkgo
-	// 5. this test case scans the directory tree for oats.yaml files and runs them
-
-	// details
-	// Generate a whole docker-compose file with all the services
-	// - application: ls $dir/build/libs | grep -v plain | grep jar
-	// - take docker-compose file from the parent directory
-	// - grafana: mount dashboard
-
 	for _, c := range readTestCases() {
 		runTestCase(c)
 	}
-
 })
 
 func runTestCase(c TestCase) {
