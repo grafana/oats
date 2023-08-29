@@ -70,6 +70,10 @@ func (e *ComposeEndpoint) Stop(ctx context.Context) error {
 	return compose.Close()
 }
 
+func (e *ComposeEndpoint) Logger() io.WriteCloser {
+	return compose.Logger
+}
+
 func (e *ComposeEndpoint) TracerProvider(ctx context.Context, r *resource.Resource) (*trace.TracerProvider, error) {
 	var exporter *otlptrace.Exporter
 	var err error

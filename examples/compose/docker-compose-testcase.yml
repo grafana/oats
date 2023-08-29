@@ -1,0 +1,46 @@
+version: "3.9"
+services:
+  application:
+    image: eclipse-temurin:17-jre
+    network_mode: host
+    volumes:
+      - /home/gregor/source/otel-distro/agent/build/libs/grafana-opentelemetry-java.jar:/grafana-opentelemetry-java.jar
+      - /home/gregor/source/otel-distro/examples/jdbc/spring-boot-non-reactive-2.7/build/libs/spring-boot-non-reactive-2.7-0.0.1-SNAPSHOT.jar:/app.jar
+    command:
+      - /bin/bash
+      - -c
+      - java -javaagent:grafana-opentelemetry-java.jar -Dgrafana.otlp.debug.logging=true -Dotel.resource.attributes=deployment.environment=production,service.namespace=shop,service.version=1.1 -Dotel.instrumentation.common.default-enabled=true -Dgrafana.otel.instrumentation.enable-unsupported-modules=true -jar /app.jar
+  grafana:
+    image: grafana/grafana:10.0.0
+    network_mode: host
+    volumes:
+      - ./testcase-configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
+      - ./testcase-configs/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/grafana-dashboards.yaml
+      - ./testcase-configs/grafana-dashboard-classic-histogram.json:/etc/grafana/grafana-dashboard-classic-histogram.json
+      - ./testcase-configs/grafana-dashboard-exponential-histogram.json:/etc/grafana/grafana-dashboard-exponential-histogram.json
+  prometheus:
+    image: prom/prometheus:v2.44.0
+    network_mode: host
+    command:
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --enable-feature=native-histograms
+      - --config.file=/etc/prometheus/prometheus.yml
+  tempo:
+    image: grafana/tempo:2.1.1
+    network_mode: host
+    volumes:
+      - ./testcase-configs/tempo-config.yaml:/config.yaml
+    command:
+      - --config.file=/config.yaml
+  loki:
+    image: grafana/loki:2.8.2
+    network_mode: host
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.83.0
+    network_mode: host
+    volumes:
+      - ./testcase-configs/otelcol-config.yaml:/config.yaml
+    command:
+      - --config=file:/config.yaml
+      - --feature-gates=pkg.translator.prometheus.NormalizeName
