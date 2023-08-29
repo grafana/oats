@@ -1,11 +1,11 @@
 version: "3.9"
 services:
   application:
-    image: eclipse-temurin:17-jre
+    image: "{{ .Image }}"
     network_mode: host
     volumes:
-      - /home/gregor/source/otel-distro/agent/build/libs/grafana-opentelemetry-java.jar:/grafana-opentelemetry-java.jar
-      - /home/gregor/source/otel-distro/examples/jdbc/spring-boot-non-reactive-2.7/build/libs/spring-boot-non-reactive-2.7-0.0.1-SNAPSHOT.jar:/app.jar
+      - "{{ .JavaAgent }}:/grafana-opentelemetry-java.jar"
+      - "{{ .ApplicationJar }}:/app.jar"
     command:
       - /bin/bash
       - -c
@@ -16,8 +16,7 @@ services:
     volumes:
       - ./testcase-configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
       - ./testcase-configs/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/grafana-dashboards.yaml
-      - ./testcase-configs/grafana-dashboard-classic-histogram.json:/etc/grafana/grafana-dashboard-classic-histogram.json
-      - ./testcase-configs/grafana-dashboard-exponential-histogram.json:/etc/grafana/grafana-dashboard-exponential-histogram.json
+      - "{{ .Dashboard }}:/etc/grafana/grafana-test-dashboard.json"
   prometheus:
     image: prom/prometheus:v2.44.0
     network_mode: host

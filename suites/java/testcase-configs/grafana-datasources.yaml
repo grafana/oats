@@ -1,22 +1,6 @@
 apiVersion: 1
 
 datasources:
-#
-#  - name: Prometheus
-#    type: prometheus
-#    uid: prometheus
-#    url: http://localhost:9090
-#
-#  - name: Tempo
-#    type: tempo
-#    uid: tempo
-#    url: http://localhost:3200
-#
-#  - name: Loki
-#    type: loki
-#    uid: loki
-#    url: http://localhost:3100
-
   - name: Prometheus
     type: prometheus
     uid: prometheus

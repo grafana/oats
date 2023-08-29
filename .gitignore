@@ -4,3 +4,4 @@
 **/*.test
 .idea/
 **/*.log
+docker-compose-generated-*.yml
