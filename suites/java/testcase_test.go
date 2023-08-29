@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"github.com/grafana/dashboard-linter/lint"
 	"gopkg.in/yaml.v3"
-	"io"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -24,6 +22,8 @@ import (
 	"github.com/grafana/oats/internal/testhelpers/prometheus/responses"
 	"github.com/grafana/oats/internal/testhelpers/requests"
 )
+
+var promQlVariables = []string{"$job", "$instance", "$pod", "$namespace", "$container"}
 
 type ExpectedDashboardPanel struct {
 	Title string `yaml:"title"`
@@ -48,8 +48,8 @@ type TestCaseDefinition struct {
 }
 
 type testDashboard struct {
-	uid  string
-	path string
+	path    string
+	content lint.Dashboard
 }
 
 type testCase struct {
@@ -72,21 +72,13 @@ func (c *testCase) validateAndSetDashboard() {
 		Expect(d.Path).ToNot(BeEmpty())
 		Expect(d.Panels).ToNot(BeEmpty())
 		for _, panel := range d.Panels {
-			Expect(panel.Title).To(BeEmpty(), string(out))
-			Expect(panel.Value).To(BeEmpty(), string(out))
+			Expect(panel.Title).ToNot(BeEmpty(), string(out))
+			Expect(panel.Value).ToNot(BeEmpty(), string(out))
 		}
 
 		Expect(c.dashboard).To(BeNil(), "only one dashboard is supported")
 		dashboardPath := path.Join(c.exampleDir, d.Path)
-		content, err := os.ReadFile(dashboardPath)
-		Expect(err).ToNot(HaveOccurred())
-		dash := map[string]any{}
-		err = yaml.Unmarshal(content, &dash)
-		Expect(err).ToNot(HaveOccurred())
-		uid := dash["uid"]
-		Expect(uid).ToNot(BeEmpty())
 		c.dashboard = &testDashboard{
-			uid:  uid.(string),
 			path: dashboardPath,
 		}
 	}
@@ -154,12 +146,13 @@ func runTestCase(c testCase) {
 				err := requests.DoHTTPGet("http://localhost:8080/stock", 200)
 				g.Expect(err).ToNot(HaveOccurred())
 
-				for _, metric := range c.definition.Expected.Metrics {
-					if metric.PromQL != "" {
-						assertPromQL(g, otelComposeEndpoint, verbose, metric)
-					} else {
-						assertDashboard(g, otelComposeEndpoint, verbose, metric, c.dashboard)
-					}
+				expected := c.definition.Expected
+				for _, metric := range expected.Metrics {
+					assertProm(g, otelComposeEndpoint, verbose, metric.PromQL, metric.Value)
+				}
+				for _, dashboard := range expected.Dashboards {
+					assertDashboard(g, otelComposeEndpoint, verbose, dashboard, &c.dashboard.content)
+
 				}
 
 			}).WithTimeout(30*time.Second).Should(Succeed(), "calling application for 30 seconds should cause metrics in Prometheus")
@@ -167,34 +160,39 @@ func runTestCase(c testCase) {
 	})
 }
 
-func assertDashboard(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, want ExpectedMetrics, dashboard *testDashboard) {
-	//resp, err := http.Get(fmt.Sprintf("http://admin:admin@localhost:3000/api/search?query=TestDashboard"))
-	//g.Expect(err).ToNot(HaveOccurred())
-	//all, err := io.ReadAll(resp.Body)
-	//g.Expect(err).ToNot(HaveOccurred())
-	//println(string(all))
+func assertDashboard(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, want ExpectedDashboard, dashboard *lint.Dashboard) {
+	wantPanelValues := map[string]string{}
+	for _, panel := range want.Panels {
+		wantPanelValues[panel.Title] = panel.Value
+	}
 
-	url := fmt.Sprintf("http://admin:admin@localhost:3000/api/dashboards/uid/%s", dashboard.uid)
-	println(url)
-	resp, err := http.Get(url)
-	g.Expect(err).ToNot(HaveOccurred())
+	for _, panel := range dashboard.Panels {
+		wantValue := wantPanelValues[panel.Title]
+		if wantValue == "" {
+			continue
+		}
+		wantPanelValues[panel.Title] = ""
+		g.Expect(panel.Targets).To(HaveLen(1))
 
-	//db = requests.get(url = 'http://localhost:3923/api/dashboards/uid/' + uid, headers = headers)
-	//data = db.json()
-	//
-	//panels = data['dashboard']['panels']
-	//targets = panels[0]['targets'][0]
-	//print(targets['query'])
+		assertProm(g, endpoint, verbose, replaceVariables(panel.Targets[0].Expr), wantValue)
+	}
 
-	all, err := io.ReadAll(resp.Body)
-	g.Expect(err).ToNot(HaveOccurred())
-	println(string(all))
-
+	for panel, expected := range wantPanelValues {
+		g.Expect(expected).To(BeEmpty(), "panel '%s' not found", panel)
+	}
 }
-func assertPromQL(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, want ExpectedMetrics) {
+
+func replaceVariables(promQL string) string {
+	for _, variable := range promQlVariables {
+		promQL = strings.ReplaceAll(promQL, variable, ".*")
+	}
+	return promQL
+}
+
+func assertProm(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, promQL string, value string) {
 	ctx := context.Background()
 	logger := endpoint.Logger()
-	b, err := endpoint.RunPromQL(ctx, want.PromQL)
+	b, err := endpoint.RunPromQL(ctx, promQL)
 	if verbose {
 		_, _ = fmt.Fprintf(logger, "prom response %v err=%v\n", string(b), err)
 	}
@@ -206,7 +204,7 @@ func assertPromQL(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, wan
 	g.Expect(len(pr)).Should(BeNumerically(">", 0))
 	_, _ = fmt.Fprintf(logger, "prom response %v err=%v\n", string(b), err)
 
-	s := strings.Split(want.Value, " ")
+	s := strings.Split(value, " ")
 	comp := s[0]
 	val, err := strconv.ParseFloat(s[1], 64)
 	if err != nil {
@@ -287,16 +285,15 @@ func (c *testCase) readDashboardFile() string {
 	content, err := os.ReadFile(c.dashboard.path)
 	Expect(err).ToNot(HaveOccurred())
 
-	c.parseDashboard(content)
-
+	c.dashboard.content = c.parseDashboard(content)
 	return c.replaceDatasourceId(content, err)
 }
 
-func (c *testCase) parseDashboard(content []byte) error {
+func (c *testCase) parseDashboard(content []byte) lint.Dashboard {
 	d := lint.Dashboard{}
 	err := json.Unmarshal(content, &d)
 	Expect(err).ToNot(HaveOccurred())
-	return err
+	return d
 }
 
 func (c *testCase) replaceDatasourceId(content []byte, err error) string {
