@@ -156,7 +156,7 @@ func generateDockerComposeFile(c TestCase) string {
 		Image:          "eclipse-temurin:17-jre",
 		JavaAgent:      "/home/gregor/source/otel-distro/agent/build/libs/grafana-opentelemetry-java.jar",
 		ApplicationJar: "/home/gregor/source/otel-distro/examples/jdbc/spring-boot-non-reactive-2.7/build/libs/spring-boot-non-reactive-2.7-0.0.1-SNAPSHOT.jar",
-		Dashboard:      "./testcase-configs/grafana-test-dashboard.json",
+		Dashboard:      "./configs/grafana-test-dashboard.json",
 	}
 
 	err = t.Execute(f, templateVars)

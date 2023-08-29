@@ -14,8 +14,8 @@ services:
     image: grafana/grafana:10.0.0
     network_mode: host
     volumes:
-      - ./testcase-configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
-      - ./testcase-configs/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/grafana-dashboards.yaml
+      - ./configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
+      - ./configs/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/grafana-dashboards.yaml
       - "{{ .Dashboard }}:/etc/grafana/grafana-test-dashboard.json"
   prometheus:
     image: prom/prometheus:v2.44.0
@@ -29,7 +29,7 @@ services:
     image: grafana/tempo:2.1.1
     network_mode: host
     volumes:
-      - ./testcase-configs/tempo-config.yaml:/config.yaml
+      - ./configs/tempo-config.yaml:/config.yaml
     command:
       - --config.file=/config.yaml
   loki:
@@ -39,7 +39,7 @@ services:
     image: otel/opentelemetry-collector-contrib:0.83.0
     network_mode: host
     volumes:
-      - ./testcase-configs/otelcol-config.yaml:/config.yaml
+      - ./configs/otelcol-config.yaml:/config.yaml
     command:
       - --config=file:/config.yaml
       - --feature-gates=pkg.translator.prometheus.NormalizeName
