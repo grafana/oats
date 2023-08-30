@@ -2,6 +2,7 @@ package yaml
 
 import (
 	"github.com/grafana/dashboard-linter/lint"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -93,7 +94,9 @@ func ReadTestCases() []TestCase {
 func (c *TestCase) ValidateAndSetDashboard() {
 	validateDockerCompose(&c.Definition.DockerCompose, c.Dir)
 	expected := c.Definition.Expected
-	Expect(expected.Metrics).ToNot(BeEmpty())
+	if len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 {
+		ginkgo.Fail("expected metrics or dashboards")
+	}
 	for _, d := range expected.Metrics {
 		Expect(d.PromQL).ToNot(BeEmpty())
 		Expect(d.Value).ToNot(BeEmpty())

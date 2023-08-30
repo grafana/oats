@@ -57,7 +57,7 @@ func runTestCase(c yaml.TestCase) {
 			}
 		})
 
-		It("should have all data in prometheus", func() {
+		It("should have all telemetry data", func() {
 			ctx := context.Background()
 			logger := otelComposeEndpoint.Logger()
 
@@ -79,7 +79,6 @@ func runTestCase(c yaml.TestCase) {
 
 				expected := c.Definition.Expected
 				yaml.AssertMetrics(g, expected, otelComposeEndpoint, verbose, c)
-
 			}).WithTimeout(30*time.Second).Should(Succeed(), "calling application for 30 seconds should cause metrics in Prometheus")
 		})
 	})

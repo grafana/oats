@@ -104,7 +104,7 @@ func (c *TestCase) readDashboardFile() string {
 	Expect(err).ToNot(HaveOccurred())
 
 	c.Dashboard.Content = c.parseDashboard(content)
-	return c.replaceDatasourceId(content, err)
+	return c.replaceDatasource(content, err)
 }
 
 func (c *TestCase) parseDashboard(content []byte) lint.Dashboard {
@@ -114,8 +114,9 @@ func (c *TestCase) parseDashboard(content []byte) lint.Dashboard {
 	return d
 }
 
-func (c *TestCase) replaceDatasourceId(content []byte, err error) string {
-	newFile := path.Join(c.OutputDir, "dashboard.json")
+func (c *TestCase) replaceDatasource(content []byte, err error) string {
+	// we need the ./ in docker-compose.yml
+	newFile := "./" + path.Join(c.OutputDir, "dashboard.json")
 	lines := strings.Split(string(content), "\n")
 	for i, line := range lines {
 		lines[i] = strings.ReplaceAll(line, "${DS_GRAFANACLOUD-GREGORZEITLINGER-PROM}", "prometheus")
