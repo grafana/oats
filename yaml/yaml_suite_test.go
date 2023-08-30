@@ -1,4 +1,4 @@
-package java_test
+package yaml_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestJava(t *testing.T) {
+func TestYaml(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Java Suite")
+	RunSpecs(t, "Yaml Suite")
 }
