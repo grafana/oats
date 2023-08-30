@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/grafana/oats/yaml"
+	"os"
+	"os/exec"
 	"path"
 	"time"
 
@@ -14,7 +16,7 @@ import (
 	"github.com/grafana/oats/internal/testhelpers/requests"
 )
 
-var _ = Describe("testcases", Ordered, Label("docker", "integration", "slow"), func() {
+var _ = Describe("test case", Ordered, Label("docker", "integration", "slow"), func() {
 	for _, c := range yaml.ReadTestCases() {
 		runTestCase(c)
 	}
@@ -29,9 +31,15 @@ func runTestCase(c yaml.TestCase) {
 			var ctx = context.Background()
 			var startErr error
 
+			c.OutputDir = path.Join(".", "build", c.Name)
+			err := os.MkdirAll(c.OutputDir, 0755)
+			Expect(err).ToNot(HaveOccurred(), "expected no error creating output directory")
+			err = exec.Command("cp", "-r", "configs", c.OutputDir).Run()
+			Expect(err).ToNot(HaveOccurred(), "expected no error copying configs directory")
+
 			otelComposeEndpoint = compose.NewEndpoint(
-				c.GenerateDockerComposeFile(),
-				path.Join(".", fmt.Sprintf("testcase-%s.log", c.Name)),
+				c.GetDockerComposeFile(),
+				path.Join(c.OutputDir, "output.log"),
 				[]string{},
 				compose.PortsConfig{PrometheusHTTPPort: 9090},
 			)

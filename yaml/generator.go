@@ -1,50 +1,102 @@
 package yaml
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/grafana/dashboard-linter/lint"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"os"
 	"path"
-	"path/filepath"
-	"regexp"
 	"strings"
 	"text/template"
 )
 
-type TemplateVars struct {
-	Image          string
-	JavaAgent      string
-	ApplicationJar string
-	Dashboard      string
+var skipComposeLines = []string{
+	"services:",
+	"version:",
 }
 
-func (c *TestCase) GenerateDockerComposeFile() string {
-	p := path.Join(".", fmt.Sprintf("docker-compose-generated-%s.yml", c.Name))
-
-	t := template.Must(template.ParseFiles("./docker-compose-template.yml"))
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+func (c *TestCase) GetDockerComposeFile() string {
+	p := path.Join(c.OutputDir, "docker-compose.yml")
+	lines := c.getContent(c.Definition.DockerCompose)
+	err := os.WriteFile(p, []byte(strings.Join(lines, "\n")), 0644)
 	Expect(err).ToNot(HaveOccurred())
-	defer f.Close()
+	return p
+}
+
+func (c *TestCase) getContent(compose DockerCompose) []string {
+	if compose.Generator != "" {
+		return c.generateDockerComposeFile()
+	} else {
+		return readComposeFile(compose)
+	}
+}
+
+func readComposeFile(compose DockerCompose) []string {
+	b, err := os.ReadFile(compose.File)
+	Expect(err).ToNot(HaveOccurred())
+	return replaceRefs(compose, b)
+}
+
+func replaceRefs(compose DockerCompose, bytes []byte) []string {
+	baseDir := path.Dir(compose.File)
+	lines := strings.Split(string(bytes), "\n")
+	for i, line := range lines {
+		for _, resource := range compose.Resources {
+			lines[i] = strings.ReplaceAll(line, "./"+resource, path.Join(baseDir, resource))
+		}
+	}
+	return lines
+}
+
+func (c *TestCase) generateDockerComposeFile() []string {
 
 	dashboard := "./configs/grafana-test-dashboard.json"
 	if c.Dashboard != nil {
 		dashboard = c.readDashboardFile()
 	}
+	name, vars := c.getTemplateVars(dashboard)
+	t := template.Must(template.ParseFiles(name))
 
-	templateVars := TemplateVars{
-		Image:          imageName(c.ExampleDir),
-		JavaAgent:      path.Join(c.ProjectDir, "agent/build/libs/grafana-opentelemetry-java.jar"),
-		ApplicationJar: c.applicationJar(),
-		Dashboard:      dashboard,
-	}
-
-	err = t.Execute(f, templateVars)
+	buf := bytes.NewBufferString("")
+	err := t.Execute(buf, vars)
 	Expect(err).ToNot(HaveOccurred())
+	lines := strings.Split(buf.String(), "\n")
+	compose := c.Definition.DockerCompose
+	if compose.File != "" {
+		return joinComposeFiles(readComposeFile(compose), lines)
+	}
+	return lines
+}
 
-	return p
+func (c *TestCase) getTemplateVars(dashboard string) (string, any) {
+	generator := c.Definition.DockerCompose.Generator
+	switch generator {
+	case "java":
+		return c.javaTemplateVars(dashboard)
+	default:
+		Fail("unknown generator " + generator)
+		return "", nil
+	}
+}
+
+func joinComposeFiles(base []string, add []string) []string {
+	for _, l := range add {
+		if !skipLine(l) {
+			base = append(base, l)
+		}
+	}
+	return base
+}
+
+func skipLine(line string) bool {
+	for _, skip := range skipComposeLines {
+		if strings.HasPrefix(line, skip) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *TestCase) readDashboardFile() string {
@@ -63,7 +115,7 @@ func (c *TestCase) parseDashboard(content []byte) lint.Dashboard {
 }
 
 func (c *TestCase) replaceDatasourceId(content []byte, err error) string {
-	newFile := fmt.Sprintf("./generated-dashboard%s.json", c.Name)
+	newFile := path.Join(c.OutputDir, "dashboard.json")
 	lines := strings.Split(string(content), "\n")
 	for i, line := range lines {
 		lines[i] = strings.ReplaceAll(line, "${DS_GRAFANACLOUD-GREGORZEITLINGER-PROM}", "prometheus")
@@ -71,27 +123,4 @@ func (c *TestCase) replaceDatasourceId(content []byte, err error) string {
 	err = os.WriteFile(newFile, []byte(strings.Join(lines, "\n")), 0644)
 	Expect(err).ToNot(HaveOccurred())
 	return newFile
-}
-
-func (c *TestCase) applicationJar() string {
-	pattern := c.ExampleDir + "/build/libs/*SNAPSHOT.jar"
-	matches, err := filepath.Glob(pattern)
-	Expect(err).ToNot(HaveOccurred())
-	Expect(matches).To(HaveLen(1))
-
-	return matches[0]
-}
-
-func imageName(dir string) string {
-	content, err := os.ReadFile(path.Join(dir, ".tool-versions"))
-	Expect(err).ToNot(HaveOccurred())
-	for _, line := range strings.Split(string(content), "\n") {
-		if strings.HasPrefix(line, "java ") {
-			// find major version in java temurin-8.0.372+7 using regex
-			major := regexp.MustCompile("java temurin-(\\d+).*").FindStringSubmatch(line)[1]
-			return fmt.Sprintf("eclipse-temurin:%s-jre", major)
-		}
-	}
-	Fail("no java version found")
-	return ""
 }

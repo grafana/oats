@@ -19,11 +19,11 @@ expected:
 ```
                                                               
 You have to provide the root path of the java distributions example directory to ginkgo 
-via the environment variable `JAVA_TESTCASE_BASE_PATH`.
+via the environment variable `TESTCASE_BASE_PATH`.
 
 ## Starting the Java Suite
 
 ```bash
-JAVA_TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
+TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
 ```
                            

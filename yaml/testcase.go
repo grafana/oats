@@ -30,8 +30,15 @@ type Expected struct {
 	Dashboards []ExpectedDashboard `yaml:"dashboards"`
 }
 
+type DockerCompose struct {
+	Generator string   `yaml:"generator"`
+	File      string   `yaml:"file"`
+	Resources []string `yaml:"resources"`
+}
+
 type TestCaseDefinition struct {
-	Expected Expected `yaml:"expected"`
+	DockerCompose DockerCompose `yaml:"docker-compose"`
+	Expected      Expected      `yaml:"expected"`
 }
 
 type TestDashboard struct {
@@ -41,8 +48,8 @@ type TestDashboard struct {
 
 type TestCase struct {
 	Name       string
-	ExampleDir string
-	ProjectDir string
+	Dir        string
+	OutputDir  string
 	Definition TestCaseDefinition
 	Dashboard  *TestDashboard
 }
@@ -50,7 +57,7 @@ type TestCase struct {
 func ReadTestCases() []TestCase {
 	var cases []TestCase
 
-	base := os.Getenv("JAVA_TESTCASE_BASE_PATH")
+	base := os.Getenv("TESTCASE_BASE_PATH")
 	if base != "" {
 		err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
 			if err != nil {
@@ -67,12 +74,11 @@ func ReadTestCases() []TestCase {
 				return err
 			}
 			dir := path.Dir(p)
-			name := strings.ReplaceAll(strings.SplitAfter(dir, "examples/")[1], "/", "-")
-			projectDir := strings.Split(dir, "examples/")[0]
+			s := strings.Split(dir, "/")
+			name := strings.ReplaceAll(strings.Join(s[len(s)-2:], "/"), "/", "-")
 			cases = append(cases, TestCase{
 				Name:       name,
-				ExampleDir: dir,
-				ProjectDir: projectDir,
+				Dir:        dir,
 				Definition: def,
 			})
 			return nil
@@ -85,13 +91,14 @@ func ReadTestCases() []TestCase {
 }
 
 func (c *TestCase) ValidateAndSetDashboard() {
-	expectedMetrics := c.Definition.Expected.Metrics
-	Expect(expectedMetrics).ToNot(BeEmpty())
-	for _, d := range c.Definition.Expected.Metrics {
+	validateDockerCompose(&c.Definition.DockerCompose, c.Dir)
+	expected := c.Definition.Expected
+	Expect(expected.Metrics).ToNot(BeEmpty())
+	for _, d := range expected.Metrics {
 		Expect(d.PromQL).ToNot(BeEmpty())
 		Expect(d.Value).ToNot(BeEmpty())
 	}
-	for _, d := range c.Definition.Expected.Dashboards {
+	for _, d := range expected.Dashboards {
 		out, _ := yaml.Marshal(d)
 		Expect(d.Path).ToNot(BeEmpty())
 		Expect(d.Panels).ToNot(BeEmpty())
@@ -101,9 +108,22 @@ func (c *TestCase) ValidateAndSetDashboard() {
 		}
 
 		Expect(c.Dashboard).To(BeNil(), "only one dashboard is supported")
-		dashboardPath := path.Join(c.ExampleDir, d.Path)
+		dashboardPath := path.Join(c.Dir, d.Path)
 		c.Dashboard = &TestDashboard{
 			Path: dashboardPath,
 		}
+	}
+}
+
+func validateDockerCompose(d *DockerCompose, dir string) {
+	if d.File != "" {
+		d.File = path.Join(dir, d.File)
+		Expect(d.File).To(BeARegularFile())
+		for _, resource := range d.Resources {
+			Expect(path.Join(path.Dir(d.File), resource)).To(BeAnExistingFile())
+		}
+	} else {
+		Expect(d.Generator).ToNot(BeEmpty())
+		Expect(d.Resources).To(BeEmpty())
 	}
 }
