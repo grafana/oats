@@ -42,4 +42,4 @@ services:
       - ./configs/otelcol-config.yaml:/config.yaml
     command:
       - --config=file:/config.yaml
-      - --feature-gates=pkg.translator.prometheus.NormalizeName
+#      - --feature-gates=pkg.translator.prometheus.NormalizeName # we currently don't support this in our dashboards
