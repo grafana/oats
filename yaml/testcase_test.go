@@ -16,59 +16,88 @@ import (
 	"github.com/grafana/oats/internal/testhelpers/requests"
 )
 
-var _ = Describe("test case", Ordered, Label("docker", "integration", "slow"), func() {
-	for _, c := range yaml.ReadTestCases() {
-		runTestCase(c)
-	}
+var _ = Describe("test case", Ordered, ContinueOnFailure, Label("docker", "integration", "slow"), func() {
+	Describe("yaml test case", func() {
+		for _, c := range yaml.ReadTestCases() {
+			Describe(c.Name, func() {
+				runTestCase(c)
+			})
+		}
+	})
 })
 
-func runTestCase(c yaml.TestCase) {
-	var otelComposeEndpoint *compose.ComposeEndpoint
-
-	Describe(c.Name, func() {
-		BeforeAll(func() {
-			c.ValidateAndSetDashboard()
-			var ctx = context.Background()
-			var startErr error
-
-			c.OutputDir = path.Join(".", "build", c.Name)
-			err := os.MkdirAll(c.OutputDir, 0755)
-			Expect(err).ToNot(HaveOccurred(), "expected no error creating output directory")
-			err = exec.Command("cp", "-r", "configs", c.OutputDir).Run()
-			Expect(err).ToNot(HaveOccurred(), "expected no error copying configs directory")
-
-			otelComposeEndpoint = compose.NewEndpoint(
-				c.GetDockerComposeFile(),
-				path.Join(c.OutputDir, "output.log"),
-				[]string{},
-				compose.PortsConfig{PrometheusHTTPPort: 9090},
-			)
-			startErr = otelComposeEndpoint.Start(ctx)
-			Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
-		})
-
-		AfterAll(func() {
-			var ctx = context.Background()
-			var stopErr error
-
-			if otelComposeEndpoint != nil {
-				stopErr = otelComposeEndpoint.Stop(ctx)
-				Expect(stopErr).ToNot(HaveOccurred(), "expected no error stopping the local observability endpoint")
-			}
-		})
-
-		It("should have all telemetry data", func() {
-			waitForTelemetry(otelComposeEndpoint, c.Definition.Input, func(g Gomega, verbose bool) {
-				yaml.AssertMetrics(g, c.Definition.Expected, otelComposeEndpoint, verbose, c) //better tree construction
-			})
-		})
-	})
+type runner struct {
+	testCase *yaml.TestCase
+	endpoint *compose.ComposeEndpoint
+	deadline time.Time
 }
 
-func waitForTelemetry(endpoint *compose.ComposeEndpoint, input []yaml.Input, asserter func(g Gomega, verbose bool)) {
+func runTestCase(c yaml.TestCase) {
+	r := &runner{
+		testCase: &c,
+	}
+
+	BeforeAll(func() {
+		c.ValidateAndSetDashboard()
+		var ctx = context.Background()
+		var startErr error
+
+		c.OutputDir = path.Join(".", "build", c.Name)
+		err := os.MkdirAll(c.OutputDir, 0755)
+		Expect(err).ToNot(HaveOccurred(), "expected no error creating output directory")
+		err = exec.Command("cp", "-r", "configs", c.OutputDir).Run()
+		Expect(err).ToNot(HaveOccurred(), "expected no error copying configs directory")
+
+		r.endpoint = compose.NewEndpoint(
+			c.GetDockerComposeFile(),
+			path.Join(c.OutputDir, "output.log"),
+			[]string{},
+			compose.PortsConfig{PrometheusHTTPPort: 9090},
+		)
+		startErr = r.endpoint.Start(ctx)
+		Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
+
+		r.deadline = time.Now().Add(c.Timeout)
+		_, _ = fmt.Fprintf(r.endpoint.Logger(), "deadline = %v\n", r.deadline)
+	})
+
+	AfterAll(func() {
+		var ctx = context.Background()
+		var stopErr error
+
+		if r.endpoint != nil {
+			stopErr = r.endpoint.Stop(ctx)
+			Expect(stopErr).ToNot(HaveOccurred(), "expected no error stopping the local observability endpoint")
+		}
+	})
+
+	expected := c.Definition.Expected
+	for _, dashboard := range expected.Dashboards {
+		dashboardAssert := yaml.NewDashboardAssert(dashboard)
+		for i, panel := range dashboard.Panels {
+			It(fmt.Sprintf("dashboard panel '%s'", panel.Title), func() {
+				r.eventually(func(g Gomega, verbose bool) {
+					dashboardAssert.AssertDashboard(g, r.endpoint, verbose, i, &c.Dashboard.Content)
+				})
+			})
+		}
+	}
+	for _, metric := range expected.Metrics {
+		It(fmt.Sprintf("should have '%s' in prometheus", metric.PromQL), func() {
+			r.eventually(func(g Gomega, verbose bool) {
+				yaml.AssertProm(g, r.endpoint, verbose, metric.PromQL, metric.Value)
+			})
+		})
+	}
+}
+
+func (r *runner) eventually(asserter func(g Gomega, verbose bool)) {
+	if r.deadline.Before(time.Now()) {
+		Fail("deadline exceeded waiting for telemetry")
+	}
 	t := time.Now()
 	ctx := context.Background()
-	logger := endpoint.Logger()
+	logger := r.endpoint.Logger()
 
 	Eventually(ctx, func(g Gomega) {
 		verbose := false
@@ -81,12 +110,11 @@ func waitForTelemetry(endpoint *compose.ComposeEndpoint, input []yaml.Input, ass
 			_, _ = fmt.Fprintf(logger, "waiting for telemetry data\n")
 		}
 
-		for _, i := range input {
+		for _, i := range r.testCase.Definition.Input {
 			err := requests.DoHTTPGet(i.Url, 200)
 			g.Expect(err).ToNot(HaveOccurred())
 		}
 
 		asserter(g, verbose)
-	}).WithTimeout(30*time.Second).Should(Succeed(), "calling application for 30 seconds should cause telemetry to appear")
-
+	}).WithTimeout(r.deadline.Sub(time.Now())).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
 }

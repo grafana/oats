@@ -12,6 +12,9 @@ import (
 	"text/template"
 )
 
+// relative to docker-compose.yml
+const generatedDashboard = "./dashboard.json"
+
 var skipComposeLines = []string{
 	"services:",
 	"version:",
@@ -115,13 +118,12 @@ func (c *TestCase) parseDashboard(content []byte) lint.Dashboard {
 }
 
 func (c *TestCase) replaceDatasource(content []byte, err error) string {
-	// we need the ./ in docker-compose.yml
-	newFile := "./" + path.Join(c.OutputDir, "dashboard.json")
+	newFile := path.Join(c.OutputDir, generatedDashboard)
 	lines := strings.Split(string(content), "\n")
 	for i, line := range lines {
 		lines[i] = strings.ReplaceAll(line, "${DS_GRAFANACLOUD-GREGORZEITLINGER-PROM}", "prometheus")
 	}
 	err = os.WriteFile(newFile, []byte(strings.Join(lines, "\n")), 0644)
 	Expect(err).ToNot(HaveOccurred())
-	return newFile
+	return generatedDashboard
 }

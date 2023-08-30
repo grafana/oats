@@ -14,37 +14,32 @@ import (
 
 var promQlVariables = []string{"$job", "$instance", "$pod", "$namespace", "$container"}
 
-func AssertMetrics(g Gomega, expected Expected, otelComposeEndpoint *compose.ComposeEndpoint, verbose bool, c TestCase) {
-	for _, metric := range expected.Metrics {
-		assertProm(g, otelComposeEndpoint, verbose, metric.PromQL, metric.Value)
-	}
-	for _, dashboard := range expected.Dashboards {
-		assertDashboard(g, otelComposeEndpoint, verbose, dashboard, &c.Dashboard.Content)
-	}
+type DashboardAssert struct {
+	want ExpectedDashboard
 }
 
-func assertDashboard(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, want ExpectedDashboard, dashboard *lint.Dashboard) {
-	wantPanelValues := map[string]string{}
-	for _, panel := range want.Panels {
-		wantPanelValues[panel.Title] = panel.Value
+func NewDashboardAssert(d ExpectedDashboard) *DashboardAssert {
+	a := DashboardAssert{
+		want: d,
 	}
+	return &a
+}
+
+func (a *DashboardAssert) AssertDashboard(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool,
+	panelIndex int, dashboard *lint.Dashboard) {
+	p := a.want.Panels[panelIndex]
+	wantTitle := p.Title
+	wantValue := p.Value
 
 	for _, panel := range dashboard.Panels {
-		ginkgo.It(fmt.Sprintf("panel '%s'", panel.Title), func() {
-			wantValue := wantPanelValues[panel.Title]
-			if wantValue == "" {
-				return
-			}
-			wantPanelValues[panel.Title] = ""
+		if panel.Title == wantTitle {
 			g.Expect(panel.Targets).To(HaveLen(1))
 
-			assertProm(g, endpoint, verbose, replaceVariables(panel.Targets[0].Expr), wantValue)
-		})
+			AssertProm(g, endpoint, verbose, replaceVariables(panel.Targets[0].Expr), wantValue)
+			return
+		}
 	}
-
-	for panel, expected := range wantPanelValues {
-		g.Expect(expected).To(BeEmpty(), "panel '%s' not found", panel)
-	}
+	ginkgo.Fail(fmt.Sprintf("panel '%s' not found", wantTitle))
 }
 
 func replaceVariables(promQL string) string {
@@ -54,34 +49,31 @@ func replaceVariables(promQL string) string {
 	return promQL
 }
 
-func assertProm(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, promQL string, value string) {
-	ginkgo.It(fmt.Sprintf("should have %s in prometheus", promQL), func() {
-
-		ctx := context.Background()
-		logger := endpoint.Logger()
-		b, err := endpoint.RunPromQL(ctx, promQL)
-		if verbose {
-			_, _ = fmt.Fprintf(logger, "prom response %v err=%v\n", string(b), err)
-		}
-		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(len(b)).Should(BeNumerically(">", 0), "expected prometheus response to be non-empty")
-
-		pr, err := responses.ParseQueryOutput(b)
-		g.Expect(err).ToNot(HaveOccurred())
-		g.Expect(len(pr)).Should(BeNumerically(">", 0), "expected prometheus results to be non-empty")
+func AssertProm(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, promQL string, value string) {
+	ctx := context.Background()
+	logger := endpoint.Logger()
+	b, err := endpoint.RunPromQL(ctx, promQL)
+	if verbose {
 		_, _ = fmt.Fprintf(logger, "prom response %v err=%v\n", string(b), err)
+	}
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(len(b)).Should(BeNumerically(">", 0), "expected prometheus response to be non-empty")
 
-		s := strings.Split(value, " ")
-		comp := s[0]
-		val, err := strconv.ParseFloat(s[1], 64)
-		if err != nil {
-			g.Expect(err).ToNot(HaveOccurred())
-		}
-		got, err := strconv.ParseFloat(pr[0].Value[1].(string), 64)
-		if err != nil {
-			g.Expect(err).ToNot(HaveOccurred())
-		}
+	pr, err := responses.ParseQueryOutput(b)
+	g.Expect(err).ToNot(HaveOccurred())
+	g.Expect(len(pr)).Should(BeNumerically(">", 0), "expected prometheus results to be non-empty")
+	_, _ = fmt.Fprintf(logger, "prom response %v err=%v\n", string(b), err)
 
-		g.Expect(got).Should(BeNumerically(comp, val), "expected %s %f, got %f", comp, val, got)
-	})
+	s := strings.Split(value, " ")
+	comp := s[0]
+	val, err := strconv.ParseFloat(s[1], 64)
+	if err != nil {
+		g.Expect(err).ToNot(HaveOccurred())
+	}
+	got, err := strconv.ParseFloat(pr[0].Value[1].(string), 64)
+	if err != nil {
+		g.Expect(err).ToNot(HaveOccurred())
+	}
+
+	g.Expect(got).Should(BeNumerically(comp, val), "expected %s %f, got %f", comp, val, got)
 }

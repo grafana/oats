@@ -10,6 +10,8 @@ docker-compose:
   file: ../docker-compose.yaml
   resources:
     - kafka
+input:
+  - url: http://localhost:8080/stock
 expected:
   metrics:
     - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
@@ -50,3 +52,9 @@ examples.
 TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
 ```
                            
+You can increase the timeout, which is useful if you want to inspect the telemetry data manually
+in grafana at http://localhost:3000
+
+```
+TESTCASE_TIMEOUT=1h TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
+```

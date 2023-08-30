@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type ExpectedDashboardPanel struct {
@@ -58,6 +59,7 @@ type TestCase struct {
 	OutputDir  string
 	Definition TestCaseDefinition
 	Dashboard  *TestDashboard
+	Timeout    time.Duration
 }
 
 func ReadTestCases() []TestCase {
@@ -65,7 +67,16 @@ func ReadTestCases() []TestCase {
 
 	base := os.Getenv("TESTCASE_BASE_PATH")
 	if base != "" {
-		err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
+		timeout := os.Getenv("TESTCASE_TIMEOUT")
+		if timeout == "" {
+			timeout = "30s"
+		}
+		duration, err := time.ParseDuration(timeout)
+		if err != nil {
+			panic(err)
+		}
+
+		err = filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -86,6 +97,7 @@ func ReadTestCases() []TestCase {
 				Name:       name,
 				Dir:        dir,
 				Definition: def,
+				Timeout:    duration,
 			})
 			return nil
 		})
