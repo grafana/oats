@@ -37,8 +37,13 @@ type DockerCompose struct {
 	Resources []string `yaml:"resources"`
 }
 
+type Input struct {
+	Url string `yaml:"url"`
+}
+
 type TestCaseDefinition struct {
 	DockerCompose DockerCompose `yaml:"docker-compose"`
+	Input         []Input       `yaml:"input"`
 	Expected      Expected      `yaml:"expected"`
 }
 
@@ -93,6 +98,7 @@ func ReadTestCases() []TestCase {
 
 func (c *TestCase) ValidateAndSetDashboard() {
 	validateDockerCompose(&c.Definition.DockerCompose, c.Dir)
+	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
 	if len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 {
 		ginkgo.Fail("expected metrics or dashboards")
@@ -115,6 +121,13 @@ func (c *TestCase) ValidateAndSetDashboard() {
 		c.Dashboard = &TestDashboard{
 			Path: dashboardPath,
 		}
+	}
+}
+
+func validateInput(input []Input) {
+	Expect(input).ToNot(BeEmpty())
+	for _, i := range input {
+		Expect(i.Url).ToNot(BeEmpty())
 	}
 }
 

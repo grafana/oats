@@ -58,28 +58,35 @@ func runTestCase(c yaml.TestCase) {
 		})
 
 		It("should have all telemetry data", func() {
-			ctx := context.Background()
-			logger := otelComposeEndpoint.Logger()
-
-			t := time.Now()
-
-			Eventually(ctx, func(g Gomega) {
-				verbose := false
-				if time.Since(t) > 10*time.Second {
-					verbose = true
-					t = time.Now()
-				}
-
-				if verbose {
-					_, _ = fmt.Fprintf(logger, "waiting for telemetry data\n")
-				}
-
-				err := requests.DoHTTPGet("http://localhost:8080/stock", 200)
-				g.Expect(err).ToNot(HaveOccurred())
-
-				expected := c.Definition.Expected
-				yaml.AssertMetrics(g, expected, otelComposeEndpoint, verbose, c)
-			}).WithTimeout(30*time.Second).Should(Succeed(), "calling application for 30 seconds should cause metrics in Prometheus")
+			waitForTelemetry(otelComposeEndpoint, c.Definition.Input, func(g Gomega, verbose bool) {
+				yaml.AssertMetrics(g, c.Definition.Expected, otelComposeEndpoint, verbose, c) //better tree construction
+			})
 		})
 	})
+}
+
+func waitForTelemetry(endpoint *compose.ComposeEndpoint, input []yaml.Input, asserter func(g Gomega, verbose bool)) {
+	t := time.Now()
+	ctx := context.Background()
+	logger := endpoint.Logger()
+
+	Eventually(ctx, func(g Gomega) {
+		verbose := false
+		if time.Since(t) > 10*time.Second {
+			verbose = true
+			t = time.Now()
+		}
+
+		if verbose {
+			_, _ = fmt.Fprintf(logger, "waiting for telemetry data\n")
+		}
+
+		for _, i := range input {
+			err := requests.DoHTTPGet(i.Url, 200)
+			g.Expect(err).ToNot(HaveOccurred())
+		}
+
+		asserter(g, verbose)
+	}).WithTimeout(30*time.Second).Should(Succeed(), "calling application for 30 seconds should cause telemetry to appear")
+
 }
