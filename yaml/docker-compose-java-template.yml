@@ -6,10 +6,18 @@ services:
     volumes:
       - "{{ .JavaAgent }}:/grafana-opentelemetry-java.jar"
       - "{{ .ApplicationJar }}:/app.jar"
+    environment:
+      GRAFANA_OTLP_DEBUG_LOGGING: "true"
+      OTEL_LOGS_EXPORTER: otlp # otherwise, it's too verbose
+      OTEL_RESOURCE_ATTRIBUTES: 'deployment.environment=production,service.namespace=shop,service.version=1.1'
+      OTEL_INSTRUMENTATION_COMMON_DEFAULT_ENABLED: "true"
+      GRAFANA_OTEL_INSTRUMENTATION_ENABLE_UNSUPPORTED_MODULES: "true"
+      OTEL_METRIC_EXPORT_INTERVAL: "500"
+      OTEL_JAVAAGENT_DEBUG: "true"
     command:
       - /bin/bash
       - -c
-      - java -javaagent:grafana-opentelemetry-java.jar -Dgrafana.otlp.debug.logging=true -Dotel.resource.attributes=deployment.environment=production,service.namespace=shop,service.version=1.1 -Dotel.instrumentation.common.default-enabled=true -Dgrafana.otel.instrumentation.enable-unsupported-modules=true -Dotel.metric.export.interval=500 -jar /app.jar
+      - java -javaagent:grafana-opentelemetry-java.jar -jar /app.jar
   grafana:
     image: grafana/grafana:10.0.0
     network_mode: host
