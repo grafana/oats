@@ -38,26 +38,12 @@ func runTestCase(c yaml.TestCase) {
 	}
 
 	BeforeAll(func() {
+		c.OutputDir = prepareBuildDir(c.Name)
 		c.ValidateAndSetDashboard()
-		var ctx = context.Background()
-		var startErr error
-
-		c.OutputDir = path.Join(".", "build", c.Name)
-		err := os.MkdirAll(c.OutputDir, 0755)
-		Expect(err).ToNot(HaveOccurred(), "expected no error creating output directory")
-		err = exec.Command("cp", "-r", "configs", c.OutputDir).Run()
-		Expect(err).ToNot(HaveOccurred(), "expected no error copying configs directory")
-
-		r.endpoint = compose.NewEndpoint(
-			c.GetDockerComposeFile(),
-			path.Join(c.OutputDir, "output.log"),
-			[]string{},
-			compose.PortsConfig{PrometheusHTTPPort: 9090},
-		)
-		startErr = r.endpoint.Start(ctx)
-		Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
+		endpoint := startEndpoint(c)
 
 		r.deadline = time.Now().Add(c.Timeout)
+		r.endpoint = endpoint
 		_, _ = fmt.Fprintf(r.endpoint.Logger(), "deadline = %v\n", r.deadline)
 	})
 
@@ -89,6 +75,38 @@ func runTestCase(c yaml.TestCase) {
 			})
 		})
 	}
+}
+
+func startEndpoint(c yaml.TestCase) *compose.ComposeEndpoint {
+	var ctx = context.Background()
+	var startErr error
+
+	endpoint := compose.NewEndpoint(
+		c.CreateDockerComposeFile(),
+		path.Join(c.OutputDir, "output.log"),
+		[]string{},
+		compose.PortsConfig{PrometheusHTTPPort: 9090},
+	)
+	startErr = endpoint.Start(ctx)
+	Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
+	return endpoint
+}
+
+func prepareBuildDir(name string) string {
+	dir := path.Join(".", "build", name)
+
+	fileinfo, err := os.Stat(dir)
+	if err == nil {
+		if fileinfo.IsDir() {
+			err := os.RemoveAll(dir)
+			Expect(err).ToNot(HaveOccurred(), "expected no error removing output directory")
+		}
+	}
+	err = os.MkdirAll(dir, 0755)
+	Expect(err).ToNot(HaveOccurred(), "expected no error creating output directory")
+	err = exec.Command("cp", "-r", "configs", dir).Run()
+	Expect(err).ToNot(HaveOccurred(), "expected no error copying configs directory")
+	return dir
 }
 
 func (r *runner) eventually(asserter func(g Gomega, verbose bool)) {

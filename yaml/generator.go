@@ -20,7 +20,7 @@ var skipComposeLines = []string{
 	"version:",
 }
 
-func (c *TestCase) GetDockerComposeFile() string {
+func (c *TestCase) CreateDockerComposeFile() string {
 	p := path.Join(c.OutputDir, "docker-compose.yml")
 	lines := c.getContent(c.Definition.DockerCompose)
 	err := os.WriteFile(p, []byte(strings.Join(lines, "\n")), 0644)

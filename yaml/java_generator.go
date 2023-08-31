@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -23,15 +22,18 @@ type javaTemplateVars struct {
 
 func (c *TestCase) applicationJar() string {
 	t := time.Now()
-	println("building application jar in " + c.Dir)
-	// create a new app.jar - only needed for local testing - maybe add an option to skip this in CI
-	cmd := exec.Command("../../../gradlew", "clean", "build")
-	cmd.Dir = c.Dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stdout
+	build := os.Getenv("TESTCASE_SKIP_BUILD") != "true"
+	if build {
+		println("building application jar in " + c.Dir)
+		// create a new app.jar - only needed for local testing - maybe add an option to skip this in CI
+		cmd := exec.Command("../../../gradlew", "clean", "build")
+		cmd.Dir = c.Dir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stdout
 
-	err := cmd.Run()
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err := cmd.Run()
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
 
 	pattern := c.Dir + "/build/libs/*SNAPSHOT.jar"
 	matches, err := filepath.Glob(pattern)
@@ -40,11 +42,11 @@ func (c *TestCase) applicationJar() string {
 
 	file := matches[0]
 
-	fileinfo, err := os.Stat(file)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	modified := fileinfo.Sys().(*syscall.Stat_t).Mtim
-	unix := time.Unix(modified.Sec, modified.Nsec)
-	gomega.Expect(unix).To(gomega.BeTemporally(">=", t), "application jar was not built")
+	if build {
+		fileinfo, err := os.Stat(file)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect(fileinfo.ModTime()).To(gomega.BeTemporally(">=", t), "application jar was not built")
+	}
 
 	return file
 }

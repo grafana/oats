@@ -91,8 +91,9 @@ func ReadTestCases() []TestCase {
 				return err
 			}
 			dir := path.Dir(p)
-			s := strings.Split(dir, "/")
-			name := strings.ReplaceAll(strings.Join(s[len(s)-2:], "/"), "/", "-")
+			name := strings.TrimPrefix(dir, base)
+			name = strings.TrimPrefix(name, "/")
+			name = strings.ReplaceAll(name, "/", "-")
 			cases = append(cases, TestCase{
 				Name:       name,
 				Dir:        dir,
