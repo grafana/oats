@@ -3,7 +3,7 @@ package yaml
 import (
 	"fmt"
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	"os"
 	"os/exec"
 	"path"
@@ -17,6 +17,7 @@ type javaTemplateVars struct {
 	Image          string
 	JavaAgent      string
 	ApplicationJar string
+	JmxConfig      string
 	Dashboard      string
 }
 
@@ -32,20 +33,20 @@ func (c *TestCase) applicationJar() string {
 		cmd.Stderr = os.Stdout
 
 		err := cmd.Run()
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred(), "could not build application jar")
 	}
 
 	pattern := c.Dir + "/build/libs/*SNAPSHOT.jar"
 	matches, err := filepath.Glob(pattern)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	gomega.Expect(matches).To(gomega.HaveLen(1))
+	Expect(err).ToNot(HaveOccurred(), "could not find application jar")
+	Expect(matches).To(HaveLen(1))
 
 	file := matches[0]
 
 	if build {
 		fileinfo, err := os.Stat(file)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Expect(fileinfo.ModTime()).To(gomega.BeTemporally(">=", t), "application jar was not built")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(fileinfo.ModTime()).To(BeTemporally(">=", t), "application jar was not built")
 	}
 
 	return file
@@ -53,7 +54,7 @@ func (c *TestCase) applicationJar() string {
 
 func imageName(dir string) string {
 	content, err := os.ReadFile(path.Join(dir, ".tool-versions"))
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred(), "could not read .tool-versions")
 	for _, line := range strings.Split(string(content), "\n") {
 		if strings.HasPrefix(line, "java ") {
 			// find major version in java temurin-8.0.372+7 using regex
@@ -72,6 +73,16 @@ func (c *TestCase) javaTemplateVars(dashboard string) (string, any) {
 		Image:          imageName(c.Dir),
 		JavaAgent:      path.Join(projectDir, "agent/build/libs/grafana-opentelemetry-java.jar"),
 		ApplicationJar: c.applicationJar(),
+		JmxConfig:      jmxConfig(c.Dir, c.Definition.DockerCompose.JavaGeneratorParams.OtelJmxConfig),
 		Dashboard:      dashboard,
 	}
+}
+
+func jmxConfig(dir string, jmxConfig string) string {
+	if jmxConfig == "" {
+		return ""
+	}
+	p := path.Join(dir, jmxConfig)
+	Expect(p).To(BeAnExistingFile(), "jmx config file does not exist")
+	return p
 }

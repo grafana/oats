@@ -32,10 +32,15 @@ type Expected struct {
 	Dashboards []ExpectedDashboard `yaml:"dashboards"`
 }
 
+type JavaGeneratorParams struct {
+	OtelJmxConfig string `yaml:"otel-jmx-config"`
+}
+
 type DockerCompose struct {
-	Generator string   `yaml:"generator"`
-	File      string   `yaml:"file"`
-	Resources []string `yaml:"resources"`
+	Generator           string              `yaml:"generator"`
+	File                string              `yaml:"file"`
+	Resources           []string            `yaml:"resources"`
+	JavaGeneratorParams JavaGeneratorParams `yaml:"java-generator-params"`
 }
 
 type Input struct {
@@ -117,16 +122,17 @@ func (c *TestCase) ValidateAndSetDashboard() {
 		ginkgo.Fail("expected metrics or dashboards")
 	}
 	for _, d := range expected.Metrics {
-		Expect(d.PromQL).ToNot(BeEmpty())
-		Expect(d.Value).ToNot(BeEmpty())
+		out, _ := yaml.Marshal(d)
+		Expect(d.PromQL).ToNot(BeEmpty(), "promQL is empty in "+string(out))
+		Expect(d.Value).ToNot(BeEmpty(), "value is empty in "+string(out))
 	}
 	for _, d := range expected.Dashboards {
 		out, _ := yaml.Marshal(d)
-		Expect(d.Path).ToNot(BeEmpty())
-		Expect(d.Panels).ToNot(BeEmpty())
+		Expect(d.Path).ToNot(BeEmpty(), "path is emtpy in "+string(out))
+		Expect(d.Panels).ToNot(BeEmpty(), "panels are empty in "+string(out))
 		for _, panel := range d.Panels {
-			Expect(panel.Title).ToNot(BeEmpty(), string(out))
-			Expect(panel.Value).ToNot(BeEmpty(), string(out))
+			Expect(panel.Title).ToNot(BeEmpty(), "panel title is empty in "+string(out))
+			Expect(panel.Value).ToNot(BeEmpty(), "value is empty in "+string(out))
 		}
 
 		Expect(c.Dashboard).To(BeNil(), "only one dashboard is supported")

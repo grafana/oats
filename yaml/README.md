@@ -2,6 +2,8 @@
 
 You can use declarative yaml tests in `oats.yaml` files:
 
+The syntax is a bit similar to https://github.com/kubeshop/tracetest
+
 This is an example:
 
 ```yaml
@@ -48,13 +50,19 @@ examples.
 
 ## Starting the Java Suite
 
-```bash
+```sh
 TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
 ```
                            
 You can increase the timeout, which is useful if you want to inspect the telemetry data manually
 in grafana at http://localhost:3000
 
-```
+```sh
 TESTCASE_TIMEOUT=1h TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
+```
+
+If you don't want to build the java examples, you can use the `TESTCASE_SKIP_BUILD` environment variable:
+
+```sh
+TESTCASE_SKIP_BUILD=true TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
 ```
