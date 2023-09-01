@@ -5,6 +5,7 @@ import (
 	"github.com/grafana/oats/internal/testhelpers/compose"
 	"github.com/grafana/oats/internal/testhelpers/tempo/responses"
 	. "github.com/onsi/gomega"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 )
 
 func AssertTempo(g Gomega, endpoint *compose.ComposeEndpoint, queryLogger QueryLogger, traceQL string, spans []ExpectedSpan) {
@@ -33,25 +34,14 @@ func assertTrace(g Gomega, endpoint *compose.ComposeEndpoint, tr responses.Trace
 
 	td, err := responses.ParseTraceDetails(b)
 	g.Expect(err).ToNot(HaveOccurred(), "we should be able to parse the GET trace by traceID API output")
-	g.Expect(td.Batches).ToNot(BeEmpty())
 
 	for _, wantSpan := range wantSpans {
-		span := findSpan(td, wantSpan)
-		g.Expect(span).ToNot(BeNil(), "we should find a single span with the name %s", wantSpan.Name)
+		spans := responses.FindSpans(td, wantSpan.Name)
+		g.Expect(spans).ToNot(HaveLen(1), "we should find a single span with the name %s", wantSpan.Name)
 
 		for k, v := range wantSpan.Attributes {
-			err := responses.MatchTraceAttribute(span.Attributes, "string", k, v)
+			err := responses.MatchTraceAttribute(spans[0].Attributes(), pcommon.ValueTypeStr, k, v)
 			g.Expect(err).ToNot(HaveOccurred(), "span attribute should match")
 		}
 	}
-}
-
-func findSpan(td responses.TraceDetails, wantSpan ExpectedSpan) *responses.Span {
-	for _, batch := range td.Batches {
-		spans := batch.FindSpansByName(wantSpan.Name)
-		if len(spans) > 0 {
-			return &spans[0]
-		}
-	}
-	return nil
 }
