@@ -37,7 +37,7 @@ func assertTrace(g Gomega, endpoint *compose.ComposeEndpoint, tr responses.Trace
 
 	for _, wantSpan := range wantSpans {
 		spans := responses.FindSpans(td, wantSpan.Name)
-		g.Expect(spans).ToNot(HaveLen(1), "we should find a single span with the name %s", wantSpan.Name)
+		g.Expect(spans).To(HaveLen(1), "we should find a single span with the name %s", wantSpan.Name)
 
 		for k, v := range wantSpan.Attributes {
 			err := responses.MatchTraceAttribute(spans[0].Attributes(), pcommon.ValueTypeStr, k, v)

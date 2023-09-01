@@ -138,7 +138,7 @@ func (r *runner) eventually(asserter func(g Gomega, queryLogger yaml.QueryLogger
 
 		for _, i := range r.testCase.Definition.Input {
 			err := requests.DoHTTPGet(i.Url, 200)
-			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).ToNot(HaveOccurred(), "expected no error calling application endpoint %s", i.Url)
 		}
 
 		asserter(g, queryLogger)

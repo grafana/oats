@@ -105,7 +105,14 @@ func ParseTempoResult(body []byte) (TempoResult, error) {
 }
 
 func FindSpans(td ptrace.Traces, name string) []ptrace.Span {
+	var re *regexp.Regexp
+	if strings.HasPrefix(name, "regex:") {
+		re = regexp.MustCompile(name[6:])
+	}
 	return FindSpansFunc(td, func(span *ptrace.Span) bool {
+		if re != nil {
+			return re.MatchString(span.Name())
+		}
 		return span.Name() == name
 	})
 }

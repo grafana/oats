@@ -15,6 +15,6 @@ func TestParseTraceDetails(t *testing.T) {
 	i := spans.Len()
 	require.NotZero(t, i)
 	require.NotEmpty(t, details)
-	findSpans := FindSpans(details, "kafkaTopic publish")
-	require.Len(t, findSpans, 1)
+	require.Len(t, FindSpans(details, "kafkaTopic publish"), 1)
+	require.Len(t, FindSpans(details, "regex:.* publish"), 1)
 }
