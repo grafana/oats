@@ -6,6 +6,7 @@ import (
 	"github.com/grafana/dashboard-linter/lint"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"gopkg.in/yaml.v3"
 	"os"
 	"path"
 	"strings"
@@ -22,13 +23,13 @@ var skipComposeLines = []string{
 
 func (c *TestCase) CreateDockerComposeFile() string {
 	p := path.Join(c.OutputDir, "docker-compose.yml")
-	lines := c.getContent(c.Definition.DockerCompose)
-	err := os.WriteFile(p, []byte(strings.Join(lines, "\n")), 0644)
+	content := c.getContent(c.Definition.DockerCompose)
+	err := os.WriteFile(p, content, 0644)
 	Expect(err).ToNot(HaveOccurred())
 	return p
 }
 
-func (c *TestCase) getContent(compose DockerCompose) []string {
+func (c *TestCase) getContent(compose DockerCompose) []byte {
 	if compose.Generator != "" {
 		return c.generateDockerComposeFile()
 	} else {
@@ -36,13 +37,13 @@ func (c *TestCase) getContent(compose DockerCompose) []string {
 	}
 }
 
-func readComposeFile(compose DockerCompose) []string {
+func readComposeFile(compose DockerCompose) []byte {
 	b, err := os.ReadFile(compose.File)
 	Expect(err).ToNot(HaveOccurred())
 	return replaceRefs(compose, b)
 }
 
-func replaceRefs(compose DockerCompose, bytes []byte) []string {
+func replaceRefs(compose DockerCompose, bytes []byte) []byte {
 	baseDir := path.Dir(compose.File)
 	lines := strings.Split(string(bytes), "\n")
 	for i, line := range lines {
@@ -50,10 +51,10 @@ func replaceRefs(compose DockerCompose, bytes []byte) []string {
 			lines[i] = strings.ReplaceAll(line, "./"+resource, path.Join(baseDir, resource))
 		}
 	}
-	return lines
+	return []byte(strings.Join(lines, "\n"))
 }
 
-func (c *TestCase) generateDockerComposeFile() []string {
+func (c *TestCase) generateDockerComposeFile() []byte {
 
 	dashboard := "./configs/grafana-test-dashboard.json"
 	if c.Dashboard != nil {
@@ -65,12 +66,13 @@ func (c *TestCase) generateDockerComposeFile() []string {
 	buf := bytes.NewBufferString("")
 	err := t.Execute(buf, vars)
 	Expect(err).ToNot(HaveOccurred())
-	lines := strings.Split(buf.String(), "\n")
 	compose := c.Definition.DockerCompose
 	if compose.File != "" {
-		return joinComposeFiles(readComposeFile(compose), lines)
+		files, err := joinComposeFiles(buf.Bytes(), readComposeFile(compose))
+		Expect(err).ToNot(HaveOccurred())
+		return files
 	}
-	return lines
+	return buf.Bytes()
 }
 
 func (c *TestCase) getTemplateVars(dashboard string) (string, any) {
@@ -84,22 +86,28 @@ func (c *TestCase) getTemplateVars(dashboard string) (string, any) {
 	}
 }
 
-func joinComposeFiles(base []string, add []string) []string {
-	for _, l := range add {
-		if !skipLine(l) {
-			base = append(base, l)
-		}
-	}
-	return base
-}
+func joinComposeFiles(base []byte, add []byte) ([]byte, error) {
+	a := map[string]any{}
+	b := map[string]any{}
 
-func skipLine(line string) bool {
-	for _, skip := range skipComposeLines {
-		if strings.HasPrefix(line, skip) {
-			return true
-		}
+	err := yaml.Unmarshal(base, &a)
+	if err != nil {
+		return nil, err
 	}
-	return false
+	err = yaml.Unmarshal(add, &b)
+	if err != nil {
+		return nil, err
+	}
+
+	//not a generic solution, but works for our use case
+	elems := b["services"].(map[string]any)
+	for k, v := range a["services"].(map[string]any) {
+		elems[k] = v
+	}
+
+	//services = append(services, elems...)
+	//b["services"] = services
+	return yaml.Marshal(b)
 }
 
 func (c *TestCase) readDashboardFile() string {
