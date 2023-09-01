@@ -99,8 +99,8 @@ func ParseTraceDetails(body []byte) (TraceDetails, error) {
 	return td, err
 }
 
-func ParseSearchTagsResult(body []byte) (SearchTagsResult, error) {
-	var st SearchTagsResult
+func ParseTempoResult(body []byte) (TempoResult, error) {
+	var st TempoResult
 	err := json.Unmarshal(body, &st)
 
 	return st, err

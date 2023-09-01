@@ -135,6 +135,14 @@ func (e *ComposeEndpoint) GetTraceByID(ctx context.Context, id string) ([]byte, 
 	return e.makeGetRequest(url)
 }
 
+func (e *ComposeEndpoint) SearchTempo(ctx context.Context, query string) ([]byte, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/search?%s", e.Ports.TempoHTTPPort, url.QueryEscape(query)))
+}
+
 func (e *ComposeEndpoint) SearchTags(ctx context.Context, tags map[string]string) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()

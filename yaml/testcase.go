@@ -27,7 +27,18 @@ type ExpectedMetrics struct {
 	Value  string `yaml:"value"`
 }
 
+type ExpectedSpan struct {
+	Name       string            `yaml:"name"`
+	Attributes map[string]string `yaml:"attributes"`
+}
+
+type ExpectedTraces struct {
+	TraceQL string         `yaml:"traceql"`
+	Spans   []ExpectedSpan `yaml:"spans"`
+}
+
 type Expected struct {
+	Traces     []ExpectedTraces    `yaml:"traces"`
 	Metrics    []ExpectedMetrics   `yaml:"metrics"`
 	Dashboards []ExpectedDashboard `yaml:"dashboards"`
 }
@@ -118,13 +129,25 @@ func (c *TestCase) ValidateAndSetDashboard() {
 	validateDockerCompose(&c.Definition.DockerCompose, c.Dir)
 	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
-	if len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 {
-		ginkgo.Fail("expected metrics or dashboards")
+	if len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 && len(expected.Traces) == 0 {
+		ginkgo.Fail("expected metrics or dashboards or traces")
 	}
 	for _, d := range expected.Metrics {
 		out, _ := yaml.Marshal(d)
 		Expect(d.PromQL).ToNot(BeEmpty(), "promQL is empty in "+string(out))
 		Expect(d.Value).ToNot(BeEmpty(), "value is empty in "+string(out))
+	}
+	for _, d := range expected.Traces {
+		out, _ := yaml.Marshal(d)
+		Expect(d.TraceQL).ToNot(BeEmpty(), "traceQL is empty in "+string(out))
+		Expect(d.Spans).ToNot(BeEmpty(), "spans are empty in "+string(out))
+		for _, span := range d.Spans {
+			Expect(span.Name).ToNot(BeEmpty(), "span name is empty in "+string(out))
+			for k, v := range span.Attributes {
+				Expect(k).ToNot(BeEmpty(), "attribute key is empty in "+string(out))
+				Expect(v).ToNot(BeEmpty(), "attribute value is empty in "+string(out))
+			}
+		}
 	}
 	for _, d := range expected.Dashboards {
 		out, _ := yaml.Marshal(d)

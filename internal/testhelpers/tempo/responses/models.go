@@ -1,6 +1,6 @@
 package responses
 
-type SearchTagsResult struct {
+type TempoResult struct {
 	Traces []Trace `json:"traces"`
 }
 

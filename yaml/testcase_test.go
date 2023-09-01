@@ -44,7 +44,7 @@ func runTestCase(c yaml.TestCase) {
 
 		r.deadline = time.Now().Add(c.Timeout)
 		r.endpoint = endpoint
-		_, _ = fmt.Fprintf(r.endpoint.Logger(), "deadline = %v\n", r.deadline)
+		_, _ = fmt.Printf("deadline = %v\n", r.deadline)
 	})
 
 	AfterAll(func() {
@@ -75,6 +75,13 @@ func runTestCase(c yaml.TestCase) {
 			})
 		})
 	}
+	for _, trace := range expected.Traces {
+		It(fmt.Sprintf("should have '%s' in tempo", trace.TraceQL), func() {
+			r.eventually(func(g Gomega, verbose bool) {
+				yaml.AssertTempo(g, r.endpoint, verbose, trace.TraceQL, trace.Spans)
+			})
+		})
+	}
 }
 
 func startEndpoint(c yaml.TestCase) *compose.ComposeEndpoint {
@@ -85,7 +92,10 @@ func startEndpoint(c yaml.TestCase) *compose.ComposeEndpoint {
 		c.CreateDockerComposeFile(),
 		path.Join(c.OutputDir, "output.log"),
 		[]string{},
-		compose.PortsConfig{PrometheusHTTPPort: 9090},
+		compose.PortsConfig{
+			PrometheusHTTPPort: 9090,
+			TempoHTTPPort:      3200,
+		},
 	)
 	startErr = endpoint.Start(ctx)
 	Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
@@ -115,7 +125,6 @@ func (r *runner) eventually(asserter func(g Gomega, verbose bool)) {
 	}
 	t := time.Now()
 	ctx := context.Background()
-	logger := r.endpoint.Logger()
 
 	Eventually(ctx, func(g Gomega) {
 		verbose := false
@@ -125,7 +134,7 @@ func (r *runner) eventually(asserter func(g Gomega, verbose bool)) {
 		}
 
 		if verbose {
-			_, _ = fmt.Fprintf(logger, "waiting for telemetry data\n")
+			_, _ = fmt.Printf("waiting for telemetry data\n")
 		}
 
 		for _, i := range r.testCase.Definition.Input {

@@ -56,7 +56,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(b)).Should(BeNumerically(">", 0))
 
-				sr, err := responses.ParseSearchTagsResult(b)
+				sr, err := responses.ParseTempoResult(b)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(sr.Traces)).Should(BeNumerically(">", 0))
 			}).WithTimeout(30*time.Second).Should(Succeed(), "calling /smoke for 30 seconds should cause traces in Tempo")
@@ -65,7 +65,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 			err := requests.DoHTTPGet("http://localhost:8080/create-trace?delay=30&response=200", 200)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			var sr responses.SearchTagsResult
+			var sr responses.TempoResult
 
 			// Loop until we find a /create-trace trace
 			Eventually(ctx, func(g Gomega) {
@@ -73,7 +73,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(b)).Should(BeNumerically(">", 0))
 
-				sr, err = responses.ParseSearchTagsResult(b)
+				sr, err = responses.ParseTempoResult(b)
 
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(sr.Traces)).Should(BeNumerically(">", 0))

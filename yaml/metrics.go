@@ -52,10 +52,9 @@ func replaceVariables(promQL string) string {
 func AssertProm(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, promQL string, value string) {
 	promQL = replaceVariables(promQL)
 	ctx := context.Background()
-	logger := endpoint.Logger()
 	b, err := endpoint.RunPromQL(ctx, promQL)
 	if verbose {
-		_, _ = fmt.Fprintf(logger, "promQL query %v response %v err=%v\n", promQL, string(b), err)
+		_, _ = fmt.Printf("promQL query %v response %v err=%v\n", promQL, string(b), err)
 	}
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(len(b)).Should(BeNumerically(">", 0), "expected prometheus response to be non-empty")
@@ -63,7 +62,6 @@ func AssertProm(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, promQ
 	pr, err := responses.ParseQueryOutput(b)
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(len(pr)).Should(BeNumerically(">", 0), "expected prometheus results to be non-empty")
-	_, _ = fmt.Fprintf(logger, "prom response %v err=%v\n", string(b), err)
 
 	s := strings.Split(value, " ")
 	comp := s[0]
