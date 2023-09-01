@@ -25,7 +25,7 @@ func NewDashboardAssert(d ExpectedDashboard) *DashboardAssert {
 	return &a
 }
 
-func (a *DashboardAssert) AssertDashboard(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool,
+func (a *DashboardAssert) AssertDashboard(g Gomega, endpoint *compose.ComposeEndpoint, queryLogger QueryLogger,
 	panelIndex int, dashboard *lint.Dashboard) {
 	p := a.want.Panels[panelIndex]
 	wantTitle := p.Title
@@ -35,7 +35,7 @@ func (a *DashboardAssert) AssertDashboard(g Gomega, endpoint *compose.ComposeEnd
 		if panel.Title == wantTitle {
 			g.Expect(panel.Targets).To(HaveLen(1))
 
-			AssertProm(g, endpoint, verbose, panel.Targets[0].Expr, wantValue)
+			AssertProm(g, endpoint, queryLogger, panel.Targets[0].Expr, wantValue)
 			return
 		}
 	}
@@ -49,13 +49,11 @@ func replaceVariables(promQL string) string {
 	return promQL
 }
 
-func AssertProm(g Gomega, endpoint *compose.ComposeEndpoint, verbose bool, promQL string, value string) {
+func AssertProm(g Gomega, endpoint *compose.ComposeEndpoint, queryLogger QueryLogger, promQL string, value string) {
 	promQL = replaceVariables(promQL)
 	ctx := context.Background()
 	b, err := endpoint.RunPromQL(ctx, promQL)
-	if verbose {
-		_, _ = fmt.Printf("promQL query %v response %v err=%v\n", promQL, string(b), err)
-	}
+	queryLogger.LogQueryResult("promQL query %v response %v err=%v\n", promQL, string(b), err)
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(len(b)).Should(BeNumerically(">", 0), "expected prometheus response to be non-empty")
 

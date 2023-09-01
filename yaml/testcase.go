@@ -1,7 +1,9 @@
 package yaml
 
 import (
+	"fmt"
 	"github.com/grafana/dashboard-linter/lint"
+	"github.com/grafana/oats/internal/testhelpers/compose"
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
@@ -76,6 +78,26 @@ type TestCase struct {
 	Definition TestCaseDefinition
 	Dashboard  *TestDashboard
 	Timeout    time.Duration
+}
+
+type QueryLogger struct {
+	verbose  bool
+	endpoint *compose.ComposeEndpoint
+}
+
+func NewQueryLogger(endpoint *compose.ComposeEndpoint, verbose bool) QueryLogger {
+	return QueryLogger{
+		endpoint: endpoint,
+		verbose:  verbose,
+	}
+}
+
+func (q *QueryLogger) LogQueryResult(format string, a ...any) {
+	result := fmt.Sprintf(format, a...)
+	if q.verbose {
+		_, _ = fmt.Fprintf(q.endpoint.Logger(), result)
+		fmt.Print(result)
+	}
 }
 
 func ReadTestCases() []TestCase {

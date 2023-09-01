@@ -62,23 +62,23 @@ func runTestCase(c yaml.TestCase) {
 		dashboardAssert := yaml.NewDashboardAssert(dashboard)
 		for i, panel := range dashboard.Panels {
 			It(fmt.Sprintf("dashboard panel '%s'", panel.Title), func() {
-				r.eventually(func(g Gomega, verbose bool) {
-					dashboardAssert.AssertDashboard(g, r.endpoint, verbose, i, &c.Dashboard.Content)
+				r.eventually(func(g Gomega, queryLogger yaml.QueryLogger) {
+					dashboardAssert.AssertDashboard(g, r.endpoint, queryLogger, i, &c.Dashboard.Content)
 				})
 			})
 		}
 	}
 	for _, metric := range expected.Metrics {
 		It(fmt.Sprintf("should have '%s' in prometheus", metric.PromQL), func() {
-			r.eventually(func(g Gomega, verbose bool) {
-				yaml.AssertProm(g, r.endpoint, verbose, metric.PromQL, metric.Value)
+			r.eventually(func(g Gomega, queryLogger yaml.QueryLogger) {
+				yaml.AssertProm(g, r.endpoint, queryLogger, metric.PromQL, metric.Value)
 			})
 		})
 	}
 	for _, trace := range expected.Traces {
 		It(fmt.Sprintf("should have '%s' in tempo", trace.TraceQL), func() {
-			r.eventually(func(g Gomega, verbose bool) {
-				yaml.AssertTempo(g, r.endpoint, verbose, trace.TraceQL, trace.Spans)
+			r.eventually(func(g Gomega, queryLogger yaml.QueryLogger) {
+				yaml.AssertTempo(g, r.endpoint, queryLogger, trace.TraceQL, trace.Spans)
 			})
 		})
 	}
@@ -119,7 +119,7 @@ func prepareBuildDir(name string) string {
 	return dir
 }
 
-func (r *runner) eventually(asserter func(g Gomega, verbose bool)) {
+func (r *runner) eventually(asserter func(g Gomega, queryLogger yaml.QueryLogger)) {
 	if r.deadline.Before(time.Now()) {
 		Fail("deadline exceeded waiting for telemetry")
 	}
@@ -132,16 +132,15 @@ func (r *runner) eventually(asserter func(g Gomega, verbose bool)) {
 			verbose = true
 			t = time.Now()
 		}
+		queryLogger := yaml.NewQueryLogger(r.endpoint, verbose)
 
-		if verbose {
-			_, _ = fmt.Printf("waiting for telemetry data\n")
-		}
+		queryLogger.LogQueryResult("waiting for telemetry data\n")
 
 		for _, i := range r.testCase.Definition.Input {
 			err := requests.DoHTTPGet(i.Url, 200)
 			g.Expect(err).ToNot(HaveOccurred())
 		}
 
-		asserter(g, verbose)
+		asserter(g, queryLogger)
 	}).WithTimeout(r.deadline.Sub(time.Now())).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
 }
