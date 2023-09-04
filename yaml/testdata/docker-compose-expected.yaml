@@ -1,0 +1,26 @@
+services:
+    grafana:
+        image: grafana/grafana:10.0.0
+        network_mode: host
+        volumes:
+            - ./configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
+            - ./configs/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/grafana-dashboards.yaml
+    mongodb:
+        image: mongo:6-jammy
+        logging:
+            driver: json-file
+            options:
+                max-file: "2"
+                max-size: 5m
+        ports:
+            - 27017:27017
+        volumes:
+            - dbdata6:/data/db
+version: "3.9"
+volumes:
+    dbdata6: null
+x-default-logging:
+    driver: json-file
+    options:
+        max-file: "2"
+        max-size: 5m

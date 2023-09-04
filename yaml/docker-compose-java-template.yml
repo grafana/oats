@@ -1,0 +1,55 @@
+version: "3.9"
+services:
+  application:
+    image: "{{ .Image }}"
+    network_mode: host
+    volumes:
+      - "{{ .JavaAgent }}:/grafana-opentelemetry-java.jar"
+      - "{{ .ApplicationJar }}:/app.jar"
+      {{if .JmxConfig }}- "{{ .JmxConfig }}:/otel-jmx-config.yaml" {{end}}
+    environment:
+      GRAFANA_OTLP_DEBUG_LOGGING: "true"
+      OTEL_LOGS_EXPORTER: otlp # otherwise, it's too verbose
+      OTEL_RESOURCE_ATTRIBUTES: 'deployment.environment=production,service.namespace=shop,service.version=1.1'
+      OTEL_INSTRUMENTATION_COMMON_DEFAULT_ENABLED: "true"
+      GRAFANA_OTEL_INSTRUMENTATION_ENABLE_UNSUPPORTED_MODULES: "true"
+      OTEL_METRIC_EXPORT_INTERVAL: "500"  # so we don't have to wait 60s for metrics
+      OTEL_JAVAAGENT_DEBUG: "true"
+      {{if .JmxConfig }}OTEL_JMX_CONFIG: /otel-jmx-config.yaml{{end}}
+    command:
+      - /bin/bash
+      - -c
+      - java -javaagent:grafana-opentelemetry-java.jar -jar /app.jar
+  grafana:
+    image: grafana/grafana:10.0.0
+    network_mode: host
+    volumes:
+      - ./configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
+      - ./configs/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/grafana-dashboards.yaml
+      - "{{ .Dashboard }}:/etc/grafana/grafana-test-dashboard.json"
+  prometheus:
+    image: prom/prometheus:v2.44.0
+    network_mode: host
+    command:
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --enable-feature=native-histograms
+      - --config.file=/etc/prometheus/prometheus.yml
+  tempo:
+    image: grafana/tempo:2.1.1
+    network_mode: host
+    volumes:
+      - ./configs/tempo-config.yaml:/config.yaml
+    command:
+      - --config.file=/config.yaml
+  loki:
+    image: grafana/loki:2.8.2
+    network_mode: host
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.83.0
+    network_mode: host
+    volumes:
+      - ./configs/otelcol-config.yaml:/config.yaml
+    command:
+      - --config=file:/config.yaml
+#      - --feature-gates=pkg.translator.prometheus.NormalizeName # we currently don't support this in our dashboards

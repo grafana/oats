@@ -1,0 +1,636 @@
+{
+  "batches": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "container.id",
+            "value": {
+              "stringValue": "6bc40019e40bf63b842d99834ab4ed6826792a36fedb0b45754290816c4cfbe3"
+            }
+          },
+          {
+            "key": "deployment.environment",
+            "value": {
+              "stringValue": "production"
+            }
+          },
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "amd64"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "nevla"
+            }
+          },
+          {
+            "key": "os.description",
+            "value": {
+              "stringValue": "Linux 6.2.0-31-generic"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "linux"
+            }
+          },
+          {
+            "key": "process.command_args",
+            "value": {
+              "arrayValue": {
+                "values": [
+                  {
+                    "stringValue": "/opt/java/openjdk/bin/java"
+                  },
+                  {
+                    "stringValue": "-javaagent:grafana-opentelemetry-java.jar"
+                  },
+                  {
+                    "stringValue": "-jar"
+                  },
+                  {
+                    "stringValue": "/app.jar"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "key": "process.executable.path",
+            "value": {
+              "stringValue": "/opt/java/openjdk/bin/java"
+            }
+          },
+          {
+            "key": "process.pid",
+            "value": {
+              "intValue": "1"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "stringValue": "Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.8+7"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "stringValue": "OpenJDK Runtime Environment"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "stringValue": "17.0.8+7"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "7d722ae5-15ae-47c5-81c5-41842a9b98ac"
+            }
+          },
+          {
+            "key": "service.namespace",
+            "value": {
+              "stringValue": "shop"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "1.1"
+            }
+          },
+          {
+            "key": "telemetry.auto.version",
+            "value": {
+              "stringValue": "1.29.0"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "java"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "grafana"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "0.1"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "app"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "io.opentelemetry.tomcat-10.0",
+            "version": "1.29.0-alpha"
+          },
+          "spans": [
+            {
+              "traceId": "B3vTDy+BVLWUjcBHJPif9Q==",
+              "spanId": "P7TdbwfHmLc=",
+              "name": "GET /stock",
+              "kind": "SPAN_KIND_SERVER",
+              "startTimeUnixNano": "1693573635765422206",
+              "endTimeUnixNano": "1693573635766725356",
+              "attributes": [
+                {
+                  "key": "user_agent.original",
+                  "value": {
+                    "stringValue": "Go-http-client/1.1"
+                  }
+                },
+                {
+                  "key": "network.protocol.version",
+                  "value": {
+                    "stringValue": "1.1"
+                  }
+                },
+                {
+                  "key": "http.response.body.size",
+                  "value": {
+                    "intValue": "13"
+                  }
+                },
+                {
+                  "key": "client.socket.port",
+                  "value": {
+                    "intValue": "45600"
+                  }
+                },
+                {
+                  "key": "url.scheme",
+                  "value": {
+                    "stringValue": "http"
+                  }
+                },
+                {
+                  "key": "thread.name",
+                  "value": {
+                    "stringValue": "http-nio-8080-exec-4"
+                  }
+                },
+                {
+                  "key": "url.path",
+                  "value": {
+                    "stringValue": "/stock"
+                  }
+                },
+                {
+                  "key": "server.port",
+                  "value": {
+                    "intValue": "8080"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "localhost"
+                  }
+                },
+                {
+                  "key": "http.response.status_code",
+                  "value": {
+                    "intValue": "200"
+                  }
+                },
+                {
+                  "key": "http.route",
+                  "value": {
+                    "stringValue": "/stock"
+                  }
+                },
+                {
+                  "key": "http.request.method",
+                  "value": {
+                    "stringValue": "GET"
+                  }
+                },
+                {
+                  "key": "thread.id",
+                  "value": {
+                    "intValue": "42"
+                  }
+                },
+                {
+                  "key": "client.socket.address",
+                  "value": {
+                    "stringValue": "127.0.0.1"
+                  }
+                },
+                {
+                  "key": "network.protocol.name",
+                  "value": {
+                    "stringValue": "http"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "container.id",
+            "value": {
+              "stringValue": "6bc40019e40bf63b842d99834ab4ed6826792a36fedb0b45754290816c4cfbe3"
+            }
+          },
+          {
+            "key": "deployment.environment",
+            "value": {
+              "stringValue": "production"
+            }
+          },
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "amd64"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "nevla"
+            }
+          },
+          {
+            "key": "os.description",
+            "value": {
+              "stringValue": "Linux 6.2.0-31-generic"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "linux"
+            }
+          },
+          {
+            "key": "process.command_args",
+            "value": {
+              "arrayValue": {
+                "values": [
+                  {
+                    "stringValue": "/opt/java/openjdk/bin/java"
+                  },
+                  {
+                    "stringValue": "-javaagent:grafana-opentelemetry-java.jar"
+                  },
+                  {
+                    "stringValue": "-jar"
+                  },
+                  {
+                    "stringValue": "/app.jar"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "key": "process.executable.path",
+            "value": {
+              "stringValue": "/opt/java/openjdk/bin/java"
+            }
+          },
+          {
+            "key": "process.pid",
+            "value": {
+              "intValue": "1"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "stringValue": "Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.8+7"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "stringValue": "OpenJDK Runtime Environment"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "stringValue": "17.0.8+7"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "7d722ae5-15ae-47c5-81c5-41842a9b98ac"
+            }
+          },
+          {
+            "key": "service.namespace",
+            "value": {
+              "stringValue": "shop"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "1.1"
+            }
+          },
+          {
+            "key": "telemetry.auto.version",
+            "value": {
+              "stringValue": "1.29.0"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "java"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "grafana"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "0.1"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "app"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "io.opentelemetry.spring-webmvc-6.0",
+            "version": "1.29.0-alpha"
+          },
+          "spans": [
+            {
+              "traceId": "B3vTDy+BVLWUjcBHJPif9Q==",
+              "spanId": "2qIRtIJLOhY=",
+              "parentSpanId": "P7TdbwfHmLc=",
+              "name": "StockController.getStock",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1693573635765875566",
+              "endTimeUnixNano": "1693573635766430797",
+              "attributes": [
+                {
+                  "key": "thread.id",
+                  "value": {
+                    "intValue": "42"
+                  }
+                },
+                {
+                  "key": "thread.name",
+                  "value": {
+                    "stringValue": "http-nio-8080-exec-4"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "container.id",
+            "value": {
+              "stringValue": "6bc40019e40bf63b842d99834ab4ed6826792a36fedb0b45754290816c4cfbe3"
+            }
+          },
+          {
+            "key": "deployment.environment",
+            "value": {
+              "stringValue": "production"
+            }
+          },
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "amd64"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "nevla"
+            }
+          },
+          {
+            "key": "os.description",
+            "value": {
+              "stringValue": "Linux 6.2.0-31-generic"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "linux"
+            }
+          },
+          {
+            "key": "process.command_args",
+            "value": {
+              "arrayValue": {
+                "values": [
+                  {
+                    "stringValue": "/opt/java/openjdk/bin/java"
+                  },
+                  {
+                    "stringValue": "-javaagent:grafana-opentelemetry-java.jar"
+                  },
+                  {
+                    "stringValue": "-jar"
+                  },
+                  {
+                    "stringValue": "/app.jar"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "key": "process.executable.path",
+            "value": {
+              "stringValue": "/opt/java/openjdk/bin/java"
+            }
+          },
+          {
+            "key": "process.pid",
+            "value": {
+              "intValue": "1"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "stringValue": "Eclipse Adoptium OpenJDK 64-Bit Server VM 17.0.8+7"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "stringValue": "OpenJDK Runtime Environment"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "stringValue": "17.0.8+7"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "7d722ae5-15ae-47c5-81c5-41842a9b98ac"
+            }
+          },
+          {
+            "key": "service.namespace",
+            "value": {
+              "stringValue": "shop"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "1.1"
+            }
+          },
+          {
+            "key": "telemetry.auto.version",
+            "value": {
+              "stringValue": "1.29.0"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "java"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "grafana"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "0.1"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "app"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "io.opentelemetry.kafka-clients-0.11",
+            "version": "1.29.0-alpha"
+          },
+          "spans": [
+            {
+              "traceId": "B3vTDy+BVLWUjcBHJPif9Q==",
+              "spanId": "ymu/6+mnY7A=",
+              "parentSpanId": "2qIRtIJLOhY=",
+              "name": "kafkaTopic publish",
+              "kind": "SPAN_KIND_PRODUCER",
+              "startTimeUnixNano": "1693573635765969551",
+              "endTimeUnixNano": "1693573635768210634",
+              "attributes": [
+                {
+                  "key": "messaging.system",
+                  "value": {
+                    "stringValue": "kafka"
+                  }
+                },
+                {
+                  "key": "messaging.kafka.destination.partition",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "messaging.kafka.client_id",
+                  "value": {
+                    "stringValue": "producer-1"
+                  }
+                },
+                {
+                  "key": "thread.id",
+                  "value": {
+                    "intValue": "42"
+                  }
+                },
+                {
+                  "key": "messaging.kafka.message.offset",
+                  "value": {
+                    "intValue": "34"
+                  }
+                },
+                {
+                  "key": "messaging.destination.name",
+                  "value": {
+                    "stringValue": "kafkaTopic"
+                  }
+                },
+                {
+                  "key": "thread.name",
+                  "value": {
+                    "stringValue": "http-nio-8080-exec-4"
+                  }
+                }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

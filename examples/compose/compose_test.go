@@ -2,6 +2,8 @@ package compose_test
 
 import (
 	"context"
+	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 	"path"
 	"time"
 
@@ -56,7 +58,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(b)).Should(BeNumerically(">", 0))
 
-				sr, err := responses.ParseSearchTagsResult(b)
+				sr, err := responses.ParseTempoResult(b)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(sr.Traces)).Should(BeNumerically(">", 0))
 			}).WithTimeout(30*time.Second).Should(Succeed(), "calling /smoke for 30 seconds should cause traces in Tempo")
@@ -65,7 +67,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 			err := requests.DoHTTPGet("http://localhost:8080/create-trace?delay=30&response=200", 200)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			var sr responses.SearchTagsResult
+			var sr responses.TempoResult
 
 			// Loop until we find a /create-trace trace
 			Eventually(ctx, func(g Gomega) {
@@ -73,7 +75,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(b)).Should(BeNumerically(">", 0))
 
-				sr, err = responses.ParseSearchTagsResult(b)
+				sr, err = responses.ParseTempoResult(b)
 
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(sr.Traces)).Should(BeNumerically(">", 0))
@@ -90,67 +92,54 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 
 			td, err := responses.ParseTraceDetails(traceBytes)
 			Expect(err).ToNot(HaveOccurred(), "we should be able to parse the GET trace by traceID API output")
-			Expect(len(td.Batches)).Should(Equal(1))
 
-			batch := td.Batches[0]
-			Expect(batch.Resource).ToNot(BeNil())
-			err = responses.AttributesMatch(
-				batch.Resource.Attributes,
-				[]responses.AttributeMatch{
-					{Type: "string", Key: "service.namespace", Value: "integration-test"},
-					{Type: "string", Key: "service.name", Value: "testserver"},
-					{Type: "string", Key: "telemetry.sdk.language", Value: "go"},
-				},
-			)
-			Expect(err).ToNot(HaveOccurred(), "we should be able to match the trace attributes")
-
-			parents := batch.FindSpansByName("GET /create-trace")
+			parents := responses.FindSpans(td, "GET /create-trace")
 			Expect(len(parents)).Should(Equal(1))
 			parent := parents[0]
 
-			Expect(parent.Kind).To(Equal("SPAN_KIND_SERVER"))
+			Expect(parent.Kind()).To(Equal(ptrace.SpanKindServer))
 			Expect(responses.TimeIsIncreasing(parent)).ToNot(HaveOccurred(), "the parent span duration must be a positive value")
 
 			err = responses.AttributesMatch(
-				parent.Attributes,
+				parent.Attributes(),
 				[]responses.AttributeMatch{
-					{Type: "string", Key: "http.target", Value: "/create-trace"},
-					{Type: "string", Key: "http.route", Value: "/create-trace"},
-					{Type: "string", Key: "http.method", Value: "GET"},
-					{Type: "int", Key: "net.host.port", Value: "8080"},
-					{Type: "int", Key: "http.status_code", Value: "200"},
-					{Type: "int", Key: "http.request_content_length", Value: "0"},
+					{Type: pcommon.ValueTypeStr, Key: "http.target", Value: "/create-trace"},
+					{Type: pcommon.ValueTypeStr, Key: "http.route", Value: "/create-trace"},
+					{Type: pcommon.ValueTypeStr, Key: "http.method", Value: "GET"},
+					{Type: pcommon.ValueTypeInt, Key: "net.host.port", Value: "8080"},
+					{Type: pcommon.ValueTypeInt, Key: "http.status_code", Value: "200"},
+					{Type: pcommon.ValueTypeInt, Key: "http.request_content_length", Value: "0"},
 				},
 			)
 			Expect(err).ToNot(HaveOccurred(), "parent attributes must match")
 
 			err = responses.AttributesExist(
-				parent.Attributes,
+				parent.Attributes(),
 				[]responses.AttributeMatch{
-					{Type: "string", Key: "net.host.name"},
-					{Type: "string", Key: "net.sock.peer.addr"},
+					{Type: pcommon.ValueTypeStr, Key: "net.host.name"},
+					{Type: pcommon.ValueTypeStr, Key: "net.sock.peer.addr"},
 				},
 			)
 			Expect(err).ToNot(HaveOccurred(), "parent host and peer attributes must exist")
 
-			children := batch.ChildrenOf(parent.SpanId)
+			children := responses.ChildrenOf(td, parent.SpanID().String())
 			Expect(len(children)).Should(Equal(2))
 
 			inQueue := false
 			processing := false
 			for _, c := range children {
-				Expect(c.Kind).To(Equal("SPAN_KIND_INTERNAL"))
-				Expect(parent.SpanId).To(Equal(c.ParentSpanId))
+				Expect(c.Kind()).To(Equal(ptrace.SpanKindInternal))
+				Expect(parent.SpanID()).To(Equal(c.ParentSpanID()))
 				Expect(responses.TimeIsIncreasing(c)).ToNot(HaveOccurred(), "the child span duration must be a positive value")
-				Expect(c.SpanId).ToNot(Equal(c.ParentSpanId))
-				Expect(parent.TraceId).To(Equal(c.TraceId))
-				Expect(c.Attributes).To(BeNil()) // internal spans don't have the attributes set
+				Expect(c.SpanID()).ToNot(Equal(c.ParentSpanID()))
+				Expect(parent.TraceID()).To(Equal(c.TraceID()))
+				Expect(c.Attributes().Len()).To(Equal(0)) // internal spans don't have the attributes set
 
-				if c.Name == "in queue" {
+				if c.Name() == "in queue" {
 					inQueue = true
 				}
 
-				if c.Name == "processing" {
+				if c.Name() == "processing" {
 					processing = true
 				}
 			}

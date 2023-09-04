@@ -70,6 +70,10 @@ func (e *ComposeEndpoint) Stop(ctx context.Context) error {
 	return compose.Close()
 }
 
+func (e *ComposeEndpoint) Logger() io.WriteCloser {
+	return compose.Logger
+}
+
 func (e *ComposeEndpoint) TracerProvider(ctx context.Context, r *resource.Resource) (*trace.TracerProvider, error) {
 	var exporter *otlptrace.Exporter
 	var err error
@@ -129,6 +133,14 @@ func (e *ComposeEndpoint) GetTraceByID(ctx context.Context, id string) ([]byte, 
 
 	url := fmt.Sprintf("http://localhost:%d/api/traces/%s", e.Ports.TempoHTTPPort, id)
 	return e.makeGetRequest(url)
+}
+
+func (e *ComposeEndpoint) SearchTempo(ctx context.Context, query string) ([]byte, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/search?%s", e.Ports.TempoHTTPPort, url.QueryEscape(query)))
 }
 
 func (e *ComposeEndpoint) SearchTags(ctx context.Context, tags map[string]string) ([]byte, error) {

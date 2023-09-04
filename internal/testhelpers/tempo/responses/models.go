@@ -1,6 +1,6 @@
 package responses
 
-type SearchTagsResult struct {
+type TempoResult struct {
 	Traces []Trace `json:"traces"`
 }
 
@@ -48,38 +48,4 @@ type Span struct {
 	StartTimeUnixNano string      `json:"startTimeUnixNano"`
 	EndTimeUnixNano   string      `json:"endTimeUnixNano"`
 	Attributes        []Attribute `json:"attributes"`
-}
-
-func (b *Batch) FindSpansByName(name string) []Span {
-	var spans []Span
-	if b == nil || b.ScopeSpans == nil {
-		return spans
-	}
-
-	for _, ss := range b.ScopeSpans {
-		for _, s := range ss.Spans {
-			if s.Name == name {
-				spans = append(spans, s)
-			}
-		}
-	}
-
-	return spans
-}
-
-func (b *Batch) ChildrenOf(spanId string) []Span {
-	var spans []Span
-	if b == nil || b.ScopeSpans == nil {
-		return spans
-	}
-
-	for _, ss := range b.ScopeSpans {
-		for _, s := range ss.Spans {
-			if s.ParentSpanId == spanId {
-				spans = append(spans, s)
-			}
-		}
-	}
-
-	return spans
 }
