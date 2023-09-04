@@ -100,7 +100,7 @@ func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 	}
 }
 
-func ReadTestCases() []TestCase {
+func ReadTestCases() ([]TestCase, string) {
 	var cases []TestCase
 
 	base := os.Getenv("TESTCASE_BASE_PATH")
@@ -144,7 +144,7 @@ func ReadTestCases() []TestCase {
 			panic(err)
 		}
 	}
-	return cases
+	return cases, base
 }
 
 func (c *TestCase) ValidateAndSetDashboard() {

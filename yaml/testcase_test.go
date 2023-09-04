@@ -18,7 +18,14 @@ import (
 
 var _ = Describe("test case", Ordered, ContinueOnFailure, Label("docker", "integration", "slow"), func() {
 	Describe("yaml test case", func() {
-		for _, c := range yaml.ReadTestCases() {
+		cases, base := yaml.ReadTestCases()
+		if base != "" {
+			It("should have at least one test case", func() {
+				Expect(cases).ToNot(BeEmpty(), "expected at least one test case in %s", base)
+			})
+		}
+
+		for _, c := range cases {
 			Describe(c.Name, func() {
 				runTestCase(c)
 			})

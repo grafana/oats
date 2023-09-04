@@ -13,7 +13,7 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: 'deployment.environment=production,service.namespace=shop,service.version=1.1'
       OTEL_INSTRUMENTATION_COMMON_DEFAULT_ENABLED: "true"
       GRAFANA_OTEL_INSTRUMENTATION_ENABLE_UNSUPPORTED_MODULES: "true"
-      OTEL_METRIC_EXPORT_INTERVAL: "500"  # so we don't have to wait 60s for metrics
+      OTEL_METRIC_EXPORT_INTERVAL: "5000"  # so we don't have to wait 60s for metrics
       OTEL_JAVAAGENT_DEBUG: "true"
       {{if .JmxConfig }}OTEL_JMX_CONFIG: /otel-jmx-config.yaml{{end}}
     command:
