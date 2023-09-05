@@ -105,6 +105,11 @@ func ReadTestCases() ([]TestCase, string) {
 
 	base := os.Getenv("TESTCASE_BASE_PATH")
 	if base != "" {
+		abs, err := filepath.Abs(base)
+		if err != nil {
+			panic(err)
+		}
+		base = abs
 		timeout := os.Getenv("TESTCASE_TIMEOUT")
 		if timeout == "" {
 			timeout = "30s"
