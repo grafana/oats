@@ -67,7 +67,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 			err := requests.DoHTTPGet("http://localhost:8080/create-trace?delay=30&response=200", 200)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			var sr responses.TempoResult
+			var sr responses.TempoSearchResult
 
 			// Loop until we find a /create-trace trace
 			Eventually(ctx, func(g Gomega) {
