@@ -58,7 +58,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(b)).Should(BeNumerically(">", 0))
 
-				sr, err := responses.ParseTempoResult(b)
+				sr, err := responses.ParseTempoSearchResult(b)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(sr.Traces)).Should(BeNumerically(">", 0))
 			}).WithTimeout(30*time.Second).Should(Succeed(), "calling /smoke for 30 seconds should cause traces in Tempo")
@@ -75,7 +75,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(b)).Should(BeNumerically(">", 0))
 
-				sr, err = responses.ParseTempoResult(b)
+				sr, err = responses.ParseTempoSearchResult(b)
 
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(sr.Traces)).Should(BeNumerically(">", 0))
