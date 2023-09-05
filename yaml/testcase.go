@@ -96,6 +96,9 @@ func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 	result := fmt.Sprintf(format, a...)
 	if q.verbose {
 		_, _ = fmt.Fprintf(q.endpoint.Logger(), result)
+		if len(result) > 100 {
+			result = result[:100] + ".."
+		}
 		fmt.Print(result)
 	}
 }
