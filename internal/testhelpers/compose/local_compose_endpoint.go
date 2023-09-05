@@ -140,7 +140,7 @@ func (e *ComposeEndpoint) SearchTempo(ctx context.Context, query string) ([]byte
 		return nil, ctx.Err()
 	}
 
-	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/search?%s", e.Ports.TempoHTTPPort, url.QueryEscape(query)))
+	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/search?q=%s", e.Ports.TempoHTTPPort, url.QueryEscape(query)))
 }
 
 func (e *ComposeEndpoint) SearchTags(ctx context.Context, tags map[string]string) ([]byte, error) {

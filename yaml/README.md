@@ -27,7 +27,7 @@ expected:
           value: "> 0"
 ```
 
-You have to provide the root path of the java distributions example directory to ginkgo
+You have to provide the root path of the directory where your test cases are located to ginkgo
 via the environment variable `TESTCASE_BASE_PATH`.
 
 ## Docker Compose
@@ -48,21 +48,25 @@ Generators can be used to generate a docker-compose file from a template as a wa
 Currently, the only generator available is `java` which generates a docker-compose file for the java distribution
 examples.
 
-## Starting the Java Suite
+## Starting the Tests
+
+The java distribution is used as an example here, but you can use any other example.
 
 ```sh
-TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
+export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r
 ```
                            
 You can increase the timeout, which is useful if you want to inspect the telemetry data manually
 in grafana at http://localhost:3000
 
 ```sh
-TESTCASE_TIMEOUT=1h TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
+export TESTCASE_TIMEOUT=1h && export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r
 ```
+
+### Java specific options
 
 If you don't want to build the java examples, you can use the `TESTCASE_SKIP_BUILD` environment variable:
 
 ```sh
-TESTCASE_SKIP_BUILD=true TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
+export TESTCASE_SKIP_BUILD=true && export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r
 ```

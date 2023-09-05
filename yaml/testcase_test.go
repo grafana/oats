@@ -18,7 +18,14 @@ import (
 
 var _ = Describe("test case", Ordered, ContinueOnFailure, Label("docker", "integration", "slow"), func() {
 	Describe("yaml test case", func() {
-		for _, c := range yaml.ReadTestCases() {
+		cases, base := yaml.ReadTestCases()
+		if base != "" {
+			It("should have at least one test case", func() {
+				Expect(cases).ToNot(BeEmpty(), "expected at least one test case in %s", base)
+			})
+		}
+
+		for _, c := range cases {
 			Describe(c.Name, func() {
 				runTestCase(c)
 			})
@@ -58,6 +65,15 @@ func runTestCase(c yaml.TestCase) {
 	})
 
 	expected := c.Definition.Expected
+	// Assert traces first, because metrics and dashboards can take longer to appear
+	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
+	for _, trace := range expected.Traces {
+		It(fmt.Sprintf("should have '%s' in tempo", trace.TraceQL), func() {
+			r.eventually(func(g Gomega, queryLogger yaml.QueryLogger) {
+				yaml.AssertTempo(g, r.endpoint, queryLogger, trace.TraceQL, trace.Spans)
+			})
+		})
+	}
 	for _, dashboard := range expected.Dashboards {
 		dashboardAssert := yaml.NewDashboardAssert(dashboard)
 		for i, panel := range dashboard.Panels {
@@ -72,13 +88,6 @@ func runTestCase(c yaml.TestCase) {
 		It(fmt.Sprintf("should have '%s' in prometheus", metric.PromQL), func() {
 			r.eventually(func(g Gomega, queryLogger yaml.QueryLogger) {
 				yaml.AssertProm(g, r.endpoint, queryLogger, metric.PromQL, metric.Value)
-			})
-		})
-	}
-	for _, trace := range expected.Traces {
-		It(fmt.Sprintf("should have '%s' in tempo", trace.TraceQL), func() {
-			r.eventually(func(g Gomega, queryLogger yaml.QueryLogger) {
-				yaml.AssertTempo(g, r.endpoint, queryLogger, trace.TraceQL, trace.Spans)
 			})
 		})
 	}

@@ -97,8 +97,8 @@ func fixIds(body []byte, re *regexp.Regexp, idName string, capacity int) []byte 
 	})
 }
 
-func ParseTempoResult(body []byte) (TempoResult, error) {
-	var st TempoResult
+func ParseTempoSearchResult(body []byte) (TempoSearchResult, error) {
+	var st TempoSearchResult
 	err := json.Unmarshal(body, &st)
 
 	return st, err

@@ -16,7 +16,7 @@ func AssertTempo(g Gomega, endpoint *compose.ComposeEndpoint, queryLogger QueryL
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(len(b)).Should(BeNumerically(">", 0))
 
-	r, err := responses.ParseTempoResult(b)
+	r, err := responses.ParseTempoSearchResult(b)
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(r.Traces).ToNot(BeEmpty())
 

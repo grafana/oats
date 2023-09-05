@@ -96,15 +96,23 @@ func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 	result := fmt.Sprintf(format, a...)
 	if q.verbose {
 		_, _ = fmt.Fprintf(q.endpoint.Logger(), result)
+		if len(result) > 100 {
+			result = result[:100] + ".."
+		}
 		fmt.Print(result)
 	}
 }
 
-func ReadTestCases() []TestCase {
+func ReadTestCases() ([]TestCase, string) {
 	var cases []TestCase
 
 	base := os.Getenv("TESTCASE_BASE_PATH")
 	if base != "" {
+		abs, err := filepath.Abs(base)
+		if err != nil {
+			panic(err)
+		}
+		base = abs
 		timeout := os.Getenv("TESTCASE_TIMEOUT")
 		if timeout == "" {
 			timeout = "30s"
@@ -144,7 +152,7 @@ func ReadTestCases() []TestCase {
 			panic(err)
 		}
 	}
-	return cases
+	return cases, base
 }
 
 func (c *TestCase) ValidateAndSetDashboard() {
