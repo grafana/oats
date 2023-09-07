@@ -105,8 +105,6 @@ func joinComposeFiles(base []byte, add []byte) ([]byte, error) {
 		elems[k] = v
 	}
 
-	//services = append(services, elems...)
-	//b["services"] = services
 	return yaml.Marshal(b)
 }
 
