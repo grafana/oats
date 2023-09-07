@@ -106,7 +106,7 @@ func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 func ReadTestCases() ([]TestCase, string) {
 	var cases []TestCase
 
-	base := os.Getenv("TESTCASE_BASE_PATH")
+	base := TestCaseBashPath()
 	if base != "" {
 		abs, err := filepath.Abs(base)
 		if err != nil {
@@ -132,14 +132,18 @@ func ReadTestCases() ([]TestCase, string) {
 			}
 			def := TestCaseDefinition{}
 			content, err := os.ReadFile(p)
+			if err != nil {
+				return err
+			}
 			err = yaml.Unmarshal(content, &def)
 			if err != nil {
 				return err
 			}
 			dir := path.Dir(p)
 			name := strings.TrimPrefix(dir, base)
-			name = strings.TrimPrefix(name, "/")
-			name = strings.ReplaceAll(name, "/", "-")
+			sep := string(filepath.Separator)
+			name = strings.TrimPrefix(name, sep)
+			name = strings.ReplaceAll(name, sep, "-")
 			cases = append(cases, TestCase{
 				Name:       name,
 				Dir:        dir,
@@ -153,6 +157,10 @@ func ReadTestCases() ([]TestCase, string) {
 		}
 	}
 	return cases, base
+}
+
+func TestCaseBashPath() string {
+	return os.Getenv("TESTCASE_BASE_PATH")
 }
 
 func (c *TestCase) ValidateAndSetDashboard() {
