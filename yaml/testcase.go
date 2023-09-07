@@ -135,11 +135,22 @@ func ReadTestCases() ([]TestCase, string) {
 			if err != nil {
 				return err
 			}
+
+			dir := path.Dir(p)
+			maybeSymlink := strings.Split(string(content), "\n")
+			if len(maybeSymlink) == 1 {
+				// A symlink that is turned into a plain file on Windows
+				target := path.Join(dir, maybeSymlink[0])
+				content, err = os.ReadFile(target)
+				if err != nil {
+					return err
+				}
+			}
+
 			err = yaml.Unmarshal(content, &def)
 			if err != nil {
 				return err
 			}
-			dir := path.Dir(p)
 			name := strings.TrimPrefix(dir, base)
 			sep := string(filepath.Separator)
 			name = strings.TrimPrefix(name, sep)
