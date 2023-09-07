@@ -138,7 +138,7 @@ func ReadTestCases() ([]TestCase, string) {
 
 			dir := path.Dir(p)
 			maybeSymlink := strings.Split(string(content), "\n")
-			if len(maybeSymlink) == 1 {
+			if len(maybeSymlink) <= 2 {
 				// A symlink that is turned into a plain file on Windows
 				target := path.Join(dir, maybeSymlink[0])
 				content, err = os.ReadFile(target)

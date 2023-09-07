@@ -19,6 +19,7 @@ type javaTemplateVars struct {
 	ApplicationJar string
 	JmxConfig      string
 	Dashboard      string
+	ConfigDir      string
 }
 
 func (c *TestCase) applicationJar() string {
@@ -69,12 +70,16 @@ func imageName(dir string) string {
 func (c *TestCase) javaTemplateVars(dashboard string) (string, any) {
 	projectDir := strings.Split(c.Dir, "examples/")[0]
 
+	configDir, err := filepath.Abs("configs")
+	Expect(err).ToNot(HaveOccurred())
+
 	return "./docker-compose-java-template.yml", javaTemplateVars{
 		Image:          imageName(c.Dir),
 		JavaAgent:      path.Join(projectDir, "agent/build/libs/grafana-opentelemetry-java.jar"),
 		ApplicationJar: c.applicationJar(),
 		JmxConfig:      jmxConfig(c.Dir, c.Definition.DockerCompose.JavaGeneratorParams.OtelJmxConfig),
 		Dashboard:      dashboard,
+		ConfigDir:      configDir,
 	}
 }
 

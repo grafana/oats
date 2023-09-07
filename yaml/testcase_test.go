@@ -8,12 +8,10 @@ import (
 	"path"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	cp "github.com/otiai10/copy"
-
 	"github.com/grafana/oats/internal/testhelpers/compose"
 	"github.com/grafana/oats/internal/testhelpers/requests"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("test case", Ordered, ContinueOnFailure, Label("docker", "integration", "slow"), func() {
@@ -123,8 +121,6 @@ func prepareBuildDir(name string) string {
 	}
 	err = os.MkdirAll(dir, 0755)
 	Expect(err).ToNot(HaveOccurred(), "expected no error creating output directory")
-	err = cp.Copy("configs", dir)
-	Expect(err).ToNot(HaveOccurred(), "expected no error copying configs directory")
 	return dir
 }
 
