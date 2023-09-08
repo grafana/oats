@@ -29,7 +29,7 @@ func (c *TestCase) CreateDockerComposeFile() string {
 	return p
 }
 
-func (c *TestCase) getContent(compose DockerCompose) []byte {
+func (c *TestCase) getContent(compose *DockerCompose) []byte {
 	if compose.Generator != "" {
 		return c.generateDockerComposeFile()
 	} else {
@@ -37,13 +37,13 @@ func (c *TestCase) getContent(compose DockerCompose) []byte {
 	}
 }
 
-func readComposeFile(compose DockerCompose) []byte {
+func readComposeFile(compose *DockerCompose) []byte {
 	b, err := os.ReadFile(compose.File)
 	Expect(err).ToNot(HaveOccurred())
 	return replaceRefs(compose, b)
 }
 
-func replaceRefs(compose DockerCompose, bytes []byte) []byte {
+func replaceRefs(compose *DockerCompose, bytes []byte) []byte {
 	baseDir := path.Dir(compose.File)
 	lines := strings.Split(string(bytes), "\n")
 	for i, line := range lines {

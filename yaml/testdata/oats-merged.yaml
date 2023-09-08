@@ -1,0 +1,34 @@
+docker-compose:
+  generator: java
+input:
+  - url: http://localhost:8080/stock
+expected:
+  traces:
+    - traceql: '{ name =~ "SELECT .*cart"}'
+      spans:
+        - name: 'regex:SELECT .*cart'
+          attributes:
+            db.system: h2
+    - traceql: '{ name =~ "SELECT .*product"}'
+      spans:
+        - name: 'regex:SELECT .*'
+          attributes:
+            db.system: h2
+  dashboards:
+    - path: ../jdbc-dashboard2.json
+      panels:
+        - title: foo
+          value: "== 0"
+        - title: bar
+          value: ">= 0"
+    - path: ../jdbc-dashboard.json
+      panels:
+        - title: Connection pool waiting requests
+          value: "== 0"
+        - title: Connection pool utilization
+          value: ">= 0"
+  metrics:
+    - promql: foo
+      value: '>= 0'
+    - promql: bar
+      value: '>= 0'
