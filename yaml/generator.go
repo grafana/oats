@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/grafana/dashboard-linter/lint"
-	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -81,7 +81,7 @@ func (c *TestCase) getTemplateVars(dashboard string) (string, any) {
 	case "java":
 		return c.javaTemplateVars(dashboard)
 	default:
-		Fail("unknown generator " + generator)
+		ginkgo.Fail("unknown generator " + generator)
 		return "", nil
 	}
 }
