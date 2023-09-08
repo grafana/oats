@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"text/template"
 )
@@ -56,9 +57,13 @@ func replaceRefs(compose *DockerCompose, bytes []byte) []byte {
 
 func (c *TestCase) generateDockerComposeFile() []byte {
 
-	dashboard := "./configs/grafana-test-dashboard.json"
+	dashboard := ""
 	if c.Dashboard != nil {
 		dashboard = c.readDashboardFile()
+	} else {
+		configDir, err := filepath.Abs("configs")
+		Expect(err).ToNot(HaveOccurred())
+		dashboard = path.Join(configDir, "grafana-test-dashboard.json")
 	}
 	name, vars := c.getTemplateVars(dashboard)
 	t := template.Must(template.ParseFiles(name))
