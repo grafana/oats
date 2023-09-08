@@ -62,8 +62,8 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	Expect(err).ToNot(HaveOccurred())
 
 	name, vars := c.getTemplateVars()
-	vars["Dashboard"] = dashboard
-	vars["ConfigDir"] = configDir
+	vars["Dashboard"] = filepath.ToSlash(dashboard)
+	vars["ConfigDir"] = filepath.ToSlash(configDir)
 	vars["ApplicationPort"] = c.PortConfig.ApplicationPort
 	vars["GrafanaHTTPPort"] = c.PortConfig.GrafanaHTTPPort
 	vars["PrometheusHTTPPort"] = c.PortConfig.PrometheusHTTPPort

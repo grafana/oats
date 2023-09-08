@@ -62,8 +62,8 @@ func (c *TestCase) javaTemplateVars() (string, map[string]any) {
 
 	return filepath.FromSlash("./docker-compose-java-template.yml"), map[string]any{
 		"Image":          imageName(c.Dir),
-		"JavaAgent":      filepath.Join(projectDir, filepath.FromSlash("agent/build/libs/grafana-opentelemetry-java.jar")),
-		"ApplicationJar": c.applicationJar(),
+		"JavaAgent":      filepath.ToSlash(filepath.Join(projectDir, filepath.FromSlash("agent/build/libs/grafana-opentelemetry-java.jar"))),
+		"ApplicationJar": filepath.ToSlash(c.applicationJar()),
 		"JmxConfig":      jmxConfig(c.Dir, c.Definition.DockerCompose.JavaGeneratorParams.OtelJmxConfig),
 	}
 }
@@ -74,5 +74,5 @@ func jmxConfig(dir string, jmxConfig string) string {
 	}
 	p := filepath.Join(dir, jmxConfig)
 	Expect(p).To(BeAnExistingFile(), "jmx config file does not exist")
-	return p
+	return filepath.ToSlash(p)
 }

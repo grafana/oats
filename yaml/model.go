@@ -170,6 +170,10 @@ func (c *TestCase) validateAndSetVariables() {
 	}
 
 	ginkgo.GinkgoWriter.Printf("grafana port: %d\n", c.PortConfig.GrafanaHTTPPort)
+	ginkgo.GinkgoWriter.Printf("prometheus port: %d\n", c.PortConfig.PrometheusHTTPPort)
+	ginkgo.GinkgoWriter.Printf("loki port: %d\n", c.PortConfig.LokiHTTPPort)
+	ginkgo.GinkgoWriter.Printf("tempo port: %d\n", c.PortConfig.TempoHTTPPort)
+	ginkgo.GinkgoWriter.Printf("application port: %d\n", c.PortConfig.ApplicationPort)
 }
 
 func validateInput(input []Input) {
