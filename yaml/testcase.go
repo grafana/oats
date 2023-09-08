@@ -3,7 +3,6 @@ package yaml
 import (
 	"gopkg.in/yaml.v3"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -88,7 +87,7 @@ func readTestCaseDefinition(filePath string) (TestCaseDefinition, error) {
 	}
 
 	for _, s := range def.Include {
-		p := filepath.Join(path.Dir(filePath), s)
+		p := includePath(filePath, s)
 		other, err := readTestCaseDefinition(p)
 		if err != nil {
 			return TestCaseDefinition{}, err
@@ -98,6 +97,12 @@ func readTestCaseDefinition(filePath string) (TestCaseDefinition, error) {
 	def.Include = []string{}
 
 	return def, nil
+}
+
+func includePath(filePath string, include string) string {
+	dir := filepath.Dir(filePath)
+	fromSlash := filepath.FromSlash(include)
+	return filepath.Join(dir, fromSlash)
 }
 
 func TestCaseBashPath() string {
