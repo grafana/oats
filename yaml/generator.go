@@ -50,7 +50,6 @@ func replaceRefs(compose *DockerCompose, bytes []byte) []byte {
 }
 
 func (c *TestCase) generateDockerComposeFile() []byte {
-
 	dashboard := ""
 	if c.Dashboard != nil {
 		dashboard = c.readDashboardFile()
@@ -59,11 +58,22 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 		Expect(err).ToNot(HaveOccurred())
 		dashboard = filepath.Join(configDir, "grafana-test-dashboard.json")
 	}
-	name, vars := c.getTemplateVars(dashboard)
+	configDir, err := filepath.Abs("configs")
+	Expect(err).ToNot(HaveOccurred())
+
+	name, vars := c.getTemplateVars()
+	vars["Dashboard"] = dashboard
+	vars["ConfigDir"] = configDir
+	vars["ApplicationPort"] = c.PortConfig.ApplicationPort
+	vars["GrafanaHTTPPort"] = c.PortConfig.GrafanaHTTPPort
+	vars["PrometheusHTTPPort"] = c.PortConfig.PrometheusHTTPPort
+	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
+	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
+
 	t := template.Must(template.ParseFiles(name))
 
 	buf := bytes.NewBufferString("")
-	err := t.Execute(buf, vars)
+	err = t.Execute(buf, vars)
 	Expect(err).ToNot(HaveOccurred())
 	compose := c.Definition.DockerCompose
 	if compose.File != "" {
@@ -74,11 +84,11 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	return buf.Bytes()
 }
 
-func (c *TestCase) getTemplateVars(dashboard string) (string, any) {
+func (c *TestCase) getTemplateVars() (string, map[string]any) {
 	generator := c.Definition.DockerCompose.Generator
 	switch generator {
 	case "java":
-		return c.javaTemplateVars(dashboard)
+		return c.javaTemplateVars()
 	default:
 		ginkgo.Fail("unknown generator " + generator)
 		return "", nil

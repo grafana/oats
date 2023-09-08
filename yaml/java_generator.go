@@ -12,20 +12,11 @@ import (
 	"time"
 )
 
-type javaTemplateVars struct {
-	Image          string
-	JavaAgent      string
-	ApplicationJar string
-	JmxConfig      string
-	Dashboard      string
-	ConfigDir      string
-}
-
 func (c *TestCase) applicationJar() string {
 	t := time.Now()
 	build := os.Getenv("TESTCASE_SKIP_BUILD") != "true"
 	if build {
-		println("building application jar in " + c.Dir)
+		ginkgo.GinkgoWriter.Printf("building application jar in %s\n", c.Dir)
 		// create a new app.jar - only needed for local testing - maybe add an option to skip this in CI
 		cmd := exec.Command(filepath.FromSlash("../../../gradlew"), "clean", "build")
 		cmd.Dir = c.Dir
@@ -69,16 +60,11 @@ func imageName(dir string) string {
 func (c *TestCase) javaTemplateVars() (string, map[string]any) {
 	projectDir := strings.Split(c.Dir, filepath.FromSlash("examples/"))[0]
 
-	configDir, err := filepath.Abs("configs")
-	Expect(err).ToNot(HaveOccurred())
-
-	return "./docker-compose-java-template.yml", javaTemplateVars{
-		Image:          imageName(c.Dir),
-		JavaAgent:      filepath.Join(projectDir, "agent/build/libs/grafana-opentelemetry-java.jar"),
-		ApplicationJar: c.applicationJar(),
-		JmxConfig:      jmxConfig(c.Dir, c.Definition.DockerCompose.JavaGeneratorParams.OtelJmxConfig),
-		Dashboard:      dashboard,
-		ConfigDir:      configDir,
+	return filepath.FromSlash("./docker-compose-java-template.yml"), map[string]any{
+		"Image":          imageName(c.Dir),
+		"JavaAgent":      filepath.Join(projectDir, filepath.FromSlash("agent/build/libs/grafana-opentelemetry-java.jar")),
+		"ApplicationJar": c.applicationJar(),
+		"JmxConfig":      jmxConfig(c.Dir, c.Definition.DockerCompose.JavaGeneratorParams.OtelJmxConfig),
 	}
 }
 

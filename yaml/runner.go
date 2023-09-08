@@ -26,12 +26,12 @@ func RunTestCase(c TestCase) {
 
 	BeforeAll(func() {
 		c.OutputDir = prepareBuildDir(c.Name)
-		c.ValidateAndSetDashboard()
-		endpoint := startEndpoint(c)
+		c.validateAndSetVariables()
+		endpoint := c.startEndpoint()
 
 		r.deadline = time.Now().Add(c.Timeout)
 		r.endpoint = endpoint
-		_, _ = fmt.Printf("deadline = %v\n", r.deadline)
+		GinkgoWriter.Printf("deadline = %v\n", r.deadline)
 	})
 
 	AfterAll(func() {
@@ -73,20 +73,19 @@ func RunTestCase(c TestCase) {
 	}
 }
 
-func startEndpoint(c TestCase) *compose.ComposeEndpoint {
+func (c *TestCase) startEndpoint() *compose.ComposeEndpoint {
 	var ctx = context.Background()
-	var startErr error
 
 	endpoint := compose.NewEndpoint(
 		c.CreateDockerComposeFile(),
 		filepath.Join(c.OutputDir, "output.log"),
 		[]string{},
 		compose.PortsConfig{
-			PrometheusHTTPPort: 9090,
-			TempoHTTPPort:      3200,
+			PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
+			TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
 		},
 	)
-	startErr = endpoint.Start(ctx)
+	startErr := endpoint.Start(ctx)
 	Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
 	return endpoint
 }
@@ -124,8 +123,9 @@ func (r *runner) eventually(asserter func(g Gomega, queryLogger QueryLogger)) {
 		queryLogger.LogQueryResult("waiting for telemetry data\n")
 
 		for _, i := range r.testCase.Definition.Input {
-			err := requests.DoHTTPGet(i.Url, 200)
-			g.Expect(err).ToNot(HaveOccurred(), "expected no error calling application endpoint %s", i.Url)
+			url := fmt.Sprintf("http://localhost:%d%s", r.testCase.PortConfig.ApplicationPort, i.Path)
+			err := requests.DoHTTPGet(url, 200)
+			g.Expect(err).ToNot(HaveOccurred(), "expected no error calling application endpoint %s", url)
 		}
 
 		asserter(g, queryLogger)

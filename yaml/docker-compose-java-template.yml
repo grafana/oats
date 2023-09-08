@@ -21,7 +21,7 @@ services:
       - -c
       - java -javaagent:grafana-opentelemetry-java.jar -jar /app.jar
     ports:
-      - "8080:8080"
+      - "{{ .ApplicationPort }}:8080"
   grafana:
     image: grafana/grafana:10.0.0
     volumes:
@@ -29,7 +29,7 @@ services:
       - "{{ .ConfigDir }}/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/grafana-dashboards.yaml"
       - "{{ .Dashboard }}:/etc/grafana/grafana-test-dashboard.json"
     ports:
-      - "3000:3000"
+      - "{{ .GrafanaHTTPPort }}:3000"
   prometheus:
     image: prom/prometheus:v2.44.0
     command:
@@ -38,7 +38,7 @@ services:
       - --enable-feature=native-histograms
       - --config.file=/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"
+      - "{{ .PrometheusHTTPPort }}:9090"
   tempo:
     image: grafana/tempo:2.1.1
     volumes:
@@ -46,12 +46,12 @@ services:
     command:
       - --config.file=/config.yaml
     ports:
-      - "3200:3200"
+      - "{{ .TempoHTTPPort }}:3200"
 
   loki:
     image: grafana/loki:2.8.2
     ports:
-      - "3100:3100"
+      - "{{ .LokiHTTPPort }}:3100"
   collector:
     image: otel/opentelemetry-collector-contrib:0.83.0
     volumes:

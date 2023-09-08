@@ -7,6 +7,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
+	"net"
 	"path/filepath"
 	"time"
 )
@@ -54,7 +55,7 @@ type DockerCompose struct {
 }
 
 type Input struct {
-	Url string `yaml:"url"`
+	Path string `yaml:"path"`
 }
 
 type TestCaseDefinition struct {
@@ -79,11 +80,20 @@ type TestDashboard struct {
 	Content lint.Dashboard
 }
 
+type PortConfig struct {
+	ApplicationPort    int
+	GrafanaHTTPPort    int
+	PrometheusHTTPPort int
+	LokiHTTPPort       int
+	TempoHTTPPort      int
+}
+
 type TestCase struct {
 	Name       string
 	Dir        string
 	OutputDir  string
 	Definition TestCaseDefinition
+	PortConfig PortConfig
 	Dashboard  *TestDashboard
 	Timeout    time.Duration
 }
@@ -107,11 +117,11 @@ func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 		if len(result) > 100 {
 			result = result[:100] + ".."
 		}
-		fmt.Print(result)
+		ginkgo.GinkgoWriter.Print(result)
 	}
 }
 
-func (c *TestCase) ValidateAndSetDashboard() {
+func (c *TestCase) validateAndSetVariables() {
 	validateDockerCompose(c.Definition.DockerCompose, c.Dir)
 	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
@@ -150,12 +160,22 @@ func (c *TestCase) ValidateAndSetDashboard() {
 			Path: dashboardPath,
 		}
 	}
+
+	c.PortConfig = PortConfig{
+		ApplicationPort:    getFreePort(),
+		GrafanaHTTPPort:    getFreePort(),
+		PrometheusHTTPPort: getFreePort(),
+		LokiHTTPPort:       getFreePort(),
+		TempoHTTPPort:      getFreePort(),
+	}
+
+	ginkgo.GinkgoWriter.Printf("grafana port: %d\n", c.PortConfig.GrafanaHTTPPort)
 }
 
 func validateInput(input []Input) {
-	Expect(input).ToNot(BeEmpty())
+	Expect(input).ToNot(BeEmpty(), "input is empty")
 	for _, i := range input {
-		Expect(i.Url).ToNot(BeEmpty())
+		Expect(i.Path).ToNot(BeEmpty(), "input path is empty")
 	}
 }
 
@@ -167,7 +187,21 @@ func validateDockerCompose(d *DockerCompose, dir string) {
 			Expect(filepath.Join(filepath.Dir(d.File), resource)).To(BeAnExistingFile())
 		}
 	} else {
-		Expect(d.Generator).ToNot(BeEmpty())
-		Expect(d.Resources).To(BeEmpty())
+		Expect(d.Generator).ToNot(BeEmpty(), "generator needed if no file is specified")
+		Expect(d.Resources).To(BeEmpty(), "resources requires file")
 	}
+}
+
+func getFreePort() (port int) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		panic(err)
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		panic(err)
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
 }
