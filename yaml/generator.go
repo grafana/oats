@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -18,7 +17,7 @@ import (
 const generatedDashboard = "./dashboard.json"
 
 func (c *TestCase) CreateDockerComposeFile() string {
-	p := path.Join(c.OutputDir, "docker-compose.yml")
+	p := filepath.Join(c.OutputDir, "docker-compose.yml")
 	content := c.getContent(c.Definition.DockerCompose)
 	err := os.WriteFile(p, content, 0644)
 	Expect(err).ToNot(HaveOccurred())
@@ -40,11 +39,11 @@ func readComposeFile(compose *DockerCompose) []byte {
 }
 
 func replaceRefs(compose *DockerCompose, bytes []byte) []byte {
-	baseDir := path.Dir(compose.File)
+	baseDir := filepath.Dir(compose.File)
 	lines := strings.Split(string(bytes), "\n")
 	for i, line := range lines {
 		for _, resource := range compose.Resources {
-			lines[i] = strings.ReplaceAll(line, "./"+resource, path.Join(baseDir, resource))
+			lines[i] = strings.ReplaceAll(line, "./"+resource, filepath.Join(baseDir, resource))
 		}
 	}
 	return []byte(strings.Join(lines, "\n"))
@@ -58,7 +57,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	} else {
 		configDir, err := filepath.Abs("configs")
 		Expect(err).ToNot(HaveOccurred())
-		dashboard = path.Join(configDir, "grafana-test-dashboard.json")
+		dashboard = filepath.Join(configDir, "grafana-test-dashboard.json")
 	}
 	name, vars := c.getTemplateVars(dashboard)
 	t := template.Must(template.ParseFiles(name))
@@ -124,7 +123,7 @@ func (c *TestCase) parseDashboard(content []byte) lint.Dashboard {
 }
 
 func (c *TestCase) replaceDatasource(content []byte, err error) string {
-	newFile := path.Join(c.OutputDir, generatedDashboard)
+	newFile := filepath.Join(c.OutputDir, generatedDashboard)
 	lines := strings.Split(string(content), "\n")
 	for i, line := range lines {
 		lines[i] = strings.ReplaceAll(line, "${DS_GRAFANACLOUD-GREGORZEITLINGER-PROM}", "prometheus")

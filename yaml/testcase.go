@@ -60,7 +60,7 @@ func readTestCase(testBase, filePath string, duration time.Duration) (TestCase, 
 		return TestCase{}, err
 	}
 
-	dir := path.Dir(absolutePath(filePath))
+	dir := filepath.Dir(absolutePath(filePath))
 	name := strings.TrimPrefix(dir, absolutePath(testBase))
 	sep := string(filepath.Separator)
 	name = strings.TrimPrefix(name, sep)
@@ -88,7 +88,7 @@ func readTestCaseDefinition(filePath string) (TestCaseDefinition, error) {
 	}
 
 	for _, s := range def.Include {
-		p := path.Join(path.Dir(filePath), s)
+		p := filepath.Join(path.Dir(filePath), s)
 		other, err := readTestCaseDefinition(p)
 		if err != nil {
 			return TestCaseDefinition{}, err

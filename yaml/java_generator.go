@@ -6,7 +6,6 @@ import (
 	. "github.com/onsi/gomega"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -54,7 +53,7 @@ func (c *TestCase) applicationJar() string {
 }
 
 func imageName(dir string) string {
-	content, err := os.ReadFile(path.Join(dir, ".tool-versions"))
+	content, err := os.ReadFile(filepath.Join(dir, ".tool-versions"))
 	Expect(err).ToNot(HaveOccurred(), "could not read .tool-versions")
 	for _, line := range strings.Split(string(content), "\n") {
 		if strings.HasPrefix(line, "java ") {
@@ -75,7 +74,7 @@ func (c *TestCase) javaTemplateVars(dashboard string) (string, any) {
 
 	return "./docker-compose-java-template.yml", javaTemplateVars{
 		Image:          imageName(c.Dir),
-		JavaAgent:      path.Join(projectDir, "agent/build/libs/grafana-opentelemetry-java.jar"),
+		JavaAgent:      filepath.Join(projectDir, "agent/build/libs/grafana-opentelemetry-java.jar"),
 		ApplicationJar: c.applicationJar(),
 		JmxConfig:      jmxConfig(c.Dir, c.Definition.DockerCompose.JavaGeneratorParams.OtelJmxConfig),
 		Dashboard:      dashboard,
@@ -87,7 +86,7 @@ func jmxConfig(dir string, jmxConfig string) string {
 	if jmxConfig == "" {
 		return ""
 	}
-	p := path.Join(dir, jmxConfig)
+	p := filepath.Join(dir, jmxConfig)
 	Expect(p).To(BeAnExistingFile(), "jmx config file does not exist")
 	return p
 }

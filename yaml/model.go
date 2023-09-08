@@ -7,7 +7,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
-	"path"
+	"path/filepath"
 	"time"
 )
 
@@ -145,7 +145,7 @@ func (c *TestCase) ValidateAndSetDashboard() {
 		}
 
 		Expect(c.Dashboard).To(BeNil(), "only one dashboard is supported")
-		dashboardPath := path.Join(c.Dir, d.Path)
+		dashboardPath := filepath.Join(c.Dir, d.Path)
 		c.Dashboard = &TestDashboard{
 			Path: dashboardPath,
 		}
@@ -161,10 +161,10 @@ func validateInput(input []Input) {
 
 func validateDockerCompose(d *DockerCompose, dir string) {
 	if d.File != "" {
-		d.File = path.Join(dir, d.File)
+		d.File = filepath.Join(dir, d.File)
 		Expect(d.File).To(BeARegularFile())
 		for _, resource := range d.Resources {
-			Expect(path.Join(path.Dir(d.File), resource)).To(BeAnExistingFile())
+			Expect(filepath.Join(filepath.Dir(d.File), resource)).To(BeAnExistingFile())
 		}
 	} else {
 		Expect(d.Generator).ToNot(BeEmpty())

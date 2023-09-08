@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/grafana/oats/internal/testhelpers/compose"
@@ -79,7 +79,7 @@ func startEndpoint(c TestCase) *compose.ComposeEndpoint {
 
 	endpoint := compose.NewEndpoint(
 		c.CreateDockerComposeFile(),
-		path.Join(c.OutputDir, "output.log"),
+		filepath.Join(c.OutputDir, "output.log"),
 		[]string{},
 		compose.PortsConfig{
 			PrometheusHTTPPort: 9090,
@@ -92,7 +92,7 @@ func startEndpoint(c TestCase) *compose.ComposeEndpoint {
 }
 
 func prepareBuildDir(name string) string {
-	dir := path.Join(".", "build", name)
+	dir := filepath.Join(".", "build", name)
 
 	fileinfo, err := os.Stat(dir)
 	if err == nil {
