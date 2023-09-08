@@ -17,11 +17,6 @@ import (
 // relative to docker-compose.yml
 const generatedDashboard = "./dashboard.json"
 
-var skipComposeLines = []string{
-	"services:",
-	"version:",
-}
-
 func (c *TestCase) CreateDockerComposeFile() string {
 	p := path.Join(c.OutputDir, "docker-compose.yml")
 	content := c.getContent(c.Definition.DockerCompose)

@@ -75,8 +75,9 @@ func readTestCase(testBase, filePath string, duration time.Duration) (TestCase, 
 }
 
 func readTestCaseDefinition(filePath string) (TestCaseDefinition, error) {
+	filePath = absolutePath(filePath)
 	def := TestCaseDefinition{}
-	content, err := os.ReadFile(absolutePath(filePath))
+	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return TestCaseDefinition{}, err
 	}
