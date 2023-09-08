@@ -14,7 +14,7 @@ import (
 )
 
 // relative to docker-compose.yml
-const generatedDashboard = "./dashboard.json"
+var generatedDashboard = filepath.FromSlash("./dashboard.json")
 
 func (c *TestCase) CreateDockerComposeFile() string {
 	p := filepath.Join(c.OutputDir, "docker-compose.yml")

@@ -27,7 +27,7 @@ func (c *TestCase) applicationJar() string {
 	if build {
 		println("building application jar in " + c.Dir)
 		// create a new app.jar - only needed for local testing - maybe add an option to skip this in CI
-		cmd := exec.Command("../../../gradlew", "clean", "build")
+		cmd := exec.Command(filepath.FromSlash("../../../gradlew"), "clean", "build")
 		cmd.Dir = c.Dir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stdout
@@ -36,7 +36,7 @@ func (c *TestCase) applicationJar() string {
 		Expect(err).ToNot(HaveOccurred(), "could not build application jar")
 	}
 
-	pattern := c.Dir + "/build/libs/*SNAPSHOT.jar"
+	pattern := c.Dir + filepath.FromSlash("/build/libs/*SNAPSHOT.jar")
 	matches, err := filepath.Glob(pattern)
 	Expect(err).ToNot(HaveOccurred(), "could not find application jar")
 	Expect(matches).To(HaveLen(1))
@@ -66,8 +66,8 @@ func imageName(dir string) string {
 	return ""
 }
 
-func (c *TestCase) javaTemplateVars(dashboard string) (string, any) {
-	projectDir := strings.Split(c.Dir, "examples/")[0]
+func (c *TestCase) javaTemplateVars() (string, map[string]any) {
+	projectDir := strings.Split(c.Dir, filepath.FromSlash("examples/"))[0]
 
 	configDir, err := filepath.Abs("configs")
 	Expect(err).ToNot(HaveOccurred())
