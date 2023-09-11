@@ -22,10 +22,11 @@ var _ = Describe("test case", Label("docker", "integration", "slow"), func() {
 
 	configuration, _ := GinkgoConfiguration()
 	if configuration.ParallelTotal > 1 {
+		ports := yaml.NewPortAllocator(len(cases))
 		for _, c := range cases {
 			// Ports have to be allocated before we start executing in parallel to avoid taking the same port.
 			// Even though it sounds unlikely, it happens quite often.
-			c.AllocatePorts()
+			c.PortConfig = ports.AllocatePorts()
 		}
 	}
 

@@ -7,7 +7,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
-	"net"
 	"path/filepath"
 	"time"
 )
@@ -164,7 +163,7 @@ func (c *TestCase) validateAndSetVariables() {
 	if c.PortConfig == nil {
 		// In parallel execution, we allocate the ports before we start executing in parallel
 		// to avoid taking the same port.
-		c.AllocatePorts()
+		c.PortConfig = NewPortAllocator(1).AllocatePorts()
 	}
 
 	ginkgo.GinkgoWriter.Printf("grafana port: %d\n", c.PortConfig.GrafanaHTTPPort)
@@ -172,16 +171,6 @@ func (c *TestCase) validateAndSetVariables() {
 	ginkgo.GinkgoWriter.Printf("loki port: %d\n", c.PortConfig.LokiHTTPPort)
 	ginkgo.GinkgoWriter.Printf("tempo port: %d\n", c.PortConfig.TempoHTTPPort)
 	ginkgo.GinkgoWriter.Printf("application port: %d\n", c.PortConfig.ApplicationPort)
-}
-
-func (c *TestCase) AllocatePorts() {
-	c.PortConfig = &PortConfig{
-		ApplicationPort:    getFreePort(),
-		GrafanaHTTPPort:    getFreePort(),
-		PrometheusHTTPPort: getFreePort(),
-		LokiHTTPPort:       getFreePort(),
-		TempoHTTPPort:      getFreePort(),
-	}
 }
 
 func validateInput(input []Input) {
@@ -202,18 +191,4 @@ func validateDockerCompose(d *DockerCompose, dir string) {
 		Expect(d.Generator).ToNot(BeEmpty(), "generator needed if no file is specified")
 		Expect(d.Resources).To(BeEmpty(), "resources requires file")
 	}
-}
-
-func getFreePort() (port int) {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-	if err != nil {
-		panic(err)
-	}
-
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		panic(err)
-	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port
 }
