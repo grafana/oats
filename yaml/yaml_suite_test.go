@@ -20,6 +20,15 @@ var _ = Describe("test case", Label("docker", "integration", "slow"), func() {
 		})
 	}
 
+	configuration, _ := GinkgoConfiguration()
+	if configuration.ParallelTotal > 1 {
+		for _, c := range cases {
+			// Ports have to be allocated before we start executing in parallel to avoid taking the same port.
+			// Even though it sounds unlikely, it happens quite often.
+			c.AllocatePorts()
+		}
+	}
+
 	for _, c := range cases {
 		Describe(c.Name, Ordered, func() {
 			yaml.RunTestCase(c)

@@ -93,7 +93,7 @@ type TestCase struct {
 	Dir        string
 	OutputDir  string
 	Definition TestCaseDefinition
-	PortConfig PortConfig
+	PortConfig *PortConfig
 	Dashboard  *TestDashboard
 	Timeout    time.Duration
 }
@@ -161,12 +161,10 @@ func (c *TestCase) validateAndSetVariables() {
 		}
 	}
 
-	c.PortConfig = PortConfig{
-		ApplicationPort:    getFreePort(),
-		GrafanaHTTPPort:    getFreePort(),
-		PrometheusHTTPPort: getFreePort(),
-		LokiHTTPPort:       getFreePort(),
-		TempoHTTPPort:      getFreePort(),
+	if c.PortConfig == nil {
+		// In parallel execution, we allocate the ports before we start executing in parallel
+		// to avoid taking the same port.
+		c.AllocatePorts()
 	}
 
 	ginkgo.GinkgoWriter.Printf("grafana port: %d\n", c.PortConfig.GrafanaHTTPPort)
@@ -174,6 +172,16 @@ func (c *TestCase) validateAndSetVariables() {
 	ginkgo.GinkgoWriter.Printf("loki port: %d\n", c.PortConfig.LokiHTTPPort)
 	ginkgo.GinkgoWriter.Printf("tempo port: %d\n", c.PortConfig.TempoHTTPPort)
 	ginkgo.GinkgoWriter.Printf("application port: %d\n", c.PortConfig.ApplicationPort)
+}
+
+func (c *TestCase) AllocatePorts() {
+	c.PortConfig = &PortConfig{
+		ApplicationPort:    getFreePort(),
+		GrafanaHTTPPort:    getFreePort(),
+		PrometheusHTTPPort: getFreePort(),
+		LokiHTTPPort:       getFreePort(),
+		TempoHTTPPort:      getFreePort(),
+	}
 }
 
 func validateInput(input []Input) {
