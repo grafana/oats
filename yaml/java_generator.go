@@ -59,13 +59,30 @@ func imageName(dir string) string {
 
 func (c *TestCase) javaTemplateVars() (string, map[string]any) {
 	projectDir := strings.Split(c.Dir, filepath.FromSlash("examples/"))[0]
+	agent := filepath.Join(projectDir, filepath.FromSlash("agent/build/libs/grafana-opentelemetry-java.jar"))
+
+	_, err := os.Stat(agent)
+	if err != nil {
+		buildAgent(projectDir)
+	}
 
 	return filepath.FromSlash("./docker-compose-java-template.yml"), map[string]any{
 		"Image":          imageName(c.Dir),
-		"JavaAgent":      filepath.ToSlash(filepath.Join(projectDir, filepath.FromSlash("agent/build/libs/grafana-opentelemetry-java.jar"))),
+		"JavaAgent":      filepath.ToSlash(agent),
 		"ApplicationJar": filepath.ToSlash(c.applicationJar()),
 		"JmxConfig":      jmxConfig(c.Dir, c.Definition.DockerCompose.JavaGeneratorParams.OtelJmxConfig),
 	}
+}
+
+func buildAgent(projectDir string) {
+	ginkgo.GinkgoWriter.Printf("building javaagent in %s\n", projectDir)
+	cmd := exec.Command(filepath.FromSlash("./gradlew"), "clean", "build")
+	cmd.Dir = projectDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stdout
+
+	err := cmd.Run()
+	Expect(err).ToNot(HaveOccurred(), "could not build javaagent jar")
 }
 
 func jmxConfig(dir string, jmxConfig string) string {

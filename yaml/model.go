@@ -117,7 +117,7 @@ func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 		if len(result) > 100 {
 			result = result[:100] + ".."
 		}
-		ginkgo.GinkgoWriter.Print(result)
+		ginkgo.GinkgoWriter.Println(result)
 	}
 }
 
