@@ -63,6 +63,12 @@ in grafana at http://localhost:3000
 export TESTCASE_TIMEOUT=1h && export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r
 ```
 
+You can also run the tests in parallel:
+
+```sh
+export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r -p
+```
+
 ### Java specific options
 
 If you don't want to build the java examples, you can use the `TESTCASE_SKIP_BUILD` environment variable:
@@ -70,3 +76,11 @@ If you don't want to build the java examples, you can use the `TESTCASE_SKIP_BUI
 ```sh
 export TESTCASE_SKIP_BUILD=true && export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r
 ```
+
+If you want to attach a debugger to the java application, you can use the `TESTCASE_JVM_DEBUG` environment variable:
+
+```sh
+export TESTCASE_JVM_DEBUG=true && export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r
+```
+
+You can then attach a debugger to the java application at port 5005.

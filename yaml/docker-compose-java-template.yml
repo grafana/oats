@@ -19,9 +19,10 @@ services:
     command:
       - /bin/bash
       - -c
-      - java -javaagent:grafana-opentelemetry-java.jar -jar /app.jar
+      - java {{ .JvmDebug }} -javaagent:grafana-opentelemetry-java.jar -jar /app.jar
     ports:
       - "{{ .ApplicationPort }}:8080"
+      {{if .JvmDebug }}- "5005:5005" {{end}}
   grafana:
     image: grafana/grafana:10.0.0
     volumes:

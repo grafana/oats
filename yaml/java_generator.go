@@ -66,12 +66,28 @@ func (c *TestCase) javaTemplateVars() (string, map[string]any) {
 		buildAgent(projectDir)
 	}
 
+	image := imageName(c.Dir)
 	return filepath.FromSlash("./docker-compose-java-template.yml"), map[string]any{
-		"Image":          imageName(c.Dir),
+		"Image":          image,
 		"JavaAgent":      filepath.ToSlash(agent),
 		"ApplicationJar": filepath.ToSlash(c.applicationJar()),
 		"JmxConfig":      jmxConfig(c.Dir, c.Definition.DockerCompose.JavaGeneratorParams.OtelJmxConfig),
+		"JvmDebug":       jvmDebug(image),
 	}
+}
+
+func jvmDebug(image string) string {
+	if os.Getenv("TESTCASE_JVM_DEBUG") != "true" {
+		return ""
+	}
+	port := ""
+	if image == "eclipse-temurin:8-jre" {
+		port = "5005"
+	} else {
+		port = "*:5005"
+	}
+	ginkgo.GinkgoWriter.Printf("jvm debug port: %s\n", port)
+	return fmt.Sprintf("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=%s", port)
 }
 
 func buildAgent(projectDir string) {
