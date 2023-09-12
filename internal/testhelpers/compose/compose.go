@@ -4,6 +4,7 @@ package compose
 import (
 	"errors"
 	"fmt"
+	"github.com/onsi/ginkgo/v2"
 	"io"
 	"os"
 	"os/exec"
@@ -30,7 +31,7 @@ func ComposeSuite(composeFile, logFile string) (*Compose, error) {
 		return nil, err
 	}
 	abs, _ := filepath.Abs(logFile)
-	fmt.Printf("Logging to %s\n", abs)
+	ginkgo.GinkgoWriter.Printf("Logging to %s\n", abs)
 
 	command := "docker"
 	defaultArgs := []string{"compose"}

@@ -4,32 +4,27 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/grafana/dashboard-linter/lint"
-	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"text/template"
 )
 
 // relative to docker-compose.yml
-const generatedDashboard = "./dashboard.json"
-
-var skipComposeLines = []string{
-	"services:",
-	"version:",
-}
+var generatedDashboard = filepath.FromSlash("./dashboard.json")
 
 func (c *TestCase) CreateDockerComposeFile() string {
-	p := path.Join(c.OutputDir, "docker-compose.yml")
+	p := filepath.Join(c.OutputDir, "docker-compose.yml")
 	content := c.getContent(c.Definition.DockerCompose)
 	err := os.WriteFile(p, content, 0644)
 	Expect(err).ToNot(HaveOccurred())
 	return p
 }
 
-func (c *TestCase) getContent(compose DockerCompose) []byte {
+func (c *TestCase) getContent(compose *DockerCompose) []byte {
 	if compose.Generator != "" {
 		return c.generateDockerComposeFile()
 	} else {
@@ -37,34 +32,48 @@ func (c *TestCase) getContent(compose DockerCompose) []byte {
 	}
 }
 
-func readComposeFile(compose DockerCompose) []byte {
+func readComposeFile(compose *DockerCompose) []byte {
 	b, err := os.ReadFile(compose.File)
 	Expect(err).ToNot(HaveOccurred())
 	return replaceRefs(compose, b)
 }
 
-func replaceRefs(compose DockerCompose, bytes []byte) []byte {
-	baseDir := path.Dir(compose.File)
+func replaceRefs(compose *DockerCompose, bytes []byte) []byte {
+	baseDir := filepath.Dir(compose.File)
 	lines := strings.Split(string(bytes), "\n")
 	for i, line := range lines {
 		for _, resource := range compose.Resources {
-			lines[i] = strings.ReplaceAll(line, "./"+resource, path.Join(baseDir, resource))
+			lines[i] = strings.ReplaceAll(line, "./"+resource, filepath.Join(baseDir, resource))
 		}
 	}
 	return []byte(strings.Join(lines, "\n"))
 }
 
 func (c *TestCase) generateDockerComposeFile() []byte {
-
-	dashboard := "./configs/grafana-test-dashboard.json"
+	dashboard := ""
 	if c.Dashboard != nil {
 		dashboard = c.readDashboardFile()
+	} else {
+		configDir, err := filepath.Abs("configs")
+		Expect(err).ToNot(HaveOccurred())
+		dashboard = filepath.Join(configDir, "grafana-test-dashboard.json")
 	}
-	name, vars := c.getTemplateVars(dashboard)
+	configDir, err := filepath.Abs("configs")
+	Expect(err).ToNot(HaveOccurred())
+
+	name, vars := c.getTemplateVars()
+	vars["Dashboard"] = filepath.ToSlash(dashboard)
+	vars["ConfigDir"] = filepath.ToSlash(configDir)
+	vars["ApplicationPort"] = c.PortConfig.ApplicationPort
+	vars["GrafanaHTTPPort"] = c.PortConfig.GrafanaHTTPPort
+	vars["PrometheusHTTPPort"] = c.PortConfig.PrometheusHTTPPort
+	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
+	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
+
 	t := template.Must(template.ParseFiles(name))
 
 	buf := bytes.NewBufferString("")
-	err := t.Execute(buf, vars)
+	err = t.Execute(buf, vars)
 	Expect(err).ToNot(HaveOccurred())
 	compose := c.Definition.DockerCompose
 	if compose.File != "" {
@@ -75,13 +84,13 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	return buf.Bytes()
 }
 
-func (c *TestCase) getTemplateVars(dashboard string) (string, any) {
+func (c *TestCase) getTemplateVars() (string, map[string]any) {
 	generator := c.Definition.DockerCompose.Generator
 	switch generator {
 	case "java":
-		return c.javaTemplateVars(dashboard)
+		return c.javaTemplateVars()
 	default:
-		Fail("unknown generator " + generator)
+		ginkgo.Fail("unknown generator " + generator)
 		return "", nil
 	}
 }
@@ -105,8 +114,6 @@ func joinComposeFiles(base []byte, add []byte) ([]byte, error) {
 		elems[k] = v
 	}
 
-	//services = append(services, elems...)
-	//b["services"] = services
 	return yaml.Marshal(b)
 }
 
@@ -126,7 +133,7 @@ func (c *TestCase) parseDashboard(content []byte) lint.Dashboard {
 }
 
 func (c *TestCase) replaceDatasource(content []byte, err error) string {
-	newFile := path.Join(c.OutputDir, generatedDashboard)
+	newFile := filepath.Join(c.OutputDir, generatedDashboard)
 	lines := strings.Split(string(content), "\n")
 	for i, line := range lines {
 		lines[i] = strings.ReplaceAll(line, "${DS_GRAFANACLOUD-GREGORZEITLINGER-PROM}", "prometheus")

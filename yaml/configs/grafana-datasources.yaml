@@ -4,7 +4,7 @@ datasources:
   - name: Prometheus
     type: prometheus
     uid: prometheus
-    url: http://localhost:9090
+    url: http://prometheus:9090
     jsonData:
       exemplarTraceIdDestinations:
         - name: trace_id
@@ -13,7 +13,7 @@ datasources:
   - name: Tempo
     type: tempo
     uid: tempo
-    url: http://localhost:3200
+    url: http://tempo:3200
     jsonData:
       tracesToLogs:
         datasourceUid: 'loki'
@@ -32,7 +32,7 @@ datasources:
   - name: Loki
     type: loki
     uid: loki
-    url: http://localhost:3100
+    url: http://loki:3100
     jsonData:
       derivedFields:
         - name: 'trace_id'

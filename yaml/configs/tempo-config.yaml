@@ -7,9 +7,6 @@ distributor:
     otlp:
       protocols:
         grpc:
-          endpoint: "localhost:4417"
-        http:
-          endpoint: "localhost:4418"
 
 storage:
   trace:
