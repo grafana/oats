@@ -161,9 +161,14 @@ func (c *TestCase) validateAndSetVariables() {
 	}
 
 	if c.PortConfig == nil {
-		// In parallel execution, we allocate the ports before we start executing in parallel
-		// to avoid taking the same port.
-		c.PortConfig = NewPortAllocator(1).AllocatePorts()
+		// We're in non-parallel mode, so we can static ports here.
+		c.PortConfig = &PortConfig{
+			ApplicationPort:    8080,
+			GrafanaHTTPPort:    3000,
+			PrometheusHTTPPort: 9090,
+			LokiHTTPPort:       3100,
+			TempoHTTPPort:      3200,
+		}
 	}
 
 	ginkgo.GinkgoWriter.Printf("grafana port: %d\n", c.PortConfig.GrafanaHTTPPort)

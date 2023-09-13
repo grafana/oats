@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-func ReadTestCases() ([]TestCase, string) {
-	var cases []TestCase
+func ReadTestCases() ([]*TestCase, string) {
+	var cases []*TestCase
 
 	base := TestCaseBashPath()
 	if base != "" {
@@ -35,7 +35,7 @@ func ReadTestCases() ([]TestCase, string) {
 			if err != nil {
 				return err
 			}
-			cases = append(cases, testCase)
+			cases = append(cases, &testCase)
 			return nil
 		})
 		if err != nil {

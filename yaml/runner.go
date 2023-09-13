@@ -19,9 +19,9 @@ type runner struct {
 	deadline time.Time
 }
 
-func RunTestCase(c TestCase) {
+func RunTestCase(c *TestCase) {
 	r := &runner{
-		testCase: &c,
+		testCase: c,
 	}
 
 	BeforeAll(func() {
@@ -31,6 +31,11 @@ func RunTestCase(c TestCase) {
 
 		r.deadline = time.Now().Add(c.Timeout)
 		r.endpoint = endpoint
+		if os.Getenv("TESTCASE_MANUAL_DEBUG") == "true" {
+			GinkgoWriter.Printf("stopping to let you manually debug on http://localhost:%d", r.testCase.PortConfig.GrafanaHTTPPort)
+			time.Sleep(100 * time.Hour)
+		}
+
 		GinkgoWriter.Printf("deadline = %v\n", r.deadline)
 	})
 
