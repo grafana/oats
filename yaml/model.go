@@ -32,8 +32,8 @@ type ExpectedSpan struct {
 }
 
 type ExpectedLogs struct {
-	LogQL    string `yaml:"logql"`
-	Contains string `yaml:"contains"`
+	LogQL    string   `yaml:"logql"`
+	Contains []string `yaml:"contains"`
 }
 
 type ExpectedTraces struct {
@@ -138,6 +138,9 @@ func (c *TestCase) validateAndSetVariables() {
 		out, _ := yaml.Marshal(l)
 		Expect(l.LogQL).ToNot(BeEmpty(), "logQL is empty in "+string(out))
 		Expect(l.Contains).ToNot(BeEmpty(), "contains is empty in "+string(out))
+		for _, s := range l.Contains {
+			Expect(s).ToNot(BeEmpty(), "contains string is empty in "+string(out))
+		}
 	}
 	for _, d := range expected.Metrics {
 		out, _ := yaml.Marshal(d)
