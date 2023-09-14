@@ -23,7 +23,7 @@ services:
       - "{{ .ApplicationPort }}:8080"
       {{if .JvmDebug }}- "5005:5005" {{end}}
   grafana:
-    image: grafana/grafana:10.0.0
+    image: grafana/grafana:10.0.5
     volumes:
       - "{{ .ConfigDir }}/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml"
       - "{{ .ConfigDir }}/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/grafana-dashboards.yaml"
@@ -31,7 +31,7 @@ services:
     ports:
       - "{{ .GrafanaHTTPPort }}:3000"
   prometheus:
-    image: prom/prometheus:v2.44.0
+    image: prom/prometheus:v2.47.0
     command:
       - --web.enable-remote-write-receiver
       - --enable-feature=exemplar-storage
@@ -40,7 +40,7 @@ services:
     ports:
       - "{{ .PrometheusHTTPPort }}:9090"
   tempo:
-    image: grafana/tempo:2.1.1
+    image: grafana/tempo:2.2.3
     volumes:
       - "{{ .ConfigDir }}/tempo-config.yaml:/config.yaml"
     command:
@@ -49,11 +49,11 @@ services:
       - "{{ .TempoHTTPPort }}:3200"
 
   loki:
-    image: grafana/loki:2.8.2
+    image: grafana/loki:2.9.0
     ports:
       - "{{ .LokiHTTPPort }}:3100"
   collector:
-    image: otel/opentelemetry-collector-contrib:0.83.0
+    image: otel/opentelemetry-collector-contrib:0.85.0
     volumes:
       - "{{ .ConfigDir }}/otelcol-config.yaml:/config.yaml"
     command:
