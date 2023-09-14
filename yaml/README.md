@@ -15,6 +15,15 @@ docker-compose:
 input:
   - url: http://localhost:8080/stock
 expected:
+  traces:
+    - traceql: '{ name =~ "SELECT .*product"}'
+      spans:
+        - name: 'regex:SELECT .*'
+          attributes:
+            db.system: h2
+  logs:
+    - logql: '{exporter = "OTLP"}'
+      contains: 'hello LGTM'
   metrics:
     - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
       value: "== 10"

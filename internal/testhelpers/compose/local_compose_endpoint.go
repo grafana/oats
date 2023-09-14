@@ -22,6 +22,7 @@ type PortsConfig struct {
 	TempoHTTPPort      int
 	MimirHTTPPort      int
 	PrometheusHTTPPort int
+	LokiHttpPort       int
 }
 
 type ComposeEndpoint struct {
@@ -176,6 +177,28 @@ func (e *ComposeEndpoint) RunPromQL(ctx context.Context, promQL string) ([]byte,
 	resp, err := http.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("querying prometheus: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("can't read response body: %w", err)
+	}
+
+	return body, nil
+}
+
+func (e *ComposeEndpoint) SearchLoki(query string) ([]byte, error) {
+	if e.Ports.LokiHttpPort == 0 {
+		return nil, fmt.Errorf("to search Loki you must configure a LokiHttpPort")
+	}
+
+	u := fmt.Sprintf("http://localhost:%d/loki/api/v1/query?query=%s", e.Ports.LokiHttpPort, url.PathEscape(query))
+
+	resp, err := http.Get(u)
+	if err != nil {
+		return nil, fmt.Errorf("querying loki: %w", err)
 	}
 
 	defer resp.Body.Close()

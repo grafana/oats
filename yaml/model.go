@@ -31,12 +31,18 @@ type ExpectedSpan struct {
 	Attributes map[string]string `yaml:"attributes"`
 }
 
+type ExpectedLogs struct {
+	LogQL    string `yaml:"logql"`
+	Contains string `yaml:"contains"`
+}
+
 type ExpectedTraces struct {
 	TraceQL string         `yaml:"traceql"`
 	Spans   []ExpectedSpan `yaml:"spans"`
 }
 
 type Expected struct {
+	Logs       []ExpectedLogs      `yaml:"logs"`
 	Traces     []ExpectedTraces    `yaml:"traces"`
 	Metrics    []ExpectedMetrics   `yaml:"metrics"`
 	Dashboards []ExpectedDashboard `yaml:"dashboards"`
@@ -65,6 +71,7 @@ type TestCaseDefinition struct {
 }
 
 func (d *TestCaseDefinition) Merge(other TestCaseDefinition) {
+	d.Expected.Logs = append(d.Expected.Logs, other.Expected.Logs...)
 	d.Expected.Traces = append(d.Expected.Traces, other.Expected.Traces...)
 	d.Expected.Metrics = append(d.Expected.Metrics, other.Expected.Metrics...)
 	d.Expected.Dashboards = append(d.Expected.Dashboards, other.Expected.Dashboards...)
@@ -124,8 +131,13 @@ func (c *TestCase) validateAndSetVariables() {
 	validateDockerCompose(c.Definition.DockerCompose, c.Dir)
 	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
-	if len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 && len(expected.Traces) == 0 {
-		ginkgo.Fail("expected metrics or dashboards or traces")
+	if len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0 {
+		ginkgo.Fail("expected metrics or dashboards or traces or logs")
+	}
+	for _, l := range expected.Logs {
+		out, _ := yaml.Marshal(l)
+		Expect(l.LogQL).ToNot(BeEmpty(), "logQL is empty in "+string(out))
+		Expect(l.Contains).ToNot(BeEmpty(), "contains is empty in "+string(out))
 	}
 	for _, d := range expected.Metrics {
 		out, _ := yaml.Marshal(d)
