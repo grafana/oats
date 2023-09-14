@@ -68,12 +68,12 @@ func (c *TestCase) javaTemplateVars() (string, map[string]any) {
 
 	image := imageName(c.Dir)
 	return filepath.FromSlash("./docker-compose-java-template.yml"), map[string]any{
-		"Image":                     image,
-		"JavaAgent":                 filepath.ToSlash(agent),
-		"ApplicationJar":            filepath.ToSlash(c.applicationJar()),
-		"JmxConfig":                 jmxConfig(c.Dir, c.Definition.DockerCompose.JavaGeneratorParams.OtelJmxConfig),
-		"JvmDebug":                  jvmDebug(image),
-		"UseTestedInstrumentations": os.Getenv("TESTCASE_INCLUDE_ALL_INSTRUMENTATIONS") != "true",
+		"Image":                  image,
+		"JavaAgent":              filepath.ToSlash(agent),
+		"ApplicationJar":         filepath.ToSlash(c.applicationJar()),
+		"JmxConfig":              jmxConfig(c.Dir, c.Definition.DockerCompose.JavaGeneratorParams.OtelJmxConfig),
+		"JvmDebug":               jvmDebug(image),
+		"UseAllInstrumentations": os.Getenv("TESTCASE_INCLUDE_ALL_INSTRUMENTATIONS") == "true",
 	}
 }
 
