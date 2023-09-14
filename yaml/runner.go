@@ -19,9 +19,9 @@ type runner struct {
 	deadline time.Time
 }
 
-func RunTestCase(c TestCase) {
+func RunTestCase(c *TestCase) {
 	r := &runner{
-		testCase: &c,
+		testCase: c,
 	}
 
 	BeforeAll(func() {
@@ -31,6 +31,17 @@ func RunTestCase(c TestCase) {
 
 		r.deadline = time.Now().Add(c.Timeout)
 		r.endpoint = endpoint
+		if os.Getenv("TESTCASE_MANUAL_DEBUG") == "true" {
+			GinkgoWriter.Printf("stopping to let you manually debug on http://localhost:%d", r.testCase.PortConfig.GrafanaHTTPPort)
+
+			for {
+				r.eventually(func(g Gomega, queryLogger QueryLogger) {
+					// do nothing - just feed input into the application
+				})
+				time.Sleep(1 * time.Second)
+			}
+		}
+
 		GinkgoWriter.Printf("deadline = %v\n", r.deadline)
 	})
 
@@ -45,8 +56,15 @@ func RunTestCase(c TestCase) {
 	})
 
 	expected := c.Definition.Expected
-	// Assert traces first, because metrics and dashboards can take longer to appear
+	// Assert logs traces first, because metrics and dashboards can take longer to appear
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
+	for _, log := range expected.Logs {
+		It(fmt.Sprintf("should have '%s' in loki", log.LogQL), func() {
+			r.eventually(func(g Gomega, queryLogger QueryLogger) {
+				AssertLoki(g, r.endpoint, queryLogger, log.LogQL, log.Contains)
+			})
+		})
+	}
 	for _, trace := range expected.Traces {
 		It(fmt.Sprintf("should have '%s' in tempo", trace.TraceQL), func() {
 			r.eventually(func(g Gomega, queryLogger QueryLogger) {
@@ -83,6 +101,7 @@ func (c *TestCase) startEndpoint() *compose.ComposeEndpoint {
 		compose.PortsConfig{
 			PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
 			TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
+			LokiHttpPort:       c.PortConfig.LokiHTTPPort,
 		},
 	)
 	startErr := endpoint.Start(ctx)
