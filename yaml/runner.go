@@ -33,7 +33,13 @@ func RunTestCase(c *TestCase) {
 		r.endpoint = endpoint
 		if os.Getenv("TESTCASE_MANUAL_DEBUG") == "true" {
 			GinkgoWriter.Printf("stopping to let you manually debug on http://localhost:%d", r.testCase.PortConfig.GrafanaHTTPPort)
-			time.Sleep(100 * time.Hour)
+
+			for {
+				r.eventually(func(g Gomega, queryLogger QueryLogger) {
+					// do nothing - just feed input into the application
+				})
+				time.Sleep(1 * time.Second)
+			}
 		}
 
 		GinkgoWriter.Printf("deadline = %v\n", r.deadline)
