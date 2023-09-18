@@ -7,6 +7,8 @@ The syntax is a bit similar to https://github.com/kubeshop/tracetest
 This is an example:
 
 ```yaml
+include:
+  - ../oats-template.yaml
 docker-compose:
   generator: java
   file: ../docker-compose.yaml
@@ -63,44 +65,51 @@ examples.
 The java distribution is used as an example here, but you can use any other example.
 
 ```sh
-(export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r)
+TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
 ```
-                           
+
+If you want to run a single test case, you can use the `--focus` option:
+
+```sh
+TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r --focus="jdbc"
+```
+
 You can increase the timeout, which is useful if you want to inspect the telemetry data manually
 in grafana at http://localhost:3000
 
 ```sh
-(export TESTCASE_TIMEOUT=1h && export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r)
+TESTCASE_TIMEOUT=1h TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
 ```
 
 You can also run the tests in parallel:
 
 ```sh
-(export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r -p)
+TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r -p
 ```
                              
 You can keep the container running without executing the tests - which is useful to debug in grafana manually:
 
 ```sh
-(export TESTCASE_MANUAL_DEBUG=true && export TESTCASE_TIMEOUT=1h && export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r)
+TESTCASE_MANUAL_DEBUG=true TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
+```
 
 ### Java specific options
 
 If you don't want to build the java examples, you can use the `TESTCASE_SKIP_BUILD` environment variable:
 
 ```sh
-(export TESTCASE_SKIP_BUILD=true && export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r)
+TESTCASE_SKIP_BUILD=true TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
 ```
 
 If you want to attach a debugger to the java application, you can use the `TESTCASE_JVM_DEBUG` environment variable:
 
 ```sh
-(export TESTCASE_JVM_DEBUG=true && export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r)
+TESTCASE_JVM_DEBUG=true TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
 ```
 
 If you want to enable all instrumentations (including the ones that are disabled by default), you can use the `TESTCASE_INCLUDE_ALL_INSTRUMENTATIONS` environment variable:
 
 ```sh
-(export TESTCASE_INCLUDE_ALL_INSTRUMENTATIONS=true && export TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples && ginkgo -v -r)
+TESTCASE_INCLUDE_ALL_INSTRUMENTATIONS=true TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
 ```
 You can then attach a debugger to the java application at port 5005.

@@ -36,11 +36,17 @@ func assertTrace(g Gomega, endpoint *compose.ComposeEndpoint, tr responses.Trace
 	g.Expect(err).ToNot(HaveOccurred(), "we should be able to parse the GET trace by traceID API output")
 
 	for _, wantSpan := range wantSpans {
-		spans := responses.FindSpans(td, wantSpan.Name)
+		spans, atts := responses.FindSpansWithAttributes(td, wantSpan.Name)
 		g.Expect(spans).To(HaveLen(1), "we should find a single span with the name %s", wantSpan.Name)
 
 		for k, v := range wantSpan.Attributes {
-			err := responses.MatchTraceAttribute(spans[0].Attributes(), pcommon.ValueTypeStr, k, v)
+			for k, v := range spans[0].Attributes().AsRaw() {
+				atts[k] = v
+			}
+			m := pcommon.NewMap()
+			err = m.FromRaw(atts)
+			g.Expect(err).ToNot(HaveOccurred(), "we should be able to convert the map to a pdata.Map")
+			err := responses.MatchTraceAttribute(m, pcommon.ValueTypeStr, k, v)
 			g.Expect(err).ToNot(HaveOccurred(), "span attribute should match")
 		}
 	}
