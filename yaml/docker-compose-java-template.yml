@@ -58,4 +58,5 @@ services:
       - "{{ .ConfigDir }}/otelcol-config.yaml:/config.yaml"
     command:
       - --config=file:/config.yaml
-#      - --feature-gates=pkg.translator.prometheus.NormalizeName # we currently don't support this in our dashboards
+      # we currently don't support this in our dashboards and grafana agent doesn't understand it yet
+      - --feature-gates=-pkg.translator.prometheus.NormalizeName
