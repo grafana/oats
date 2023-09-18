@@ -21,9 +21,8 @@ func MatchTraceAttribute(attributes pcommon.Map, attrType pcommon.ValueType, key
 		return fmt.Errorf("value type for key %s is %s which doesn't match the expect type %s", key, valueType, attrType)
 	}
 
-	str := att.AsString()
-	if value != "" && value != str {
-		return fmt.Errorf("value for key %s is %s which doesn't match the expect value %s", key, str, value)
+	if value != "" && !matcherMaybeRegex(value)(att.AsString()) {
+		return fmt.Errorf("value for key %s is %s which doesn't match the expect value %s", key, att.AsString(), value)
 	}
 	return nil
 }
@@ -105,38 +104,64 @@ func ParseTempoSearchResult(body []byte) (TempoSearchResult, error) {
 }
 
 func FindSpans(td ptrace.Traces, name string) []ptrace.Span {
-	var re *regexp.Regexp
-	if strings.HasPrefix(name, "regex:") {
-		re = regexp.MustCompile(name[6:])
-	}
+	spans, _ := FindSpansWithAttributes(td, name)
+	return spans
+}
+func FindSpansWithAttributes(td ptrace.Traces, name string) ([]ptrace.Span, map[string]any) {
+	m := matcherMaybeRegex(name)
 	return FindSpansFunc(td, func(span *ptrace.Span) bool {
-		if re != nil {
-			return re.MatchString(span.Name())
-		}
-		return span.Name() == name
+		return m(span.Name())
 	})
 }
 
 func ChildrenOf(td ptrace.Traces, spanId string) []ptrace.Span {
-	return FindSpansFunc(td, func(span *ptrace.Span) bool {
+	spans, _ := FindSpansFunc(td, func(span *ptrace.Span) bool {
 		return span.ParentSpanID().String() == spanId
 	})
+	return spans
 }
 
-func FindSpansFunc(td ptrace.Traces, pred func(*ptrace.Span) bool) []ptrace.Span {
+func FindSpansFunc(td ptrace.Traces, pred func(*ptrace.Span) bool) ([]ptrace.Span, map[string]any) {
 	var result []ptrace.Span
+	atts := map[string]any{}
 	resourceSpans := td.ResourceSpans()
 	for i := 0; i < resourceSpans.Len(); i++ {
-		scopeSpans := resourceSpans.At(i).ScopeSpans()
+		resourceSpan := resourceSpans.At(i)
+		scopeSpans := resourceSpan.ScopeSpans()
 		for j := 0; j < scopeSpans.Len(); j++ {
-			spans := scopeSpans.At(j).Spans()
+			scopeSpan := scopeSpans.At(j)
+			spans := scopeSpan.Spans()
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
 				if pred(&span) {
 					result = append(result, span)
+					for k, v := range resourceSpan.Resource().Attributes().AsRaw() {
+						atts[k] = v
+					}
+					scope := scopeSpan.Scope()
+					for k, v := range scope.Attributes().AsRaw() {
+						atts[k] = v
+					}
+					//this is how the scope name is shown in tempo
+					atts["otel.library.name"] = scope.Name()
+					atts["otel.library.version"] = scope.Version()
 				}
 			}
 		}
 	}
-	return result
+	return result, atts
+}
+
+func matcherMaybeRegex(want string) func(got string) bool {
+	var re *regexp.Regexp
+	if strings.HasPrefix(want, "regex:") {
+		re = regexp.MustCompile(want[6:])
+	}
+
+	return func(got string) bool {
+		if re != nil {
+			return re.MatchString(got)
+		}
+		return want == got
+	}
 }
