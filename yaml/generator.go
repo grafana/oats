@@ -95,26 +95,39 @@ func (c *TestCase) getTemplateVars() (string, map[string]any) {
 	}
 }
 
-func joinComposeFiles(base []byte, add []byte) ([]byte, error) {
-	a := map[string]any{}
-	b := map[string]any{}
+func joinComposeFiles(template []byte, addition []byte) ([]byte, error) {
+	base := map[string]any{}
+	add := map[string]any{}
 
-	err := yaml.Unmarshal(base, &a)
+	err := yaml.Unmarshal(template, &base)
 	if err != nil {
 		return nil, err
 	}
-	err = yaml.Unmarshal(add, &b)
+	err = yaml.Unmarshal(addition, &add)
 	if err != nil {
 		return nil, err
 	}
 
 	//not a generic solution, but works for our use case
-	elems := b["services"].(map[string]any)
-	for k, v := range a["services"].(map[string]any) {
-		elems[k] = v
+	addFromBase(base, add, "services")
+	addFromBase(base, add, "networks")
+
+	return yaml.Marshal(add)
+}
+
+func addFromBase(base map[string]any, add map[string]any, key string) {
+	addMap, ok := add[key].(map[string]any)
+	if !ok {
+		addMap = map[string]any{}
+		add[key] = addMap
 	}
 
-	return yaml.Marshal(b)
+	baseMap, ok := base[key].(map[string]any)
+	if ok {
+		for k, v := range baseMap {
+			addMap[k] = v
+		}
+	}
 }
 
 func (c *TestCase) readDashboardFile() string {

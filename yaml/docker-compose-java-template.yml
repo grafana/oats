@@ -1,4 +1,10 @@
 version: "3.9"
+networks: # see https://stackoverflow.com/questions/43720339/docker-error-could-not-find-an-available-non-overlapping-ipv4-address-pool-am
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.57.0/24
 services:
   application:
     image: "{{ .Image }}"
