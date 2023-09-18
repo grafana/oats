@@ -91,6 +91,7 @@ You can keep the container running without executing the tests - which is useful
 
 ```sh
 TESTCASE_MANUAL_DEBUG=true TESTCASE_BASE_PATH=/path/to/grafana-opentelemetry-java/examples ginkgo -v -r
+```
 
 ### Java specific options
 
