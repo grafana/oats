@@ -52,7 +52,13 @@ func ComposeSuite(composeFile, logFile string) (*Compose, error) {
 }
 
 func (c *Compose) Up() error {
-	return c.command("up", "--build", "--detach")
+	//networks accumulate over time and can cause issues with the tests
+	err := c.runDocker(false, "network", "prune", "-f")
+	if err != nil {
+		return fmt.Errorf("failed to prune docker networks: %w", err)
+	}
+
+	return c.command("up", "--build", "--detach", "--force-recreate")
 }
 
 func (c *Compose) Logs() error {
@@ -68,8 +74,15 @@ func (c *Compose) Remove() error {
 }
 
 func (c *Compose) command(args ...string) error {
-	cmdArgs := c.DefaultArgs
-	cmdArgs = append(cmdArgs, "-f", c.Path)
+	return c.runDocker(true, args...)
+}
+
+func (c *Compose) runDocker(composeCommand bool, args ...string) error {
+	var cmdArgs []string
+	if composeCommand {
+		cmdArgs = c.DefaultArgs
+		cmdArgs = append(cmdArgs, "-f", c.Path)
+	}
 	cmdArgs = append(cmdArgs, args...)
 	cmd := exec.Command(c.Command, cmdArgs...)
 	cmd.Env = c.Env
