@@ -38,7 +38,7 @@ ginkgo -r (or ginkgo ./...)
 [Go]: https://go.dev/
 [Docker]: https://www.docker.com/
 [Podman]: https://podman.io/
-[example]: examples/send_simple_trace_test.go
+[example]: examples/dockertest/send_simple_trace_test.go
 
 ### Writing Specs
 
