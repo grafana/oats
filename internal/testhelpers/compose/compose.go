@@ -36,11 +36,11 @@ func ComposeSuite(composeFile, logFile string) (*Compose, error) {
 	command := "docker"
 	defaultArgs := []string{"compose"}
 
-	err = exec.Command("which", "docker-compose").Run()
-	if err == nil {
-		command = "docker-compose"
-		defaultArgs = []string{}
-	}
+	//err = exec.Command("which", "docker-compose").Run()
+	//if err == nil {
+	//	command = "docker-compose"
+	//	defaultArgs = []string{}
+	//}
 
 	return &Compose{
 		Command:     command,
