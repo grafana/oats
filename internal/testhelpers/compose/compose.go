@@ -53,9 +53,13 @@ func ComposeSuite(composeFile, logFile string) (*Compose, error) {
 
 func (c *Compose) Up() error {
 	//networks accumulate over time and can cause issues with the tests
-	err := c.runDocker(false, "network", "prune", "-f", "--filter", "until=5m")
-	if err != nil {
-		return fmt.Errorf("failed to prune docker networks: %w", err)
+	configuration, _ := ginkgo.GinkgoConfiguration()
+	if configuration.ParallelProcess == 1 {
+		//don't do this in parallel, it can cause issues
+		err := c.runDocker(false, "network", "prune", "-f", "--filter", "until=5m")
+		if err != nil {
+			return fmt.Errorf("failed to prune docker networks: %w", err)
+		}
 	}
 
 	return c.command("up", "--build", "--detach", "--force-recreate")
