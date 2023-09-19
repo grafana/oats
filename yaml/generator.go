@@ -61,9 +61,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	configDir, err := filepath.Abs("configs")
 	Expect(err).ToNot(HaveOccurred())
 
-	configuration, _ := ginkgo.GinkgoConfiguration()
 	name, vars := c.getTemplateVars()
-	vars["Subnet"] = configuration.ParallelProcess
 	vars["Dashboard"] = filepath.ToSlash(dashboard)
 	vars["ConfigDir"] = filepath.ToSlash(configDir)
 	vars["ApplicationPort"] = c.PortConfig.ApplicationPort
