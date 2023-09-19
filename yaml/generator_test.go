@@ -9,13 +9,13 @@ import (
 func TestJoinDockerComposeFiles(t *testing.T) {
 	AssumeNoYamlTest(t)
 
-	a, err := os.ReadFile("testdata/docker-compose-a.yaml")
+	template, err := os.ReadFile("testdata/docker-compose-template.yaml")
 	require.NoError(t, err)
-	b, err := os.ReadFile("testdata/docker-compose-b.yaml")
+	add, err := os.ReadFile("testdata/docker-compose-addition.yaml")
 	require.NoError(t, err)
 	want, err := os.ReadFile("testdata/docker-compose-expected.yaml")
 	require.NoError(t, err)
-	c, err := joinComposeFiles(a, b)
+	c, err := joinComposeFiles(template, add)
 	require.NoError(t, err)
 	require.Equal(t, string(want), string(c))
 }
