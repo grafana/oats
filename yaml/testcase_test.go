@@ -2,6 +2,7 @@ package yaml
 
 import (
 	"github.com/stretchr/testify/require"
+	"path/filepath"
 	"testing"
 )
 
@@ -28,6 +29,6 @@ func TestIncludePath(t *testing.T) {
 	AssumeNoYamlTest(t)
 
 	require.Equal(t,
-		"/home/gregor/source/grafana-opentelemetry-java/examples/jdbc/oats-non-reactive.yaml",
+		filepath.FromSlash("/home/gregor/source/grafana-opentelemetry-java/examples/jdbc/oats-non-reactive.yaml"),
 		includePath("/home/gregor/source/grafana-opentelemetry-java/examples/jdbc/spring-boot-non-reactive-2.7/oats.yaml", "../oats-non-reactive.yaml"))
 }
