@@ -17,5 +17,5 @@ func TestJoinDockerComposeFiles(t *testing.T) {
 	require.NoError(t, err)
 	c, err := joinComposeFiles(template, add)
 	require.NoError(t, err)
-	require.Equal(t, string(want), string(c))
+	require.YAMLEq(t, string(want), string(c))
 }
