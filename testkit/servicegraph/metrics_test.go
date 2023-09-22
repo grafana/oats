@@ -45,7 +45,6 @@ var _ = Describe("generating service graph metrics", func() {
 		metrics  []pmetric.Metrics
 	)
 
-	// Issue #: https://github.com/grafana/app-o11y/issues/163
 	Context("from trace: POST /api/orders", func() {
 		JustBeforeEach(func() {
 			// create servicegraph connector config
