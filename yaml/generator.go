@@ -3,14 +3,14 @@ package yaml
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/grafana/dashboard-linter/lint"
-	"github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/grafana/dashboard-linter/lint"
+	. "github.com/onsi/gomega"
+	"gopkg.in/yaml.v3"
 )
 
 // relative to docker-compose.yml
@@ -90,8 +90,7 @@ func (c *TestCase) getTemplateVars() (string, map[string]any) {
 	case "java":
 		return c.javaTemplateVars()
 	default:
-		ginkgo.Fail("unknown generator " + generator)
-		return "", nil
+		return filepath.FromSlash("./docker-compose-" + generator + "-template.yml"), map[string]any{}
 	}
 }
 
