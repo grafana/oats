@@ -28,18 +28,25 @@ func (c *TestCase) getContent(compose *DockerCompose) []byte {
 	if compose.Generator != "" {
 		return c.generateDockerComposeFile()
 	} else {
-		return readComposeFile(compose)
+		// TODO: allow for template vars on docker-compose files, similar to generator
+		var buf []byte
+		for _, filename := range compose.Files {
+			var err error
+			buf, err = joinComposeFiles(buf, readComposeFile(compose, filename))
+			Expect(err).ToNot(HaveOccurred())
+		}
+		return buf
 	}
 }
 
-func readComposeFile(compose *DockerCompose) []byte {
-	b, err := os.ReadFile(compose.File)
+func readComposeFile(compose *DockerCompose, file string) []byte {
+	b, err := os.ReadFile(file)
 	Expect(err).ToNot(HaveOccurred())
 	return replaceRefs(compose, b)
 }
 
 func replaceRefs(compose *DockerCompose, bytes []byte) []byte {
-	baseDir := filepath.Dir(compose.File)
+	baseDir := filepath.Dir(compose.Files[0]) // TODO: more direct way of getting baseDir?
 	lines := strings.Split(string(bytes), "\n")
 	for i, line := range lines {
 		for _, resource := range compose.Resources {
@@ -76,12 +83,16 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	err = t.Execute(buf, vars)
 	Expect(err).ToNot(HaveOccurred())
 	compose := c.Definition.DockerCompose
-	if compose.File != "" {
-		files, err := joinComposeFiles(buf.Bytes(), readComposeFile(compose))
+	content := buf.Bytes()
+	for _, filename := range compose.Files {
+		t = template.Must(template.ParseFiles(filename))
+		addbuf := bytes.NewBufferString("")
+		err = t.Execute(addbuf, vars)
 		Expect(err).ToNot(HaveOccurred())
-		return files
+		content, err = joinComposeFiles(content, addbuf.Bytes())
+		Expect(err).ToNot(HaveOccurred())
 	}
-	return buf.Bytes()
+	return content
 }
 
 func (c *TestCase) getTemplateVars() (string, map[string]any) {

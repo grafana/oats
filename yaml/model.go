@@ -2,13 +2,14 @@ package yaml
 
 import (
 	"fmt"
+	"path/filepath"
+	"time"
+
 	"github.com/grafana/dashboard-linter/lint"
 	"github.com/grafana/oats/internal/testhelpers/compose"
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
-	"path/filepath"
-	"time"
 )
 
 type ExpectedDashboardPanel struct {
@@ -54,7 +55,7 @@ type JavaGeneratorParams struct {
 
 type DockerCompose struct {
 	Generator           string              `yaml:"generator"`
-	File                string              `yaml:"file"`
+	Files               []string            `yaml:"files"`
 	Resources           []string            `yaml:"resources"`
 	JavaGeneratorParams JavaGeneratorParams `yaml:"java-generator-params"`
 }
@@ -201,11 +202,13 @@ func validateInput(input []Input) {
 }
 
 func validateDockerCompose(d *DockerCompose, dir string) {
-	if d.File != "" {
-		d.File = filepath.Join(dir, d.File)
-		Expect(d.File).To(BeARegularFile())
-		for _, resource := range d.Resources {
-			Expect(filepath.Join(filepath.Dir(d.File), resource)).To(BeAnExistingFile())
+	if len(d.Files) > 0 {
+		for i, filename := range d.Files {
+			d.Files[i] = filepath.Join(dir, filename)
+			Expect(d.Files[i]).To(BeARegularFile())
+			for _, resource := range d.Resources {
+				Expect(filepath.Join(filepath.Dir(d.Files[i]), resource)).To(BeAnExistingFile())
+			}
 		}
 	} else {
 		Expect(d.Generator).ToNot(BeEmpty(), "generator needed if no file is specified")
