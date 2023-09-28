@@ -67,8 +67,11 @@ type TestCaseDefinition struct {
 	Include       []string       `yaml:"include"`
 	DockerCompose *DockerCompose `yaml:"docker-compose"`
 	Input         []Input        `yaml:"input"`
+	Interval      time.Duration  `yaml:"interval"`
 	Expected      Expected       `yaml:"expected"`
 }
+
+const DefaultTestCaseInterval = 100 * time.Millisecond
 
 func (d *TestCaseDefinition) Merge(other TestCaseDefinition) {
 	d.Expected.Logs = append(d.Expected.Logs, other.Expected.Logs...)

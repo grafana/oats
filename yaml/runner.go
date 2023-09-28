@@ -130,15 +130,19 @@ func (r *runner) eventually(asserter func(g Gomega, queryLogger QueryLogger)) {
 	}
 	t := time.Now()
 	ctx := context.Background()
-
+	interval := r.testCase.Definition.Interval
+	if interval == 0 {
+		interval = DefaultTestCaseInterval
+	}
+	iterations := 0
 	Eventually(ctx, func(g Gomega) {
+		iterations++
 		verbose := false
 		if time.Since(t) > 10*time.Second {
 			verbose = true
 			t = time.Now()
 		}
 		queryLogger := NewQueryLogger(r.endpoint, verbose)
-
 		queryLogger.LogQueryResult("waiting for telemetry data\n")
 
 		for _, i := range r.testCase.Definition.Input {
@@ -148,5 +152,6 @@ func (r *runner) eventually(asserter func(g Gomega, queryLogger QueryLogger)) {
 		}
 
 		asserter(g, queryLogger)
-	}).WithTimeout(r.deadline.Sub(time.Now())).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
+	}).WithTimeout(r.deadline.Sub(time.Now())).WithPolling(interval).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
+	GinkgoWriter.Println(iterations, "iterations to get telemetry data")
 }
