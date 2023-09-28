@@ -44,7 +44,7 @@ via the environment variable `TESTCASE_BASE_PATH`.
 
 ## Docker Compose
 
-Describes the docker-compose file to use for the test.
+Describes the docker-compose file(s) to use for the test.
 The files typically defines the instrumented application you want to test and optionally some dependencies,
 e.g. a database server to send requests to.
 You don't need (and should have) to define the observability stack (e.g. prometheus, grafana, etc.),
@@ -57,8 +57,23 @@ If you're referencing other configuration files, you can use the `resources` fie
 ### Generators
 
 Generators can be used to generate a docker-compose file from a template as a way to avoid repetition.
-Currently, the only generator available is `java` which generates a docker-compose file for the java distribution
+
+Currently, the only defined generator is `java` which generates a docker-compose file for the java distribution
 examples.
+Using an undefined generator name (e.g.) `name` will result in using the file `docker-compose-name-template.yml`
+and performing template variable substitution, with the vars as seen in this excerpt of generateDockerComposeFile() in generator.go:
+```
+	vars["Dashboard"] = filepath.ToSlash(dashboard)
+	vars["ConfigDir"] = filepath.ToSlash(configDir)
+	vars["ApplicationPort"] = c.PortConfig.ApplicationPort
+	vars["GrafanaHTTPPort"] = c.PortConfig.GrafanaHTTPPort
+	vars["PrometheusHTTPPort"] = c.PortConfig.PrometheusHTTPPort
+	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
+	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
+```
+Additional variables could be added for more specific generators as needed. (e.g. add new case in getTemplateVars() that adds more vars.)
+
+When a generator is used, template variable interpolation will also occur on all docker-compose file(s).
 
 ## Starting the Tests
 
