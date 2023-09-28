@@ -16,6 +16,7 @@ docker-compose:
     - kafka
 input:
   - url: http://localhost:8080/stock
+interval: 500ms
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*product"}'
