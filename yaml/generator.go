@@ -83,8 +83,11 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	buf := bytes.NewBufferString("")
 	err = t.Execute(buf, vars)
 	Expect(err).ToNot(HaveOccurred())
+	generated := strings.TrimSuffix(name, filepath.Ext(name)) + "-generated.yml"
+	os.WriteFile(generated, buf.Bytes(), 0644)
+	defer os.Remove(generated)
 	compose := c.Definition.DockerCompose
-	content := buf.Bytes()
+	files := []string{}
 	for _, filename := range compose.Files {
 		t = template.Must(template.ParseFiles(filename))
 		addbuf := bytes.NewBufferString("")
@@ -96,11 +99,21 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 		// uses docker compose to resolve relative paths in rendered template
 		cmd := exec.Command("docker", "compose", "-f", name, "config")
 		cmd.Dir = filepath.Dir(filename)
-		out, err := cmd.Output()
+		content, err := cmd.Output()
+		os.WriteFile(name, content, 0644)
 		Expect(err).ToNot(HaveOccurred())
-		content, err = joinComposeFiles(content, out)
-		Expect(err).ToNot(HaveOccurred())
+		files = append(files, name)
 	}
+
+	// uses docker compose to merge templates
+	args := []string{"compose", "-f", generated}
+	for _, filename := range files {
+		args = append(args, "-f", filename)
+	}
+	args = append(args, "config")
+	cmd := exec.Command("docker", args...)
+	content, err := cmd.Output()
+	Expect(err).ToNot(HaveOccurred())
 	return content
 }
 
