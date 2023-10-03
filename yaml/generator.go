@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -88,8 +89,16 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 		t = template.Must(template.ParseFiles(filename))
 		addbuf := bytes.NewBufferString("")
 		err = t.Execute(addbuf, vars)
+		name := strings.TrimSuffix(filename, filepath.Ext(filename)) + "-generated.yml"
+		os.WriteFile(name, addbuf.Bytes(), 0644)
+		defer os.Remove(name)
+
+		// uses docker compose to resolve relative paths in rendered template
+		cmd := exec.Command("docker", "compose", "-f", name, "config")
+		cmd.Dir = filepath.Dir(filename)
+		out, err := cmd.Output()
 		Expect(err).ToNot(HaveOccurred())
-		content, err = joinComposeFiles(content, addbuf.Bytes())
+		content, err = joinComposeFiles(content, out)
 		Expect(err).ToNot(HaveOccurred())
 	}
 	return content
