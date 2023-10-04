@@ -2,6 +2,9 @@
 
 You can use declarative yaml tests in `oats.yaml` files:
 
+> You can use any file name that matches `oats*.yaml` (e.g. `oats-test.yaml`), that doesn't end in `-template.yaml`.
+> `oats-template.yaml` is reserved for template files, which are used in the "include" section.
+
 The syntax is a bit similar to https://github.com/kubeshop/tracetest
 
 This is an example:
