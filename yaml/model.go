@@ -56,6 +56,7 @@ type JavaGeneratorParams struct {
 type DockerCompose struct {
 	Generator           string              `yaml:"generator"`
 	Files               []string            `yaml:"files"`
+	Environment         []string            `yaml:"environment"`
 	Resources           []string            `yaml:"resources"`
 	JavaGeneratorParams JavaGeneratorParams `yaml:"java-generator-params"`
 }

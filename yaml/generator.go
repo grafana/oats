@@ -83,6 +83,11 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	for k, v := range vars {
 		env = append(env, "OATS_"+strings.ToUpper(k)+"="+v.(string))
 	}
+
+	for _, v := range c.Definition.DockerCompose.Environment {
+		env = append(env, "OATS_"+v)
+	}
+
 	t := template.Must(template.ParseFiles(name))
 
 	buf := bytes.NewBufferString("")
