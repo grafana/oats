@@ -4,10 +4,13 @@ import (
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 )
+
+var oatsFileRegex = regexp.MustCompile("oats.*\\.yaml")
 
 func ReadTestCases() ([]*TestCase, string) {
 	var cases []*TestCase
@@ -28,7 +31,7 @@ func ReadTestCases() ([]*TestCase, string) {
 			if err != nil {
 				return err
 			}
-			if d.Name() != "oats.yaml" {
+			if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") {
 				return nil
 			}
 			testCase, err := readTestCase(base, p, duration)
