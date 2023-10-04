@@ -78,6 +78,11 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
 	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
 
+	env := []string{}
+
+	for k, v := range vars {
+		env = append(env, "OATS_"+strings.ToUpper(k)+"="+v.(string))
+	}
 	t := template.Must(template.ParseFiles(name))
 
 	buf := bytes.NewBufferString("")
@@ -99,6 +104,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 		// uses docker compose to resolve relative paths in rendered template
 		cmd := exec.Command("docker", "compose", "-f", name, "config")
 		cmd.Dir = filepath.Dir(filename)
+		cmd.Env = env
 		content, err := cmd.Output()
 		os.WriteFile(name, content, 0644)
 		Expect(err).ToNot(HaveOccurred())
@@ -112,6 +118,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	}
 	args = append(args, "config")
 	cmd := exec.Command("docker", args...)
+	cmd.Env = env
 	content, err := cmd.Output()
 	Expect(err).ToNot(HaveOccurred())
 	return content
