@@ -78,6 +78,10 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				pr, err = responses.ParseQueryOutput(b)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(pr)).Should(BeNumerically(">", 0))
+
+				count, err := responses.TotalPromCount(pr)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(count).Should(Equal(apiCount))
 			}).WithTimeout(30*time.Second).Should(Succeed(), "metrics should appear in Mimir with /greeting as http.target")
 
 			Expect(responses.EnoughPromResults(pr)).ToNot(HaveOccurred())
