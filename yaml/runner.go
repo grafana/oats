@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/grafana/oats/internal/testhelpers/compose"
-	"github.com/grafana/oats/internal/testhelpers/requests"
+	"github.com/grafana/oats/testhelpers/compose"
+	"github.com/grafana/oats/testhelpers/requests"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

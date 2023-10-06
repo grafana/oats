@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/grafana/oats/internal/testhelpers/observability"
+	"github.com/grafana/oats/testhelpers/observability"
 )
 
 var localEndpoint *observability.LocalEndpoint

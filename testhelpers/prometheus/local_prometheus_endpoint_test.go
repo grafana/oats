@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/grafana/oats/internal/testhelpers/common"
+	"github.com/grafana/oats/testhelpers/common"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/grafana/oats/internal/testhelpers/prometheus"
+	"github.com/grafana/oats/testhelpers/prometheus"
 )
 
 var _ = Describe("provisioning a LocalPrometheusEndpoint with Docker", func() {

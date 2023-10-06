@@ -1,7 +1,7 @@
 package yaml
 
 import (
-	"github.com/grafana/oats/internal/testhelpers/compose"
+	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/onsi/gomega"
 	. "github.com/onsi/gomega"
 )

@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	impl "github.com/grafana/oats/internal/testhelpers/observability"
+	impl "github.com/grafana/oats/testhelpers/observability"
 
-	 "github.com/grafana/oats/observability"
+	"github.com/grafana/oats/observability"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -19,7 +19,7 @@ var _ = BeforeSuite(func() {
 	localEndpoint = impl.NewLocalEndpoint()
 
 	DeferCleanup(func() {
-		var  stopCtx context.Context = context.Background()
+		var stopCtx context.Context = context.Background()
 
 		if localEndpoint != nil {
 			Expect(localEndpoint.Stop(stopCtx)).To(Succeed(), "expected no error stopping the local observability endpoint")

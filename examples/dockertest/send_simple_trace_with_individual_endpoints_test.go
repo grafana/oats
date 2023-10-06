@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/grafana/oats/internal/testhelpers/common"
-	"github.com/grafana/oats/internal/testhelpers/otelcollector"
-	"github.com/grafana/oats/internal/testhelpers/prometheus"
-	"github.com/grafana/oats/internal/testhelpers/tempo"
+	"github.com/grafana/oats/testhelpers/common"
+	"github.com/grafana/oats/testhelpers/otelcollector"
+	"github.com/grafana/oats/testhelpers/prometheus"
+	"github.com/grafana/oats/testhelpers/tempo"
 	"go.opentelemetry.io/otel/sdk/resource"
 
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
