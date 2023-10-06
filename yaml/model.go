@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/grafana/dashboard-linter/lint"
-	"github.com/grafana/oats/internal/testhelpers/compose"
+	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"

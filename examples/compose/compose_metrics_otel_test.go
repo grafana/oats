@@ -9,9 +9,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/grafana/oats/internal/testhelpers/compose"
-	"github.com/grafana/oats/internal/testhelpers/prometheus/responses"
-	"github.com/grafana/oats/internal/testhelpers/requests"
+	"github.com/grafana/oats/testhelpers/compose"
+	"github.com/grafana/oats/testhelpers/prometheus/responses"
+	"github.com/grafana/oats/testhelpers/requests"
 )
 
 var _ = Describe("provisioning a local observability endpoint with Docker", Ordered, Label("docker", "integration", "slow"), func() {

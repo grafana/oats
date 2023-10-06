@@ -12,7 +12,7 @@ import (
 
 	_ "embed"
 
-	"github.com/grafana/oats/internal/testhelpers/common"
+	"github.com/grafana/oats/testhelpers/common"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 )
@@ -76,11 +76,11 @@ func NewLocalEndpoint(ctx context.Context, networkName string) (*LocalEndpoint, 
 	}
 
 	endpoint := &LocalEndpoint{
-		mutex:         &sync.Mutex{},
-		networkName:   networkName,
-		configPath:    promConfigPath,
-		dataDir:       promDataDir,
-		stopped:       true,
+		mutex:       &sync.Mutex{},
+		networkName: networkName,
+		configPath:  promConfigPath,
+		dataDir:     promDataDir,
+		stopped:     true,
 	}
 
 	return endpoint, nil

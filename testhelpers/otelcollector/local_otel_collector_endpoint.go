@@ -13,7 +13,7 @@ import (
 	_ "embed"
 
 	"github.com/google/uuid"
-	"github.com/grafana/oats/internal/testhelpers/common"
+	"github.com/grafana/oats/testhelpers/common"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"

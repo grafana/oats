@@ -3,13 +3,14 @@ package yaml
 import (
 	"context"
 	"fmt"
-	"github.com/grafana/dashboard-linter/lint"
-	"github.com/grafana/oats/internal/testhelpers/compose"
-	"github.com/grafana/oats/internal/testhelpers/prometheus/responses"
-	"github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"strconv"
 	"strings"
+
+	"github.com/grafana/dashboard-linter/lint"
+	"github.com/grafana/oats/testhelpers/compose"
+	"github.com/grafana/oats/testhelpers/prometheus/responses"
+	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var promQlVariables = []string{"$job", "$instance", "$pod", "$namespace", "$container"}

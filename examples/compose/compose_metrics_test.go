@@ -8,9 +8,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/grafana/oats/internal/testhelpers/compose"
-	"github.com/grafana/oats/internal/testhelpers/prometheus/responses"
-	"github.com/grafana/oats/internal/testhelpers/requests"
+	"github.com/grafana/oats/testhelpers/compose"
+	"github.com/grafana/oats/testhelpers/prometheus/responses"
+	"github.com/grafana/oats/testhelpers/requests"
 )
 
 var _ = Describe("provisioning a local observability endpoint with Docker", Ordered, Label("docker", "integration", "slow"), func() {
@@ -78,6 +78,10 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 				pr, err = responses.ParseQueryOutput(b)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(len(pr)).Should(BeNumerically(">", 0))
+
+				count, err := responses.TotalPromCount(pr)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(count).Should(Equal(apiCount))
 			}).WithTimeout(30*time.Second).Should(Succeed(), "metrics should appear in Mimir with /greeting as http.target")
 
 			Expect(responses.EnoughPromResults(pr)).ToNot(HaveOccurred())

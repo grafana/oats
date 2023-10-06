@@ -2,8 +2,9 @@ package yaml
 
 import (
 	"context"
-	"github.com/grafana/oats/internal/testhelpers/compose"
-	"github.com/grafana/oats/internal/testhelpers/tempo/responses"
+
+	"github.com/grafana/oats/testhelpers/compose"
+	"github.com/grafana/oats/testhelpers/tempo/responses"
 	. "github.com/onsi/gomega"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 )
