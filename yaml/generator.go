@@ -185,5 +185,7 @@ func (c *TestCase) replaceDatasource(content []byte, err error) string {
 	}
 	err = os.WriteFile(newFile, []byte(strings.Join(lines, "\n")), 0644)
 	Expect(err).ToNot(HaveOccurred())
-	return generatedDashboard
+	abs, err := filepath.Abs(newFile)
+	Expect(err).ToNot(HaveOccurred())
+	return abs
 }
