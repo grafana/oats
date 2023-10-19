@@ -81,7 +81,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	env := []string{}
 
 	for k, v := range vars {
-		env = append(env, "OATS_"+strings.ToUpper(k)+"="+v.(string))
+		env = append(env, k+"="+v.(string))
 	}
 
 	for _, v := range c.Definition.DockerCompose.Environment {
