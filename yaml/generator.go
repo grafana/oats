@@ -78,7 +78,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
 	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
 
-	env := []string{}
+	env := os.Environ()
 
 	for k, v := range vars {
 		env = append(env, k+"="+v.(string))
