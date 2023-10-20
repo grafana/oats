@@ -3,6 +3,7 @@ package yaml
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -78,10 +79,10 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
 	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
 
-	env := []string{}
+	env := os.Environ()
 
 	for k, v := range vars {
-		env = append(env, k+"="+v.(string))
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
 	for _, v := range c.Definition.DockerCompose.Environment {
