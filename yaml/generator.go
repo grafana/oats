@@ -94,35 +94,38 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	buf := bytes.NewBufferString("")
 	err = t.Execute(buf, vars)
 	Expect(err).ToNot(HaveOccurred())
-	generated := strings.TrimSuffix(name, filepath.Ext(name)) + "-generated.yml"
+	generated, err := filepath.Abs(strings.TrimSuffix(name, filepath.Ext(name)) + "-generated.yml")
 	os.WriteFile(generated, buf.Bytes(), 0644)
 	defer os.Remove(generated)
 	compose := c.Definition.DockerCompose
-	files := []string{}
+	files := []string{generated}
 	for _, filename := range compose.Files {
 		t = template.Must(template.ParseFiles(filename))
 		addbuf := bytes.NewBufferString("")
 		err = t.Execute(addbuf, vars)
-		name := strings.TrimSuffix(filename, filepath.Ext(filename)) + "-generated.yml"
-		os.WriteFile(name, addbuf.Bytes(), 0644)
-		defer os.Remove(name)
-
-		// uses docker compose to resolve relative paths in rendered template
-		cmd := exec.Command("docker", "compose", "-f", name, "config")
-		cmd.Dir = filepath.Dir(filename)
-		cmd.Env = env
-		content, err := cmd.Output()
-		os.WriteFile(name, content, 0644)
 		Expect(err).ToNot(HaveOccurred())
+		name := strings.TrimSuffix(filename, filepath.Ext(filename)) + "-generated.yml"
+		err = os.WriteFile(name, addbuf.Bytes(), 0644)
+		Expect(err).ToNot(HaveOccurred())
+		defer os.Remove(name)
 		files = append(files, name)
 	}
 
+	base := filepath.FromSlash("./docker-compose-include-base.yml")
+	t = template.Must(template.ParseFiles(base))
+	buf = bytes.NewBufferString("")
+	vars = map[string]any{}
+	vars["files"] = files
+	err = t.Execute(buf, vars)
+	Expect(err).ToNot(HaveOccurred())
+	f, err := os.CreateTemp("", "docker-compose-base.yml")
+	Expect(err).ToNot(HaveOccurred())
+	_, err = f.Write(buf.Bytes())
+	Expect(err).ToNot(HaveOccurred())
+	defer os.Remove(f.Name())
+
 	// uses docker compose to merge templates
-	args := []string{"compose", "-f", generated}
-	for _, filename := range files {
-		args = append(args, "-f", filename)
-	}
-	args = append(args, "config")
+	args := []string{"compose", "-f", f.Name(), "config"}
 	cmd := exec.Command("docker", args...)
 	cmd.Env = env
 	content, err := cmd.Output()
