@@ -61,33 +61,38 @@ func RunTestCase(c *TestCase) {
 	// Assert logs traces first, because metrics and dashboards can take longer to appear
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {
-		It(fmt.Sprintf("should have '%s' in loki", log.LogQL), func() {
+		l := log
+		It(fmt.Sprintf("should have '%s' in loki", l), func() {
 			r.eventually(func(g Gomega, queryLogger QueryLogger) {
-				AssertLoki(g, r.endpoint, queryLogger, log.LogQL, log.Contains)
+				AssertLoki(g, r.endpoint, queryLogger, l.LogQL, l.Contains)
 			})
 		})
 	}
 	for _, trace := range expected.Traces {
-		It(fmt.Sprintf("should have '%s' in tempo", trace.TraceQL), func() {
+		t := trace
+		It(fmt.Sprintf("should have '%s' in tempo", t.TraceQL), func() {
 			r.eventually(func(g Gomega, queryLogger QueryLogger) {
-				AssertTempo(g, r.endpoint, queryLogger, trace.TraceQL, trace.Spans)
+				AssertTempo(g, r.endpoint, queryLogger, t.TraceQL, t.Spans)
 			})
 		})
 	}
 	for _, dashboard := range expected.Dashboards {
 		dashboardAssert := NewDashboardAssert(dashboard)
 		for i, panel := range dashboard.Panels {
-			It(fmt.Sprintf("dashboard panel '%s'", panel.Title), func() {
+			iCopy := i
+			p := panel
+			It(fmt.Sprintf("dashboard panel '%s'", p.Title), func() {
 				r.eventually(func(g Gomega, queryLogger QueryLogger) {
-					dashboardAssert.AssertDashboard(g, r.endpoint, queryLogger, i, &c.Dashboard.Content)
+					dashboardAssert.AssertDashboard(g, r.endpoint, queryLogger, iCopy, &c.Dashboard.Content)
 				})
 			})
 		}
 	}
 	for _, metric := range expected.Metrics {
-		It(fmt.Sprintf("should have '%s' in prometheus", metric.PromQL), func() {
+		m := metric
+		It(fmt.Sprintf("should have '%s' in prometheus", m.PromQL), func() {
 			r.eventually(func(g Gomega, queryLogger QueryLogger) {
-				AssertProm(g, r.endpoint, queryLogger, metric.PromQL, metric.Value)
+				AssertProm(g, r.endpoint, queryLogger, m.PromQL, m.Value)
 			})
 		})
 	}
