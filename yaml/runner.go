@@ -19,6 +19,8 @@ type runner struct {
 	deadline time.Time
 }
 
+var VerboseLogging bool
+
 func RunTestCase(c *TestCase) {
 	r := &runner{
 		testCase: c,
@@ -137,7 +139,7 @@ func (r *runner) eventually(asserter func(g Gomega, queryLogger QueryLogger)) {
 	iterations := 0
 	Eventually(ctx, func(g Gomega) {
 		iterations++
-		verbose := false
+		verbose := VerboseLogging
 		if time.Since(t) > 10*time.Second {
 			verbose = true
 			t = time.Now()
