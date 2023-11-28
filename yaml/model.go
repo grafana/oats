@@ -50,7 +50,15 @@ type Expected struct {
 }
 
 type JavaGeneratorParams struct {
-	OtelJmxConfig string `yaml:"otel-jmx-config"`
+	OtelJmxConfig    string `yaml:"otel-jmx-config"`
+	OldJvmMetrics    bool   `yaml:"old-jvm-metrics"`
+	PromNaming       bool   `yaml:"prom-naming"`
+	DisableDataSaver bool   `yaml:"disable-data-saver"`
+}
+
+type Matrix struct {
+	Name          string         `yaml:"name"`
+	DockerCompose *DockerCompose `yaml:"docker-compose"`
 }
 
 type DockerCompose struct {
@@ -68,6 +76,7 @@ type Input struct {
 type TestCaseDefinition struct {
 	Include       []string       `yaml:"include"`
 	DockerCompose *DockerCompose `yaml:"docker-compose"`
+	Matrix        []Matrix       `yaml:"matrix"`
 	Input         []Input        `yaml:"input"`
 	Interval      time.Duration  `yaml:"interval"`
 	Expected      Expected       `yaml:"expected"`
@@ -80,6 +89,7 @@ func (d *TestCaseDefinition) Merge(other TestCaseDefinition) {
 	d.Expected.Traces = append(d.Expected.Traces, other.Expected.Traces...)
 	d.Expected.Metrics = append(d.Expected.Metrics, other.Expected.Metrics...)
 	d.Expected.Dashboards = append(d.Expected.Dashboards, other.Expected.Dashboards...)
+	d.Matrix = append(d.Matrix, other.Matrix...)
 	if d.DockerCompose == nil {
 		d.DockerCompose = other.DockerCompose
 	}
@@ -125,7 +135,7 @@ func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 	result := fmt.Sprintf(format, a...)
 	if q.verbose {
 		_, _ = fmt.Fprintf(q.endpoint.Logger(), result)
-		if len(result) > 100 {
+		if len(result) > 1000 {
 			result = result[:100] + ".."
 		}
 		ginkgo.GinkgoWriter.Println(result)

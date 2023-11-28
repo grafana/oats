@@ -78,6 +78,39 @@ and performing template variable substitution, with the vars as seen in this exc
 Additional variables could be added for more specific generators as needed. (e.g. add new case in getTemplateVars() that adds more vars.)
 
 When a generator is used, template variable interpolation will also occur on all docker-compose file(s).
+        
+## Matrix of test cases
+
+Matrix tests are useful to test different configurations of the same application, 
+e.g. with different settings of the otel collector or different flags in the application.
+
+```yaml
+matrix:
+  - name: new
+    docker-compose:
+      generator: java
+  - name: old-jvm-metrics
+    docker-compose:
+      generator: java
+      java-generator-params:
+        old-jvm-metrics: true
+        disable-data-saver: true
+  - name: prom-naming
+    docker-compose:
+      generator: java
+      java-generator-params:
+        disable-data-saver: true
+        prom-naming: true
+  - name: prom-naming-old-jvm-metrics
+    docker-compose:
+      generator: java
+      java-generator-params:
+        disable-data-saver: true
+        old-jvm-metrics: true
+        prom-naming: true
+input:
+  - path: /stock
+```
 
 ## Starting the Tests
 
