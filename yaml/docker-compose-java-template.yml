@@ -11,11 +11,12 @@ services:
       OTEL_LOGS_EXPORTER: otlp # otherwise, it's too verbose
       OTEL_RESOURCE_ATTRIBUTES: 'deployment.environment=production,service.namespace=shop,service.version=1.1'
       GRAFANA_OTEL_USE_TESTED_INSTRUMENTATIONS: "{{ not .UseAllInstrumentations }}"
-      GRAFANA_OTEL_APPLICATION_OBSERVABILITY_METRICS: "true"
+      GRAFANA_OTEL_APPLICATION_OBSERVABILITY_METRICS: "{{ not .DisableDataSaver }}"
       OTEL_METRIC_EXPORT_INTERVAL: "5000"  # so we don't have to wait 60s for metrics
       OTEL_JAVAAGENT_DEBUG: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4317"
       {{if .JmxConfig }}OTEL_JMX_CONFIG: /otel-jmx-config.yaml{{end}}
+      {{if .OldJvmMetrics }}OTEL_SEMCONV_STABILITY_OPT_IN: http{{end}}
     command:
       - /bin/bash
       - -c
@@ -60,4 +61,4 @@ services:
     command:
       - --config=file:/config.yaml
       # we currently don't support this in our dashboards and grafana agent doesn't understand it yet
-      - --feature-gates=-pkg.translator.prometheus.NormalizeName
+      {{if not .PromNaming }}- --feature-gates=-pkg.translator.prometheus.NormalizeName {{end}}

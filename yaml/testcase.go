@@ -1,6 +1,7 @@
 package yaml
 
 import (
+	"fmt"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
@@ -38,6 +39,16 @@ func ReadTestCases() ([]*TestCase, string) {
 			if err != nil {
 				return err
 			}
+			if testCase.Definition.Matrix != nil {
+				for _, matrix := range testCase.Definition.Matrix {
+					newCase := testCase
+					newCase.Definition = testCase.Definition
+					newCase.Definition.DockerCompose = matrix.DockerCompose
+					newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
+					cases = append(cases, &newCase)
+				}
+				return nil
+			}
 			cases = append(cases, &testCase)
 			return nil
 		})
@@ -45,6 +56,7 @@ func ReadTestCases() ([]*TestCase, string) {
 			panic(err)
 		}
 	}
+
 	return cases, base
 }
 
