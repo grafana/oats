@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/dashboard-linter/lint"
-	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/prometheus/responses"
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,17 +24,18 @@ func NewDashboardAssert(d ExpectedDashboard) *DashboardAssert {
 	return &a
 }
 
-func (a *DashboardAssert) AssertDashboard(g Gomega, endpoint *compose.ComposeEndpoint, queryLogger QueryLogger,
-	panelIndex int, dashboard *lint.Dashboard) {
+func (a *DashboardAssert) AssertDashboard(r *runner, panelIndex int) {
 	p := a.want.Panels[panelIndex]
 	wantTitle := p.Title
 	wantValue := p.Value
 
-	for _, panel := range dashboard.Panels {
+	c := r.testCase
+	for _, panel := range c.Dashboard.Content.Panels {
 		if panel.Title == wantTitle {
+			g := r.gomega
 			g.Expect(panel.Targets).To(HaveLen(1))
-
-			AssertProm(g, endpoint, queryLogger, panel.Targets[0].Expr, wantValue)
+			promQl := strings.ReplaceAll(panel.Targets[0].Expr, "$__rate_interval", "1m")
+			AssertProm(r, promQl, wantValue)
 			return
 		}
 	}
@@ -50,11 +49,12 @@ func replaceVariables(promQL string) string {
 	return promQL
 }
 
-func AssertProm(g Gomega, endpoint *compose.ComposeEndpoint, queryLogger QueryLogger, promQL string, value string) {
+func AssertProm(r *runner, promQL string, value string) {
 	promQL = replaceVariables(promQL)
 	ctx := context.Background()
-	b, err := endpoint.RunPromQL(ctx, promQL)
-	queryLogger.LogQueryResult("promQL query %v response %v err=%v\n", promQL, string(b), err)
+	b, err := r.endpoint.RunPromQL(ctx, promQL)
+	r.queryLogger.LogQueryResult("promQL query %v response %v err=%v\n", promQL, string(b), err)
+	g := r.gomega
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(len(b)).Should(BeNumerically(">", 0), "expected prometheus response to be non-empty")
 

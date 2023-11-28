@@ -13,8 +13,9 @@ import (
 )
 
 type ExpectedDashboardPanel struct {
-	Title string `yaml:"title"`
-	Value string `yaml:"value"`
+	Title           string `yaml:"title"`
+	Value           string `yaml:"value"`
+	MatrixCondition string `yaml:"matrix-condition"`
 }
 
 type ExpectedDashboard struct {
@@ -23,8 +24,9 @@ type ExpectedDashboard struct {
 }
 
 type ExpectedMetrics struct {
-	PromQL string `yaml:"promql"`
-	Value  string `yaml:"value"`
+	PromQL          string `yaml:"promql"`
+	Value           string `yaml:"value"`
+	MatrixCondition string `yaml:"matrix-condition"`
 }
 
 type ExpectedSpan struct {
@@ -33,13 +35,15 @@ type ExpectedSpan struct {
 }
 
 type ExpectedLogs struct {
-	LogQL    string   `yaml:"logql"`
-	Contains []string `yaml:"contains"`
+	LogQL           string   `yaml:"logql"`
+	Contains        []string `yaml:"contains"`
+	MatrixCondition string   `yaml:"matrix-condition"`
 }
 
 type ExpectedTraces struct {
-	TraceQL string         `yaml:"traceql"`
-	Spans   []ExpectedSpan `yaml:"spans"`
+	TraceQL         string         `yaml:"traceql"`
+	Spans           []ExpectedSpan `yaml:"spans"`
+	MatrixCondition string         `yaml:"matrix-condition"`
 }
 
 type Expected struct {
@@ -110,13 +114,14 @@ type PortConfig struct {
 }
 
 type TestCase struct {
-	Name       string
-	Dir        string
-	OutputDir  string
-	Definition TestCaseDefinition
-	PortConfig *PortConfig
-	Dashboard  *TestDashboard
-	Timeout    time.Duration
+	Name               string
+	MatrixTestCaseName string
+	Dir                string
+	OutputDir          string
+	Definition         TestCaseDefinition
+	PortConfig         *PortConfig
+	Dashboard          *TestDashboard
+	Timeout            time.Duration
 }
 
 type QueryLogger struct {
