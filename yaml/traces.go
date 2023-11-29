@@ -3,33 +3,34 @@ package yaml
 import (
 	"context"
 
-	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/tempo/responses"
 	. "github.com/onsi/gomega"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 )
 
-func AssertTempo(g Gomega, endpoint *compose.ComposeEndpoint, queryLogger QueryLogger, traceQL string, spans []ExpectedSpan) {
+func AssertTempo(r *runner, t ExpectedTraces) {
 	ctx := context.Background()
 
-	b, err := endpoint.SearchTempo(ctx, traceQL)
-	queryLogger.LogQueryResult("traceQL query %v response %v err=%v\n", traceQL, string(b), err)
+	b, err := r.endpoint.SearchTempo(ctx, t.TraceQL)
+	r.queryLogger.LogQueryResult("traceQL query %v response %v err=%v\n", t.TraceQL, string(b), err)
+	g := r.gomega
 	g.Expect(err).ToNot(HaveOccurred())
 	g.Expect(len(b)).Should(BeNumerically(">", 0))
 
-	r, err := responses.ParseTempoSearchResult(b)
+	res, err := responses.ParseTempoSearchResult(b)
 	g.Expect(err).ToNot(HaveOccurred())
-	g.Expect(r.Traces).ToNot(BeEmpty())
+	g.Expect(res.Traces).ToNot(BeEmpty())
 
-	assertTrace(g, endpoint, r.Traces[0], spans, queryLogger)
+	assertTrace(r, res.Traces[0], t.Spans)
 }
 
-func assertTrace(g Gomega, endpoint *compose.ComposeEndpoint, tr responses.Trace, wantSpans []ExpectedSpan, queryLogger QueryLogger) {
+func assertTrace(r *runner, tr responses.Trace, wantSpans []ExpectedSpan) {
 	ctx := context.Background()
 
-	b, err := endpoint.GetTraceByID(ctx, tr.TraceID)
-	queryLogger.LogQueryResult("traceQL traceID %v response %v err=%v\n", tr.TraceID, string(b), err)
+	b, err := r.endpoint.GetTraceByID(ctx, tr.TraceID)
+	r.queryLogger.LogQueryResult("traceQL traceID %v response %v err=%v\n", tr.TraceID, string(b), err)
 
+	g := r.gomega
 	g.Expect(err).ToNot(HaveOccurred(), "we should find the trace by traceID")
 	g.Expect(len(b)).Should(BeNumerically(">", 0))
 

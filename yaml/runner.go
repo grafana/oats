@@ -3,6 +3,7 @@ package yaml
 import (
 	"context"
 	"fmt"
+	"github.com/grafana/regexp"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,9 +15,11 @@ import (
 )
 
 type runner struct {
-	testCase *TestCase
-	endpoint *compose.ComposeEndpoint
-	deadline time.Time
+	testCase    *TestCase
+	endpoint    *compose.ComposeEndpoint
+	deadline    time.Time
+	queryLogger QueryLogger
+	gomega      Gomega
 }
 
 var VerboseLogging bool
@@ -37,7 +40,7 @@ func RunTestCase(c *TestCase) {
 			GinkgoWriter.Printf("stopping to let you manually debug on http://localhost:%d\n", r.testCase.PortConfig.GrafanaHTTPPort)
 
 			for {
-				r.eventually(func(g Gomega, queryLogger QueryLogger) {
+				r.eventually(func() {
 					// do nothing - just feed input into the application
 				})
 				time.Sleep(1 * time.Second)
@@ -62,39 +65,47 @@ func RunTestCase(c *TestCase) {
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {
 		l := log
-		It(fmt.Sprintf("should have '%s' in loki", l), func() {
-			r.eventually(func(g Gomega, queryLogger QueryLogger) {
-				AssertLoki(g, r.endpoint, queryLogger, l.LogQL, l.Contains)
+		if r.MatchesMatrixCondition(l.MatrixCondition, l.LogQL) {
+			It(fmt.Sprintf("should have '%s' in loki", l), func() {
+				r.eventually(func() {
+					AssertLoki(r, l)
+				})
 			})
-		})
+		}
 	}
 	for _, trace := range expected.Traces {
 		t := trace
-		It(fmt.Sprintf("should have '%s' in tempo", t.TraceQL), func() {
-			r.eventually(func(g Gomega, queryLogger QueryLogger) {
-				AssertTempo(g, r.endpoint, queryLogger, t.TraceQL, t.Spans)
+		if r.MatchesMatrixCondition(t.MatrixCondition, t.TraceQL) {
+			It(fmt.Sprintf("should have '%s' in tempo", t.TraceQL), func() {
+				r.eventually(func() {
+					AssertTempo(r, t)
+				})
 			})
-		})
+		}
 	}
 	for _, dashboard := range expected.Dashboards {
 		dashboardAssert := NewDashboardAssert(dashboard)
 		for i, panel := range dashboard.Panels {
 			iCopy := i
 			p := panel
-			It(fmt.Sprintf("dashboard panel '%s'", p.Title), func() {
-				r.eventually(func(g Gomega, queryLogger QueryLogger) {
-					dashboardAssert.AssertDashboard(g, r.endpoint, queryLogger, iCopy, &c.Dashboard.Content)
+			if r.MatchesMatrixCondition(p.MatrixCondition, p.Title) {
+				It(fmt.Sprintf("dashboard panel '%s'", p.Title), func() {
+					r.eventually(func() {
+						dashboardAssert.AssertDashboard(r, iCopy)
+					})
 				})
-			})
+			}
 		}
 	}
 	for _, metric := range expected.Metrics {
 		m := metric
-		It(fmt.Sprintf("should have '%s' in prometheus", m.PromQL), func() {
-			r.eventually(func(g Gomega, queryLogger QueryLogger) {
-				AssertProm(g, r.endpoint, queryLogger, m.PromQL, m.Value)
+		if r.MatchesMatrixCondition(m.MatrixCondition, m.PromQL) {
+			It(fmt.Sprintf("should have '%s' in prometheus", m.PromQL), func() {
+				r.eventually(func() {
+					AssertProm(r, m.PromQL, m.Value)
+				})
 			})
-		})
+		}
 	}
 }
 
@@ -131,7 +142,7 @@ func prepareBuildDir(name string) string {
 	return dir
 }
 
-func (r *runner) eventually(asserter func(g Gomega, queryLogger QueryLogger)) {
+func (r *runner) eventually(asserter func()) {
 	if r.deadline.Before(time.Now()) {
 		Fail("deadline exceeded waiting for telemetry")
 	}
@@ -158,7 +169,25 @@ func (r *runner) eventually(asserter func(g Gomega, queryLogger QueryLogger)) {
 			g.Expect(err).ToNot(HaveOccurred(), "expected no error calling application endpoint %s", url)
 		}
 
-		asserter(g, queryLogger)
+		r.queryLogger = queryLogger
+		r.gomega = g
+		asserter()
 	}).WithTimeout(r.deadline.Sub(time.Now())).WithPolling(interval).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
 	GinkgoWriter.Println(iterations, "iterations to get telemetry data")
+}
+
+func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) bool {
+	if matrixCondition == "" {
+		return true
+	}
+	name := r.testCase.MatrixTestCaseName
+	if name == "" {
+		r.queryLogger.LogQueryResult("matrix condition %v ignored we're not in a matrix test\n", matrixCondition)
+		return true
+	}
+	if regexp.MustCompile(matrixCondition).MatchString(name) {
+		return true
+	}
+	fmt.Printf("matrix condition not matched - ignoring assertion: %v/%v/%v\n", r.testCase.Name, name, subject)
+	return false
 }

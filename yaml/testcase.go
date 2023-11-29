@@ -45,6 +45,7 @@ func ReadTestCases() ([]*TestCase, string) {
 					newCase.Definition = testCase.Definition
 					newCase.Definition.DockerCompose = matrix.DockerCompose
 					newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
+					newCase.MatrixTestCaseName = matrix.Name
 					cases = append(cases, &newCase)
 				}
 				return nil

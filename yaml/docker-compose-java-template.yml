@@ -16,7 +16,7 @@ services:
       OTEL_JAVAAGENT_DEBUG: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4317"
       {{if .JmxConfig }}OTEL_JMX_CONFIG: /otel-jmx-config.yaml{{end}}
-      {{if .OldJvmMetrics }}OTEL_SEMCONV_STABILITY_OPT_IN: http{{end}}
+      {{if .OldJvmMetrics }}OTEL_SEMCONV_STABILITY_OPT_IN: old{{end}}
     command:
       - /bin/bash
       - -c
