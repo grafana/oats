@@ -14,7 +14,7 @@ services:
       GRAFANA_OTEL_APPLICATION_OBSERVABILITY_METRICS: "{{ not .DisableDataSaver }}"
       OTEL_METRIC_EXPORT_INTERVAL: "5000"  # so we don't have to wait 60s for metrics
       OTEL_JAVAAGENT_DEBUG: "true"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4317"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318"
       {{if .JmxConfig }}OTEL_JMX_CONFIG: /otel-jmx-config.yaml{{end}}
       {{if .OldJvmMetrics }}OTEL_SEMCONV_STABILITY_OPT_IN: old{{end}}
     command:
