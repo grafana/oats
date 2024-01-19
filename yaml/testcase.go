@@ -76,7 +76,7 @@ func readTestCase(testBase, filePath string, duration time.Duration) (TestCase, 
 	}
 
 	dir := filepath.Dir(absolutePath(filePath))
-	name := strings.TrimPrefix(dir, absolutePath(testBase))
+	name := strings.TrimPrefix(dir, absolutePath(testBase)) + "-" + strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 	sep := string(filepath.Separator)
 	name = strings.TrimPrefix(name, sep)
 	name = strings.ReplaceAll(name, sep, "-")
