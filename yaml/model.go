@@ -141,7 +141,7 @@ func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 	if q.verbose {
 		_, _ = fmt.Fprintf(q.endpoint.Logger(), result)
 		if len(result) > 1000 {
-			result = result[:100] + ".."
+			result = result[:1000] + ".."
 		}
 		ginkgo.GinkgoWriter.Println(result)
 	}
