@@ -33,6 +33,7 @@ type ExpectedMetrics struct {
 type ExpectedSpan struct {
 	Name       string            `yaml:"name"`
 	Attributes map[string]string `yaml:"attributes"`
+	AllowDups  bool              `yaml:"allow-duplicates"`
 }
 
 type ExpectedLogs struct {

@@ -39,7 +39,11 @@ func assertTrace(r *runner, tr responses.Trace, wantSpans []ExpectedSpan) {
 
 	for _, wantSpan := range wantSpans {
 		spans, atts := responses.FindSpansWithAttributes(td, wantSpan.Name)
-		g.Expect(spans).To(HaveLen(1), "we should find a single span with the name %s", wantSpan.Name)
+		if wantSpan.AllowDups {
+			g.Expect(len(spans)).Should(BeNumerically(">", 0), "we should find at least one span with the name %s", wantSpan.Name)
+		} else {
+			g.Expect(spans).To(HaveLen(1), "we should find a single span with the name %s", wantSpan.Name)
+		}
 
 		for k, v := range wantSpan.Attributes {
 			for k, v := range spans[0].Attributes().AsRaw() {
