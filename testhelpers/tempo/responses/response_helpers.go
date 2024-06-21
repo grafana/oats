@@ -5,10 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"go.opentelemetry.io/collector/pdata/pcommon"
-	"go.opentelemetry.io/collector/pdata/ptrace"
 	"regexp"
 	"strings"
+
+	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
 func MatchTraceAttribute(attributes pcommon.Map, attrType pcommon.ValueType, key, value string) error {
@@ -16,10 +17,12 @@ func MatchTraceAttribute(attributes pcommon.Map, attrType pcommon.ValueType, key
 	if !found {
 		return fmt.Errorf("couldn't find attribute %s", key)
 	}
-	valueType := att.Type()
-	if valueType != attrType {
-		return fmt.Errorf("value type for key %s is %s which doesn't match the expect type %s", key, valueType, attrType)
-	}
+
+	// We convert to strings anyway, if this check is here you can't match Int values in traces
+	// valueType := att.Type()
+	// if valueType != attrType {
+	// 	return fmt.Errorf("value type for key %s is %s which doesn't match the expect type %s", key, valueType, attrType)
+	// }
 
 	if value != "" && !matcherMaybeRegex(value)(att.AsString()) {
 		return fmt.Errorf("value for key %s is %s which doesn't match the expect value %s", key, att.AsString(), value)
