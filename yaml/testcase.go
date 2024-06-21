@@ -2,13 +2,14 @@ package yaml
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 var oatsFileRegex = regexp.MustCompile("oats.*\\.yaml")
@@ -80,6 +81,7 @@ func readTestCase(testBase, filePath string, duration time.Duration) (TestCase, 
 	sep := string(filepath.Separator)
 	name = strings.TrimPrefix(name, sep)
 	name = strings.ReplaceAll(name, sep, "-")
+	name = "run" + name
 	testCase := TestCase{
 		Name:       name,
 		Dir:        dir,
