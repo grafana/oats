@@ -3,6 +3,7 @@ package yaml
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/grafana/dashboard-linter/lint"
@@ -74,7 +75,8 @@ type DockerCompose struct {
 }
 
 type Input struct {
-	Path string `yaml:"path"`
+	Path   string `yaml:"path"`
+	Status string `yaml:"status"`
 }
 
 type TestCaseDefinition struct {
@@ -217,6 +219,10 @@ func validateInput(input []Input) {
 	Expect(input).ToNot(BeEmpty(), "input is empty")
 	for _, i := range input {
 		Expect(i.Path).ToNot(BeEmpty(), "input path is empty")
+		if i.Status != "" {
+			_, err := strconv.ParseInt(i.Status, 10, 32)
+			Expect(err).To(BeNil(), "status must parse as integer or be empty")
+		}
 	}
 }
 

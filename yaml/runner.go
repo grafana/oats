@@ -3,10 +3,12 @@ package yaml
 import (
 	"context"
 	"fmt"
-	"github.com/grafana/regexp"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
+
+	"github.com/grafana/regexp"
 
 	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/requests"
@@ -112,9 +114,11 @@ func RunTestCase(c *TestCase) {
 func (c *TestCase) startEndpoint() *compose.ComposeEndpoint {
 	var ctx = context.Background()
 
+	GinkgoWriter.Printf("Launching test for %s\n", c.Name)
+
 	endpoint := compose.NewEndpoint(
 		c.CreateDockerComposeFile(),
-		filepath.Join(c.OutputDir, "output.log"),
+		filepath.Join(c.OutputDir, fmt.Sprintf("output-%s.log", c.Name)),
 		[]string{},
 		compose.PortsConfig{
 			PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
@@ -165,7 +169,14 @@ func (r *runner) eventually(asserter func()) {
 
 		for _, i := range r.testCase.Definition.Input {
 			url := fmt.Sprintf("http://localhost:%d%s", r.testCase.PortConfig.ApplicationPort, i.Path)
-			err := requests.DoHTTPGet(url, 200)
+			status := 200
+			if i.Status != "" {
+				parsedStatus, err := strconv.ParseInt(i.Status, 10, 64)
+				if err == nil {
+					status = int(parsedStatus)
+				}
+			}
+			err := requests.DoHTTPGet(url, status)
 			g.Expect(err).ToNot(HaveOccurred(), "expected no error calling application endpoint %s", url)
 		}
 
