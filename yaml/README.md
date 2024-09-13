@@ -95,19 +95,6 @@ matrix:
       java-generator-params:
         old-jvm-metrics: true
         disable-data-saver: true
-  - name: prom-naming
-    docker-compose:
-      generator: java
-      java-generator-params:
-        disable-data-saver: true
-        prom-naming: true
-  - name: prom-naming-old-jvm-metrics
-    docker-compose:
-      generator: java
-      java-generator-params:
-        disable-data-saver: true
-        old-jvm-metrics: true
-        prom-naming: true
 input:
   - path: /stock
 ```
