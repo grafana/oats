@@ -57,8 +57,6 @@ type Expected struct {
 
 type JavaGeneratorParams struct {
 	OtelJmxConfig    string `yaml:"otel-jmx-config"`
-	OldJvmMetrics    bool   `yaml:"old-jvm-metrics"`
-	PromNaming       bool   `yaml:"prom-naming"`
 	DisableDataSaver bool   `yaml:"disable-data-saver"`
 }
 

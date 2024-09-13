@@ -73,8 +73,6 @@ func (c *TestCase) javaTemplateVars() (string, map[string]any) {
 		"JavaAgent":              filepath.ToSlash(agent),
 		"ApplicationJar":         filepath.ToSlash(c.applicationJar()),
 		"JmxConfig":              jmxConfig(c.Dir, params.OtelJmxConfig),
-		"OldJvmMetrics":          params.OldJvmMetrics,
-		"PromNaming":             params.PromNaming,
 		"DisableDataSaver":       params.DisableDataSaver,
 		"JvmDebug":               jvmDebug(image),
 		"UseAllInstrumentations": os.Getenv("TESTCASE_INCLUDE_ALL_INSTRUMENTATIONS") == "true",
