@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  lgtm:
+    image: grafana/otel-lgtm:latest
+    ports:
+      - "{{ .GrafanaHTTPPort }}:3000"
+      - "{{ .PrometheusHTTPPort }}:9090"
+      - "{{ .TempoHTTPPort }}:3200"
+      - "{{ .LokiHTTPPort }}:3100"
