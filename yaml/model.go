@@ -2,6 +2,8 @@ package yaml
 
 import (
 	"fmt"
+	"github.com/grafana/oats/observability"
+	"github.com/grafana/oats/testhelpers/remote"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -73,6 +75,10 @@ type DockerCompose struct {
 	JavaGeneratorParams JavaGeneratorParams `yaml:"java-generator-params"`
 }
 
+type Kubernetes struct {
+	Dir string `yaml:"dir"`
+}
+
 type Input struct {
 	Path   string `yaml:"path"`
 	Status string `yaml:"status"`
@@ -81,6 +87,7 @@ type Input struct {
 type TestCaseDefinition struct {
 	Include       []string       `yaml:"include"`
 	DockerCompose *DockerCompose `yaml:"docker-compose"`
+	Kubernetes    *Kubernetes    `yaml:"kubernetes"`
 	Matrix        []Matrix       `yaml:"matrix"`
 	Input         []Input        `yaml:"input"`
 	Interval      time.Duration  `yaml:"interval"`
@@ -127,10 +134,10 @@ type TestCase struct {
 
 type QueryLogger struct {
 	verbose  bool
-	endpoint *compose.ComposeEndpoint
+	endpoint *remote.Endpoint
 }
 
-func NewQueryLogger(endpoint *compose.ComposeEndpoint, verbose bool) QueryLogger {
+func NewQueryLogger(endpoint *remote.Endpoint, verbose bool) QueryLogger {
 	return QueryLogger{
 		endpoint: endpoint,
 		verbose:  verbose,
@@ -140,7 +147,7 @@ func NewQueryLogger(endpoint *compose.ComposeEndpoint, verbose bool) QueryLogger
 func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 	result := fmt.Sprintf(format, a...)
 	if q.verbose {
-		_, _ = fmt.Fprintf(q.endpoint.Logger(), result)
+		_, _ = fmt.Fprintf(q.endpoint.Logger, result)
 		if len(result) > 1000 {
 			result = result[:1000] + ".."
 		}

@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -25,14 +24,7 @@ func defaultEnv() []string {
 	return os.Environ()
 }
 
-func ComposeSuite(composeFile, logFile string) (*Compose, error) {
-	logs, err := os.OpenFile(logFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
-	if err != nil {
-		return nil, err
-	}
-	abs, _ := filepath.Abs(logFile)
-	ginkgo.GinkgoWriter.Printf("Logging to %s\n", abs)
-
+func ComposeSuite(composeFile string) (*Compose, error) {
 	command := "docker"
 	defaultArgs := []string{"compose"}
 
@@ -40,7 +32,6 @@ func ComposeSuite(composeFile, logFile string) (*Compose, error) {
 		Command:     command,
 		DefaultArgs: defaultArgs,
 		Path:        path.Join(composeFile),
-		Logger:      logs,
 		Env:         defaultEnv(),
 	}, nil
 }

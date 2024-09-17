@@ -2,7 +2,10 @@ package compose_test
 
 import (
 	"context"
+	"github.com/grafana/oats/observability"
+	"github.com/grafana/oats/testhelpers/remote"
 	"net"
+	"os"
 	"path"
 	"time"
 
@@ -15,18 +18,13 @@ import (
 )
 
 var _ = Describe("provisioning a local observability endpoint with Docker", Ordered, Label("docker", "integration", "slow"), func() {
-	var otelComposeEndpoint *compose.ComposeEndpoint
+	var otelComposeEndpoint observability.Endpoint
 
 	BeforeAll(func() {
 		var ctx context.Context = context.Background()
 		var startErr error
 
-		otelComposeEndpoint = compose.NewEndpoint(
-			path.Join(".", "docker-compose-metrics.yml"),
-			path.Join(".", "test-suite-metrics-otel.log"),
-			[]string{},
-			compose.PortsConfig{PrometheusHTTPPort: 9090},
-		)
+		otelComposeEndpoint = compose.NewEndpoint(path.Join(".", "docker-compose-metrics.yml"), os.Stdout, remote.PortsConfig{PrometheusHTTPPort: 9090})
 		startErr = otelComposeEndpoint.Start(ctx)
 		Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
 	})

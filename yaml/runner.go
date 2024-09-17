@@ -3,6 +3,9 @@ package yaml
 import (
 	"context"
 	"fmt"
+	"github.com/grafana/oats/observability"
+	"github.com/grafana/oats/testhelpers/remote"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -18,7 +21,7 @@ import (
 
 type runner struct {
 	testCase    *TestCase
-	endpoint    *compose.ComposeEndpoint
+	endpoint    *remote.Endpoint
 	deadline    time.Time
 	queryLogger QueryLogger
 	gomega      Gomega
@@ -34,7 +37,9 @@ func RunTestCase(c *TestCase) {
 	BeforeAll(func() {
 		c.OutputDir = prepareBuildDir(c.Name)
 		c.validateAndSetVariables()
-		endpoint := c.startEndpoint()
+		endpoint, err := startEndpoint(c)
+		Expect(err).ToNot(HaveOccurred(), "expected no error starting a observability endpoint")
+		return
 
 		r.deadline = time.Now().Add(c.Timeout)
 		r.endpoint = endpoint
@@ -111,24 +116,38 @@ func RunTestCase(c *TestCase) {
 	}
 }
 
-func (c *TestCase) startEndpoint() *compose.ComposeEndpoint {
-	var ctx = context.Background()
+func startEndpoint(c *TestCase) (observability.Endpoint, error) {
+	logger, err := createLogger(c)
+	Expect(err).ToNot(HaveOccurred(), "expected no error creating logger")
+
+	ports := remote.PortsConfig{
+		PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
+		TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
+		LokiHttpPort:       c.PortConfig.LokiHTTPPort,
+	}
 
 	GinkgoWriter.Printf("Launching test for %s\n", c.Name)
+	var endpoint observability.Endpoint
+	if c.Definition.Kubernetes != nil {
+		//todo
+	} else {
+		endpoint = compose.NewEndpoint(c.CreateDockerComposeFile(), logger, ports)
+	}
 
-	endpoint := compose.NewEndpoint(
-		c.CreateDockerComposeFile(),
-		filepath.Join(c.OutputDir, fmt.Sprintf("output-%s.log", c.Name)),
-		[]string{},
-		compose.PortsConfig{
-			PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
-			TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
-			LokiHttpPort:       c.PortConfig.LokiHTTPPort,
-		},
-	)
+	var ctx = context.Background()
 	startErr := endpoint.Start(ctx)
-	Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
-	return endpoint
+	return endpoint, startErr
+}
+
+func createLogger(c *TestCase) (io.WriteCloser, error) {
+	logFile := filepath.Join(c.OutputDir, fmt.Sprintf("output-%s.log", c.Name))
+	logs, err := os.OpenFile(logFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	if err != nil {
+		return nil, err
+	}
+	abs, _ := filepath.Abs(logFile)
+	GinkgoWriter.Printf("Logging to %s\n", abs)
+	return logs, nil
 }
 
 func prepareBuildDir(name string) string {
