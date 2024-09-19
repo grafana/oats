@@ -24,18 +24,16 @@ type PortsConfig struct {
 }
 
 type Endpoint struct {
-	ports  PortsConfig
-	Logger io.WriteCloser
-	start  func(context.Context) error
-	stop   func(context.Context) error
+	ports PortsConfig
+	start func(context.Context) error
+	stop  func(context.Context) error
 }
 
-func NewEndpoint(ports PortsConfig, logger io.WriteCloser, start func(context.Context) error, stop func(context.Context) error) *Endpoint {
+func NewEndpoint(ports PortsConfig, start func(context.Context) error, stop func(context.Context) error) *Endpoint {
 	return &Endpoint{
-		ports:  ports,
-		Logger: logger,
-		start:  start,
-		stop:   stop,
+		ports: ports,
+		start: start,
+		stop:  stop,
 	}
 }
 

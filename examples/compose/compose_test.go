@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/grafana/oats/observability"
 	"github.com/grafana/oats/testhelpers/remote"
-	"os"
 	"path"
 	"time"
 
@@ -28,7 +27,7 @@ var _ = Describe("provisioning a local observability endpoint with Docker", Orde
 		var ctx = context.Background()
 		var startErr error
 
-		composeEndpoint = compose.NewEndpoint(path.Join(".", "docker-compose-traces.yml"), os.Stdout, remote.PortsConfig{TracesGRPCPort: 4017, TempoHTTPPort: 3200})
+		composeEndpoint = compose.NewEndpoint(path.Join(".", "docker-compose-traces.yml"), remote.PortsConfig{TracesGRPCPort: 4017, TempoHTTPPort: 3200}, nil)
 		startErr = composeEndpoint.Start(ctx)
 		Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
 	})

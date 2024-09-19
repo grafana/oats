@@ -3,7 +3,7 @@ package yaml
 import (
 	"context"
 	"fmt"
-	"github.com/grafana/oats/observability"
+	"github.com/grafana/oats/testhelpers/kubernetes"
 	"github.com/grafana/oats/testhelpers/remote"
 	"io"
 	"os"
@@ -37,9 +37,12 @@ func RunTestCase(c *TestCase) {
 	BeforeAll(func() {
 		c.OutputDir = prepareBuildDir(c.Name)
 		c.validateAndSetVariables()
-		endpoint, err := startEndpoint(c)
+		logger, err := createLogger(c)
+		Expect(err).ToNot(HaveOccurred(), "expected no error creating logger")
+		r.queryLogger = NewQueryLogger(r.endpoint, logger)
+
+		endpoint, err := startEndpoint(c, logger)
 		Expect(err).ToNot(HaveOccurred(), "expected no error starting a observability endpoint")
-		return
 
 		r.deadline = time.Now().Add(c.Timeout)
 		r.endpoint = endpoint
@@ -116,10 +119,7 @@ func RunTestCase(c *TestCase) {
 	}
 }
 
-func startEndpoint(c *TestCase) (observability.Endpoint, error) {
-	logger, err := createLogger(c)
-	Expect(err).ToNot(HaveOccurred(), "expected no error creating logger")
-
+func startEndpoint(c *TestCase, logger io.WriteCloser) (*remote.Endpoint, error) {
 	ports := remote.PortsConfig{
 		PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
 		TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
@@ -127,11 +127,11 @@ func startEndpoint(c *TestCase) (observability.Endpoint, error) {
 	}
 
 	GinkgoWriter.Printf("Launching test for %s\n", c.Name)
-	var endpoint observability.Endpoint
+	var endpoint *remote.Endpoint
 	if c.Definition.Kubernetes != nil {
-		//todo
+		endpoint = kubernetes.NewEndpoint(c.Definition.Kubernetes, ports, logger, c.Name, c.Dir)
 	} else {
-		endpoint = compose.NewEndpoint(c.CreateDockerComposeFile(), logger, ports)
+		endpoint = compose.NewEndpoint(c.CreateDockerComposeFile(), ports, logger)
 	}
 
 	var ctx = context.Background()
@@ -183,8 +183,8 @@ func (r *runner) eventually(asserter func()) {
 			verbose = true
 			t = time.Now()
 		}
-		queryLogger := NewQueryLogger(r.endpoint, verbose)
-		queryLogger.LogQueryResult("waiting for telemetry data\n")
+		r.queryLogger.Verbose = verbose
+		r.queryLogger.LogQueryResult("waiting for telemetry data\n")
 
 		for _, i := range r.testCase.Definition.Input {
 			url := fmt.Sprintf("http://localhost:%d%s", r.testCase.PortConfig.ApplicationPort, i.Path)
@@ -199,7 +199,6 @@ func (r *runner) eventually(asserter func()) {
 			g.Expect(err).ToNot(HaveOccurred(), "expected no error calling application endpoint %s", url)
 		}
 
-		r.queryLogger = queryLogger
 		r.gomega = g
 		asserter()
 	}).WithTimeout(r.deadline.Sub(time.Now())).WithPolling(interval).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)

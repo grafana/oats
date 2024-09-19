@@ -78,7 +78,24 @@ and performing template variable substitution, with the vars as seen in this exc
 Additional variables could be added for more specific generators as needed. (e.g. add new case in getTemplateVars() that adds more vars.)
 
 When a generator is used, template variable interpolation will also occur on all docker-compose file(s).
-        
+
+## Kubernetes
+
+A local kubernetes cluster can be used to test the application in a kubernetes environment rather than in docker-compose.
+This is useful to test the application in a more realistic environment - and when you want to test Kubernetes specific features.
+
+Describes the kubernetes manifest(s) to use for the test.
+
+```yaml
+kubernetes:
+  dir: k8s
+  app-service: dice
+  app-docker-file: Dockerfile
+  app-docker-context: ..
+  app-docker-tag: dice:1.1-SNAPSHOT
+  app-docker-port: 8080
+```
+
 ## Matrix of test cases
 
 Matrix tests are useful to test different configurations of the same application, 

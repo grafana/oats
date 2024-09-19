@@ -2,8 +2,10 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/grafana/oats/testhelpers/remote"
 	"github.com/onsi/ginkgo/v2"
 	"io"
 	"os"
@@ -24,7 +26,7 @@ func defaultEnv() []string {
 	return os.Environ()
 }
 
-func ComposeSuite(composeFile string) (*Compose, error) {
+func ComposeSuite(composeFile string, logger io.WriteCloser) (*Compose, error) {
 	command := "docker"
 	defaultArgs := []string{"compose"}
 
@@ -33,6 +35,7 @@ func ComposeSuite(composeFile string) (*Compose, error) {
 		DefaultArgs: defaultArgs,
 		Path:        path.Join(composeFile),
 		Env:         defaultEnv(),
+		Logger:      logger,
 	}, nil
 }
 
@@ -102,4 +105,25 @@ func (c *Compose) Close() error {
 		return nil
 	}
 	return errors.New(strings.Join(errs, " / "))
+}
+
+func NewEndpoint(composeFilePath string, ports remote.PortsConfig, logger io.WriteCloser) *remote.Endpoint {
+	var compose *Compose
+	return remote.NewEndpoint(ports, func(ctx context.Context) error {
+		var err error
+
+		if composeFilePath == "" {
+			return fmt.Errorf("composeFilePath cannot be empty")
+		}
+
+		compose, err = ComposeSuite(composeFilePath, logger)
+		if err != nil {
+			return err
+		}
+		err = compose.Up()
+
+		return err
+	}, func(ctx context.Context) error {
+		return compose.Close()
+	})
 }

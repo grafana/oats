@@ -1,0 +1,35 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "streams",
+    "result": [
+      {
+        "stream": {
+          "deployment_environment": "staging",
+          "detected_level": "info",
+          "k8s_container_name": "dice",
+          "k8s_container_restart_count": "0",
+          "k8s_namespace_name": "default",
+          "k8s_pod_name": "dice-5cc7448679-rll6c",
+          "k8s_pod_uid": "60348509-a707-4e3e-8473-627e52c09d63",
+          "observed_timestamp": "1726671804922950304",
+          "scope_name": "com.grafana.example.RollController",
+          "service_instance_id": "3ed808da-0e20-4f13-a565-b223dbcd58fa",
+          "service_name": "dice",
+          "service_namespace": "shop",
+          "severity_number": "9",
+          "severity_text": "INFO",
+          "span_id": "f7a8e15889d245f6",
+          "thread_name": "http-nio-8080-exec-1",
+          "trace_id": "9b865f26c3a116ad2e5995d74a150848"
+        },
+        "values": [
+          [
+            "1726671804886000000",
+            "Anonymous player is rolling the dice: 6"
+          ]
+        ]
+      }
+    ]
+  }
+}
