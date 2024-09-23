@@ -20,11 +20,12 @@ import (
 )
 
 type runner struct {
-	testCase    *TestCase
-	endpoint    *remote.Endpoint
-	deadline    time.Time
-	queryLogger QueryLogger
-	gomega      Gomega
+	testCase          *TestCase
+	endpoint          *remote.Endpoint
+	deadline          time.Time
+	queryLogger       QueryLogger
+	gomega            Gomega
+	additionalAsserts []func()
 }
 
 var VerboseLogging bool
@@ -76,7 +77,7 @@ func RunTestCase(c *TestCase) {
 	for _, log := range expected.Logs {
 		l := log
 		if r.MatchesMatrixCondition(l.MatrixCondition, l.LogQL) {
-			It(fmt.Sprintf("should have '%s' in loki", l), func() {
+			It(fmt.Sprintf("should have '%s' in loki", l.LogQL), func() {
 				r.eventually(func() {
 					AssertLoki(r, l)
 				})
@@ -146,7 +147,7 @@ func createLogger(c *TestCase) (io.WriteCloser, error) {
 		return nil, err
 	}
 	abs, _ := filepath.Abs(logFile)
-	GinkgoWriter.Printf("Logging to %s\n", abs)
+	println("Logging to", abs)
 	return logs, nil
 }
 
@@ -176,6 +177,7 @@ func (r *runner) eventually(asserter func()) {
 		interval = DefaultTestCaseInterval
 	}
 	iterations := 0
+	r.additionalAsserts = nil
 	Eventually(ctx, func(g Gomega) {
 		iterations++
 		verbose := VerboseLogging
@@ -203,6 +205,9 @@ func (r *runner) eventually(asserter func()) {
 		asserter()
 	}).WithTimeout(r.deadline.Sub(time.Now())).WithPolling(interval).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
 	GinkgoWriter.Println(iterations, "iterations to get telemetry data")
+	for _, a := range r.additionalAsserts {
+		a()
+	}
 }
 
 func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) bool {

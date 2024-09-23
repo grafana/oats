@@ -39,11 +39,13 @@ type ExpectedSpan struct {
 }
 
 type ExpectedLogs struct {
-	LogQL           string            `yaml:"logql"`
-	Contains        []string          `yaml:"contains"`
-	Attributes      map[string]string `yaml:"attributes"`
-	AttributeRegexp map[string]string `yaml:"attribute-regexp"`
-	MatrixCondition string            `yaml:"matrix-condition"`
+	LogQL             string            `yaml:"logql"`
+	Equals            []string          `yaml:"equals"`
+	Contains          []string          `yaml:"contains"`
+	Attributes        map[string]string `yaml:"attributes"`
+	AttributeRegexp   map[string]string `yaml:"attribute-regexp"`
+	NoExtraAttributes bool              `yaml:"no-extra-attributes"`
+	MatrixCondition   string            `yaml:"matrix-condition"`
 }
 
 type ExpectedTraces struct {
@@ -169,7 +171,14 @@ func (c *TestCase) validateAndSetVariables() {
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
 		Expect(l.LogQL).ToNot(BeEmpty(), "logQL is empty in "+string(out))
-		Expect(l.Contains).ToNot(BeEmpty(), "contains is empty in "+string(out))
+		if l.Equals == nil {
+			Expect(l.Contains).ToNot(BeEmpty(), "contains is empty in "+string(out))
+		} else {
+			Expect(l.Equals).ToNot(BeEmpty(), "equals is empty in "+string(out))
+		}
+		for _, s := range l.Equals {
+			Expect(s).ToNot(BeEmpty(), "contains string is empty in "+string(out))
+		}
 		for _, s := range l.Contains {
 			Expect(s).ToNot(BeEmpty(), "contains string is empty in "+string(out))
 		}

@@ -8,6 +8,8 @@ import (
 )
 
 func TestAssertLokiResponse(t *testing.T) {
+	gomega.RegisterTestingT(t)
+
 	file, err := os.ReadFile("testdata/loki_response.json")
 	require.NoError(t, err)
 	logs := ExpectedLogs{
@@ -26,37 +28,24 @@ func TestAssertLokiResponse(t *testing.T) {
 			"message":                "Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed: java.lang.RuntimeException: simulating an error] with root cause",
 		},
 		AttributeRegexp: map[string]string{
-			"thread_name":          ".*",
-			"span_id":              ".*",
-			"trace_id":             ".*",
-			"k8s_pod_name":         "dice-.*-.*",
-			"k8s_pod_uid":          ".*",
-			"exception_stacktrace": ".*",
+			"thread_name":                 ".*",
+			"span_id":                     ".*",
+			"trace_id":                    ".*",
+			"k8s_pod_name":                "dice-.*-.*",
+			"k8s_pod_uid":                 ".*",
+			"k8s_container_restart_count": ".*",
+			"service_instance_id":         ".*",
+			"exception_stacktrace":        ".*",
 		},
+		NoExtraAttributes: true,
 	}
-	AssertLokiResponse(gomega.NewGomega(func(message string, callerSkip ...int) {
-		t.Error(message)
-	}), file, logs, nil)
-}
+	r := &runner{
+		gomega: gomega.NewGomega(func(message string, callerSkip ...int) {
+			t.Error(message)
+		}),
+	}
+	AssertLokiResponse(file, logs, r)
 
-//contains:
-//  - 'simulating an error'
-//attributes:
-//  deployment_environment: staging
-//  exception_message: "simulating an error"
-//  exception_type: "java.lang.RuntimeException"
-//  scope_name: "org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/].[dispatcherServlet]"
-//  service_name: dice
-//  service_namespace: shop
-//  severity_number: 17
-//  severity_text: ERROR
-//  k8s_container_name: dice
-//  k8s_namespace_name: shop
-//  message: "Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed: java.lang.RuntimeException: simulating an error] with root cause"
-//attribute-regexp:
-//  thread_name: ".*"
-//  span_id: ".*"
-//  trace_id: ".*"
-//  k8s_pod_name: dice-.*-.*
-//  k8s_pod_uid: ".*"
-//  exception_stacktrace: ".*" # TODO: transform to sanitized stacktrace
+	require.Len(t, r.additionalAsserts, 1)
+	r.additionalAsserts[0]()
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/grafana/oats/testhelpers/remote"
 	"io"
+	"os"
 	"os/exec"
 )
 
@@ -18,6 +19,7 @@ type Kubernetes struct {
 }
 
 func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, logger io.WriteCloser, testName string, dir string) *remote.Endpoint {
+	var killList []*os.Process
 	run := func(cmd *exec.Cmd, background bool) error {
 		_, _ = fmt.Fprintf(logger, "Running: %s\n", cmd.String())
 		cmd.Stdout = logger
@@ -28,13 +30,20 @@ func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, logger io.WriteClo
 			if err != nil {
 				return err
 			}
-			return cmd.Process.Release()
+			killList = append(killList, cmd.Process)
+			return nil
 		}
 		return cmd.Run()
 	}
 	return remote.NewEndpoint(ports, func(ctx context.Context) error {
 		return start(model, ports, testName, run, logger)
 	}, func(ctx context.Context) error {
+		for _, p := range killList {
+			err := p.Kill()
+			if err != nil {
+				return err
+			}
+		}
 		return run(exec.Command("k3d", "cluster", "delete", testName), false)
 	})
 }
@@ -55,11 +64,23 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 	}
 
 	cluster := testName
-	err = run(exec.Command("k3d", "cluster", "create", cluster), false)
-	if err != nil {
-		_, _ = fmt.Fprintf(logger, "Failed to create cluster (it probably already exists) %s: %v\n", cluster, err)
+	if len(cluster) > 32 {
+		cluster = cluster[(len(cluster))-32:]
 	}
 
+	err = run(exec.Command("k3d", "cluster", "list", cluster), false)
+	if err == nil {
+		_, _ = fmt.Fprintf(logger, "cluster %s already exists - deleting\n", cluster)
+		err = run(exec.Command("k3d", "cluster", "delete", cluster), false)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = run(exec.Command("k3d", "cluster", "create", cluster), false)
+	if err != nil {
+		return err
+	}
 	err = run(exec.Command("k3d", "image", "import", "-c", cluster, model.AppDockerTag), false)
 	if err != nil {
 		return err
