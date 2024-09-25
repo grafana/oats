@@ -10,12 +10,13 @@ import (
 )
 
 type Kubernetes struct {
-	Dir              string `yaml:"dir"`
-	AppService       string `yaml:"app-service"`
-	AppDockerFile    string `yaml:"app-docker-file"`
-	AppDockerContext string `yaml:"app-docker-context"`
-	AppDockerTag     string `yaml:"app-docker-tag"`
-	AppDockerPort    int    `yaml:"app-docker-port"`
+	Dir              string   `yaml:"dir"`
+	AppService       string   `yaml:"app-service"`
+	AppDockerFile    string   `yaml:"app-docker-file"`
+	AppDockerContext string   `yaml:"app-docker-context"`
+	AppDockerTag     string   `yaml:"app-docker-tag"`
+	AppDockerPort    int      `yaml:"app-docker-port"`
+	ImportImages     []string `yaml:"import-images"`
 }
 
 func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, logger io.WriteCloser, testName string, dir string) *remote.Endpoint {
@@ -81,9 +82,13 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 	if err != nil {
 		return err
 	}
-	err = run(exec.Command("k3d", "image", "import", "-c", cluster, model.AppDockerTag), false)
-	if err != nil {
-		return err
+	importImages := []string{model.AppDockerTag}
+	importImages = append(importImages, model.ImportImages...)
+	for _, image := range importImages {
+		err = run(exec.Command("k3d", "image", "import", "-c", cluster, image), false)
+		if err != nil {
+			return err
+		}
 	}
 	err = run(exec.Command("kubectl", "apply", "-f", model.Dir), false)
 	if err != nil {
