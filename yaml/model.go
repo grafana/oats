@@ -2,12 +2,14 @@ package yaml
 
 import (
 	"fmt"
+	"github.com/grafana/oats/observability"
+	"github.com/grafana/oats/testhelpers/kubernetes"
+	"io"
 	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/grafana/dashboard-linter/lint"
-	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
@@ -37,9 +39,13 @@ type ExpectedSpan struct {
 }
 
 type ExpectedLogs struct {
-	LogQL           string   `yaml:"logql"`
-	Contains        []string `yaml:"contains"`
-	MatrixCondition string   `yaml:"matrix-condition"`
+	LogQL             string            `yaml:"logql"`
+	Equals            []string          `yaml:"equals"`
+	Contains          []string          `yaml:"contains"`
+	Attributes        map[string]string `yaml:"attributes"`
+	AttributeRegexp   map[string]string `yaml:"attribute-regexp"`
+	NoExtraAttributes bool              `yaml:"no-extra-attributes"`
+	MatrixCondition   string            `yaml:"matrix-condition"`
 }
 
 type ExpectedTraces struct {
@@ -79,12 +85,13 @@ type Input struct {
 }
 
 type TestCaseDefinition struct {
-	Include       []string       `yaml:"include"`
-	DockerCompose *DockerCompose `yaml:"docker-compose"`
-	Matrix        []Matrix       `yaml:"matrix"`
-	Input         []Input        `yaml:"input"`
-	Interval      time.Duration  `yaml:"interval"`
-	Expected      Expected       `yaml:"expected"`
+	Include       []string               `yaml:"include"`
+	DockerCompose *DockerCompose         `yaml:"docker-compose"`
+	Kubernetes    *kubernetes.Kubernetes `yaml:"kubernetes"`
+	Matrix        []Matrix               `yaml:"matrix"`
+	Input         []Input                `yaml:"input"`
+	Interval      time.Duration          `yaml:"interval"`
+	Expected      Expected               `yaml:"expected"`
 }
 
 const DefaultTestCaseInterval = 100 * time.Millisecond
@@ -126,21 +133,22 @@ type TestCase struct {
 }
 
 type QueryLogger struct {
-	verbose  bool
-	endpoint *compose.ComposeEndpoint
+	Verbose  bool
+	endpoint observability.Endpoint
+	Logger   io.WriteCloser
 }
 
-func NewQueryLogger(endpoint *compose.ComposeEndpoint, verbose bool) QueryLogger {
+func NewQueryLogger(endpoint observability.Endpoint, logger io.WriteCloser) QueryLogger {
 	return QueryLogger{
 		endpoint: endpoint,
-		verbose:  verbose,
+		Logger:   logger,
 	}
 }
 
 func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 	result := fmt.Sprintf(format, a...)
-	if q.verbose {
-		_, _ = fmt.Fprintf(q.endpoint.Logger(), result)
+	if q.Verbose {
+		_, _ = fmt.Fprintf(q.Logger, result)
 		if len(result) > 1000 {
 			result = result[:1000] + ".."
 		}
@@ -149,7 +157,12 @@ func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 }
 
 func (c *TestCase) validateAndSetVariables() {
-	validateDockerCompose(c.Definition.DockerCompose, c.Dir)
+	if c.Definition.Kubernetes != nil {
+		validateK8s(c.Definition.Kubernetes)
+		Expect(c.Definition.DockerCompose).To(BeNil(), "kubernetes and docker-compose are mutually exclusive")
+	} else {
+		validateDockerCompose(c.Definition.DockerCompose, c.Dir)
+	}
 	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
 	if len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0 {
@@ -158,7 +171,14 @@ func (c *TestCase) validateAndSetVariables() {
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
 		Expect(l.LogQL).ToNot(BeEmpty(), "logQL is empty in "+string(out))
-		Expect(l.Contains).ToNot(BeEmpty(), "contains is empty in "+string(out))
+		if l.Equals == nil {
+			Expect(l.Contains).ToNot(BeEmpty(), "contains is empty in "+string(out))
+		} else {
+			Expect(l.Equals).ToNot(BeEmpty(), "equals is empty in "+string(out))
+		}
+		for _, s := range l.Equals {
+			Expect(s).ToNot(BeEmpty(), "contains string is empty in "+string(out))
+		}
 		for _, s := range l.Contains {
 			Expect(s).ToNot(BeEmpty(), "contains string is empty in "+string(out))
 		}
@@ -212,6 +232,14 @@ func (c *TestCase) validateAndSetVariables() {
 	ginkgo.GinkgoWriter.Printf("loki port: %d\n", c.PortConfig.LokiHTTPPort)
 	ginkgo.GinkgoWriter.Printf("tempo port: %d\n", c.PortConfig.TempoHTTPPort)
 	ginkgo.GinkgoWriter.Printf("application port: %d\n", c.PortConfig.ApplicationPort)
+}
+
+func validateK8s(kubernetes *kubernetes.Kubernetes) {
+	Expect(kubernetes.Dir).ToNot(BeEmpty(), "k8s-dir is empty")
+	Expect(kubernetes.AppService).ToNot(BeEmpty(), "k8s-app-service is empty")
+	Expect(kubernetes.AppDockerFile).ToNot(BeEmpty(), "app-docker-file is empty")
+	Expect(kubernetes.AppDockerTag).ToNot(BeEmpty(), "app-docker-tag is empty")
+	Expect(kubernetes.AppDockerPort).ToNot(BeZero(), "app-docker-port is zero")
 }
 
 func validateInput(input []Input) {

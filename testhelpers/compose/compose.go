@@ -2,14 +2,15 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/grafana/oats/testhelpers/remote"
 	"github.com/onsi/ginkgo/v2"
 	"io"
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -25,14 +26,7 @@ func defaultEnv() []string {
 	return os.Environ()
 }
 
-func ComposeSuite(composeFile, logFile string) (*Compose, error) {
-	logs, err := os.OpenFile(logFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
-	if err != nil {
-		return nil, err
-	}
-	abs, _ := filepath.Abs(logFile)
-	ginkgo.GinkgoWriter.Printf("Logging to %s\n", abs)
-
+func ComposeSuite(composeFile string, logger io.WriteCloser) (*Compose, error) {
 	command := "docker"
 	defaultArgs := []string{"compose"}
 
@@ -40,8 +34,8 @@ func ComposeSuite(composeFile, logFile string) (*Compose, error) {
 		Command:     command,
 		DefaultArgs: defaultArgs,
 		Path:        path.Join(composeFile),
-		Logger:      logs,
 		Env:         defaultEnv(),
+		Logger:      logger,
 	}, nil
 }
 
@@ -111,4 +105,25 @@ func (c *Compose) Close() error {
 		return nil
 	}
 	return errors.New(strings.Join(errs, " / "))
+}
+
+func NewEndpoint(composeFilePath string, ports remote.PortsConfig, logger io.WriteCloser) *remote.Endpoint {
+	var compose *Compose
+	return remote.NewEndpoint(ports, func(ctx context.Context) error {
+		var err error
+
+		if composeFilePath == "" {
+			return fmt.Errorf("composeFilePath cannot be empty")
+		}
+
+		compose, err = ComposeSuite(composeFilePath, logger)
+		if err != nil {
+			return err
+		}
+		err = compose.Up()
+
+		return err
+	}, func(ctx context.Context) error {
+		return compose.Close()
+	})
 }

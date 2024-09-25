@@ -3,6 +3,9 @@ package yaml
 import (
 	"context"
 	"fmt"
+	"github.com/grafana/oats/testhelpers/kubernetes"
+	"github.com/grafana/oats/testhelpers/remote"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,11 +20,12 @@ import (
 )
 
 type runner struct {
-	testCase    *TestCase
-	endpoint    *compose.ComposeEndpoint
-	deadline    time.Time
-	queryLogger QueryLogger
-	gomega      Gomega
+	testCase          *TestCase
+	endpoint          *remote.Endpoint
+	deadline          time.Time
+	queryLogger       QueryLogger
+	gomega            Gomega
+	additionalAsserts []func()
 }
 
 var VerboseLogging bool
@@ -34,7 +38,12 @@ func RunTestCase(c *TestCase) {
 	BeforeAll(func() {
 		c.OutputDir = prepareBuildDir(c.Name)
 		c.validateAndSetVariables()
-		endpoint := c.startEndpoint()
+		logger, err := createLogger(c)
+		Expect(err).ToNot(HaveOccurred(), "expected no error creating logger")
+		r.queryLogger = NewQueryLogger(r.endpoint, logger)
+
+		endpoint, err := startEndpoint(c, logger)
+		Expect(err).ToNot(HaveOccurred(), "expected no error starting a observability endpoint")
 
 		r.deadline = time.Now().Add(c.Timeout)
 		r.endpoint = endpoint
@@ -68,7 +77,7 @@ func RunTestCase(c *TestCase) {
 	for _, log := range expected.Logs {
 		l := log
 		if r.MatchesMatrixCondition(l.MatrixCondition, l.LogQL) {
-			It(fmt.Sprintf("should have '%s' in loki", l), func() {
+			It(fmt.Sprintf("should have '%s' in loki", l.LogQL), func() {
 				r.eventually(func() {
 					AssertLoki(r, l)
 				})
@@ -111,24 +120,35 @@ func RunTestCase(c *TestCase) {
 	}
 }
 
-func (c *TestCase) startEndpoint() *compose.ComposeEndpoint {
-	var ctx = context.Background()
+func startEndpoint(c *TestCase, logger io.WriteCloser) (*remote.Endpoint, error) {
+	ports := remote.PortsConfig{
+		PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
+		TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
+		LokiHttpPort:       c.PortConfig.LokiHTTPPort,
+	}
 
 	GinkgoWriter.Printf("Launching test for %s\n", c.Name)
+	var endpoint *remote.Endpoint
+	if c.Definition.Kubernetes != nil {
+		endpoint = kubernetes.NewEndpoint(c.Definition.Kubernetes, ports, logger, c.Name, c.Dir)
+	} else {
+		endpoint = compose.NewEndpoint(c.CreateDockerComposeFile(), ports, logger)
+	}
 
-	endpoint := compose.NewEndpoint(
-		c.CreateDockerComposeFile(),
-		filepath.Join(c.OutputDir, fmt.Sprintf("output-%s.log", c.Name)),
-		[]string{},
-		compose.PortsConfig{
-			PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
-			TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
-			LokiHttpPort:       c.PortConfig.LokiHTTPPort,
-		},
-	)
+	var ctx = context.Background()
 	startErr := endpoint.Start(ctx)
-	Expect(startErr).ToNot(HaveOccurred(), "expected no error starting a local observability endpoint")
-	return endpoint
+	return endpoint, startErr
+}
+
+func createLogger(c *TestCase) (io.WriteCloser, error) {
+	logFile := filepath.Join(c.OutputDir, fmt.Sprintf("output-%s.log", c.Name))
+	logs, err := os.OpenFile(logFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	if err != nil {
+		return nil, err
+	}
+	abs, _ := filepath.Abs(logFile)
+	println("Logging to", abs)
+	return logs, nil
 }
 
 func prepareBuildDir(name string) string {
@@ -157,6 +177,7 @@ func (r *runner) eventually(asserter func()) {
 		interval = DefaultTestCaseInterval
 	}
 	iterations := 0
+	r.additionalAsserts = nil
 	Eventually(ctx, func(g Gomega) {
 		iterations++
 		verbose := VerboseLogging
@@ -164,8 +185,8 @@ func (r *runner) eventually(asserter func()) {
 			verbose = true
 			t = time.Now()
 		}
-		queryLogger := NewQueryLogger(r.endpoint, verbose)
-		queryLogger.LogQueryResult("waiting for telemetry data\n")
+		r.queryLogger.Verbose = verbose
+		r.queryLogger.LogQueryResult("waiting for telemetry data\n")
 
 		for _, i := range r.testCase.Definition.Input {
 			url := fmt.Sprintf("http://localhost:%d%s", r.testCase.PortConfig.ApplicationPort, i.Path)
@@ -180,11 +201,13 @@ func (r *runner) eventually(asserter func()) {
 			g.Expect(err).ToNot(HaveOccurred(), "expected no error calling application endpoint %s", url)
 		}
 
-		r.queryLogger = queryLogger
 		r.gomega = g
 		asserter()
 	}).WithTimeout(r.deadline.Sub(time.Now())).WithPolling(interval).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
 	GinkgoWriter.Println(iterations, "iterations to get telemetry data")
+	for _, a := range r.additionalAsserts {
+		a()
+	}
 }
 
 func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) bool {
