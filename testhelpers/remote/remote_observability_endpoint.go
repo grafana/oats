@@ -156,7 +156,7 @@ func (e *Endpoint) SearchLoki(query string) ([]byte, error) {
 		return nil, fmt.Errorf("to search Loki you must configure a LokiHttpPort")
 	}
 
-	u := fmt.Sprintf("http://localhost:%d/loki/api/v1/query?query_range?since=5m&limit=1&query=%s", e.ports.LokiHttpPort, url.PathEscape(query))
+	u := fmt.Sprintf("http://localhost:%d/loki/api/v1/query_range?since=5m&limit=1&query=%s", e.ports.LokiHttpPort, url.PathEscape(query))
 
 	resp, err := http.Get(u)
 	if err != nil {
