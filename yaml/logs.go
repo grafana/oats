@@ -41,9 +41,12 @@ func AssertLokiResponse(b []byte, l ExpectedLogs, r *runner) {
 
 	stream := streams[0]
 	line := stream.Values[0][1]
-	for _, s := range l.Equals {
+	if len(l.Equals) > 0 {
 		// check for exact match in additional asserts
-		g.Expect(line).To(ContainSubstring(s))
+		g.Expect(line).To(ContainSubstring(l.Equals))
+	}
+	if len(l.Regexp) > 0 {
+		g.Expect(line).To(MatchRegexp(l.Regexp))
 	}
 	for _, s := range l.Contains {
 		g.Expect(line).To(ContainSubstring(s))
@@ -51,8 +54,8 @@ func AssertLokiResponse(b []byte, l ExpectedLogs, r *runner) {
 
 	// don't retry we've found the log
 	r.additionalAsserts = append(r.additionalAsserts, func() {
-		for _, s := range l.Equals {
-			g.Expect(line).To(Equal(s))
+		if len(l.Equals) > 0 {
+			g.Expect(line).To(Equal(l.Equals))
 		}
 		assertLabels(l, stream.Stream)
 	})

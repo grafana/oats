@@ -40,8 +40,9 @@ type ExpectedSpan struct {
 
 type ExpectedLogs struct {
 	LogQL             string            `yaml:"logql"`
-	Equals            []string          `yaml:"equals"`
+	Equals            string            `yaml:"equals"`
 	Contains          []string          `yaml:"contains"`
+	Regexp            string            `yaml:"regexp"`
 	Attributes        map[string]string `yaml:"attributes"`
 	AttributeRegexp   map[string]string `yaml:"attribute-regexp"`
 	NoExtraAttributes bool              `yaml:"no-extra-attributes"`
@@ -171,13 +172,8 @@ func (c *TestCase) validateAndSetVariables() {
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
 		Expect(l.LogQL).ToNot(BeEmpty(), "logQL is empty in "+string(out))
-		if l.Equals == nil {
-			Expect(l.Contains).ToNot(BeEmpty(), "contains is empty in "+string(out))
-		} else {
-			Expect(l.Equals).ToNot(BeEmpty(), "equals is empty in "+string(out))
-		}
-		for _, s := range l.Equals {
-			Expect(s).ToNot(BeEmpty(), "contains string is empty in "+string(out))
+		if l.Equals == "" && l.Contains == nil && l.Regexp == "" {
+			ginkgo.Fail("expected equals or contains or regexp in logs")
 		}
 		for _, s := range l.Contains {
 			Expect(s).ToNot(BeEmpty(), "contains string is empty in "+string(out))
