@@ -239,7 +239,6 @@ func validateK8s(kubernetes *kubernetes.Kubernetes) {
 }
 
 func validateInput(input []Input) {
-	Expect(input).ToNot(BeEmpty(), "input is empty")
 	for _, i := range input {
 		Expect(i.Path).ToNot(BeEmpty(), "input path is empty")
 		if i.Status != "" {
