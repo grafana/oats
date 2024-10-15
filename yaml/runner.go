@@ -7,6 +7,7 @@ import (
 	"github.com/grafana/oats/testhelpers/remote"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -118,6 +119,26 @@ func RunTestCase(c *TestCase) {
 			})
 		}
 	}
+	for _, customCheck := range expected.CustomChecks {
+		c := customCheck
+		It(fmt.Sprintf("custom check '%s'", c.Script), func() {
+			r.eventually(func() {
+				assertCustomCheck(r, c)
+			})
+		})
+	}
+}
+
+func assertCustomCheck(r *runner, c CustomCheck) {
+	r.queryLogger.LogQueryResult("running custom check %v\n", c.Script)
+	cmd := exec.Command(c.Script)
+	cmd.Dir = r.testCase.Dir
+	cmd.Stdout = r.queryLogger.Logger
+	cmd.Stderr = r.queryLogger.Logger
+
+	err := cmd.Run()
+	r.queryLogger.LogQueryResult("custom check %v response %v err=%v\n", c.Script, "", err)
+	r.gomega.Expect(err).ToNot(HaveOccurred())
 }
 
 func startEndpoint(c *TestCase, logger io.WriteCloser) (*remote.Endpoint, error) {

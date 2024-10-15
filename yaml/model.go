@@ -55,11 +55,16 @@ type ExpectedTraces struct {
 	MatrixCondition string         `yaml:"matrix-condition"`
 }
 
+type CustomCheck struct {
+	Script string `yaml:"script"`
+}
+
 type Expected struct {
-	Logs       []ExpectedLogs      `yaml:"logs"`
-	Traces     []ExpectedTraces    `yaml:"traces"`
-	Metrics    []ExpectedMetrics   `yaml:"metrics"`
-	Dashboards []ExpectedDashboard `yaml:"dashboards"`
+	Logs         []ExpectedLogs      `yaml:"logs"`
+	Traces       []ExpectedTraces    `yaml:"traces"`
+	Metrics      []ExpectedMetrics   `yaml:"metrics"`
+	Dashboards   []ExpectedDashboard `yaml:"dashboards"`
+	CustomChecks []CustomCheck       `yaml:"custom-checks"`
 }
 
 type JavaGeneratorParams struct {
@@ -102,6 +107,7 @@ func (d *TestCaseDefinition) Merge(other TestCaseDefinition) {
 	d.Expected.Traces = append(d.Expected.Traces, other.Expected.Traces...)
 	d.Expected.Metrics = append(d.Expected.Metrics, other.Expected.Metrics...)
 	d.Expected.Dashboards = append(d.Expected.Dashboards, other.Expected.Dashboards...)
+	d.Expected.CustomChecks = append(d.Expected.CustomChecks, other.Expected.CustomChecks...)
 	d.Matrix = append(d.Matrix, other.Matrix...)
 	if d.DockerCompose == nil {
 		d.DockerCompose = other.DockerCompose
@@ -168,6 +174,9 @@ func (c *TestCase) validateAndSetVariables() {
 	expected := c.Definition.Expected
 	if len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0 {
 		ginkgo.Fail("expected metrics or dashboards or traces or logs")
+	}
+	for _, c := range expected.CustomChecks {
+		Expect(c.Script).ToNot(BeEmpty(), "script is empty in "+string(c.Script))
 	}
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
