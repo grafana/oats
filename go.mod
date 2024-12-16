@@ -6,7 +6,7 @@ require (
 	github.com/grafana/dashboard-linter v0.0.0-20240808111517-eb2bc3ba25e3
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc
 	github.com/onsi/ginkgo/v2 v2.20.2
-	github.com/onsi/gomega v1.34.2
+	github.com/onsi/gomega v1.36.1
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/collector/pdata v1.21.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.33.0
