@@ -49,16 +49,18 @@ func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bo
 			return nil
 		}
 		if evaluateIgnoreFile {
-			if _, err := os.Stat(filepath.Join(p, ".oatsignore")); errors.Is(err, os.ErrNotExist) {
-				// ignore file does not exist
-			} else {
-				// ignore file exists
-				println("ignoring", p)
-				return nil
+			if d.IsDir() {
+				if _, err := os.Stat(filepath.Join(p, ".oatsignore")); errors.Is(err, os.ErrNotExist) {
+					// ignore file does not exist
+				} else {
+					// ignore file exists
+					println("ignoring", p)
+					return nil
+				}
 			}
+			println("adding", p)
 		}
 
-		println("adding", p)
 		testCase, err := readTestCase(base, p, duration)
 		if err != nil {
 			return err
