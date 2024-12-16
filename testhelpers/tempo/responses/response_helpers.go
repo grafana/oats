@@ -36,44 +36,6 @@ type AttributeMatch struct {
 	Type  pcommon.ValueType
 }
 
-func AttributesMatch(attributes pcommon.Map, match []AttributeMatch) error {
-	for _, m := range match {
-		if err := MatchTraceAttribute(attributes, m.Type, m.Key, m.Value); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func AttributesExist(attributes pcommon.Map, match []AttributeMatch) error {
-	for _, m := range match {
-		if err := MatchTraceAttribute(attributes, m.Type, m.Key, ""); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func TimeIsIncreasing(span ptrace.Span) error {
-	start := span.StartTimestamp()
-	if start == 0 {
-		return fmt.Errorf("span must have start time")
-	}
-
-	end := span.EndTimestamp()
-	if end == 0 {
-		return fmt.Errorf("span must have end time")
-	}
-
-	if end < start {
-		return fmt.Errorf("span end time %d is less than the start time %d", end, start)
-	}
-
-	return nil
-}
-
 func ParseTraceDetails(body []byte) (ptrace.Traces, error) {
 	body = fixIds(body, regexp.MustCompile(`"traceId":\s*"(.*?)"`), "traceId", 16)
 	body = fixIds(body, regexp.MustCompile(`"spanId":\s*"(.*?)"`), "spanId", 8)
@@ -115,13 +77,6 @@ func FindSpansWithAttributes(td ptrace.Traces, name string) ([]ptrace.Span, map[
 	return FindSpansFunc(td, func(span *ptrace.Span) bool {
 		return m(span.Name())
 	})
-}
-
-func ChildrenOf(td ptrace.Traces, spanId string) []ptrace.Span {
-	spans, _ := FindSpansFunc(td, func(span *ptrace.Span) bool {
-		return span.ParentSpanID().String() == spanId
-	})
-	return spans
 }
 
 func FindSpansFunc(td ptrace.Traces, pred func(*ptrace.Span) bool) ([]ptrace.Span, map[string]any) {
