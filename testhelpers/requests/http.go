@@ -1,7 +1,6 @@
 package requests
 
 import (
-	"bytes"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -11,10 +10,6 @@ var tr = &http.Transport{
 	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 }
 var testHTTPClient = &http.Client{Transport: tr}
-
-func DisableKeepAlives(disableKeepAlives bool) {
-	testHTTPClient.Transport.(*http.Transport).DisableKeepAlives = disableKeepAlives
-}
 
 func doRequest(req *http.Request, statusCode int) error {
 	req.Header.Set("Content-Type", "application/json")
@@ -30,16 +25,6 @@ func doRequest(req *http.Request, statusCode int) error {
 	}
 
 	return nil
-}
-
-func DoHTTPPost(url string, statusCode int, jsonBody []byte) error {
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(jsonBody))
-
-	if err != nil {
-		return err
-	}
-
-	return doRequest(req, statusCode)
 }
 
 func DoHTTPGet(url string, statusCode int) error {
