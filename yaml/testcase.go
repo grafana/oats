@@ -41,13 +41,12 @@ func ReadTestCases() ([]*TestCase, string) {
 
 func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bool) ([]*TestCase, error) {
 	var cases []*TestCase
+	var ignored []string
 	err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") {
-			return nil
-		}
+
 		if evaluateIgnoreFile {
 			if d.IsDir() {
 				if _, err := os.Stat(filepath.Join(p, ".oatsignore")); errors.Is(err, os.ErrNotExist) {
@@ -55,9 +54,23 @@ func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bo
 				} else {
 					// ignore file exists
 					println("ignoring", p)
+					ignored = append(ignored, p)
 					return nil
 				}
 			}
+		}
+
+		if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") {
+			return nil
+		}
+
+		for _, i := range ignored {
+			if strings.HasPrefix(p, i) {
+				return nil
+			}
+		}
+
+		if evaluateIgnoreFile {
 			println("adding", p)
 		}
 
