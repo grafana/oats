@@ -34,7 +34,7 @@ func TestIncludePath(t *testing.T) {
 }
 
 func TestCollectTestCases(t *testing.T) {
-	cases, err := collectTestCases("testdata", 0)
+	cases, err := collectTestCases("testdata", 0, false)
 	require.NoError(t, err)
 	require.Len(t, cases, 2)
 	require.Equal(t, "runfoo-oats", cases[0].Name)

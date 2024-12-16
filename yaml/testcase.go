@@ -1,6 +1,7 @@
 package yaml
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,7 +31,7 @@ func ReadTestCases() ([]*TestCase, string) {
 		panic(err)
 	}
 
-	cases, err := collectTestCases(base, duration)
+	cases, err := collectTestCases(base, duration, true)
 	if err != nil {
 		panic(err)
 	}
@@ -38,19 +39,26 @@ func ReadTestCases() ([]*TestCase, string) {
 	return cases, base
 }
 
-func collectTestCases(base string, duration time.Duration) ([]*TestCase, error) {
+func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bool) ([]*TestCase, error) {
 	var cases []*TestCase
 	err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if strings.HasPrefix(p, "oats/yaml") {
-			// skip the test framework which might be checked out in the same directory
-			return nil
-		}
 		if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") {
 			return nil
 		}
+		if evaluateIgnoreFile {
+			if _, err := os.Stat(filepath.Join(p, ".oatsignore")); errors.Is(err, os.ErrNotExist) {
+				// ignore file does not exist
+			} else {
+				// ignore file exists
+				println("ignoring", p)
+				return nil
+			}
+		}
+
+		println("adding", p)
 		testCase, err := readTestCase(base, p, duration)
 		if err != nil {
 			return err
