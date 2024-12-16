@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/grafana/oats/testhelpers/kubernetes"
 	"github.com/grafana/oats/testhelpers/remote"
+	"github.com/onsi/gomega/format"
 	"io"
 	"os"
 	"os/exec"
@@ -32,6 +33,7 @@ type runner struct {
 var VerboseLogging bool
 
 func RunTestCase(c *TestCase) {
+	format.MaxLength = 100000
 	r := &runner{
 		testCase: c,
 	}

@@ -22,7 +22,7 @@ type Kubernetes struct {
 func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, logger io.WriteCloser, testName string, dir string) *remote.Endpoint {
 	var killList []*os.Process
 	run := func(cmd *exec.Cmd, background bool) error {
-		_, _ = fmt.Fprintf(logger, "Running: %s\n", cmd.String())
+		_, _ = fmt.Fprintf(logger, "Running: %s\n in %s", cmd.String(), dir)
 		cmd.Stdout = logger
 		cmd.Stderr = logger
 		cmd.Dir = dir
