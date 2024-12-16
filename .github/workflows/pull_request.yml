@@ -1,0 +1,21 @@
+name: Pull request checks
+
+on:
+  push:
+    branches: [ 'main' ]
+  pull_request:
+    branches: [ 'main' ]
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.23
+      - name: test
+        # todo fix or remove tempo tests
+        run: go test $(go list ./... |grep -v examples |grep -v tempo)

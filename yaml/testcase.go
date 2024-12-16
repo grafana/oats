@@ -15,51 +15,61 @@ import (
 var oatsFileRegex = regexp.MustCompile("oats.*\\.yaml")
 
 func ReadTestCases() ([]*TestCase, string) {
-	var cases []*TestCase
+	base := TestCaseBasePath()
+	if base == "" {
+		return []*TestCase{}, ""
+	}
 
-	base := TestCaseBashPath()
-	if base != "" {
-		base = absolutePath(base)
-		timeout := os.Getenv("TESTCASE_TIMEOUT")
-		if timeout == "" {
-			timeout = "30s"
-		}
-		duration, err := time.ParseDuration(timeout)
-		if err != nil {
-			panic(err)
-		}
+	base = absolutePath(base)
+	timeout := os.Getenv("TESTCASE_TIMEOUT")
+	if timeout == "" {
+		timeout = "30s"
+	}
+	duration, err := time.ParseDuration(timeout)
+	if err != nil {
+		panic(err)
+	}
 
-		err = filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") {
-				return nil
-			}
-			testCase, err := readTestCase(base, p, duration)
-			if err != nil {
-				return err
-			}
-			if testCase.Definition.Matrix != nil {
-				for _, matrix := range testCase.Definition.Matrix {
-					newCase := testCase
-					newCase.Definition = testCase.Definition
-					newCase.Definition.DockerCompose = matrix.DockerCompose
-					newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
-					newCase.MatrixTestCaseName = matrix.Name
-					cases = append(cases, &newCase)
-				}
-				return nil
-			}
-			cases = append(cases, &testCase)
-			return nil
-		})
-		if err != nil {
-			panic(err)
-		}
+	cases, err := collectTestCases(base, duration)
+	if err != nil {
+		panic(err)
 	}
 
 	return cases, base
+}
+
+func collectTestCases(base string, duration time.Duration) ([]*TestCase, error) {
+	var cases []*TestCase
+	err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(p, "oats/yaml") {
+			// skip the test framework which might be checked out in the same directory
+			return nil
+		}
+		if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") {
+			return nil
+		}
+		testCase, err := readTestCase(base, p, duration)
+		if err != nil {
+			return err
+		}
+		if testCase.Definition.Matrix != nil {
+			for _, matrix := range testCase.Definition.Matrix {
+				newCase := testCase
+				newCase.Definition = testCase.Definition
+				newCase.Definition.DockerCompose = matrix.DockerCompose
+				newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
+				newCase.MatrixTestCaseName = matrix.Name
+				cases = append(cases, &newCase)
+			}
+			return nil
+		}
+		cases = append(cases, &testCase)
+		return nil
+	})
+	return cases, err
 }
 
 func absolutePath(dir string) string {
@@ -123,12 +133,12 @@ func includePath(filePath string, include string) string {
 	return filepath.Join(dir, fromSlash)
 }
 
-func TestCaseBashPath() string {
+func TestCaseBasePath() string {
 	return os.Getenv("TESTCASE_BASE_PATH")
 }
 
 func AssumeNoYamlTest(t *testing.T) {
-	if TestCaseBashPath() != "" {
+	if TestCaseBasePath() != "" {
 		t.Skip("skipping because we run yaml tests")
 	}
 }
