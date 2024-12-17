@@ -67,22 +67,16 @@ type Expected struct {
 	CustomChecks []CustomCheck       `yaml:"custom-checks"`
 }
 
-type JavaGeneratorParams struct {
-	OtelJmxConfig    string `yaml:"otel-jmx-config"`
-	DisableDataSaver bool   `yaml:"disable-data-saver"`
-}
-
 type Matrix struct {
 	Name          string         `yaml:"name"`
 	DockerCompose *DockerCompose `yaml:"docker-compose"`
 }
 
 type DockerCompose struct {
-	Generator           string              `yaml:"generator"`
-	Files               []string            `yaml:"files"`
-	Environment         []string            `yaml:"env"`
-	Resources           []string            `yaml:"resources"`
-	JavaGeneratorParams JavaGeneratorParams `yaml:"java-generator-params"`
+	Generator   string   `yaml:"generator"`
+	Files       []string `yaml:"files"`
+	Environment []string `yaml:"env"`
+	Resources   []string `yaml:"resources"`
 }
 
 type Input struct {
