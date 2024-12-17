@@ -73,10 +73,9 @@ type Matrix struct {
 }
 
 type DockerCompose struct {
-	Generator   string   `yaml:"generator"`
+	Generator   string   `yaml:"generator"` // deprecated: only used by beyla
 	Files       []string `yaml:"files"`
 	Environment []string `yaml:"env"`
-	Resources   []string `yaml:"resources"`
 }
 
 type Input struct {
@@ -256,12 +255,6 @@ func validateDockerCompose(d *DockerCompose, dir string) {
 		for i, filename := range d.Files {
 			d.Files[i] = filepath.Join(dir, filename)
 			Expect(d.Files[i]).To(BeARegularFile())
-			for _, resource := range d.Resources {
-				Expect(filepath.Join(filepath.Dir(d.Files[i]), resource)).To(BeAnExistingFile())
-			}
 		}
-	} else {
-		Expect(d.Generator).ToNot(BeEmpty(), "generator needed if no file is specified")
-		Expect(d.Resources).To(BeEmpty(), "resources requires file")
 	}
 }
