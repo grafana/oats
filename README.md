@@ -118,14 +118,13 @@ Each entry in the `logs` array is a test case for logs.
 ```yaml
 expected:
   logs:
-    - logql: '{exporter = "OTLP"}'
+    - logql: '{service_name="rolldice"} |~ `Anonymous player is rolling the dice.*`'
+      equals: 'Anonymous player is rolling the dice'
       attributes:
         service_name: rolldice
       attribute-regexp:  
         container_id: ".*"
       no-extra-attributes: true # fail if there are extra attributes
-    - logql: '{service_name="rolldice"} |~ `Anonymous player is rolling the dice.*`'
-      equals: 'Anonymous player is rolling the dice'
     - logql: '{service_name="rolldice"} |~ `Anonymous player is rolling the dice.*`'
       regexp: 'Anonymous player is .*'
 ```
