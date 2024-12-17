@@ -7,7 +7,7 @@ OpenTelemetry Acceptance Tests (OATs), or OATs for short, is a test framework fo
 - Full round-trip testing: from the application to the observability stack
   - Data is stored in the LGTM stack ([Loki], [Grafana], [Tempo], [Prometheus], [OpenTelemetry Collector])
   - Data is queried using LogQL, PromQL, and TraceQL
-  - All data is sent to the observability stack via OTLP - so OATS can also be used with other observability stacks
+  - All data is sent to the observability stack via OTLP - so OATs can also be used with other observability stacks
 - End-to-end testing
   - Docker Compose with the [docker-otel-lgtm] image
   - Kubernetes with the [docker-otel-lgtm] and [k3d]
@@ -43,7 +43,7 @@ Under the hood, OATs uses [Ginkgo] and [Gomega] to run the tests.
     ```
 4. Create `oats.yaml` with the test cases
     ```yaml         
-    # OATS is an acceptance testing framework for OpenTelemetry - https://github.com/grafana/oats
+    # OATs is an acceptance testing framework for OpenTelemetry - https://github.com/grafana/oats
     docker-compose:
       files:
         - ./docker-compose.yaml
