@@ -152,16 +152,16 @@ The files typically defines the instrumented application you want to test and op
 e.g. a database server to send requests to.
 You don't need (and should have) to define the observability stack (e.g. prometheus, grafana, etc.),
 because this is provided by the test framework (and may test different versions of the observability stack,
-e.g. otel collector and grafana agent).
+e.g. OTel Collector and Grafana Alloy).
 
 This docker-compose file is relative to the `oats.yaml` file.
 
 ## Kubernetes
 
-A local kubernetes cluster can be used to test the application in a kubernetes environment rather than in docker-compose.
+A local Kubernetes cluster can be used to test the application in a Kubernetes environment rather than in docker-compose.
 This is useful to test the application in a more realistic environment - and when you want to test Kubernetes specific features.
 
-Describes the kubernetes manifest(s) to use for the test.
+Describes the Kubernetes manifest(s) to use for the test.
 
 ```yaml
 kubernetes:
@@ -182,13 +182,13 @@ TESTCASE_BASE_PATH=/path/to/project ginkgo -v --focus="jdbc"
 ```
 
 You can increase the timeout, which is useful if you want to inspect the telemetry data manually
-in grafana at http://localhost:3000
+in Grafana at http://localhost:3000
 
 ```sh
 TESTCASE_TIMEOUT=1h TESTCASE_BASE_PATH=/path/to/project ginkgo -v
 ```
 
-You can keep the container running without executing the tests - which is useful to debug in grafana manually:
+You can keep the container running without executing the tests - which is useful to debug in Grafana manually:
 
 ```sh
 TESTCASE_MANUAL_DEBUG=true TESTCASE_BASE_PATH=/path/to/project ginkgo -v
