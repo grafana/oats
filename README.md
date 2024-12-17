@@ -119,8 +119,6 @@ Each entry in the `logs` array is a test case for logs.
 expected:
   logs:
     - logql: '{exporter = "OTLP"}'
-      contains: 
-        - 'hello LGTM'
       attributes:
         service_name: rolldice
       attribute-regexp:  
