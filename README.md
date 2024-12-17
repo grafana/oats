@@ -59,7 +59,7 @@ Under the hood, OATs uses [Ginkgo] and [Gomega] to run the tests.
 ## Test Case Syntax
 
 > You can use any file name that matches `oats*.yaml` (e.g. `oats-test.yaml`), that doesn't end in `-template.yaml`.
-> `oats-template.yaml` is reserved for template files, which are used in the "include" section.
+> `oats-template.yaml` is reserved for template files, which are used in the `include` section.
 
 The syntax is a bit similar to https://github.com/kubeshop/tracetest
 
@@ -148,9 +148,9 @@ expected:
 ## Docker Compose
 
 Describes the docker-compose file(s) to use for the test.
-The files typically defines the instrumented application you want to test and optionally some dependencies,
+The files typically define the instrumented application you want to test and optionally some dependencies,
 e.g. a database server to send requests to.
-You don't need (and should have) to define the observability stack (e.g. prometheus, grafana, etc.),
+You don't need (and shouldn't have) to define the observability stack (e.g. Prometheus, Grafana, etc.),
 because this is provided by the test framework (and may test different versions of the observability stack,
 e.g. OTel Collector and Grafana Alloy).
 
