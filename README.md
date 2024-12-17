@@ -72,7 +72,7 @@ docker-compose:
   file: ../docker-compose.yaml
 input:
   - url: http://localhost:8080/stock
-interval: 500ms
+interval: 500ms # interval between requests to the input URL
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*product"}'
@@ -87,7 +87,7 @@ expected:
   metrics:
     - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
       value: "== 10"
-  dashboards:
+  dashboards: # Grafana dashboards
     - path: ../jdbc-dashboard.json
       panels:
         - title: Connection pool waiting requests
@@ -96,8 +96,57 @@ expected:
           value: "> 0"
 ```
 
-You have to provide the root path of the directory where your test cases are located to ginkgo
-via the environment variable `TESTCASE_BASE_PATH`.
+### Query traces
+
+Each entry in the `traces` array is a test case for traces.
+
+```yaml
+expected:
+  traces:
+    - traceql: '{ name =~ "SELECT .*product"}'
+      spans:
+        - name: 'regex:SELECT .*' # regex match
+          attributes:
+            db.system: h2
+          allow-duplicates: true # allow multiple spans with the same attributes
+```
+
+### Query logs
+
+Each entry in the `logs` array is a test case for logs.
+
+```yaml
+expected:
+  logs:
+    - logql: '{exporter = "OTLP"}'
+      contains: 
+        - 'hello LGTM'
+      attributes:
+        service_name: rolldice
+      attribute-regexp:  
+        container_id: ".*"
+      no-extra-attributes: true # fail if there are extra attributes
+    - logql: '{service_name="rolldice"} |~ `Anonymous player is rolling the dice.*`'
+      equals: 'Anonymous player is rolling the dice'
+    - logql: '{service_name="rolldice"} |~ `Anonymous player is rolling the dice.*`'
+      regexp: 'Anonymous player is .*'
+```
+
+### Query metrics
+
+```yaml
+expected:
+  metrics:
+    - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
+      value: "== 10"
+  dashboards: # Useful if you populate Grafana dashboards from JSON
+    - path: ../jdbc-dashboard.json 
+      panels:
+        - title: Connection pool waiting requests
+          value: "== 0"
+        - title: Connection pool utilization
+          value: "> 0"
+```
 
 ## Docker Compose
 
@@ -125,21 +174,6 @@ kubernetes:
   app-docker-context: ..
   app-docker-tag: dice:1.1-SNAPSHOT
   app-docker-port: 8080
-```
-
-## Matrix of test cases
-
-Matrix tests are useful to test different configurations of the same application, 
-e.g. with different settings of the otel collector or different flags in the application.
-
-```yaml
-matrix:
-  - name: new
-    docker-compose:
-  - name: old-jvm-metrics
-    docker-compose:
-input:
-  - path: /stock
 ```
 
 ## Debugging
