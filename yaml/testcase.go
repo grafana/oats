@@ -2,7 +2,6 @@ package yaml
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -77,17 +76,6 @@ func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bo
 		testCase, err := readTestCase(base, p, duration)
 		if err != nil {
 			return err
-		}
-		if testCase.Definition.Matrix != nil {
-			for _, matrix := range testCase.Definition.Matrix {
-				newCase := testCase
-				newCase.Definition = testCase.Definition
-				newCase.Definition.DockerCompose = matrix.DockerCompose
-				newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
-				newCase.MatrixTestCaseName = matrix.Name
-				cases = append(cases, &newCase)
-			}
-			return nil
 		}
 		cases = append(cases, &testCase)
 		return nil

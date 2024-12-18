@@ -13,8 +13,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/grafana/regexp"
-
 	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/requests"
 	. "github.com/onsi/ginkgo/v2"
@@ -79,47 +77,39 @@ func RunTestCase(c *TestCase) {
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {
 		l := log
-		if r.MatchesMatrixCondition(l.MatrixCondition, l.LogQL) {
-			It(fmt.Sprintf("should have '%s' in loki", l.LogQL), func() {
-				r.eventually(func() {
-					AssertLoki(r, l)
-				})
+		It(fmt.Sprintf("should have '%s' in loki", l.LogQL), func() {
+			r.eventually(func() {
+				AssertLoki(r, l)
 			})
-		}
+		})
 	}
 	for _, trace := range expected.Traces {
 		t := trace
-		if r.MatchesMatrixCondition(t.MatrixCondition, t.TraceQL) {
-			It(fmt.Sprintf("should have '%s' in tempo", t.TraceQL), func() {
-				r.eventually(func() {
-					AssertTempo(r, t)
-				})
+		It(fmt.Sprintf("should have '%s' in tempo", t.TraceQL), func() {
+			r.eventually(func() {
+				AssertTempo(r, t)
 			})
-		}
+		})
 	}
 	for _, dashboard := range expected.Dashboards {
 		dashboardAssert := NewDashboardAssert(dashboard)
 		for i, panel := range dashboard.Panels {
 			iCopy := i
 			p := panel
-			if r.MatchesMatrixCondition(p.MatrixCondition, p.Title) {
-				It(fmt.Sprintf("dashboard panel '%s'", p.Title), func() {
-					r.eventually(func() {
-						dashboardAssert.AssertDashboard(r, iCopy)
-					})
+			It(fmt.Sprintf("dashboard panel '%s'", p.Title), func() {
+				r.eventually(func() {
+					dashboardAssert.AssertDashboard(r, iCopy)
 				})
-			}
+			})
 		}
 	}
 	for _, metric := range expected.Metrics {
 		m := metric
-		if r.MatchesMatrixCondition(m.MatrixCondition, m.PromQL) {
-			It(fmt.Sprintf("should have '%s' in prometheus", m.PromQL), func() {
-				r.eventually(func() {
-					AssertProm(r, m.PromQL, m.Value)
-				})
+		It(fmt.Sprintf("should have '%s' in prometheus", m.PromQL), func() {
+			r.eventually(func() {
+				AssertProm(r, m.PromQL, m.Value)
 			})
-		}
+		})
 	}
 	for _, customCheck := range expected.CustomChecks {
 		c := customCheck
@@ -231,20 +221,4 @@ func (r *runner) eventually(asserter func()) {
 	for _, a := range r.additionalAsserts {
 		a()
 	}
-}
-
-func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) bool {
-	if matrixCondition == "" {
-		return true
-	}
-	name := r.testCase.MatrixTestCaseName
-	if name == "" {
-		r.queryLogger.LogQueryResult("matrix condition %v ignored we're not in a matrix test\n", matrixCondition)
-		return true
-	}
-	if regexp.MustCompile(matrixCondition).MatchString(name) {
-		return true
-	}
-	fmt.Printf("matrix condition not matched - ignoring assertion: %v/%v/%v\n", r.testCase.Name, name, subject)
-	return false
 }

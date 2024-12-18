@@ -27,35 +27,7 @@ func (c *TestCase) CreateDockerComposeFile() string {
 }
 
 func (c *TestCase) getContent(compose *DockerCompose) []byte {
-	if compose.Generator != "" {
-		return c.generateDockerComposeFile()
-	} else {
-		// TODO: allow for template vars on docker-compose files, similar to generator
-		var buf []byte
-		for _, filename := range compose.Files {
-			var err error
-			buf, err = joinComposeFiles(buf, readComposeFile(compose, filename))
-			Expect(err).ToNot(HaveOccurred())
-		}
-		return buf
-	}
-}
-
-func readComposeFile(compose *DockerCompose, file string) []byte {
-	b, err := os.ReadFile(file)
-	Expect(err).ToNot(HaveOccurred())
-	return replaceRefs(compose, b)
-}
-
-func replaceRefs(compose *DockerCompose, bytes []byte) []byte {
-	baseDir := filepath.Dir(compose.Files[0]) // TODO: more direct way of getting baseDir?
-	lines := strings.Split(string(bytes), "\n")
-	for i, line := range lines {
-		for _, resource := range compose.Resources {
-			lines[i] = strings.ReplaceAll(line, "./"+resource, filepath.Join(baseDir, resource))
-		}
-	}
-	return []byte(strings.Join(lines, "\n"))
+	return c.generateDockerComposeFile()
 }
 
 func (c *TestCase) generateDockerComposeFile() []byte {
@@ -70,7 +42,12 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	configDir, err := filepath.Abs("configs")
 	Expect(err).ToNot(HaveOccurred())
 
-	name, vars := c.getTemplateVars()
+	generator := c.Definition.DockerCompose.Generator
+	if generator == "" {
+		generator = "docker-lgtm"
+	}
+	name := filepath.FromSlash("./docker-compose-" + generator + "-template.yml")
+	vars := map[string]any{}
 	vars["Dashboard"] = filepath.ToSlash(dashboard)
 	vars["ConfigDir"] = filepath.ToSlash(configDir)
 	vars["ApplicationPort"] = c.PortConfig.ApplicationPort
@@ -131,16 +108,6 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	content, err := cmd.Output()
 	Expect(err).ToNot(HaveOccurred())
 	return content
-}
-
-func (c *TestCase) getTemplateVars() (string, map[string]any) {
-	generator := c.Definition.DockerCompose.Generator
-	switch generator {
-	case "java":
-		return c.javaTemplateVars()
-	default:
-		return filepath.FromSlash("./docker-compose-" + generator + "-template.yml"), map[string]any{}
-	}
 }
 
 func joinComposeFiles(template []byte, addition []byte) ([]byte, error) {

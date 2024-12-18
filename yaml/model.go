@@ -16,9 +16,8 @@ import (
 )
 
 type ExpectedDashboardPanel struct {
-	Title           string `yaml:"title"`
-	Value           string `yaml:"value"`
-	MatrixCondition string `yaml:"matrix-condition"`
+	Title string `yaml:"title"`
+	Value string `yaml:"value"`
 }
 
 type ExpectedDashboard struct {
@@ -27,9 +26,8 @@ type ExpectedDashboard struct {
 }
 
 type ExpectedMetrics struct {
-	PromQL          string `yaml:"promql"`
-	Value           string `yaml:"value"`
-	MatrixCondition string `yaml:"matrix-condition"`
+	PromQL string `yaml:"promql"`
+	Value  string `yaml:"value"`
 }
 
 type ExpectedSpan struct {
@@ -46,13 +44,11 @@ type ExpectedLogs struct {
 	Attributes        map[string]string `yaml:"attributes"`
 	AttributeRegexp   map[string]string `yaml:"attribute-regexp"`
 	NoExtraAttributes bool              `yaml:"no-extra-attributes"`
-	MatrixCondition   string            `yaml:"matrix-condition"`
 }
 
 type ExpectedTraces struct {
-	TraceQL         string         `yaml:"traceql"`
-	Spans           []ExpectedSpan `yaml:"spans"`
-	MatrixCondition string         `yaml:"matrix-condition"`
+	TraceQL string         `yaml:"traceql"`
+	Spans   []ExpectedSpan `yaml:"spans"`
 }
 
 type CustomCheck struct {
@@ -67,22 +63,10 @@ type Expected struct {
 	CustomChecks []CustomCheck       `yaml:"custom-checks"`
 }
 
-type JavaGeneratorParams struct {
-	OtelJmxConfig    string `yaml:"otel-jmx-config"`
-	DisableDataSaver bool   `yaml:"disable-data-saver"`
-}
-
-type Matrix struct {
-	Name          string         `yaml:"name"`
-	DockerCompose *DockerCompose `yaml:"docker-compose"`
-}
-
 type DockerCompose struct {
-	Generator           string              `yaml:"generator"`
-	Files               []string            `yaml:"files"`
-	Environment         []string            `yaml:"env"`
-	Resources           []string            `yaml:"resources"`
-	JavaGeneratorParams JavaGeneratorParams `yaml:"java-generator-params"`
+	Generator   string   `yaml:"generator"` // deprecated: only used by beyla
+	Files       []string `yaml:"files"`
+	Environment []string `yaml:"env"`
 }
 
 type Input struct {
@@ -94,7 +78,6 @@ type TestCaseDefinition struct {
 	Include       []string               `yaml:"include"`
 	DockerCompose *DockerCompose         `yaml:"docker-compose"`
 	Kubernetes    *kubernetes.Kubernetes `yaml:"kubernetes"`
-	Matrix        []Matrix               `yaml:"matrix"`
 	Input         []Input                `yaml:"input"`
 	Interval      time.Duration          `yaml:"interval"`
 	Expected      Expected               `yaml:"expected"`
@@ -108,7 +91,6 @@ func (d *TestCaseDefinition) Merge(other TestCaseDefinition) {
 	d.Expected.Metrics = append(d.Expected.Metrics, other.Expected.Metrics...)
 	d.Expected.Dashboards = append(d.Expected.Dashboards, other.Expected.Dashboards...)
 	d.Expected.CustomChecks = append(d.Expected.CustomChecks, other.Expected.CustomChecks...)
-	d.Matrix = append(d.Matrix, other.Matrix...)
 	if d.DockerCompose == nil {
 		d.DockerCompose = other.DockerCompose
 	}
@@ -129,14 +111,13 @@ type PortConfig struct {
 }
 
 type TestCase struct {
-	Name               string
-	MatrixTestCaseName string
-	Dir                string
-	OutputDir          string
-	Definition         TestCaseDefinition
-	PortConfig         *PortConfig
-	Dashboard          *TestDashboard
-	Timeout            time.Duration
+	Name       string
+	Dir        string
+	OutputDir  string
+	Definition TestCaseDefinition
+	PortConfig *PortConfig
+	Dashboard  *TestDashboard
+	Timeout    time.Duration
 }
 
 type QueryLogger struct {
@@ -262,12 +243,6 @@ func validateDockerCompose(d *DockerCompose, dir string) {
 		for i, filename := range d.Files {
 			d.Files[i] = filepath.Join(dir, filename)
 			Expect(d.Files[i]).To(BeARegularFile())
-			for _, resource := range d.Resources {
-				Expect(filepath.Join(filepath.Dir(d.Files[i]), resource)).To(BeAnExistingFile())
-			}
 		}
-	} else {
-		Expect(d.Generator).ToNot(BeEmpty(), "generator needed if no file is specified")
-		Expect(d.Resources).To(BeEmpty(), "resources requires file")
 	}
 }
