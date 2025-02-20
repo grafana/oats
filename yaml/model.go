@@ -136,7 +136,7 @@ func NewQueryLogger(endpoint observability.Endpoint, logger io.WriteCloser) Quer
 func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 	result := fmt.Sprintf(format, a...)
 	if q.Verbose {
-		_, _ = fmt.Fprintf(q.Logger, result)
+		_, _ = q.Logger.Write([]byte(result))
 		if len(result) > 1000 {
 			result = result[:1000] + ".."
 		}
