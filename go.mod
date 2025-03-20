@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/grafana/dashboard-linter v0.0.0-20241224134444-1765d94aec4a
-	github.com/onsi/ginkgo/v2 v2.23.0
+	github.com/onsi/ginkgo/v2 v2.23.1
 	github.com/onsi/gomega v1.36.2
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/collector/pdata v1.28.1
