@@ -130,7 +130,7 @@ func assertCustomCheck(r *runner, c CustomCheck) {
 
 	err := cmd.Run()
 	r.queryLogger.LogQueryResult("custom check %v response %v err=%v\n", c.Script, "", err)
-	r.gomega.Expect(err).ToNot(HaveOccurred())
+	r.gomegaInst.Expect(err).ToNot(HaveOccurred())
 }
 
 func startEndpoint(c *TestCase, logger io.WriteCloser) (*remote.Endpoint, error) {
@@ -214,7 +214,7 @@ func (r *runner) eventually(asserter func()) {
 			g.Expect(err).ToNot(HaveOccurred(), "expected no error calling application endpoint %s", url)
 		}
 
-		r.gomega = g
+		r.gomegaInst = g
 		asserter()
 	}).WithTimeout(time.Until(r.deadline)).WithPolling(interval).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
 	ginkgo.GinkgoWriter.Println(iterations, "iterations to get telemetry data")
