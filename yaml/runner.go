@@ -216,7 +216,7 @@ func (r *runner) eventually(asserter func()) {
 
 		r.gomega = g
 		asserter()
-	}).WithTimeout(r.deadline.Sub(time.Now())).WithPolling(interval).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
+	}).WithTimeout(time.Until(r.deadline)).WithPolling(interval).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
 	GinkgoWriter.Println(iterations, "iterations to get telemetry data")
 	for _, a := range r.additionalAsserts {
 		a()
