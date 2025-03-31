@@ -8,13 +8,12 @@ on:
 
 jobs:
   test:
-    name: test
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.24
-      - name: test
-        run: go test $(go list ./...)
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - name: Run tests
+        run: |
+          mise run lint
+          mise run test

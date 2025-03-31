@@ -1,0 +1,23 @@
+[tools]
+go = "latest"
+golangci-lint = "latest"
+
+[tasks.test]
+description = "Run tests"
+run = "go test $(go list ./...)"
+
+[tasks.fmt]
+description = "Format code"
+run = "gofmt -w ."
+
+[tasks.lint]
+description = "Lint code"
+run = "golangci-lint run"
+
+[tasks.deps]
+description = "Update dependencies"
+run = "go mod tidy"
+
+[tasks.check]
+description = "Run all checks"
+depends = ['lint', 'test']

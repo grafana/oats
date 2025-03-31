@@ -81,7 +81,7 @@ func (c *Compose) runDocker(composeCommand bool, args ...string) error {
 	if c.Logger != nil {
 		cmd.Stdout = c.Logger
 		cmd.Stderr = c.Logger
-		fmt.Fprintf(c.Logger, "Running: docker %s\n", cmd.String())
+		_, _ = fmt.Fprintf(c.Logger, "Running: docker %s\n", cmd.String())
 	}
 
 	return cmd.Run()
