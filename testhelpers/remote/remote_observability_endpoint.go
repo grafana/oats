@@ -79,7 +79,9 @@ func (e *Endpoint) makeGetRequest(url string) ([]byte, error) {
 		return nil, fmt.Errorf("expected HTTP status 200, but got: %d", resp.StatusCode)
 	}
 
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -141,7 +143,9 @@ func (e *Endpoint) RunPromQL(ctx context.Context, promQL string) ([]byte, error)
 		return nil, fmt.Errorf("querying prometheus: %w", err)
 	}
 
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -163,7 +167,9 @@ func (e *Endpoint) SearchLoki(query string) ([]byte, error) {
 		return nil, fmt.Errorf("querying loki: %w", err)
 	}
 
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -45,7 +45,9 @@ func GetFreePorts(count int) ([]int, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer l.Close()
+		defer func(l *net.TCPListener) {
+			_ = l.Close()
+		}(l)
 		ports = append(ports, l.Addr().(*net.TCPAddr).Port)
 	}
 	return ports, nil

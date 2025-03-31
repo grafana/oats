@@ -15,8 +15,8 @@ import (
 
 	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/requests"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 type runner struct {
@@ -24,7 +24,7 @@ type runner struct {
 	endpoint          *remote.Endpoint
 	deadline          time.Time
 	queryLogger       QueryLogger
-	gomega            Gomega
+	gomegaInst        gomega.Gomega
 	additionalAsserts []func()
 }
 
@@ -36,20 +36,20 @@ func RunTestCase(c *TestCase) {
 		testCase: c,
 	}
 
-	BeforeAll(func() {
+	ginkgo.BeforeAll(func() {
 		c.OutputDir = prepareBuildDir(c.Name)
 		c.validateAndSetVariables()
 		logger, err := createLogger(c)
-		Expect(err).ToNot(HaveOccurred(), "expected no error creating logger")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error creating logger")
 		r.queryLogger = NewQueryLogger(r.endpoint, logger)
 
 		endpoint, err := startEndpoint(c, logger)
-		Expect(err).ToNot(HaveOccurred(), "expected no error starting a observability endpoint")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting a observability endpoint")
 
 		r.deadline = time.Now().Add(c.Timeout)
 		r.endpoint = endpoint
 		if os.Getenv("TESTCASE_MANUAL_DEBUG") == "true" {
-			GinkgoWriter.Printf("stopping to let you manually debug on http://localhost:%d\n", r.testCase.PortConfig.GrafanaHTTPPort)
+			ginkgo.GinkgoWriter.Printf("stopping to let you manually debug on http://localhost:%d\n", r.testCase.PortConfig.GrafanaHTTPPort)
 
 			for {
 				r.eventually(func() {
@@ -59,16 +59,16 @@ func RunTestCase(c *TestCase) {
 			}
 		}
 
-		GinkgoWriter.Printf("deadline = %v\n", r.deadline)
+		ginkgo.GinkgoWriter.Printf("deadline = %v\n", r.deadline)
 	})
 
-	AfterAll(func() {
+	ginkgo.AfterAll(func() {
 		var ctx = context.Background()
 		var stopErr error
 
 		if r.endpoint != nil {
 			stopErr = r.endpoint.Stop(ctx)
-			Expect(stopErr).ToNot(HaveOccurred(), "expected no error stopping the local observability endpoint")
+			gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
 		}
 	})
 
@@ -77,7 +77,7 @@ func RunTestCase(c *TestCase) {
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {
 		l := log
-		It(fmt.Sprintf("should have '%s' in loki", l.LogQL), func() {
+		ginkgo.It(fmt.Sprintf("should have '%s' in loki", l.LogQL), func() {
 			r.eventually(func() {
 				AssertLoki(r, l)
 			})
@@ -85,7 +85,7 @@ func RunTestCase(c *TestCase) {
 	}
 	for _, trace := range expected.Traces {
 		t := trace
-		It(fmt.Sprintf("should have '%s' in tempo", t.TraceQL), func() {
+		ginkgo.It(fmt.Sprintf("should have '%s' in tempo", t.TraceQL), func() {
 			r.eventually(func() {
 				AssertTempo(r, t)
 			})
@@ -96,7 +96,7 @@ func RunTestCase(c *TestCase) {
 		for i, panel := range dashboard.Panels {
 			iCopy := i
 			p := panel
-			It(fmt.Sprintf("dashboard panel '%s'", p.Title), func() {
+			ginkgo.It(fmt.Sprintf("dashboard panel '%s'", p.Title), func() {
 				r.eventually(func() {
 					dashboardAssert.AssertDashboard(r, iCopy)
 				})
@@ -105,7 +105,7 @@ func RunTestCase(c *TestCase) {
 	}
 	for _, metric := range expected.Metrics {
 		m := metric
-		It(fmt.Sprintf("should have '%s' in prometheus", m.PromQL), func() {
+		ginkgo.It(fmt.Sprintf("should have '%s' in prometheus", m.PromQL), func() {
 			r.eventually(func() {
 				AssertProm(r, m.PromQL, m.Value)
 			})
@@ -113,7 +113,7 @@ func RunTestCase(c *TestCase) {
 	}
 	for _, customCheck := range expected.CustomChecks {
 		c := customCheck
-		It(fmt.Sprintf("custom check '%s'", c.Script), func() {
+		ginkgo.It(fmt.Sprintf("custom check '%s'", c.Script), func() {
 			r.eventually(func() {
 				assertCustomCheck(r, c)
 			})
@@ -130,7 +130,7 @@ func assertCustomCheck(r *runner, c CustomCheck) {
 
 	err := cmd.Run()
 	r.queryLogger.LogQueryResult("custom check %v response %v err=%v\n", c.Script, "", err)
-	r.gomega.Expect(err).ToNot(HaveOccurred())
+	r.gomegaInst.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
 func startEndpoint(c *TestCase, logger io.WriteCloser) (*remote.Endpoint, error) {
@@ -140,7 +140,7 @@ func startEndpoint(c *TestCase, logger io.WriteCloser) (*remote.Endpoint, error)
 		LokiHttpPort:       c.PortConfig.LokiHTTPPort,
 	}
 
-	GinkgoWriter.Printf("Launching test for %s\n", c.Name)
+	ginkgo.GinkgoWriter.Printf("Launching test for %s\n", c.Name)
 	var endpoint *remote.Endpoint
 	if c.Definition.Kubernetes != nil {
 		endpoint = kubernetes.NewEndpoint(c.Definition.Kubernetes, ports, logger, c.Name, c.Dir)
@@ -171,17 +171,17 @@ func prepareBuildDir(name string) string {
 	if err == nil {
 		if fileinfo.IsDir() {
 			err := os.RemoveAll(dir)
-			Expect(err).ToNot(HaveOccurred(), "expected no error removing output directory")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error removing output directory")
 		}
 	}
 	err = os.MkdirAll(dir, 0755)
-	Expect(err).ToNot(HaveOccurred(), "expected no error creating output directory")
+	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error creating output directory")
 	return dir
 }
 
 func (r *runner) eventually(asserter func()) {
 	if r.deadline.Before(time.Now()) {
-		Fail("deadline exceeded waiting for telemetry")
+		ginkgo.Fail("deadline exceeded waiting for telemetry")
 	}
 	t := time.Now()
 	ctx := context.Background()
@@ -191,7 +191,7 @@ func (r *runner) eventually(asserter func()) {
 	}
 	iterations := 0
 	r.additionalAsserts = nil
-	Eventually(ctx, func(g Gomega) {
+	gomega.Eventually(ctx, func(g gomega.Gomega) {
 		iterations++
 		verbose := VerboseLogging
 		if time.Since(t) > 10*time.Second {
@@ -211,13 +211,13 @@ func (r *runner) eventually(asserter func()) {
 				}
 			}
 			err := requests.DoHTTPGet(url, status)
-			g.Expect(err).ToNot(HaveOccurred(), "expected no error calling application endpoint %s", url)
+			g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
 		}
 
-		r.gomega = g
+		r.gomegaInst = g
 		asserter()
-	}).WithTimeout(r.deadline.Sub(time.Now())).WithPolling(interval).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
-	GinkgoWriter.Println(iterations, "iterations to get telemetry data")
+	}).WithTimeout(time.Until(r.deadline)).WithPolling(interval).Should(gomega.Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
+	ginkgo.GinkgoWriter.Println(iterations, "iterations to get telemetry data")
 	for _, a := range r.additionalAsserts {
 		a()
 	}
