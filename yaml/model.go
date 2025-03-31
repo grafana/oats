@@ -11,7 +11,7 @@ import (
 
 	"github.com/grafana/dashboard-linter/lint"
 	"github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 )
 
@@ -147,7 +147,7 @@ func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 func (c *TestCase) validateAndSetVariables() {
 	if c.Definition.Kubernetes != nil {
 		validateK8s(c.Definition.Kubernetes)
-		Expect(c.Definition.DockerCompose).To(BeNil(), "kubernetes and docker-compose are mutually exclusive")
+		gomega.Expect(c.Definition.DockerCompose).To(gomega.BeNil(), "kubernetes and docker-compose are mutually exclusive")
 	} else {
 		validateDockerCompose(c.Definition.DockerCompose, c.Dir)
 	}
@@ -157,45 +157,45 @@ func (c *TestCase) validateAndSetVariables() {
 		ginkgo.Fail("expected metrics or dashboards or traces or logs")
 	}
 	for _, c := range expected.CustomChecks {
-		Expect(c.Script).ToNot(BeEmpty(), "script is empty in "+string(c.Script))
+		gomega.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in "+string(c.Script))
 	}
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
-		Expect(l.LogQL).ToNot(BeEmpty(), "logQL is empty in "+string(out))
+		gomega.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in "+string(out))
 		if l.Equals == "" && l.Contains == nil && l.Regexp == "" {
 			ginkgo.Fail("expected equals or contains or regexp in logs")
 		}
 		for _, s := range l.Contains {
-			Expect(s).ToNot(BeEmpty(), "contains string is empty in "+string(out))
+			gomega.Expect(s).ToNot(gomega.BeEmpty(), "contains string is empty in "+string(out))
 		}
 	}
 	for _, d := range expected.Metrics {
 		out, _ := yaml.Marshal(d)
-		Expect(d.PromQL).ToNot(BeEmpty(), "promQL is empty in "+string(out))
-		Expect(d.Value).ToNot(BeEmpty(), "value is empty in "+string(out))
+		gomega.Expect(d.PromQL).ToNot(gomega.BeEmpty(), "promQL is empty in "+string(out))
+		gomega.Expect(d.Value).ToNot(gomega.BeEmpty(), "value is empty in "+string(out))
 	}
 	for _, d := range expected.Traces {
 		out, _ := yaml.Marshal(d)
-		Expect(d.TraceQL).ToNot(BeEmpty(), "traceQL is empty in "+string(out))
-		Expect(d.Spans).ToNot(BeEmpty(), "spans are empty in "+string(out))
+		gomega.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in "+string(out))
+		gomega.Expect(d.Spans).ToNot(gomega.BeEmpty(), "spans are empty in "+string(out))
 		for _, span := range d.Spans {
-			Expect(span.Name).ToNot(BeEmpty(), "span name is empty in "+string(out))
+			gomega.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in "+string(out))
 			for k, v := range span.Attributes {
-				Expect(k).ToNot(BeEmpty(), "attribute key is empty in "+string(out))
-				Expect(v).ToNot(BeEmpty(), "attribute value is empty in "+string(out))
+				gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in "+string(out))
+				gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in "+string(out))
 			}
 		}
 	}
 	for _, d := range expected.Dashboards {
 		out, _ := yaml.Marshal(d)
-		Expect(d.Path).ToNot(BeEmpty(), "path is emtpy in "+string(out))
-		Expect(d.Panels).ToNot(BeEmpty(), "panels are empty in "+string(out))
+		gomega.Expect(d.Path).ToNot(gomega.BeEmpty(), "path is emtpy in "+string(out))
+		gomega.Expect(d.Panels).ToNot(gomega.BeEmpty(), "panels are empty in "+string(out))
 		for _, panel := range d.Panels {
-			Expect(panel.Title).ToNot(BeEmpty(), "panel title is empty in "+string(out))
-			Expect(panel.Value).ToNot(BeEmpty(), "value is empty in "+string(out))
+			gomega.Expect(panel.Title).ToNot(gomega.BeEmpty(), "panel title is empty in "+string(out))
+			gomega.Expect(panel.Value).ToNot(gomega.BeEmpty(), "value is empty in "+string(out))
 		}
 
-		Expect(c.Dashboard).To(BeNil(), "only one dashboard is supported")
+		gomega.Expect(c.Dashboard).To(gomega.BeNil(), "only one dashboard is supported")
 		dashboardPath := filepath.Join(c.Dir, d.Path)
 		c.Dashboard = &TestDashboard{
 			Path: dashboardPath,
@@ -221,19 +221,19 @@ func (c *TestCase) validateAndSetVariables() {
 }
 
 func validateK8s(kubernetes *kubernetes.Kubernetes) {
-	Expect(kubernetes.Dir).ToNot(BeEmpty(), "k8s-dir is empty")
-	Expect(kubernetes.AppService).ToNot(BeEmpty(), "k8s-app-service is empty")
-	Expect(kubernetes.AppDockerFile).ToNot(BeEmpty(), "app-docker-file is empty")
-	Expect(kubernetes.AppDockerTag).ToNot(BeEmpty(), "app-docker-tag is empty")
-	Expect(kubernetes.AppDockerPort).ToNot(BeZero(), "app-docker-port is zero")
+	gomega.Expect(kubernetes.Dir).ToNot(gomega.BeEmpty(), "k8s-dir is empty")
+	gomega.Expect(kubernetes.AppService).ToNot(gomega.BeEmpty(), "k8s-app-service is empty")
+	gomega.Expect(kubernetes.AppDockerFile).ToNot(gomega.BeEmpty(), "app-docker-file is empty")
+	gomega.Expect(kubernetes.AppDockerTag).ToNot(gomega.BeEmpty(), "app-docker-tag is empty")
+	gomega.Expect(kubernetes.AppDockerPort).ToNot(gomega.BeZero(), "app-docker-port is zero")
 }
 
 func validateInput(input []Input) {
 	for _, i := range input {
-		Expect(i.Path).ToNot(BeEmpty(), "input path is empty")
+		gomega.Expect(i.Path).ToNot(gomega.BeEmpty(), "input path is empty")
 		if i.Status != "" {
 			_, err := strconv.ParseInt(i.Status, 10, 32)
-			Expect(err).To(BeNil(), "status must parse as integer or be empty")
+			gomega.Expect(err).To(gomega.BeNil(), "status must parse as integer or be empty")
 		}
 	}
 }
@@ -242,7 +242,7 @@ func validateDockerCompose(d *DockerCompose, dir string) {
 	if len(d.Files) > 0 {
 		for i, filename := range d.Files {
 			d.Files[i] = filepath.Join(dir, filename)
-			Expect(d.Files[i]).To(BeARegularFile())
+			gomega.Expect(d.Files[i]).To(gomega.BeARegularFile())
 		}
 	}
 }

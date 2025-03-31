@@ -16,7 +16,7 @@ import (
 	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/requests"
 	"github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 )
 
 type runner struct {
@@ -24,7 +24,7 @@ type runner struct {
 	endpoint          *remote.Endpoint
 	deadline          time.Time
 	queryLogger       QueryLogger
-	gomegaInst        Gomega
+	gomegaInst        gomega.Gomega
 	additionalAsserts []func()
 }
 
@@ -40,11 +40,11 @@ func RunTestCase(c *TestCase) {
 		c.OutputDir = prepareBuildDir(c.Name)
 		c.validateAndSetVariables()
 		logger, err := createLogger(c)
-		Expect(err).ToNot(HaveOccurred(), "expected no error creating logger")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error creating logger")
 		r.queryLogger = NewQueryLogger(r.endpoint, logger)
 
 		endpoint, err := startEndpoint(c, logger)
-		Expect(err).ToNot(HaveOccurred(), "expected no error starting a observability endpoint")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting a observability endpoint")
 
 		r.deadline = time.Now().Add(c.Timeout)
 		r.endpoint = endpoint
@@ -68,7 +68,7 @@ func RunTestCase(c *TestCase) {
 
 		if r.endpoint != nil {
 			stopErr = r.endpoint.Stop(ctx)
-			Expect(stopErr).ToNot(HaveOccurred(), "expected no error stopping the local observability endpoint")
+			gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
 		}
 	})
 
@@ -130,7 +130,7 @@ func assertCustomCheck(r *runner, c CustomCheck) {
 
 	err := cmd.Run()
 	r.queryLogger.LogQueryResult("custom check %v response %v err=%v\n", c.Script, "", err)
-	r.gomegaInst.Expect(err).ToNot(HaveOccurred())
+	r.gomegaInst.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
 func startEndpoint(c *TestCase, logger io.WriteCloser) (*remote.Endpoint, error) {
@@ -171,11 +171,11 @@ func prepareBuildDir(name string) string {
 	if err == nil {
 		if fileinfo.IsDir() {
 			err := os.RemoveAll(dir)
-			Expect(err).ToNot(HaveOccurred(), "expected no error removing output directory")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error removing output directory")
 		}
 	}
 	err = os.MkdirAll(dir, 0755)
-	Expect(err).ToNot(HaveOccurred(), "expected no error creating output directory")
+	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error creating output directory")
 	return dir
 }
 
@@ -191,7 +191,7 @@ func (r *runner) eventually(asserter func()) {
 	}
 	iterations := 0
 	r.additionalAsserts = nil
-	Eventually(ctx, func(g Gomega) {
+	gomega.Eventually(ctx, func(g gomega.Gomega) {
 		iterations++
 		verbose := VerboseLogging
 		if time.Since(t) > 10*time.Second {
@@ -211,12 +211,12 @@ func (r *runner) eventually(asserter func()) {
 				}
 			}
 			err := requests.DoHTTPGet(url, status)
-			g.Expect(err).ToNot(HaveOccurred(), "expected no error calling application endpoint %s", url)
+			g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
 		}
 
 		r.gomegaInst = g
 		asserter()
-	}).WithTimeout(time.Until(r.deadline)).WithPolling(interval).Should(Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
+	}).WithTimeout(time.Until(r.deadline)).WithPolling(interval).Should(gomega.Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
 	ginkgo.GinkgoWriter.Println(iterations, "iterations to get telemetry data")
 	for _, a := range r.additionalAsserts {
 		a()
