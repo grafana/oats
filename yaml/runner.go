@@ -24,7 +24,7 @@ type runner struct {
 	endpoint          *remote.Endpoint
 	deadline          time.Time
 	queryLogger       QueryLogger
-	gomega            Gomega
+	gomegaInst        Gomega
 	additionalAsserts []func()
 }
 

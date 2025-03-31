@@ -32,7 +32,7 @@ func (a *DashboardAssert) AssertDashboard(r *runner, panelIndex int) {
 	c := r.testCase
 	for _, panel := range c.Dashboard.Content.Panels {
 		if panel.Title == wantTitle {
-			g := r.gomega
+			g := r.gomegaInst
 			g.Expect(panel.Targets).To(gomega.HaveLen(1))
 			promQl := strings.ReplaceAll(panel.Targets[0].Expr, "$__rate_interval", "1m")
 			AssertProm(r, promQl, wantValue)
@@ -54,7 +54,7 @@ func AssertProm(r *runner, promQL string, value string) {
 	ctx := context.Background()
 	b, err := r.endpoint.RunPromQL(ctx, promQL)
 	r.queryLogger.LogQueryResult("promQL query %v response %v err=%v\n", promQL, string(b), err)
-	g := r.gomega
+	g := r.gomegaInst
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0), "expected prometheus response to be non-empty")
 

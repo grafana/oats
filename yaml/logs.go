@@ -19,13 +19,13 @@ type QueryResponse struct {
 func AssertLoki(r *runner, l ExpectedLogs) {
 	b, err := r.endpoint.SearchLoki(l.LogQL)
 	r.queryLogger.LogQueryResult("logQL query %v response %v err=%v\n", l.LogQL, string(b), err)
-	g := r.gomega
+	g := r.gomegaInst
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 	AssertLokiResponse(b, l, r)
 }
 
 func AssertLokiResponse(b []byte, l ExpectedLogs, r *runner) {
-	g := r.gomega
+	g := r.gomegaInst
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0), "expected loki response to be non-empty")
 
 	response := QueryResponse{}
