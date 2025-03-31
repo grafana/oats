@@ -102,7 +102,9 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	_, err = f.Write(buf.Bytes())
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	defer os.Remove(f.Name())
+	defer func(name string) {
+		_ = os.Remove(name)
+	}(f.Name())
 
 	// uses docker compose to merge templates
 	args := []string{"compose", "-f", f.Name(), "config"}
