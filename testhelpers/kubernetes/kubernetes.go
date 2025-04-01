@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 )
 
 type Kubernetes struct {
@@ -46,7 +47,11 @@ func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, logger io.WriteClo
 			}
 		}
 		return run(exec.Command("k3d", "cluster", "delete", testName), false)
-	})
+	},
+		func(f func(io.ReadCloser, *sync.WaitGroup)) error {
+			panic("not implemented for kubernetes")
+		},
+	)
 }
 
 func start(model *Kubernetes, ports remote.PortsConfig, testName string, run func(cmd *exec.Cmd, background bool) error, logger io.WriteCloser) error {

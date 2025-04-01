@@ -73,6 +73,16 @@ func RunTestCase(c *TestCase) {
 	})
 
 	expected := c.Definition.Expected
+	for _, composeLog := range expected.ComposeLogs {
+		ginkgo.It(fmt.Sprintf("should have '%s' in internal compose logs", composeLog), func() {
+			r.eventually(func() {
+				found, err := r.endpoint.SearchComposeLogs(composeLog)
+				r.gomegaInst.Expect(err).ToNot(gomega.HaveOccurred())
+				r.gomegaInst.Expect(found).To(gomega.BeTrue())
+			})
+		})
+	}
+
 	// Assert logs traces first, because metrics and dashboards can take longer to appear
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {

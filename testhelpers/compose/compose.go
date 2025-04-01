@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"sync"
 )
 
 type Compose struct {
@@ -19,6 +20,7 @@ type Compose struct {
 	DefaultArgs []string
 	Path        string
 	Logger      io.WriteCloser
+	LogConsumer func(io.ReadCloser, *sync.WaitGroup)
 	Env         []string
 }
 
@@ -78,13 +80,27 @@ func (c *Compose) runDocker(composeCommand bool, args ...string) error {
 	cmdArgs = append(cmdArgs, args...)
 	cmd := exec.Command(c.Command, cmdArgs...)
 	cmd.Env = c.Env
-	if c.Logger != nil {
-		cmd.Stdout = c.Logger
-		cmd.Stderr = c.Logger
-		_, _ = fmt.Fprintf(c.Logger, "Running: docker %s\n", cmd.String())
-	}
+	if c.LogConsumer != nil {
+		stdout, _ := cmd.StdoutPipe()
+		cmd.Stderr = cmd.Stdout
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go c.LogConsumer(stdout, &wg)
 
-	return cmd.Run()
+		err := cmd.Start()
+		if err != nil {
+			return fmt.Errorf("failed to start docker command: %w", err)
+		}
+		wg.Wait()
+		return nil
+	} else {
+		if c.Logger != nil {
+			cmd.Stdout = c.Logger
+			cmd.Stderr = c.Logger
+			_, _ = fmt.Fprintf(c.Logger, "Running: docker %s\n", cmd.String())
+		}
+		return cmd.Run()
+	}
 }
 
 func (c *Compose) Close() error {
@@ -125,5 +141,15 @@ func NewEndpoint(composeFilePath string, ports remote.PortsConfig, logger io.Wri
 		return err
 	}, func(ctx context.Context) error {
 		return compose.Close()
-	})
+	},
+		func(f func(io.ReadCloser, *sync.WaitGroup)) error {
+			compose.LogConsumer = f
+			err := compose.Logs()
+			if err != nil {
+				return err
+			}
+			compose.LogConsumer = nil
+			return nil
+		},
+	)
 }

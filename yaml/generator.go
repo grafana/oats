@@ -42,10 +42,17 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	configDir, err := filepath.Abs("configs")
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	generator := c.Definition.DockerCompose.Generator
+	compose := c.Definition.DockerCompose
+	generator := compose.Generator
 	if generator == "" {
 		generator = "docker-lgtm"
 	}
+	version := os.Getenv("LGTM_VERSION")
+	if version == "" {
+		version = "latest"
+	}
+	println("using docker-compose generator", generator, "version", version)
+
 	name := filepath.FromSlash("./docker-compose-" + generator + "-template.yml")
 	vars := map[string]any{}
 	vars["Dashboard"] = filepath.ToSlash(dashboard)
@@ -55,6 +62,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	vars["PrometheusHTTPPort"] = c.PortConfig.PrometheusHTTPPort
 	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
 	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
+	vars["LgtmVersion"] = version
 
 	env := os.Environ()
 
@@ -62,7 +70,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	env = append(env, c.Definition.DockerCompose.Environment...)
+	env = append(env, compose.Environment...)
 
 	t := template.Must(template.ParseFiles(name))
 
@@ -75,7 +83,6 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	defer func(name string) {
 		_ = os.Remove(name)
 	}(generated)
-	compose := c.Definition.DockerCompose
 	files := []string{generated}
 	for _, filename := range compose.Files {
 		t = template.Must(template.ParseFiles(filename))
