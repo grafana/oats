@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 )
 
 type PortsConfig struct {
@@ -24,16 +26,18 @@ type PortsConfig struct {
 }
 
 type Endpoint struct {
-	ports PortsConfig
-	start func(context.Context) error
-	stop  func(context.Context) error
+	ports     PortsConfig
+	start     func(context.Context) error
+	stop      func(context.Context) error
+	logReader func(func(io.ReadCloser, *sync.WaitGroup)) error
 }
 
-func NewEndpoint(ports PortsConfig, start func(context.Context) error, stop func(context.Context) error) *Endpoint {
+func NewEndpoint(ports PortsConfig, start func(context.Context) error, stop func(context.Context) error, logReader func(func(io.ReadCloser, *sync.WaitGroup)) error) *Endpoint {
 	return &Endpoint{
-		ports: ports,
-		start: start,
-		stop:  stop,
+		ports:     ports,
+		start:     start,
+		stop:      stop,
+		logReader: logReader,
 	}
 }
 
@@ -185,4 +189,23 @@ func (e *Endpoint) Start(ctx context.Context) error {
 
 func (e *Endpoint) Stop(ctx context.Context) error {
 	return e.stop(ctx)
+}
+
+func (e *Endpoint) SearchComposeLogs(message string) (bool, error) {
+	found := false
+	err := e.logReader(func(pipe io.ReadCloser, wg *sync.WaitGroup) {
+		reader := bufio.NewReader(pipe)
+		line, err := reader.ReadString('\n')
+		for err == nil {
+			if strings.Contains(line, message) {
+				found = true
+			}
+			line, err = reader.ReadString('\n')
+		}
+		wg.Done()
+	})
+	if err != nil {
+		return false, fmt.Errorf("error reading logs: %w", err)
+	}
+	return found, nil
 }

@@ -56,6 +56,7 @@ type CustomCheck struct {
 }
 
 type Expected struct {
+	ComposeLogs  []string            `yaml:"compose-logs"`
 	Logs         []ExpectedLogs      `yaml:"logs"`
 	Traces       []ExpectedTraces    `yaml:"traces"`
 	Metrics      []ExpectedMetrics   `yaml:"metrics"`

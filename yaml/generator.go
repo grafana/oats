@@ -51,6 +51,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	if version == "" {
 		version = "latest"
 	}
+	println("using docker-compose generator", generator, "version", version)
 
 	name := filepath.FromSlash("./docker-compose-" + generator + "-template.yml")
 	vars := map[string]any{}

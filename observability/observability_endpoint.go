@@ -18,4 +18,5 @@ type Endpoint interface {
 
 	Start(context.Context) error
 	Stop(context.Context) error
+	SearchComposeLogs(string) (bool, error)
 }
