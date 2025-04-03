@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/grafana/dashboard-linter/lint"
 	"github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 )
@@ -56,12 +55,11 @@ type CustomCheck struct {
 }
 
 type Expected struct {
-	ComposeLogs  []string            `yaml:"compose-logs"`
-	Logs         []ExpectedLogs      `yaml:"logs"`
-	Traces       []ExpectedTraces    `yaml:"traces"`
-	Metrics      []ExpectedMetrics   `yaml:"metrics"`
-	Dashboards   []ExpectedDashboard `yaml:"dashboards"`
-	CustomChecks []CustomCheck       `yaml:"custom-checks"`
+	ComposeLogs  []string          `yaml:"compose-logs"`
+	Logs         []ExpectedLogs    `yaml:"logs"`
+	Traces       []ExpectedTraces  `yaml:"traces"`
+	Metrics      []ExpectedMetrics `yaml:"metrics"`
+	CustomChecks []CustomCheck     `yaml:"custom-checks"`
 }
 
 type DockerCompose struct {
@@ -89,17 +87,11 @@ func (d *TestCaseDefinition) Merge(other TestCaseDefinition) {
 	d.Expected.Logs = append(d.Expected.Logs, other.Expected.Logs...)
 	d.Expected.Traces = append(d.Expected.Traces, other.Expected.Traces...)
 	d.Expected.Metrics = append(d.Expected.Metrics, other.Expected.Metrics...)
-	d.Expected.Dashboards = append(d.Expected.Dashboards, other.Expected.Dashboards...)
 	d.Expected.CustomChecks = append(d.Expected.CustomChecks, other.Expected.CustomChecks...)
 	if d.DockerCompose == nil {
 		d.DockerCompose = other.DockerCompose
 	}
 	d.Input = append(d.Input, other.Input...)
-}
-
-type TestDashboard struct {
-	Path    string
-	Content lint.Dashboard
 }
 
 type PortConfig struct {
@@ -116,7 +108,6 @@ type TestCase struct {
 	OutputDir   string
 	Definition  TestCaseDefinition
 	PortConfig  *PortConfig
-	Dashboard   *TestDashboard
 	Timeout     time.Duration
 	LgtmVersion string
 	ManualDebug bool
@@ -156,7 +147,7 @@ func (c *TestCase) validateAndSetVariables() {
 	}
 	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
-	gomega.Expect(len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0).To(gomega.BeFalse())
+	gomega.Expect(len(expected.Metrics) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0).To(gomega.BeFalse())
 
 	for _, c := range expected.CustomChecks {
 		gomega.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in "+string(c.Script))
@@ -184,21 +175,6 @@ func (c *TestCase) validateAndSetVariables() {
 				gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in "+string(out))
 				gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in "+string(out))
 			}
-		}
-	}
-	for _, d := range expected.Dashboards {
-		out, _ := yaml.Marshal(d)
-		gomega.Expect(d.Path).ToNot(gomega.BeEmpty(), "path is emtpy in "+string(out))
-		gomega.Expect(d.Panels).ToNot(gomega.BeEmpty(), "panels are empty in "+string(out))
-		for _, panel := range d.Panels {
-			gomega.Expect(panel.Title).ToNot(gomega.BeEmpty(), "panel title is empty in "+string(out))
-			gomega.Expect(panel.Value).ToNot(gomega.BeEmpty(), "value is empty in "+string(out))
-		}
-
-		gomega.Expect(c.Dashboard).To(gomega.BeNil(), "only one dashboard is supported")
-		dashboardPath := filepath.Join(c.Dir, d.Path)
-		c.Dashboard = &TestDashboard{
-			Path: dashboardPath,
 		}
 	}
 

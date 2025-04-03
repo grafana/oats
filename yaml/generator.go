@@ -2,9 +2,7 @@ package yaml
 
 import (
 	"bytes"
-	"embed"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,22 +11,15 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/grafana/dashboard-linter/lint"
 	"github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 )
-
-// relative to docker-compose.yml
-var generatedDashboard = filepath.FromSlash("./dashboard.json")
 
 //go:embed docker-compose-docker-lgtm-template.yml
 var lgtmTemplate []byte
 
 //go:embed docker-compose-include-base.yml
 var lgtmTemplateIncludeBase []byte
-
-//go:embed configs/*
-var configs embed.FS
 
 func (c *TestCase) CreateDockerComposeFile() string {
 	p := filepath.Join(c.OutputDir, "docker-compose.yml")
@@ -43,23 +34,10 @@ func (c *TestCase) getContent() []byte {
 }
 
 func (c *TestCase) generateDockerComposeFile() []byte {
-	dashboard := ""
-	if c.Dashboard != nil {
-		dashboard = c.readDashboardFile()
-	} else {
-		configDir, err := filepath.Abs("configs")
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		dashboard = filepath.Join(configDir, "grafana-test-dashboard.json")
-	}
-	configDir, err := filepath.Abs("configs")
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
 	compose := c.Definition.DockerCompose
 	slog.Info("using docker-compose", "lgtm-version", c.LgtmVersion)
 
 	vars := map[string]any{}
-	vars["Dashboard"] = filepath.ToSlash(dashboard)
-	vars["ConfigDir"] = filepath.ToSlash(configDir)
 	vars["ApplicationPort"] = c.PortConfig.ApplicationPort
 	vars["GrafanaHTTPPort"] = c.PortConfig.GrafanaHTTPPort
 	vars["PrometheusHTTPPort"] = c.PortConfig.PrometheusHTTPPort
@@ -78,7 +56,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	t := template.Must(template.New("docker-compose").Parse(string(lgtmTemplate)))
 
 	buf := bytes.NewBufferString("")
-	err = t.Execute(buf, vars)
+	err := t.Execute(buf, vars)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	name := filepath.FromSlash("./docker-compose-docker-lgtm-template.yml")
 	generated, err := filepath.Abs(strings.TrimSuffix(name, filepath.Ext(name)) + "-generated.yml")
@@ -158,32 +136,4 @@ func addFromBase(base map[string]any, add map[string]any, key string) {
 			addMap[k] = v
 		}
 	}
-}
-
-func (c *TestCase) readDashboardFile() string {
-	content, err := os.ReadFile(c.Dashboard.Path)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-	c.Dashboard.Content = c.parseDashboard(content)
-	return c.replaceDatasource(content)
-}
-
-func (c *TestCase) parseDashboard(content []byte) lint.Dashboard {
-	d := lint.Dashboard{}
-	err := json.Unmarshal(content, &d)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	return d
-}
-
-func (c *TestCase) replaceDatasource(content []byte) string {
-	newFile := filepath.Join(c.OutputDir, generatedDashboard)
-	lines := strings.Split(string(content), "\n")
-	for i, line := range lines {
-		lines[i] = strings.ReplaceAll(line, "${DS_GRAFANACLOUD-GREGORZEITLINGER-PROM}", "prometheus")
-	}
-	err := os.WriteFile(newFile, []byte(strings.Join(lines, "\n")), 0644)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	abs, err := filepath.Abs(newFile)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	return abs
 }

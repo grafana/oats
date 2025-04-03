@@ -2,7 +2,6 @@ package yaml
 
 import (
 	"context"
-	"github.com/grafana/dashboard-linter/lint"
 	"strconv"
 	"strings"
 
@@ -21,28 +20,6 @@ func NewDashboardAssert(d ExpectedDashboard) *DashboardAssert {
 		want: d,
 	}
 	return &a
-}
-
-func (a *DashboardAssert) AssertDashboard(r *runner, panelIndex int) {
-	p := a.want.Panels[panelIndex]
-	wantTitle := p.Title
-	wantValue := p.Value
-
-	c := r.testCase
-	var panel lint.Panel
-	for _, p := range c.Dashboard.Content.Panels {
-		if p.Title == wantTitle {
-			panel = p
-			break
-		}
-	}
-
-	gomega.Expect(panel).ToNot(gomega.BeNil())
-
-	g := r.gomegaInst
-	g.Expect(panel.Targets).To(gomega.HaveLen(1))
-	promQl := strings.ReplaceAll(panel.Targets[0].Expr, "$__rate_interval", "1m")
-	AssertProm(r, promQl, wantValue)
 }
 
 func replaceVariables(promQL string) string {

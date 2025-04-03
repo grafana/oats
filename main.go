@@ -4,19 +4,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/fatih/color"
 	"github.com/grafana/oats/yaml"
 	"github.com/onsi/gomega"
 	"log/slog"
-	"os"
 	"time"
 )
 
 func main() {
 	err := run()
 	if err != nil {
-		fmt.Println(color.RedString(err.Error()))
-		os.Exit(1)
+		panic(err)
 	}
 }
 

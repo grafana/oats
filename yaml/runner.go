@@ -43,7 +43,7 @@ func RunTestCase(c *TestCase) {
 	r.queryLogger = NewQueryLogger(r.endpoint, logger)
 
 	endpoint, err := startEndpoint(c, logger)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting a observability endpoint")
+	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting an observability endpoint")
 
 	r.deadline = time.Now().Add(c.Timeout)
 	r.endpoint = endpoint
@@ -92,14 +92,6 @@ func RunTestCase(c *TestCase) {
 		r.eventually(func() {
 			AssertTempo(r, t)
 		})
-	}
-	for _, dashboard := range expected.Dashboards {
-		dashboardAssert := NewDashboardAssert(dashboard)
-		for i := range dashboard.Panels {
-			r.eventually(func() {
-				dashboardAssert.AssertDashboard(r, i)
-			})
-		}
 	}
 	for _, metric := range expected.Metrics {
 		m := metric
