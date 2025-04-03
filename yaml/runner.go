@@ -36,7 +36,6 @@ func RunTestCase(c *TestCase) {
 		testCase: c,
 	}
 
-	//ginkgo.BeforeAll(func() {
 	c.OutputDir = prepareBuildDir(c.Name)
 	c.validateAndSetVariables()
 	logger, err := createLogger(c)
@@ -60,7 +59,6 @@ func RunTestCase(c *TestCase) {
 	}
 
 	slog.Info("deadline", "time", r.deadline)
-	//})
 
 	defer func() {
 		var ctx = context.Background()
@@ -74,58 +72,46 @@ func RunTestCase(c *TestCase) {
 
 	expected := c.Definition.Expected
 	for _, composeLog := range expected.ComposeLogs {
-		//ginkgo.It(fmt.Sprintf("should have '%s' in internal compose logs", composeLog), func() {
 		r.eventually(func() {
 			found, err := r.endpoint.SearchComposeLogs(composeLog)
 			r.gomegaInst.Expect(err).ToNot(gomega.HaveOccurred())
 			r.gomegaInst.Expect(found).To(gomega.BeTrue())
 		})
-		//})
 	}
 
 	// Assert logs traces first, because metrics and dashboards can take longer to appear
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {
 		l := log
-		//ginkgo.It(fmt.Sprintf("should have '%s' in loki", l.LogQL), func() {
 		r.eventually(func() {
 			AssertLoki(r, l)
 		})
-		//})
 	}
 	for _, trace := range expected.Traces {
 		t := trace
-		//ginkgo.It(fmt.Sprintf("should have '%s' in tempo", t.TraceQL), func() {
 		r.eventually(func() {
 			AssertTempo(r, t)
 		})
-		//})
 	}
 	for _, dashboard := range expected.Dashboards {
 		dashboardAssert := NewDashboardAssert(dashboard)
 		for i := range dashboard.Panels {
-			//ginkgo.It(fmt.Sprintf("dashboard panel '%s'", p.Title), func() {
 			r.eventually(func() {
 				dashboardAssert.AssertDashboard(r, i)
 			})
-			//})
 		}
 	}
 	for _, metric := range expected.Metrics {
 		m := metric
-		//ginkgo.It(fmt.Sprintf("should have '%s' in prometheus", m.PromQL), func() {
 		r.eventually(func() {
 			AssertProm(r, m.PromQL, m.Value)
 		})
-		//})
 	}
 	for _, customCheck := range expected.CustomChecks {
 		c := customCheck
-		//ginkgo.It(fmt.Sprintf("custom check '%s'", c.Script), func() {
 		r.eventually(func() {
 			assertCustomCheck(r, c)
 		})
-		//})
 	}
 }
 

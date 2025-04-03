@@ -12,7 +12,20 @@ OpenTelemetry Acceptance Tests (OATs), or OATs for short, is a test framework fo
   - Docker Compose with the [docker-otel-lgtm] image
   - Kubernetes with the [docker-otel-lgtm] and [k3d]
 
-Under the hood, OATs uses [Ginkgo] and [Gomega] to run the tests.
+## Installation
+
+1. Install the `oats` binary:
+
+```sh
+go install github.com/grafana/oats@latest
+```
+
+2. You can confirm it was installed with:
+
+```sh
+❯ ls $GOPATH/bin
+oats
+```
 
 ## Getting Started
 
@@ -52,9 +65,28 @@ Under the hood, OATs uses [Ginkgo] and [Gomega] to run the tests.
         - promql: 'uptime_seconds_total{}'
           value: '>= 0'
     ```
-5. `cd /path/to/oats/yaml` 
-6. `go install github.com/onsi/ginkgo/v2/ginkgo`
-7. `TESTCASE_BASE_PATH=/path/to/oats-tests ginkgo -v`
+5. Run the tests:
+```sh
+oats /path/to/oats-tests/oats.yaml
+```
+
+## Running OATs Directly
+
+OATs can be run directly using the command-line interface:
+
+```sh
+# Basic usage
+go run main.go /path/to/oats-tests/oats.yaml
+
+# With flags
+go run main.go --timeout=1m --lgtm-version=latest --manual-debug=false /path/to/oats-tests/oats.yaml
+```
+
+The following flags are available:
+
+- `-timeout`: Set the timeout for test cases (default: 30s)
+- `-lgtm-version`: Specify the version of [docker-otel-lgtm] to use (default: "latest")
+- `-manual-debug`: Enable debug mode to keep containers running (default: false)
 
 ## Test Case Syntax
 
@@ -173,29 +205,7 @@ kubernetes:
   app-docker-port: 8080
 ```
 
-## Debugging
 
-If you want to run a single test case, you can use the `--focus` option:
-
-```sh
-TESTCASE_BASE_PATH=/path/to/project ginkgo -v --focus="jdbc"
-```
-
-You can increase the timeout, which is useful if you want to inspect the telemetry data manually
-in Grafana at http://localhost:3000
-
-```sh
-TESTCASE_TIMEOUT=1h TESTCASE_BASE_PATH=/path/to/project ginkgo -v
-```
-
-You can keep the container running without executing the tests - which is useful to debug in Grafana manually:
-
-```sh
-TESTCASE_MANUAL_DEBUG=true TESTCASE_BASE_PATH=/path/to/project ginkgo -v
-```
-
-[Ginkgo]: https://onsi.github.io/ginkgo/
-[Gomega]: https://onsi.github.io/gomega/
 [Tempo]: https://github.com/grafana/tempo
 [OpenTelemetry Collector]: https://opentelemetry.io/docs/collector/ 
 [Prometheus]: https://prometheus.io/
