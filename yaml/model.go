@@ -65,7 +65,6 @@ type Expected struct {
 }
 
 type DockerCompose struct {
-	Generator   string   `yaml:"generator"` // deprecated: only used by beyla
 	Files       []string `yaml:"files"`
 	Environment []string `yaml:"env"`
 }
@@ -112,13 +111,14 @@ type PortConfig struct {
 }
 
 type TestCase struct {
-	Name       string
-	Dir        string
-	OutputDir  string
-	Definition TestCaseDefinition
-	PortConfig *PortConfig
-	Dashboard  *TestDashboard
-	Timeout    time.Duration
+	Name        string
+	Dir         string
+	OutputDir   string
+	Definition  TestCaseDefinition
+	PortConfig  *PortConfig
+	Dashboard   *TestDashboard
+	Timeout     time.Duration
+	LgtmVersion string
 }
 
 type QueryLogger struct {

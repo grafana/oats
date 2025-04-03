@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"github.com/fatih/color"
 	"github.com/grafana/oats/yaml"
@@ -24,6 +25,9 @@ func run() error {
 		return errors.New("you must pass a path to the test case yaml file")
 	}
 
+	lgtmVersion := flag.String("lgtm-version", "latest", "version of https://github.com/grafana/docker-otel-lgtm")
+	flag.Parse()
+
 	gomega.RegisterFailHandler(func(message string, callerSkip ...int) {
 		panic(message)
 	})
@@ -38,6 +42,7 @@ func run() error {
 	}
 
 	for _, c := range cases {
+		c.LgtmVersion = *lgtmVersion
 		yaml.RunTestCase(c)
 	}
 	return nil

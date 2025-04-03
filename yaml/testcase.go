@@ -86,7 +86,7 @@ func absolutePath(dir string) string {
 	return abs
 }
 
-func readTestCase(testBase, filePath string, duration time.Duration) (TestCase, error) {
+func readTestCase(testBase, filePath string) (TestCase, error) {
 	def, err := readTestCaseDefinition(filePath)
 	if err != nil {
 		return TestCase{}, err

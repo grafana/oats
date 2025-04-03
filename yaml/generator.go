@@ -2,6 +2,8 @@ package yaml
 
 import (
 	"bytes"
+	"embed"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -19,15 +21,24 @@ import (
 // relative to docker-compose.yml
 var generatedDashboard = filepath.FromSlash("./dashboard.json")
 
+//go:embed docker-compose-docker-lgtm-template.yml
+var lgtmTemplate []byte
+
+//go:embed docker-compose-include-base.yml
+var lgtmTemplateIncludeBase []byte
+
+//go:embed configs/*
+var configs embed.FS
+
 func (c *TestCase) CreateDockerComposeFile() string {
 	p := filepath.Join(c.OutputDir, "docker-compose.yml")
-	content := c.getContent(c.Definition.DockerCompose)
+	content := c.getContent()
 	err := os.WriteFile(p, content, 0644)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	return p
 }
 
-func (c *TestCase) getContent(compose *DockerCompose) []byte {
+func (c *TestCase) getContent() []byte {
 	return c.generateDockerComposeFile()
 }
 
@@ -44,17 +55,8 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	compose := c.Definition.DockerCompose
-	generator := compose.Generator
-	if generator == "" {
-		generator = "docker-lgtm"
-	}
-	version := os.Getenv("LGTM_VERSION")
-	if version == "" {
-		version = "latest"
-	}
-	slog.Info("using docker-compose", "generator", generator, "version", version)
+	slog.Info("using docker-compose", "lgtm-version", c.LgtmVersion)
 
-	name := filepath.FromSlash("./docker-compose-" + generator + "-template.yml")
 	vars := map[string]any{}
 	vars["Dashboard"] = filepath.ToSlash(dashboard)
 	vars["ConfigDir"] = filepath.ToSlash(configDir)
@@ -63,7 +65,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	vars["PrometheusHTTPPort"] = c.PortConfig.PrometheusHTTPPort
 	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
 	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
-	vars["LgtmVersion"] = version
+	vars["LgtmVersion"] = c.LgtmVersion
 
 	env := os.Environ()
 
@@ -73,11 +75,12 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 
 	env = append(env, compose.Environment...)
 
-	t := template.Must(template.ParseFiles(name))
+	t := template.Must(template.New("docker-compose").Parse(string(lgtmTemplate)))
 
 	buf := bytes.NewBufferString("")
 	err = t.Execute(buf, vars)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	name := filepath.FromSlash("./docker-compose-docker-lgtm-template.yml")
 	generated, err := filepath.Abs(strings.TrimSuffix(name, filepath.Ext(name)) + "-generated.yml")
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	_ = os.WriteFile(generated, buf.Bytes(), 0644)
@@ -99,8 +102,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 		files = append(files, name)
 	}
 
-	base := filepath.FromSlash("./docker-compose-include-base.yml")
-	t = template.Must(template.ParseFiles(base))
+	t = template.Must(template.New("docker-compose-base").Parse(string(lgtmTemplateIncludeBase)))
 	buf = bytes.NewBufferString("")
 	vars = map[string]any{}
 	vars["files"] = files
