@@ -7,7 +7,6 @@ import (
 )
 
 func TestReadTestCaseDefinition(t *testing.T) {
-	AssumeNoYamlTest(t)
 
 	def, err := readTestCaseDefinition("testdata/foo/oats.yaml")
 	require.NoError(t, err)
@@ -17,7 +16,6 @@ func TestReadTestCaseDefinition(t *testing.T) {
 }
 
 func TestReadTestCase(t *testing.T) {
-	AssumeNoYamlTest(t)
 
 	tc, err := readTestCase("testdata", "testdata/foo/oats.yaml", 0)
 	require.NoError(t, err)
@@ -26,7 +24,6 @@ func TestReadTestCase(t *testing.T) {
 }
 
 func TestIncludePath(t *testing.T) {
-	AssumeNoYamlTest(t)
 
 	require.Equal(t,
 		filepath.FromSlash("/home/gregor/source/grafana-opentelemetry-java/examples/jdbc/oats-non-reactive.yaml"),

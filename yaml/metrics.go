@@ -2,12 +2,11 @@ package yaml
 
 import (
 	"context"
-	"fmt"
+	"github.com/grafana/dashboard-linter/lint"
 	"strconv"
 	"strings"
 
 	"github.com/grafana/oats/testhelpers/prometheus/responses"
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -30,16 +29,20 @@ func (a *DashboardAssert) AssertDashboard(r *runner, panelIndex int) {
 	wantValue := p.Value
 
 	c := r.testCase
-	for _, panel := range c.Dashboard.Content.Panels {
-		if panel.Title == wantTitle {
-			g := r.gomegaInst
-			g.Expect(panel.Targets).To(gomega.HaveLen(1))
-			promQl := strings.ReplaceAll(panel.Targets[0].Expr, "$__rate_interval", "1m")
-			AssertProm(r, promQl, wantValue)
-			return
+	var panel lint.Panel
+	for _, p := range c.Dashboard.Content.Panels {
+		if p.Title == wantTitle {
+			panel = p
+			break
 		}
 	}
-	ginkgo.Fail(fmt.Sprintf("panel '%s' not found", wantTitle))
+
+	gomega.Expect(panel).ToNot(gomega.BeNil())
+
+	g := r.gomegaInst
+	g.Expect(panel.Targets).To(gomega.HaveLen(1))
+	promQl := strings.ReplaceAll(panel.Targets[0].Expr, "$__rate_interval", "1m")
+	AssertProm(r, promQl, wantValue)
 }
 
 func replaceVariables(promQL string) string {

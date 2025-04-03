@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,7 +52,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	if version == "" {
 		version = "latest"
 	}
-	println("using docker-compose generator", generator, "version", version)
+	slog.Info("using docker-compose", "generator", generator, "version", version)
 
 	name := filepath.FromSlash("./docker-compose-" + generator + "-template.yml")
 	vars := map[string]any{}

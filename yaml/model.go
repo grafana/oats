@@ -5,12 +5,12 @@ import (
 	"github.com/grafana/oats/observability"
 	"github.com/grafana/oats/testhelpers/kubernetes"
 	"io"
+	"log/slog"
 	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/grafana/dashboard-linter/lint"
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 )
@@ -122,26 +122,27 @@ type TestCase struct {
 }
 
 type QueryLogger struct {
-	Verbose  bool
-	endpoint observability.Endpoint
-	Logger   io.WriteCloser
+	Verbose    bool
+	endpoint   observability.Endpoint
+	FileLogger io.WriteCloser
+	Loggger    slog.Logger
 }
 
 func NewQueryLogger(endpoint observability.Endpoint, logger io.WriteCloser) QueryLogger {
 	return QueryLogger{
-		endpoint: endpoint,
-		Logger:   logger,
+		endpoint:   endpoint,
+		FileLogger: logger,
 	}
 }
 
 func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 	result := fmt.Sprintf(format, a...)
 	if q.Verbose {
-		_, _ = q.Logger.Write([]byte(result))
+		_, _ = q.FileLogger.Write([]byte(result))
 		if len(result) > 1000 {
 			result = result[:1000] + ".."
 		}
-		ginkgo.GinkgoWriter.Println(result)
+		slog.Info(result)
 	}
 }
 
@@ -154,18 +155,15 @@ func (c *TestCase) validateAndSetVariables() {
 	}
 	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
-	if len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0 {
-		ginkgo.Fail("expected metrics or dashboards or traces or logs")
-	}
+	gomega.Expect(len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0).To(gomega.BeFalse())
+
 	for _, c := range expected.CustomChecks {
 		gomega.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in "+string(c.Script))
 	}
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
 		gomega.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in "+string(out))
-		if l.Equals == "" && l.Contains == nil && l.Regexp == "" {
-			ginkgo.Fail("expected equals or contains or regexp in logs")
-		}
+		gomega.Expect(l.Equals == "" && l.Contains == nil && l.Regexp == "").To(gomega.BeFalse())
 		for _, s := range l.Contains {
 			gomega.Expect(s).ToNot(gomega.BeEmpty(), "contains string is empty in "+string(out))
 		}
@@ -214,11 +212,11 @@ func (c *TestCase) validateAndSetVariables() {
 		}
 	}
 
-	ginkgo.GinkgoWriter.Printf("grafana port: %d\n", c.PortConfig.GrafanaHTTPPort)
-	ginkgo.GinkgoWriter.Printf("prometheus port: %d\n", c.PortConfig.PrometheusHTTPPort)
-	ginkgo.GinkgoWriter.Printf("loki port: %d\n", c.PortConfig.LokiHTTPPort)
-	ginkgo.GinkgoWriter.Printf("tempo port: %d\n", c.PortConfig.TempoHTTPPort)
-	ginkgo.GinkgoWriter.Printf("application port: %d\n", c.PortConfig.ApplicationPort)
+	slog.Info("grafana", "port", c.PortConfig.GrafanaHTTPPort)
+	slog.Info("prometheus", "port", c.PortConfig.PrometheusHTTPPort)
+	slog.Info("loki", "port", c.PortConfig.LokiHTTPPort)
+	slog.Info("tempo", "port", c.PortConfig.TempoHTTPPort)
+	slog.Info("application", "port", c.PortConfig.ApplicationPort)
 }
 
 func validateK8s(kubernetes *kubernetes.Kubernetes) {

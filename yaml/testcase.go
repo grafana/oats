@@ -2,11 +2,11 @@ package yaml
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"testing"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -14,8 +14,7 @@ import (
 
 var oatsFileRegex = regexp.MustCompile(`oats.*\.yaml`)
 
-func ReadTestCases() ([]*TestCase, string) {
-	base := TestCaseBasePath()
+func ReadTestCases(base string) ([]*TestCase, string) {
 	if base == "" {
 		return []*TestCase{}, ""
 	}
@@ -52,7 +51,7 @@ func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bo
 					// ignore file does not exist
 				} else {
 					// ignore file exists
-					println("ignoring", p)
+					slog.Info("ignoring", "path", p)
 					ignored = append(ignored, p)
 					return nil
 				}
@@ -67,10 +66,6 @@ func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bo
 			if strings.HasPrefix(p, i) {
 				return nil
 			}
-		}
-
-		if evaluateIgnoreFile {
-			println("adding", p)
 		}
 
 		testCase, err := readTestCase(base, p, duration)
@@ -142,14 +137,4 @@ func includePath(filePath string, include string) string {
 	dir := filepath.Dir(filePath)
 	fromSlash := filepath.FromSlash(include)
 	return filepath.Join(dir, fromSlash)
-}
-
-func TestCaseBasePath() string {
-	return os.Getenv("TESTCASE_BASE_PATH")
-}
-
-func AssumeNoYamlTest(t *testing.T) {
-	if TestCaseBasePath() != "" {
-		t.Skip("skipping because we run yaml tests")
-	}
 }
