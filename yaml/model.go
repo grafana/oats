@@ -5,12 +5,11 @@ import (
 	"github.com/grafana/oats/observability"
 	"github.com/grafana/oats/testhelpers/kubernetes"
 	"io"
+	"log/slog"
 	"path/filepath"
 	"strconv"
 	"time"
 
-	"github.com/grafana/dashboard-linter/lint"
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 )
@@ -56,16 +55,14 @@ type CustomCheck struct {
 }
 
 type Expected struct {
-	ComposeLogs  []string            `yaml:"compose-logs"`
-	Logs         []ExpectedLogs      `yaml:"logs"`
-	Traces       []ExpectedTraces    `yaml:"traces"`
-	Metrics      []ExpectedMetrics   `yaml:"metrics"`
-	Dashboards   []ExpectedDashboard `yaml:"dashboards"`
-	CustomChecks []CustomCheck       `yaml:"custom-checks"`
+	ComposeLogs  []string          `yaml:"compose-logs"`
+	Logs         []ExpectedLogs    `yaml:"logs"`
+	Traces       []ExpectedTraces  `yaml:"traces"`
+	Metrics      []ExpectedMetrics `yaml:"metrics"`
+	CustomChecks []CustomCheck     `yaml:"custom-checks"`
 }
 
 type DockerCompose struct {
-	Generator   string   `yaml:"generator"` // deprecated: only used by beyla
 	Files       []string `yaml:"files"`
 	Environment []string `yaml:"env"`
 }
@@ -90,17 +87,11 @@ func (d *TestCaseDefinition) Merge(other TestCaseDefinition) {
 	d.Expected.Logs = append(d.Expected.Logs, other.Expected.Logs...)
 	d.Expected.Traces = append(d.Expected.Traces, other.Expected.Traces...)
 	d.Expected.Metrics = append(d.Expected.Metrics, other.Expected.Metrics...)
-	d.Expected.Dashboards = append(d.Expected.Dashboards, other.Expected.Dashboards...)
 	d.Expected.CustomChecks = append(d.Expected.CustomChecks, other.Expected.CustomChecks...)
 	if d.DockerCompose == nil {
 		d.DockerCompose = other.DockerCompose
 	}
 	d.Input = append(d.Input, other.Input...)
-}
-
-type TestDashboard struct {
-	Path    string
-	Content lint.Dashboard
 }
 
 type PortConfig struct {
@@ -112,36 +103,38 @@ type PortConfig struct {
 }
 
 type TestCase struct {
-	Name       string
-	Dir        string
-	OutputDir  string
-	Definition TestCaseDefinition
-	PortConfig *PortConfig
-	Dashboard  *TestDashboard
-	Timeout    time.Duration
+	Name        string
+	Dir         string
+	OutputDir   string
+	Definition  TestCaseDefinition
+	PortConfig  *PortConfig
+	Timeout     time.Duration
+	LgtmVersion string
+	ManualDebug bool
 }
 
 type QueryLogger struct {
-	Verbose  bool
-	endpoint observability.Endpoint
-	Logger   io.WriteCloser
+	Verbose    bool
+	endpoint   observability.Endpoint
+	FileLogger io.WriteCloser
+	Loggger    slog.Logger
 }
 
 func NewQueryLogger(endpoint observability.Endpoint, logger io.WriteCloser) QueryLogger {
 	return QueryLogger{
-		endpoint: endpoint,
-		Logger:   logger,
+		endpoint:   endpoint,
+		FileLogger: logger,
 	}
 }
 
 func (q *QueryLogger) LogQueryResult(format string, a ...any) {
 	result := fmt.Sprintf(format, a...)
 	if q.Verbose {
-		_, _ = q.Logger.Write([]byte(result))
+		_, _ = q.FileLogger.Write([]byte(result))
 		if len(result) > 1000 {
 			result = result[:1000] + ".."
 		}
-		ginkgo.GinkgoWriter.Println(result)
+		slog.Info(result)
 	}
 }
 
@@ -154,18 +147,15 @@ func (c *TestCase) validateAndSetVariables() {
 	}
 	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
-	if len(expected.Metrics) == 0 && len(expected.Dashboards) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0 {
-		ginkgo.Fail("expected metrics or dashboards or traces or logs")
-	}
+	gomega.Expect(len(expected.Metrics) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0).To(gomega.BeFalse())
+
 	for _, c := range expected.CustomChecks {
 		gomega.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in "+string(c.Script))
 	}
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
 		gomega.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in "+string(out))
-		if l.Equals == "" && l.Contains == nil && l.Regexp == "" {
-			ginkgo.Fail("expected equals or contains or regexp in logs")
-		}
+		gomega.Expect(l.Equals == "" && l.Contains == nil && l.Regexp == "").To(gomega.BeFalse())
 		for _, s := range l.Contains {
 			gomega.Expect(s).ToNot(gomega.BeEmpty(), "contains string is empty in "+string(out))
 		}
@@ -187,21 +177,6 @@ func (c *TestCase) validateAndSetVariables() {
 			}
 		}
 	}
-	for _, d := range expected.Dashboards {
-		out, _ := yaml.Marshal(d)
-		gomega.Expect(d.Path).ToNot(gomega.BeEmpty(), "path is emtpy in "+string(out))
-		gomega.Expect(d.Panels).ToNot(gomega.BeEmpty(), "panels are empty in "+string(out))
-		for _, panel := range d.Panels {
-			gomega.Expect(panel.Title).ToNot(gomega.BeEmpty(), "panel title is empty in "+string(out))
-			gomega.Expect(panel.Value).ToNot(gomega.BeEmpty(), "value is empty in "+string(out))
-		}
-
-		gomega.Expect(c.Dashboard).To(gomega.BeNil(), "only one dashboard is supported")
-		dashboardPath := filepath.Join(c.Dir, d.Path)
-		c.Dashboard = &TestDashboard{
-			Path: dashboardPath,
-		}
-	}
 
 	if c.PortConfig == nil {
 		// We're in non-parallel mode, so we can static ports here.
@@ -214,11 +189,12 @@ func (c *TestCase) validateAndSetVariables() {
 		}
 	}
 
-	ginkgo.GinkgoWriter.Printf("grafana port: %d\n", c.PortConfig.GrafanaHTTPPort)
-	ginkgo.GinkgoWriter.Printf("prometheus port: %d\n", c.PortConfig.PrometheusHTTPPort)
-	ginkgo.GinkgoWriter.Printf("loki port: %d\n", c.PortConfig.LokiHTTPPort)
-	ginkgo.GinkgoWriter.Printf("tempo port: %d\n", c.PortConfig.TempoHTTPPort)
-	ginkgo.GinkgoWriter.Printf("application port: %d\n", c.PortConfig.ApplicationPort)
+	slog.Info("ports",
+		"grafana", c.PortConfig.GrafanaHTTPPort,
+		"prometheus", c.PortConfig.PrometheusHTTPPort,
+		"loki", c.PortConfig.LokiHTTPPort,
+		"tempo", c.PortConfig.TempoHTTPPort,
+		"application", c.PortConfig.ApplicationPort)
 }
 
 func validateK8s(kubernetes *kubernetes.Kubernetes) {

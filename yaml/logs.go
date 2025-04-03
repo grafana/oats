@@ -31,7 +31,7 @@ func AssertLokiResponse(b []byte, l ExpectedLogs, r *runner) {
 	response := QueryResponse{}
 	err := json.Unmarshal(b, &response)
 	if err != nil {
-		_, _ = fmt.Fprintf(r.queryLogger.Logger, "error unmarshalling loki response: %s\n", string(b))
+		_, _ = fmt.Fprintf(r.queryLogger.FileLogger, "error unmarshalling loki response: %s\n", string(b))
 	}
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 

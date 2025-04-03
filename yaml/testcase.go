@@ -2,35 +2,24 @@ package yaml
 
 import (
 	"errors"
+	"gopkg.in/yaml.v3"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"testing"
-	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
 var oatsFileRegex = regexp.MustCompile(`oats.*\.yaml`)
 
-func ReadTestCases() ([]*TestCase, string) {
-	base := TestCaseBasePath()
+func ReadTestCases(base string) ([]*TestCase, string) {
 	if base == "" {
 		return []*TestCase{}, ""
 	}
 
 	base = absolutePath(base)
-	timeout := os.Getenv("TESTCASE_TIMEOUT")
-	if timeout == "" {
-		timeout = "30s"
-	}
-	duration, err := time.ParseDuration(timeout)
-	if err != nil {
-		panic(err)
-	}
 
-	cases, err := collectTestCases(base, duration, true)
+	cases, err := collectTestCases(base, true)
 	if err != nil {
 		panic(err)
 	}
@@ -38,7 +27,7 @@ func ReadTestCases() ([]*TestCase, string) {
 	return cases, base
 }
 
-func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bool) ([]*TestCase, error) {
+func collectTestCases(base string, evaluateIgnoreFile bool) ([]*TestCase, error) {
 	var cases []*TestCase
 	var ignored []string
 	err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
@@ -52,7 +41,7 @@ func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bo
 					// ignore file does not exist
 				} else {
 					// ignore file exists
-					println("ignoring", p)
+					slog.Info("ignoring", "path", p)
 					ignored = append(ignored, p)
 					return nil
 				}
@@ -69,11 +58,7 @@ func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bo
 			}
 		}
 
-		if evaluateIgnoreFile {
-			println("adding", p)
-		}
-
-		testCase, err := readTestCase(base, p, duration)
+		testCase, err := readTestCase(base, p)
 		if err != nil {
 			return err
 		}
@@ -91,7 +76,7 @@ func absolutePath(dir string) string {
 	return abs
 }
 
-func readTestCase(testBase, filePath string, duration time.Duration) (TestCase, error) {
+func readTestCase(testBase, filePath string) (TestCase, error) {
 	def, err := readTestCaseDefinition(filePath)
 	if err != nil {
 		return TestCase{}, err
@@ -107,7 +92,6 @@ func readTestCase(testBase, filePath string, duration time.Duration) (TestCase, 
 		Name:       name,
 		Dir:        dir,
 		Definition: def,
-		Timeout:    duration,
 	}
 	return testCase, nil
 }
@@ -142,14 +126,4 @@ func includePath(filePath string, include string) string {
 	dir := filepath.Dir(filePath)
 	fromSlash := filepath.FromSlash(include)
 	return filepath.Join(dir, fromSlash)
-}
-
-func TestCaseBasePath() string {
-	return os.Getenv("TESTCASE_BASE_PATH")
-}
-
-func AssumeNoYamlTest(t *testing.T) {
-	if TestCaseBasePath() != "" {
-		t.Skip("skipping because we run yaml tests")
-	}
 }

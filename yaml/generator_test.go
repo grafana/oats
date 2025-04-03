@@ -7,7 +7,6 @@ import (
 )
 
 func TestJoinDockerComposeFiles(t *testing.T) {
-	AssumeNoYamlTest(t)
 
 	template, err := os.ReadFile("testdata/docker-compose-template.yaml")
 	require.NoError(t, err)

@@ -2,45 +2,14 @@ package yaml
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/grafana/oats/testhelpers/prometheus/responses"
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 var promQlVariables = []string{"$job", "$instance", "$pod", "$namespace", "$container"}
-
-type DashboardAssert struct {
-	want ExpectedDashboard
-}
-
-func NewDashboardAssert(d ExpectedDashboard) *DashboardAssert {
-	a := DashboardAssert{
-		want: d,
-	}
-	return &a
-}
-
-func (a *DashboardAssert) AssertDashboard(r *runner, panelIndex int) {
-	p := a.want.Panels[panelIndex]
-	wantTitle := p.Title
-	wantValue := p.Value
-
-	c := r.testCase
-	for _, panel := range c.Dashboard.Content.Panels {
-		if panel.Title == wantTitle {
-			g := r.gomegaInst
-			g.Expect(panel.Targets).To(gomega.HaveLen(1))
-			promQl := strings.ReplaceAll(panel.Targets[0].Expr, "$__rate_interval", "1m")
-			AssertProm(r, promQl, wantValue)
-			return
-		}
-	}
-	ginkgo.Fail(fmt.Sprintf("panel '%s' not found", wantTitle))
-}
 
 func replaceVariables(promQL string) string {
 	for _, variable := range promQlVariables {
