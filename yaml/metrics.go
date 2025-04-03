@@ -11,10 +11,6 @@ import (
 
 var promQlVariables = []string{"$job", "$instance", "$pod", "$namespace", "$container"}
 
-type DashboardAssert struct {
-	want ExpectedDashboard
-}
-
 func replaceVariables(promQL string) string {
 	for _, variable := range promQlVariables {
 		promQL = strings.ReplaceAll(promQL, variable, ".*")
