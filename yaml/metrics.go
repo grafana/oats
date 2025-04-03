@@ -15,13 +15,6 @@ type DashboardAssert struct {
 	want ExpectedDashboard
 }
 
-func NewDashboardAssert(d ExpectedDashboard) *DashboardAssert {
-	a := DashboardAssert{
-		want: d,
-	}
-	return &a
-}
-
 func replaceVariables(promQL string) string {
 	for _, variable := range promQlVariables {
 		promQL = strings.ReplaceAll(promQL, variable, ".*")
