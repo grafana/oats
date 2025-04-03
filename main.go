@@ -9,6 +9,7 @@ import (
 	"github.com/onsi/gomega"
 	"log/slog"
 	"os"
+	"time"
 )
 
 func main() {
@@ -20,20 +21,20 @@ func main() {
 }
 
 func run() error {
-	args := os.Args[1:]
-	if len(args) < 1 {
+	lgtmVersion := flag.String("lgtm-version", "latest", "version of https://github.com/grafana/docker-otel-lgtm")
+	timeout := flag.Duration("timeout", 30*time.Second, "timeout for the test case")
+	manualDebug := flag.Bool("manual-debug", false, "debug mode")
+	flag.Parse()
+
+	if flag.NArg() != 1 {
 		return errors.New("you must pass a path to the test case yaml file")
 	}
-
-	lgtmVersion := flag.String("lgtm-version", "latest", "version of https://github.com/grafana/docker-otel-lgtm")
-	flag.Parse()
 
 	gomega.RegisterFailHandler(func(message string, callerSkip ...int) {
 		panic(message)
 	})
 
-	// todo use positional args to get the test case name
-	cases, base := yaml.ReadTestCases(args[0])
+	cases, base := yaml.ReadTestCases(flag.Arg(0))
 	if len(cases) == 0 {
 		return fmt.Errorf("no cases found in %s", base)
 	}
@@ -43,7 +44,11 @@ func run() error {
 
 	for _, c := range cases {
 		c.LgtmVersion = *lgtmVersion
+		c.Timeout = *timeout
+		c.ManualDebug = *manualDebug
 		yaml.RunTestCase(c)
 	}
+
+	slog.Info("all test cases passed")
 	return nil
 }

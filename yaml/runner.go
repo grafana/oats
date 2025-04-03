@@ -48,7 +48,7 @@ func RunTestCase(c *TestCase) {
 
 	r.deadline = time.Now().Add(c.Timeout)
 	r.endpoint = endpoint
-	if os.Getenv("TESTCASE_MANUAL_DEBUG") == "true" {
+	if c.ManualDebug {
 		slog.Info(fmt.Sprintf("topping to let you manually debug on http://localhost:%d\n", r.testCase.PortConfig.GrafanaHTTPPort))
 
 		for {

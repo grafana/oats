@@ -119,6 +119,7 @@ type TestCase struct {
 	Dashboard   *TestDashboard
 	Timeout     time.Duration
 	LgtmVersion string
+	ManualDebug bool
 }
 
 type QueryLogger struct {
@@ -212,11 +213,12 @@ func (c *TestCase) validateAndSetVariables() {
 		}
 	}
 
-	slog.Info("grafana", "port", c.PortConfig.GrafanaHTTPPort)
-	slog.Info("prometheus", "port", c.PortConfig.PrometheusHTTPPort)
-	slog.Info("loki", "port", c.PortConfig.LokiHTTPPort)
-	slog.Info("tempo", "port", c.PortConfig.TempoHTTPPort)
-	slog.Info("application", "port", c.PortConfig.ApplicationPort)
+	slog.Info("ports",
+		"grafana", c.PortConfig.GrafanaHTTPPort,
+		"prometheus", c.PortConfig.PrometheusHTTPPort,
+		"loki", c.PortConfig.LokiHTTPPort,
+		"tempo", c.PortConfig.TempoHTTPPort,
+		"application", c.PortConfig.ApplicationPort)
 }
 
 func validateK8s(kubernetes *kubernetes.Kubernetes) {

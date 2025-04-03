@@ -2,14 +2,12 @@ package yaml
 
 import (
 	"errors"
+	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
 var oatsFileRegex = regexp.MustCompile(`oats.*\.yaml`)
@@ -20,16 +18,8 @@ func ReadTestCases(base string) ([]*TestCase, string) {
 	}
 
 	base = absolutePath(base)
-	timeout := os.Getenv("TESTCASE_TIMEOUT")
-	if timeout == "" {
-		timeout = "30s"
-	}
-	duration, err := time.ParseDuration(timeout)
-	if err != nil {
-		panic(err)
-	}
 
-	cases, err := collectTestCases(base, duration, true)
+	cases, err := collectTestCases(base, true)
 	if err != nil {
 		panic(err)
 	}
@@ -37,7 +27,7 @@ func ReadTestCases(base string) ([]*TestCase, string) {
 	return cases, base
 }
 
-func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bool) ([]*TestCase, error) {
+func collectTestCases(base string, evaluateIgnoreFile bool) ([]*TestCase, error) {
 	var cases []*TestCase
 	var ignored []string
 	err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
@@ -68,7 +58,7 @@ func collectTestCases(base string, duration time.Duration, evaluateIgnoreFile bo
 			}
 		}
 
-		testCase, err := readTestCase(base, p, duration)
+		testCase, err := readTestCase(base, p)
 		if err != nil {
 			return err
 		}
@@ -102,7 +92,6 @@ func readTestCase(testBase, filePath string) (TestCase, error) {
 		Name:       name,
 		Dir:        dir,
 		Definition: def,
-		Timeout:    duration,
 	}
 	return testCase, nil
 }
