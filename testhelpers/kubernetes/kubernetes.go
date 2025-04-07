@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/grafana/oats/testhelpers/remote"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"sync"
@@ -20,12 +21,12 @@ type Kubernetes struct {
 	ImportImages     []string `yaml:"import-images"`
 }
 
-func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, logger io.WriteCloser, testName string, dir string) *remote.Endpoint {
+func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, testName string, dir string) *remote.Endpoint {
 	var killList []*os.Process
 	run := func(cmd *exec.Cmd, background bool) error {
-		_, _ = fmt.Fprintf(logger, "Running: %s\n in %s", cmd.String(), dir)
-		cmd.Stdout = logger
-		cmd.Stderr = logger
+		slog.Info("running", "command", cmd.String(), "dir", dir)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 		cmd.Dir = dir
 		if background {
 			err := cmd.Start()
@@ -38,7 +39,7 @@ func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, logger io.WriteClo
 		return cmd.Run()
 	}
 	return remote.NewEndpoint(ports, func(ctx context.Context) error {
-		return start(model, ports, testName, run, logger)
+		return start(model, ports, testName, run)
 	}, func(ctx context.Context) error {
 		for _, p := range killList {
 			err := p.Kill()
@@ -54,7 +55,7 @@ func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, logger io.WriteClo
 	)
 }
 
-func start(model *Kubernetes, ports remote.PortsConfig, testName string, run func(cmd *exec.Cmd, background bool) error, logger io.WriteCloser) error {
+func start(model *Kubernetes, ports remote.PortsConfig, testName string, run func(cmd *exec.Cmd, background bool) error) error {
 	portForward := func(localPort int, remotePort int) error {
 		cmd := exec.Command("kubectl", "port-forward", "service/lgtm", fmt.Sprintf("%d:%d", localPort, remotePort))
 		return run(cmd, true)
@@ -76,7 +77,7 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 
 	err = run(exec.Command("k3d", "cluster", "list", cluster), false)
 	if err == nil {
-		_, _ = fmt.Fprintf(logger, "cluster %s already exists - deleting\n", cluster)
+		slog.Info("cluster already exists - deleting", "name", cluster)
 		err = run(exec.Command("k3d", "cluster", "delete", cluster), false)
 		if err != nil {
 			return err

@@ -6,7 +6,6 @@ import (
 	"github.com/grafana/oats/testhelpers/kubernetes"
 	"github.com/grafana/oats/testhelpers/remote"
 	"github.com/onsi/gomega/format"
-	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -23,7 +22,7 @@ type runner struct {
 	testCase          *TestCase
 	endpoint          *remote.Endpoint
 	deadline          time.Time
-	queryLogger       QueryLogger
+	Verbose           bool
 	gomegaInst        gomega.Gomega
 	additionalAsserts []func()
 }
@@ -38,11 +37,7 @@ func RunTestCase(c *TestCase) {
 
 	c.OutputDir = prepareBuildDir(c.Name)
 	c.validateAndSetVariables()
-	logger, err := createLogger(c)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error creating logger")
-	r.queryLogger = NewQueryLogger(r.endpoint, logger)
-
-	endpoint, err := startEndpoint(c, logger)
+	endpoint, err := startEndpoint(c)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting an observability endpoint")
 
 	r.deadline = time.Now().Add(c.Timeout)
@@ -113,18 +108,18 @@ func RunTestCase(c *TestCase) {
 }
 
 func assertCustomCheck(r *runner, c CustomCheck) {
-	r.queryLogger.LogQueryResult("running custom check %v\n", c.Script)
+	r.LogQueryResult("running custom check %v\n", c.Script)
 	cmd := exec.Command(c.Script)
 	cmd.Dir = r.testCase.Dir
-	cmd.Stdout = r.queryLogger.FileLogger
-	cmd.Stderr = r.queryLogger.FileLogger
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
-	r.queryLogger.LogQueryResult("custom check %v response %v err=%v\n", c.Script, "", err)
+	r.LogQueryResult("custom check %v response %v err=%v\n", c.Script, "", err)
 	r.gomegaInst.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
-func startEndpoint(c *TestCase, logger io.WriteCloser) (*remote.Endpoint, error) {
+func startEndpoint(c *TestCase) (*remote.Endpoint, error) {
 	ports := remote.PortsConfig{
 		PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
 		TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
@@ -134,25 +129,14 @@ func startEndpoint(c *TestCase, logger io.WriteCloser) (*remote.Endpoint, error)
 	slog.Info("Launching test", "name", c.Name)
 	var endpoint *remote.Endpoint
 	if c.Definition.Kubernetes != nil {
-		endpoint = kubernetes.NewEndpoint(c.Definition.Kubernetes, ports, logger, c.Name, c.Dir)
+		endpoint = kubernetes.NewEndpoint(c.Definition.Kubernetes, ports, c.Name, c.Dir)
 	} else {
-		endpoint = compose.NewEndpoint(c.CreateDockerComposeFile(), ports, logger)
+		endpoint = compose.NewEndpoint(c.CreateDockerComposeFile(), ports)
 	}
 
 	var ctx = context.Background()
 	startErr := endpoint.Start(ctx)
 	return endpoint, startErr
-}
-
-func createLogger(c *TestCase) (io.WriteCloser, error) {
-	logFile := filepath.Join(c.OutputDir, fmt.Sprintf("output-%s.log", c.Name))
-	logs, err := os.OpenFile(logFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
-	if err != nil {
-		return nil, err
-	}
-	abs, _ := filepath.Abs(logFile)
-	slog.Info("Logging to", "path", abs)
-	return logs, nil
 }
 
 func prepareBuildDir(name string) string {
@@ -181,14 +165,14 @@ func (r *runner) eventually(asserter func()) {
 	iterations := 0
 	r.additionalAsserts = nil
 	gomega.Eventually(ctx, func(g gomega.Gomega) {
-		iterations++
 		verbose := VerboseLogging
-		if time.Since(t) > 10*time.Second {
+		if iterations == 0 || time.Since(t) > 10*time.Second {
 			verbose = true
 			t = time.Now()
 		}
-		r.queryLogger.Verbose = verbose
-		r.queryLogger.LogQueryResult("waiting for telemetry data\n")
+		iterations++
+		r.Verbose = verbose
+		r.LogQueryResult("waiting for telemetry data\n")
 
 		for _, i := range r.testCase.Definition.Input {
 			url := fmt.Sprintf("http://localhost:%d%s", r.testCase.PortConfig.ApplicationPort, i.Path)

@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -193,6 +194,7 @@ func (e *Endpoint) Stop(ctx context.Context) error {
 
 func (e *Endpoint) SearchComposeLogs(message string) (bool, error) {
 	found := false
+	slog.Info("searching compose logs", "message", message)
 	err := e.logReader(func(pipe io.ReadCloser, wg *sync.WaitGroup) {
 		reader := bufio.NewReader(pipe)
 		line, err := reader.ReadString('\n')
