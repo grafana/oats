@@ -72,6 +72,7 @@ func RunTestCase(c *TestCase) {
 
 	expected := c.Definition.Expected
 	for _, composeLog := range expected.ComposeLogs {
+		slog.Info("searching for compose log", "log", composeLog)
 		r.eventually(func() {
 			found, err := r.endpoint.SearchComposeLogs(composeLog)
 			r.gomegaInst.Expect(err).ToNot(gomega.HaveOccurred())
@@ -83,24 +84,28 @@ func RunTestCase(c *TestCase) {
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {
 		l := log
+		slog.Info("searching loki", "logql", l.LogQL)
 		r.eventually(func() {
 			AssertLoki(r, l)
 		})
 	}
 	for _, trace := range expected.Traces {
 		t := trace
+		slog.Info("searching tempo", "traceql", t.TraceQL)
 		r.eventually(func() {
 			AssertTempo(r, t)
 		})
 	}
 	for _, metric := range expected.Metrics {
 		m := metric
+		slog.Info("searching prometheus", "promql", m.PromQL)
 		r.eventually(func() {
 			AssertProm(r, m.PromQL, m.Value)
 		})
 	}
 	for _, customCheck := range expected.CustomChecks {
 		c := customCheck
+		slog.Info("executing custom check", "check", c.Script)
 		r.eventually(func() {
 			assertCustomCheck(r, c)
 		})
