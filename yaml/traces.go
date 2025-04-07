@@ -12,7 +12,7 @@ func AssertTempo(r *runner, t ExpectedTraces) {
 	ctx := context.Background()
 
 	b, err := r.endpoint.SearchTempo(ctx, t.TraceQL)
-	r.queryLogger.LogQueryResult("traceQL query %v response %v err=%v\n", t.TraceQL, string(b), err)
+	r.LogQueryResult("traceQL query %v response %v err=%v\n", t.TraceQL, string(b), err)
 	g := r.gomegaInst
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0))
@@ -28,7 +28,7 @@ func assertTrace(r *runner, tr responses.Trace, wantSpans []ExpectedSpan) {
 	ctx := context.Background()
 
 	b, err := r.endpoint.GetTraceByID(ctx, tr.TraceID)
-	r.queryLogger.LogQueryResult("traceQL traceID %v response %v err=%v\n", tr.TraceID, string(b), err)
+	r.LogQueryResult("traceQL traceID %v response %v err=%v\n", tr.TraceID, string(b), err)
 
 	g := r.gomegaInst
 	g.Expect(err).ToNot(gomega.HaveOccurred(), "we should find the trace by traceID")

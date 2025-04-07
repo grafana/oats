@@ -22,7 +22,7 @@ func AssertProm(r *runner, promQL string, value string) {
 	promQL = replaceVariables(promQL)
 	ctx := context.Background()
 	b, err := r.endpoint.RunPromQL(ctx, promQL)
-	r.queryLogger.LogQueryResult("promQL query %v response %v err=%v\n", promQL, string(b), err)
+	r.LogQueryResult("promQL query %v response %v err=%v\n", promQL, string(b), err)
 	g := r.gomegaInst
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0), "expected prometheus response to be non-empty")

@@ -2,9 +2,7 @@ package yaml
 
 import (
 	"fmt"
-	"github.com/grafana/oats/observability"
 	"github.com/grafana/oats/testhelpers/kubernetes"
-	"io"
 	"log/slog"
 	"path/filepath"
 	"strconv"
@@ -113,24 +111,9 @@ type TestCase struct {
 	ManualDebug bool
 }
 
-type QueryLogger struct {
-	Verbose    bool
-	endpoint   observability.Endpoint
-	FileLogger io.WriteCloser
-	Loggger    slog.Logger
-}
-
-func NewQueryLogger(endpoint observability.Endpoint, logger io.WriteCloser) QueryLogger {
-	return QueryLogger{
-		endpoint:   endpoint,
-		FileLogger: logger,
-	}
-}
-
-func (q *QueryLogger) LogQueryResult(format string, a ...any) {
-	result := fmt.Sprintf(format, a...)
-	if q.Verbose {
-		_, _ = q.FileLogger.Write([]byte(result))
+func (r *runner) LogQueryResult(format string, a ...any) {
+	if r.Verbose {
+		result := fmt.Sprintf(format, a...)
 		if len(result) > 1000 {
 			result = result[:1000] + ".."
 		}

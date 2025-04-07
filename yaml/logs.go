@@ -2,8 +2,8 @@ package yaml
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/onsi/gomega"
+	"log/slog"
 )
 
 type QueryResponse struct {
@@ -18,7 +18,7 @@ type QueryResponse struct {
 
 func AssertLoki(r *runner, l ExpectedLogs) {
 	b, err := r.endpoint.SearchLoki(l.LogQL)
-	r.queryLogger.LogQueryResult("logQL query %v response %v err=%v\n", l.LogQL, string(b), err)
+	r.LogQueryResult("logQL query %v response %v err=%v\n", l.LogQL, string(b), err)
 	g := r.gomegaInst
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 	AssertLokiResponse(b, l, r)
@@ -31,7 +31,7 @@ func AssertLokiResponse(b []byte, l ExpectedLogs, r *runner) {
 	response := QueryResponse{}
 	err := json.Unmarshal(b, &response)
 	if err != nil {
-		_, _ = fmt.Fprintf(r.queryLogger.FileLogger, "error unmarshalling loki response: %s\n", string(b))
+		slog.Info("error unmarshalling loki", "response", string(b))
 	}
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 

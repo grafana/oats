@@ -88,6 +88,12 @@ The following flags are available:
 - `-lgtm-version`: Specify the version of [docker-otel-lgtm] to use (default: "latest")
 - `-manual-debug`: Enable debug mode to keep containers running (default: false)
 
+## Run OATs in GitHub Actions
+
+Here's an [script](https://github.com/grafana/docker-otel-lgtm/blob/main/scripts/run-acceptance-tests.sh) that is used 
+from GitHub Actions. It uses [mise](https://mise.jdx.dev/) to install OATs, but you also 
+[install OATs directly](#installation).
+
 ## Test Case Syntax
 
 > You can use any file name that matches `oats*.yaml` (e.g. `oats-test.yaml`), that doesn't end in `-template.yaml`.

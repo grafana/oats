@@ -2,11 +2,13 @@
 package compose
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"github.com/grafana/oats/testhelpers/remote"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path"
@@ -18,7 +20,6 @@ type Compose struct {
 	Command     string
 	DefaultArgs []string
 	Path        string
-	Logger      io.WriteCloser
 	LogConsumer func(io.ReadCloser, *sync.WaitGroup)
 	Env         []string
 }
@@ -27,7 +28,7 @@ func defaultEnv() []string {
 	return os.Environ()
 }
 
-func ComposeSuite(composeFile string, logger io.WriteCloser) (*Compose, error) {
+func ComposeSuite(composeFile string) (*Compose, error) {
 	command := "docker"
 	defaultArgs := []string{"compose"}
 
@@ -36,7 +37,6 @@ func ComposeSuite(composeFile string, logger io.WriteCloser) (*Compose, error) {
 		DefaultArgs: defaultArgs,
 		Path:        path.Join(composeFile),
 		Env:         defaultEnv(),
-		Logger:      logger,
 	}, nil
 }
 
@@ -89,12 +89,23 @@ func (c *Compose) runDocker(composeCommand bool, args ...string) error {
 		wg.Wait()
 		return nil
 	} else {
-		if c.Logger != nil {
-			cmd.Stdout = c.Logger
-			cmd.Stderr = c.Logger
-			_, _ = fmt.Fprintf(c.Logger, "Running: docker %s\n", cmd.String())
+		slog.Info("Running", "command", cmd.String(), "dir", c.Path)
+		stdout, _ := cmd.StdoutPipe()
+		cmd.Stderr = cmd.Stdout
+		go func() {
+			reader := bufio.NewReader(stdout)
+			line, err := reader.ReadString('\n')
+			for err == nil {
+				slog.Info(line)
+				line, err = reader.ReadString('\n')
+			}
+		}()
+
+		err := cmd.Start()
+		if err != nil {
+			return fmt.Errorf("failed to start docker command: %w", err)
 		}
-		return cmd.Run()
+		return nil
 	}
 }
 
@@ -109,16 +120,13 @@ func (c *Compose) Close() error {
 	if err := c.Remove(); err != nil {
 		errs = append(errs, err.Error())
 	}
-	if err := c.Logger.Close(); err != nil {
-		errs = append(errs, err.Error())
-	}
 	if len(errs) == 0 {
 		return nil
 	}
 	return errors.New(strings.Join(errs, " / "))
 }
 
-func NewEndpoint(composeFilePath string, ports remote.PortsConfig, logger io.WriteCloser) *remote.Endpoint {
+func NewEndpoint(composeFilePath string, ports remote.PortsConfig) *remote.Endpoint {
 	var compose *Compose
 	return remote.NewEndpoint(ports, func(ctx context.Context) error {
 		var err error
@@ -127,7 +135,7 @@ func NewEndpoint(composeFilePath string, ports remote.PortsConfig, logger io.Wri
 			return fmt.Errorf("composeFilePath cannot be empty")
 		}
 
-		compose, err = ComposeSuite(composeFilePath, logger)
+		compose, err = ComposeSuite(composeFilePath)
 		if err != nil {
 			return err
 		}
