@@ -96,10 +96,8 @@ func (c *Compose) runDocker(composeCommand bool, args ...string) error {
 			reader := bufio.NewReader(stdout)
 			line, err := reader.ReadString('\n')
 			for err == nil {
+				slog.Info(line)
 				line, err = reader.ReadString('\n')
-				if err == nil {
-					slog.Info(line)
-				}
 			}
 		}()
 
