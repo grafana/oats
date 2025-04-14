@@ -75,7 +75,6 @@ func (c *Compose) runDocker(composeCommand bool, args ...string) error {
 	cmdArgs = append(cmdArgs, args...)
 	cmd := exec.Command(c.Command, cmdArgs...)
 	cmd.Env = c.Env
-	cmd.Dir = path.Dir(c.Path)
 	if c.LogConsumer != nil {
 		stdout, _ := cmd.StdoutPipe()
 		cmd.Stderr = cmd.Stdout
