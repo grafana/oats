@@ -30,7 +30,6 @@ func assertPyroscopeResponse(b []byte, p ExpectedProfiles, r *runner) {
 	if err != nil {
 		slog.Info("error unmarshalling pyroscope", "response", string(b))
 	}
-	slog.Info("todo", "flamebearer", response.Flamebearer.Names)
 
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(response.Flamebearer.Names).To(gomega.ContainElement(gomega.ContainSubstring(p.Flamebearers.Contains)))
