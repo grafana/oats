@@ -22,6 +22,7 @@ func (p *PortAllocator) AllocatePorts() *PortConfig {
 		PrometheusHTTPPort: p.Allocate(),
 		LokiHTTPPort:       p.Allocate(),
 		TempoHTTPPort:      p.Allocate(),
+		PyroscopeHttpPort:  p.Allocate(),
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 )
 
-type QueryResponse struct {
+type LokiQueryResponse struct {
 	Status string `json:"status"`
 	Data   struct {
 		Result []struct {
@@ -28,7 +28,7 @@ func AssertLokiResponse(b []byte, l ExpectedLogs, r *runner) {
 	g := r.gomegaInst
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0), "expected loki response to be non-empty")
 
-	response := QueryResponse{}
+	response := LokiQueryResponse{}
 	err := json.Unmarshal(b, &response)
 	if err != nil {
 		slog.Info("error unmarshalling loki", "response", string(b))

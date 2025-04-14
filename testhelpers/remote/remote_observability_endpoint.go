@@ -24,6 +24,7 @@ type PortsConfig struct {
 	MimirHTTPPort      int
 	PrometheusHTTPPort int
 	LokiHttpPort       int
+	PyroscopeHttpPort  int
 }
 
 type Endpoint struct {
@@ -170,6 +171,30 @@ func (e *Endpoint) SearchLoki(query string) ([]byte, error) {
 	resp, err := http.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("querying loki: %w", err)
+	}
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("can't read response body: %w", err)
+	}
+
+	return body, nil
+}
+
+func (e *Endpoint) SearchPyroscope(query string) ([]byte, error) {
+	if e.ports.PyroscopeHttpPort == 0 {
+		return nil, fmt.Errorf("to search Pyroscope you must configure a PyroscopeHttpPort")
+	}
+
+	u := fmt.Sprintf("http://localhost:%d/pyroscope/render?from=from=now-1m&query=%s", e.ports.PyroscopeHttpPort, url.PathEscape(query))
+
+	resp, err := http.Get(u)
+	if err != nil {
+		return nil, fmt.Errorf("querying pyroscope: %w", err)
 	}
 
 	defer func(Body io.ReadCloser) {

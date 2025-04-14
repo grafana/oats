@@ -6,7 +6,7 @@ import (
 )
 
 func ParseQueryOutput(body []byte) ([]Result, error) {
-	qr := QueryResult{}
+	qr := PrometheusQueryResult{}
 	if err := json.Unmarshal(body, &qr); err != nil {
 		return nil, fmt.Errorf("decoding Prometheus response: %w", err)
 	}

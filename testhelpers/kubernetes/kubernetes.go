@@ -121,5 +121,9 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 	if err != nil {
 		return err
 	}
+	err = portForward(ports.PyroscopeHttpPort, 4040)
+	if err != nil {
+		return err
+	}
 	return nil
 }

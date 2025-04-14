@@ -43,6 +43,15 @@ type ExpectedLogs struct {
 	NoExtraAttributes bool              `yaml:"no-extra-attributes"`
 }
 
+type Flamebearers struct {
+	Contains string `yaml:"contains"`
+}
+
+type ExpectedProfiles struct {
+	Query        string       `yaml:"query"`
+	Flamebearers Flamebearers `yaml:"flamebearers"`
+}
+
 type ExpectedTraces struct {
 	TraceQL string         `yaml:"traceql"`
 	Spans   []ExpectedSpan `yaml:"spans"`
@@ -53,11 +62,12 @@ type CustomCheck struct {
 }
 
 type Expected struct {
-	ComposeLogs  []string          `yaml:"compose-logs"`
-	Logs         []ExpectedLogs    `yaml:"logs"`
-	Traces       []ExpectedTraces  `yaml:"traces"`
-	Metrics      []ExpectedMetrics `yaml:"metrics"`
-	CustomChecks []CustomCheck     `yaml:"custom-checks"`
+	ComposeLogs  []string           `yaml:"compose-logs"`
+	Logs         []ExpectedLogs     `yaml:"logs"`
+	Traces       []ExpectedTraces   `yaml:"traces"`
+	Metrics      []ExpectedMetrics  `yaml:"metrics"`
+	Profiles     []ExpectedProfiles `yaml:"profiles"`
+	CustomChecks []CustomCheck      `yaml:"custom-checks"`
 }
 
 type DockerCompose struct {
@@ -85,6 +95,7 @@ func (d *TestCaseDefinition) Merge(other TestCaseDefinition) {
 	d.Expected.Logs = append(d.Expected.Logs, other.Expected.Logs...)
 	d.Expected.Traces = append(d.Expected.Traces, other.Expected.Traces...)
 	d.Expected.Metrics = append(d.Expected.Metrics, other.Expected.Metrics...)
+	d.Expected.Profiles = append(d.Expected.Profiles, other.Expected.Profiles...)
 	d.Expected.CustomChecks = append(d.Expected.CustomChecks, other.Expected.CustomChecks...)
 	if d.DockerCompose == nil {
 		d.DockerCompose = other.DockerCompose
@@ -98,6 +109,7 @@ type PortConfig struct {
 	PrometheusHTTPPort int
 	LokiHTTPPort       int
 	TempoHTTPPort      int
+	PyroscopeHttpPort  int
 }
 
 type TestCase struct {
@@ -130,7 +142,7 @@ func (c *TestCase) validateAndSetVariables() {
 	}
 	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
-	gomega.Expect(len(expected.Metrics) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0).To(gomega.BeFalse())
+	gomega.Expect(len(expected.Metrics) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0 && len(expected.Profiles) == 0).To(gomega.BeFalse())
 
 	for _, c := range expected.CustomChecks {
 		gomega.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in "+string(c.Script))
@@ -160,6 +172,11 @@ func (c *TestCase) validateAndSetVariables() {
 			}
 		}
 	}
+	for _, p := range expected.Profiles {
+		out, _ := yaml.Marshal(p)
+		gomega.Expect(p.Query).ToNot(gomega.BeEmpty(), "query is empty in "+string(out))
+		gomega.Expect(p.Flamebearers.Contains).ToNot(gomega.BeEmpty(), "Flamebearers.contains is empty in "+string(out))
+	}
 
 	if c.PortConfig == nil {
 		// We're in non-parallel mode, so we can static ports here.
@@ -169,6 +186,7 @@ func (c *TestCase) validateAndSetVariables() {
 			PrometheusHTTPPort: 9090,
 			LokiHTTPPort:       3100,
 			TempoHTTPPort:      3200,
+			PyroscopeHttpPort:  4040,
 		}
 	}
 
@@ -177,6 +195,7 @@ func (c *TestCase) validateAndSetVariables() {
 		"prometheus", c.PortConfig.PrometheusHTTPPort,
 		"loki", c.PortConfig.LokiHTTPPort,
 		"tempo", c.PortConfig.TempoHTTPPort,
+		"pyroscope", c.PortConfig.PyroscopeHttpPort,
 		"application", c.PortConfig.ApplicationPort)
 }
 
