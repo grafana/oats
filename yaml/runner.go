@@ -56,13 +56,13 @@ func RunTestCase(c *TestCase) {
 	slog.Info("deadline", "time", r.deadline)
 
 	defer func() {
-		var ctx = context.Background()
-		var stopErr error
+		slog.Info("stopping observability endpoint")
 
-		if r.endpoint != nil {
-			stopErr = r.endpoint.Stop(ctx)
-			gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
-		}
+		var ctx = context.Background()
+
+		stopErr := r.endpoint.Stop(ctx)
+		gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
+		slog.Info("stopped observability endpoint")
 	}()
 
 	expected := c.Definition.Expected
@@ -129,7 +129,7 @@ func startEndpoint(c *TestCase) (*remote.Endpoint, error) {
 		PyroscopeHttpPort:  c.PortConfig.PyroscopeHttpPort,
 	}
 
-	slog.Info("Launching test", "name", c.Name)
+	slog.Info("start test", "name", c.Name)
 	var endpoint *remote.Endpoint
 	if c.Definition.Kubernetes != nil {
 		endpoint = kubernetes.NewEndpoint(c.Definition.Kubernetes, ports, c.Name, c.Dir)
