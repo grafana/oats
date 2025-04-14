@@ -102,8 +102,7 @@ func (e *Endpoint) GetTraceByID(ctx context.Context, id string) ([]byte, error) 
 		return nil, ctx.Err()
 	}
 
-	url := fmt.Sprintf("http://localhost:%d/api/traces/%s", e.ports.TempoHTTPPort, id)
-	return e.makeGetRequest(url)
+	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/traces/%s", e.ports.TempoHTTPPort, id))
 }
 
 func (e *Endpoint) SearchTempo(ctx context.Context, query string) ([]byte, error) {
@@ -129,12 +128,10 @@ func (e *Endpoint) SearchTags(ctx context.Context, tags map[string]string) ([]by
 		tb.WriteString(url.QueryEscape(s))
 	}
 
-	url := fmt.Sprintf("http://localhost:%d/api/search?tags=%s", e.ports.TempoHTTPPort, tb.String())
-
-	return e.makeGetRequest(url)
+	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/search?tags=%s", e.ports.TempoHTTPPort, tb.String()))
 }
 
-func (e *Endpoint) RunPromQL(ctx context.Context, promQL string) ([]byte, error) {
+func (e *Endpoint) RunPromQL(promQL string) ([]byte, error) {
 	var u string
 	if e.ports.MimirHTTPPort != 0 {
 		u = fmt.Sprintf("http://localhost:%d/prometheus/api/v1/query?query=%s", e.ports.MimirHTTPPort, url.PathEscape(promQL))
