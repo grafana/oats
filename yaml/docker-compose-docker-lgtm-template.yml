@@ -7,3 +7,4 @@ services:
       - "{{ .PrometheusHTTPPort }}:9090"
       - "{{ .TempoHTTPPort }}:3200"
       - "{{ .LokiHTTPPort }}:3100"
+      - "{{ .PyroscopeHttpPort }}:4040"

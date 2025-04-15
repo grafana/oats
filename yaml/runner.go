@@ -56,13 +56,13 @@ func RunTestCase(c *TestCase) {
 	slog.Info("deadline", "time", r.deadline)
 
 	defer func() {
-		var ctx = context.Background()
-		var stopErr error
+		slog.Info("stopping observability endpoint")
 
-		if r.endpoint != nil {
-			stopErr = r.endpoint.Stop(ctx)
-			gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
-		}
+		var ctx = context.Background()
+
+		stopErr := r.endpoint.Stop(ctx)
+		gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
+		slog.Info("stopped observability endpoint")
 	}()
 
 	expected := c.Definition.Expected
@@ -78,31 +78,33 @@ func RunTestCase(c *TestCase) {
 	// Assert logs traces first, because metrics and dashboards can take longer to appear
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {
-		l := log
-		slog.Info("searching loki", "logql", l.LogQL)
+		slog.Info("searching loki", "logql", log.LogQL)
 		r.eventually(func() {
-			AssertLoki(r, l)
+			AssertLoki(r, log)
 		})
 	}
 	for _, trace := range expected.Traces {
-		t := trace
-		slog.Info("searching tempo", "traceql", t.TraceQL)
+		slog.Info("searching tempo", "traceql", trace.TraceQL)
 		r.eventually(func() {
-			AssertTempo(r, t)
+			AssertTempo(r, trace)
 		})
 	}
 	for _, metric := range expected.Metrics {
-		m := metric
-		slog.Info("searching prometheus", "promql", m.PromQL)
+		slog.Info("searching prometheus", "promql", metric.PromQL)
 		r.eventually(func() {
-			AssertProm(r, m.PromQL, m.Value)
+			AssertProm(r, metric.PromQL, metric.Value)
+		})
+	}
+	for _, profile := range expected.Profiles {
+		slog.Info("searching pyroscope", "query", profile.Query)
+		r.eventually(func() {
+			AssertPyroscope(r, profile)
 		})
 	}
 	for _, customCheck := range expected.CustomChecks {
-		c := customCheck
-		slog.Info("executing custom check", "check", c.Script)
+		slog.Info("executing custom check", "check", customCheck.Script)
 		r.eventually(func() {
-			assertCustomCheck(r, c)
+			assertCustomCheck(r, customCheck)
 		})
 	}
 }
@@ -124,9 +126,10 @@ func startEndpoint(c *TestCase) (*remote.Endpoint, error) {
 		PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
 		TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
 		LokiHttpPort:       c.PortConfig.LokiHTTPPort,
+		PyroscopeHttpPort:  c.PortConfig.PyroscopeHttpPort,
 	}
 
-	slog.Info("Launching test", "name", c.Name)
+	slog.Info("start test", "name", c.Name)
 	var endpoint *remote.Endpoint
 	if c.Definition.Kubernetes != nil {
 		endpoint = kubernetes.NewEndpoint(c.Definition.Kubernetes, ports, c.Name, c.Dir)

@@ -24,6 +24,7 @@ type PortsConfig struct {
 	MimirHTTPPort      int
 	PrometheusHTTPPort int
 	LokiHttpPort       int
+	PyroscopeHttpPort  int
 }
 
 type Endpoint struct {
@@ -101,8 +102,7 @@ func (e *Endpoint) GetTraceByID(ctx context.Context, id string) ([]byte, error) 
 		return nil, ctx.Err()
 	}
 
-	url := fmt.Sprintf("http://localhost:%d/api/traces/%s", e.ports.TempoHTTPPort, id)
-	return e.makeGetRequest(url)
+	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/traces/%s", e.ports.TempoHTTPPort, id))
 }
 
 func (e *Endpoint) SearchTempo(ctx context.Context, query string) ([]byte, error) {
@@ -128,12 +128,10 @@ func (e *Endpoint) SearchTags(ctx context.Context, tags map[string]string) ([]by
 		tb.WriteString(url.QueryEscape(s))
 	}
 
-	url := fmt.Sprintf("http://localhost:%d/api/search?tags=%s", e.ports.TempoHTTPPort, tb.String())
-
-	return e.makeGetRequest(url)
+	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/search?tags=%s", e.ports.TempoHTTPPort, tb.String()))
 }
 
-func (e *Endpoint) RunPromQL(ctx context.Context, promQL string) ([]byte, error) {
+func (e *Endpoint) RunPromQL(promQL string) ([]byte, error) {
 	var u string
 	if e.ports.MimirHTTPPort != 0 {
 		u = fmt.Sprintf("http://localhost:%d/prometheus/api/v1/query?query=%s", e.ports.MimirHTTPPort, url.PathEscape(promQL))
@@ -170,6 +168,30 @@ func (e *Endpoint) SearchLoki(query string) ([]byte, error) {
 	resp, err := http.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("querying loki: %w", err)
+	}
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("can't read response body: %w", err)
+	}
+
+	return body, nil
+}
+
+func (e *Endpoint) SearchPyroscope(query string) ([]byte, error) {
+	if e.ports.PyroscopeHttpPort == 0 {
+		return nil, fmt.Errorf("to search Pyroscope you must configure a PyroscopeHttpPort")
+	}
+
+	u := fmt.Sprintf("http://localhost:%d/pyroscope/render?from=from=now-1m&query=%s", e.ports.PyroscopeHttpPort, url.PathEscape(query))
+
+	resp, err := http.Get(u)
+	if err != nil {
+		return nil, fmt.Errorf("querying pyroscope: %w", err)
 	}
 
 	defer func(Body io.ReadCloser) {

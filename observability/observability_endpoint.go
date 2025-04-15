@@ -14,7 +14,7 @@ type Endpoint interface {
 	SearchTags(context.Context, map[string]string) ([]byte, error)
 
 	// Metrics
-	RunPromQL(context.Context, string) ([]byte, error)
+	RunPromQL(string) ([]byte, error)
 
 	Start(context.Context) error
 	Stop(context.Context) error

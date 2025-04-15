@@ -43,6 +43,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	vars["PrometheusHTTPPort"] = c.PortConfig.PrometheusHTTPPort
 	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
 	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
+	vars["PyroscopeHttpPort"] = c.PortConfig.PyroscopeHttpPort
 	vars["LgtmVersion"] = c.LgtmVersion
 
 	env := os.Environ()
@@ -98,7 +99,11 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	args := []string{"compose", "-f", f.Name(), "config"}
 	cmd := exec.Command("docker", args...)
 	cmd.Env = env
+	cmd.Stderr = os.Stderr
 	content, err := cmd.Output()
+	if err != nil {
+		slog.Error("failed to run docker compose", "error", err)
+	}
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	return content
 }
