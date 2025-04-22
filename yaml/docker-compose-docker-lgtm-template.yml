@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   lgtm:
     image: grafana/otel-lgtm:{{ .LgtmVersion }}

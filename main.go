@@ -19,6 +19,15 @@ func main() {
 
 func run() error {
 	lgtmVersion := flag.String("lgtm-version", "latest", "version of https://github.com/grafana/docker-otel-lgtm")
+
+	logAll := flag.Bool("lgtm-log-all", false, "enable logging for all LGTM components")
+	logGrafana := flag.Bool("lgtm-log-grafana", false, "enable logging for Grafana")
+	logPrometheus := flag.Bool("lgtm-log-prometheus", false, "enable logging for Prometheus")
+	logLoki := flag.Bool("lgtm-log-loki", false, "enable logging for Loki")
+	logTempo := flag.Bool("lgtm-log-tempo", false, "enable logging for Tempo")
+	logPyroscope := flag.Bool("lgtm-log-pyroscope", false, "enable logging for Pyroscope")
+	logCollector := flag.Bool("lgtm-log-collector", false, "enable logging for OTel Collector")
+
 	timeout := flag.Duration("timeout", 30*time.Second, "timeout for the test case")
 	manualDebug := flag.Bool("manual-debug", false, "debug mode")
 	flag.Parse()
@@ -26,6 +35,15 @@ func run() error {
 	if flag.NArg() != 1 {
 		return errors.New("you must pass a path to the test case yaml file")
 	}
+
+	logSettings := make(map[string]bool)
+	logSettings["ENABLE_LOGS_ALL"] = *logAll
+	logSettings["ENABLE_LOGS_GRAFANA"] = *logGrafana
+	logSettings["ENABLE_LOGS_PROMETHEUS"] = *logPrometheus
+	logSettings["ENABLE_LOGS_LOKI"] = *logLoki
+	logSettings["ENABLE_LOGS_TEMPO"] = *logTempo
+	logSettings["ENABLE_LOGS_PYROSCOPE"] = *logPyroscope
+	logSettings["ENABLE_LOGS_OTELCOL"] = *logCollector
 
 	gomega.RegisterFailHandler(func(message string, callerSkip ...int) {
 		panic(message)
@@ -41,6 +59,7 @@ func run() error {
 
 	for _, c := range cases {
 		c.LgtmVersion = *lgtmVersion
+		c.LgtmLogSettings = logSettings
 		c.Timeout = *timeout
 		c.ManualDebug = *manualDebug
 		yaml.RunTestCase(c)

@@ -45,6 +45,7 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
 	vars["PyroscopeHttpPort"] = c.PortConfig.PyroscopeHttpPort
 	vars["LgtmVersion"] = c.LgtmVersion
+	vars["LgtmLogSettings"] = c.LgtmLogSettings
 
 	env := os.Environ()
 

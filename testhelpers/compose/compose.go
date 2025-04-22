@@ -20,7 +20,6 @@ type Compose struct {
 	Command     string
 	DefaultArgs []string
 	Path        string
-	LogConsumer func(io.ReadCloser, *sync.WaitGroup)
 	Env         []string
 }
 
@@ -28,7 +27,7 @@ func defaultEnv() []string {
 	return os.Environ()
 }
 
-func ComposeSuite(composeFile string) (*Compose, error) {
+func Suite(composeFile string) (*Compose, error) {
 	command := "docker"
 	defaultArgs := []string{"compose"}
 
@@ -42,53 +41,52 @@ func ComposeSuite(composeFile string) (*Compose, error) {
 
 func (c *Compose) Up() error {
 	//networks accumulate over time and can cause issues with the tests
-	err := c.runDocker(false, "network", "prune", "-f", "--filter", "until=5m")
+	err := c.runDocker(newCommand("network", "prune", "-f", "--filter", "until=5m").withCompose(false))
 	if err != nil {
 		return fmt.Errorf("failed to prune docker networks: %w", err)
 	}
 
-	return c.command("up", "--build", "--detach", "--force-recreate")
+	return c.runDocker(newCommand("up", "--build", "--detach", "--force-recreate").withBackground(true))
 }
 
-func (c *Compose) Logs() error {
-	return c.command("logs")
+func (c *Compose) LogToStdout() error {
+	return c.runDocker(newCommand("logs"))
+}
+
+func (c *Compose) LogsToConsumer(logConsumer func(io.ReadCloser, *sync.WaitGroup)) error {
+	return c.runDocker(newCommand("logs").withLogConsumer(logConsumer))
 }
 
 func (c *Compose) Stop() error {
-	return c.command("stop")
+	return c.runDocker(newCommand("stop"))
 }
 
 func (c *Compose) Remove() error {
-	return c.command("rm", "-f")
+	return c.runDocker(newCommand("rm", "-f"))
 }
 
-func (c *Compose) command(args ...string) error {
-	return c.runDocker(true, args...)
-}
-
-func (c *Compose) runDocker(composeCommand bool, args ...string) error {
+func (c *Compose) runDocker(cc command) error {
 	var cmdArgs []string
-	if composeCommand {
+	if cc.compose {
 		cmdArgs = c.DefaultArgs
 		cmdArgs = append(cmdArgs, "-f", c.Path)
 	}
-	cmdArgs = append(cmdArgs, args...)
+	cmdArgs = append(cmdArgs, cc.args...)
 	cmd := exec.Command(c.Command, cmdArgs...)
 	cmd.Env = c.Env
-	if c.LogConsumer != nil {
+	if cc.logConsumer != nil {
 		stdout, _ := cmd.StdoutPipe()
 		cmd.Stderr = cmd.Stdout
 		wg := sync.WaitGroup{}
 		wg.Add(1)
-		go c.LogConsumer(stdout, &wg)
+		go cc.logConsumer(stdout, &wg)
 
 		err := cmd.Start()
 		if err != nil {
 			return fmt.Errorf("failed to start docker command: %w", err)
 		}
 		wg.Wait()
-		return nil
-	} else {
+	} else if cc.background {
 		slog.Info("Running", "command", cmd.String(), "dir", c.Path)
 		stdout, _ := cmd.StdoutPipe()
 		cmd.Stderr = cmd.Stdout
@@ -105,13 +103,21 @@ func (c *Compose) runDocker(composeCommand bool, args ...string) error {
 		if err != nil {
 			return fmt.Errorf("failed to start docker command: %w", err)
 		}
-		return nil
+	} else {
+		slog.Info("Running", "command", cmd.String(), "dir", c.Path)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to run docker command: %w", err)
+		}
 	}
+	return nil
 }
 
 func (c *Compose) Close() error {
 	var errs []string
-	if err := c.Logs(); err != nil {
+	if err := c.LogToStdout(); err != nil {
 		errs = append(errs, err.Error())
 	}
 	if err := c.Stop(); err != nil {
@@ -135,7 +141,7 @@ func NewEndpoint(composeFilePath string, ports remote.PortsConfig) *remote.Endpo
 			return fmt.Errorf("composeFilePath cannot be empty")
 		}
 
-		compose, err = ComposeSuite(composeFilePath)
+		compose, err = Suite(composeFilePath)
 		if err != nil {
 			return err
 		}
@@ -146,13 +152,37 @@ func NewEndpoint(composeFilePath string, ports remote.PortsConfig) *remote.Endpo
 		return compose.Close()
 	},
 		func(f func(io.ReadCloser, *sync.WaitGroup)) error {
-			compose.LogConsumer = f
-			err := compose.Logs()
-			if err != nil {
-				return err
-			}
-			compose.LogConsumer = nil
-			return nil
+			return compose.LogsToConsumer(f)
 		},
 	)
+}
+
+type command struct {
+	background  bool
+	compose     bool
+	logConsumer func(io.ReadCloser, *sync.WaitGroup)
+	args        []string
+}
+
+func newCommand(
+	args ...string) command {
+	return command{
+		args:    args,
+		compose: true,
+	}
+}
+
+func (c command) withBackground(background bool) command {
+	c.background = background
+	return c
+}
+
+func (c command) withCompose(compose bool) command {
+	c.compose = compose
+	return c
+}
+
+func (c command) withLogConsumer(logConsumer func(io.ReadCloser, *sync.WaitGroup)) command {
+	c.logConsumer = logConsumer
+	return c
 }

@@ -159,7 +159,8 @@ func prepareBuildDir(name string) string {
 
 func (r *runner) eventually(asserter func()) {
 	gomega.Expect(time.Now()).Should(gomega.BeTemporally("<", r.deadline))
-	t := time.Now()
+	start := time.Now()
+	printTime := start
 	ctx := context.Background()
 	interval := r.testCase.Definition.Interval
 	if interval == 0 {
@@ -169,9 +170,9 @@ func (r *runner) eventually(asserter func()) {
 	r.additionalAsserts = nil
 	gomega.Eventually(ctx, func(g gomega.Gomega) {
 		verbose := VerboseLogging
-		if iterations == 0 || time.Since(t) > 10*time.Second {
+		if iterations == 0 || time.Since(printTime) > 10*time.Second {
 			verbose = true
-			t = time.Now()
+			printTime = time.Now()
 		}
 		iterations++
 		r.Verbose = verbose
@@ -193,7 +194,7 @@ func (r *runner) eventually(asserter func()) {
 		r.gomegaInst = g
 		asserter()
 	}).WithTimeout(time.Until(r.deadline)).WithPolling(interval).Should(gomega.Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
-	slog.Info(fmt.Sprintf("%d iterations to get telemetry data", iterations))
+	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(start)))
 	for _, a := range r.additionalAsserts {
 		a()
 	}

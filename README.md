@@ -87,6 +87,13 @@ The following flags are available:
 - `-timeout`: Set the timeout for test cases (default: 30s)
 - `-lgtm-version`: Specify the version of [docker-otel-lgtm] to use (default: "latest")
 - `-manual-debug`: Enable debug mode to keep containers running (default: false)
+- `-lgtm-log-all`: Enable logging for all containers (default: false)
+- `-lgtm-log-grafana`: Enable logging for Grafana (default: false)
+- `-lgtm-log-loki`: Enable logging for Loki (default: false)
+- `-lgtm-log-tempo`: Enable logging for Tempo (default: false)
+- `-lgtm-log-prometheus`: Enable logging for Prometheus (default: false)
+- `-lgtm-log-pyroscope`: Enable logging for Pyroscope (default: false)
+- `-lgtm-log-otel-collector`: Enable logging for OpenTelemetry Collector (default: false)
 
 ## Run OATs in GitHub Actions
 

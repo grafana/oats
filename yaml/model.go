@@ -113,14 +113,15 @@ type PortConfig struct {
 }
 
 type TestCase struct {
-	Name        string
-	Dir         string
-	OutputDir   string
-	Definition  TestCaseDefinition
-	PortConfig  *PortConfig
-	Timeout     time.Duration
-	LgtmVersion string
-	ManualDebug bool
+	Name            string
+	Dir             string
+	OutputDir       string
+	Definition      TestCaseDefinition
+	PortConfig      *PortConfig
+	Timeout         time.Duration
+	LgtmVersion     string
+	LgtmLogSettings map[string]bool
+	ManualDebug     bool
 }
 
 func (r *runner) LogQueryResult(format string, a ...any) {
