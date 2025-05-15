@@ -1,10 +1,13 @@
 [tools.go]
-version = "1.24.2"
+version = "1.24.3"
 backend = "core:go"
 
+[tools.go.checksums]
+"go1.24.3.linux-amd64.tar.gz" = "sha256:3333f6ea53afa971e9078895eaa4ac7204a8c6b5c68c10e6bc9a33e8e391bdd8"
+
 [tools.golangci-lint]
-version = "2.1.1"
+version = "2.1.6"
 backend = "aqua:golangci/golangci-lint"
 
 [tools.golangci-lint.checksums]
-"golangci-lint-2.1.1-linux-amd64.tar.gz" = "sha256:7167df345d0146d662b12ba068306f843d0eba408f9dc8f4d3ebb239786e87da"
+"golangci-lint-2.1.6-linux-amd64.tar.gz" = "sha256:e55e0eb515936c0fbd178bce504798a9bd2f0b191e5e357768b18fd5415ee541"
