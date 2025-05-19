@@ -84,7 +84,7 @@ go run main.go --timeout=1m --lgtm-version=latest --manual-debug=false /path/to/
 
 ## Running multiple tests
 
-If can run multiple tests:
+It can run multiple tests:
 
 ```sh
 oats /path/to/repo
