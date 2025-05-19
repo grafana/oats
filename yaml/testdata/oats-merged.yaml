@@ -1,6 +1,7 @@
 docker-compose:
 input:
-  - url: http://localhost:8080/stock
+  - path: /stock
+    status: 200
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*cart"}'
