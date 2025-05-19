@@ -7,13 +7,6 @@ expected:
         - name: 'regex:SELECT .*cart'
           attributes:
             db.system: h2
-  dashboards:
-    - path: ../jdbc-dashboard2.json
-      panels:
-        - title: foo
-          value: "== 0"
-        - title: bar
-          value: ">= 0"
   metrics:
     - promql: foo
       value: '>= 0'

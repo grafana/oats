@@ -12,19 +12,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type ExpectedDashboardPanel struct {
-	Title string `yaml:"title"`
-	Value string `yaml:"value"`
-}
-
-type ExpectedDashboard struct {
-	Path   string                   `yaml:"path"`
-	Panels []ExpectedDashboardPanel `yaml:"panels"`
-}
-
 type ExpectedMetrics struct {
-	PromQL string `yaml:"promql"`
-	Value  string `yaml:"value"`
+	PromQL          string `yaml:"promql"`
+	Value           string `yaml:"value"`
+	MatrixCondition string `yaml:"matrix-condition"`
 }
 
 type ExpectedSpan struct {
@@ -41,6 +32,7 @@ type ExpectedLogs struct {
 	Attributes        map[string]string `yaml:"attributes"`
 	AttributeRegexp   map[string]string `yaml:"attribute-regexp"`
 	NoExtraAttributes bool              `yaml:"no-extra-attributes"`
+	MatrixCondition   string            `yaml:"matrix-condition"`
 }
 
 type Flamebearers struct {
@@ -48,17 +40,20 @@ type Flamebearers struct {
 }
 
 type ExpectedProfiles struct {
-	Query        string       `yaml:"query"`
-	Flamebearers Flamebearers `yaml:"flamebearers"`
+	Query           string       `yaml:"query"`
+	Flamebearers    Flamebearers `yaml:"flamebearers"`
+	MatrixCondition string       `yaml:"matrix-condition"`
 }
 
 type ExpectedTraces struct {
-	TraceQL string         `yaml:"traceql"`
-	Spans   []ExpectedSpan `yaml:"spans"`
+	TraceQL         string         `yaml:"traceql"`
+	Spans           []ExpectedSpan `yaml:"spans"`
+	MatrixCondition string         `yaml:"matrix-condition"`
 }
 
 type CustomCheck struct {
-	Script string `yaml:"script"`
+	Script          string `yaml:"script"`
+	MatrixCondition string `yaml:"matrix-condition"`
 }
 
 type Expected struct {
@@ -68,6 +63,12 @@ type Expected struct {
 	Metrics      []ExpectedMetrics  `yaml:"metrics"`
 	Profiles     []ExpectedProfiles `yaml:"profiles"`
 	CustomChecks []CustomCheck      `yaml:"custom-checks"`
+}
+
+type Matrix struct {
+	Name          string                 `yaml:"name"`
+	DockerCompose *DockerCompose         `yaml:"docker-compose"`
+	Kubernetes    *kubernetes.Kubernetes `yaml:"kubernetes"`
 }
 
 type DockerCompose struct {
@@ -84,6 +85,7 @@ type TestCaseDefinition struct {
 	Include       []string               `yaml:"include"`
 	DockerCompose *DockerCompose         `yaml:"docker-compose"`
 	Kubernetes    *kubernetes.Kubernetes `yaml:"kubernetes"`
+	Matrix        []Matrix               `yaml:"matrix"`
 	Input         []Input                `yaml:"input"`
 	Interval      time.Duration          `yaml:"interval"`
 	Expected      Expected               `yaml:"expected"`
@@ -97,6 +99,7 @@ func (d *TestCaseDefinition) Merge(other TestCaseDefinition) {
 	d.Expected.Metrics = append(d.Expected.Metrics, other.Expected.Metrics...)
 	d.Expected.Profiles = append(d.Expected.Profiles, other.Expected.Profiles...)
 	d.Expected.CustomChecks = append(d.Expected.CustomChecks, other.Expected.CustomChecks...)
+	d.Matrix = append(d.Matrix, other.Matrix...)
 	if d.DockerCompose == nil {
 		d.DockerCompose = other.DockerCompose
 	}
@@ -113,15 +116,16 @@ type PortConfig struct {
 }
 
 type TestCase struct {
-	Name            string
-	Dir             string
-	OutputDir       string
-	Definition      TestCaseDefinition
-	PortConfig      *PortConfig
-	Timeout         time.Duration
-	LgtmVersion     string
-	LgtmLogSettings map[string]bool
-	ManualDebug     bool
+	Name               string
+	MatrixTestCaseName string
+	Dir                string
+	OutputDir          string
+	Definition         TestCaseDefinition
+	PortConfig         *PortConfig
+	Timeout            time.Duration
+	LgtmVersion        string
+	LgtmLogSettings    map[string]bool
+	ManualDebug        bool
 }
 
 func (r *runner) LogQueryResult(format string, a ...any) {

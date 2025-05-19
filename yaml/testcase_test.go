@@ -7,7 +7,6 @@ import (
 )
 
 func TestReadTestCaseDefinition(t *testing.T) {
-
 	def, err := readTestCaseDefinition("testdata/foo/oats.yaml")
 	require.NoError(t, err)
 	merged, err := readTestCaseDefinition("testdata/oats-merged.yaml")
@@ -16,7 +15,6 @@ func TestReadTestCaseDefinition(t *testing.T) {
 }
 
 func TestReadTestCase(t *testing.T) {
-
 	tc, err := readTestCase("testdata", "testdata/foo/oats.yaml")
 	require.NoError(t, err)
 	require.Equal(t, "runfoo-oats", tc.Name)
@@ -24,7 +22,6 @@ func TestReadTestCase(t *testing.T) {
 }
 
 func TestIncludePath(t *testing.T) {
-
 	require.Equal(t,
 		filepath.FromSlash("/home/gregor/source/grafana-opentelemetry-java/examples/jdbc/oats-non-reactive.yaml"),
 		includePath("/home/gregor/source/grafana-opentelemetry-java/examples/jdbc/spring-boot-non-reactive-2.7/oats.yaml", "../oats-non-reactive.yaml"))
