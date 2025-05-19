@@ -82,6 +82,18 @@ go run main.go /path/to/oats-tests/oats.yaml
 go run main.go --timeout=1m --lgtm-version=latest --manual-debug=false /path/to/oats-tests/oats.yaml
 ```
 
+## Running multiple tests
+
+If can run multiple tests:
+
+```sh
+oats /path/to/repo
+```
+
+This will search all subdirectories for test files. The tests are defined in `oats*.yaml` files.
+
+## Flags 
+
 The following flags are available:
 
 - `-timeout`: Set the timeout for test cases (default: 30s)
