@@ -116,7 +116,8 @@ include:
 docker-compose:
   file: ../docker-compose.yaml
 input:
-  - url: http://localhost:8080/stock
+  - path: /stock
+    status: 200 (expected status code, 200 is the default)
 interval: 500ms # interval between requests to the input URL
 expected:
   traces:
