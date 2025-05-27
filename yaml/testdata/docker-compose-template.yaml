@@ -11,4 +11,3 @@ services:
     network_mode: host
     volumes:
       - ./configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
-      - ./configs/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/grafana-dashboards.yaml

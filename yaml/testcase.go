@@ -2,6 +2,7 @@ package yaml
 
 import (
 	"errors"
+	"fmt"
 	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
@@ -61,6 +62,18 @@ func collectTestCases(base string, evaluateIgnoreFile bool) ([]*TestCase, error)
 		testCase, err := readTestCase(base, p)
 		if err != nil {
 			return err
+		}
+		if testCase.Definition.Matrix != nil {
+			for _, matrix := range testCase.Definition.Matrix {
+				newCase := testCase
+				newCase.Definition = testCase.Definition
+				newCase.Definition.DockerCompose = matrix.DockerCompose
+				newCase.Definition.Kubernetes = matrix.Kubernetes
+				newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
+				newCase.MatrixTestCaseName = matrix.Name
+				cases = append(cases, &newCase)
+			}
+			return nil
 		}
 		cases = append(cases, &testCase)
 		return nil
