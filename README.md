@@ -82,6 +82,18 @@ go run main.go /path/to/oats-tests/oats.yaml
 go run main.go --timeout=1m --lgtm-version=latest --manual-debug=false /path/to/oats-tests/oats.yaml
 ```
 
+## Running multiple tests
+
+It can run multiple tests:
+
+```sh
+oats /path/to/repo
+```
+
+This will search all subdirectories for test files. The tests are defined in `oats*.yaml` files.
+
+## Flags 
+
 The following flags are available:
 
 - `-timeout`: Set the timeout for test cases (default: 30s)
@@ -175,14 +187,40 @@ expected:
   metrics:
     - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
       value: "== 10"
-  dashboards: # Useful if you populate Grafana dashboards from JSON
-    - path: ../jdbc-dashboard.json 
-      panels:
-        - title: Connection pool waiting requests
-          value: "== 0"
-        - title: Connection pool utilization
-          value: "> 0"
 ```
+
+### Matrix of test cases
+
+Matrix tests are useful to test different configurations of the same application, 
+e.g. with different settings of the otel collector or different flags in the application.
+
+```yaml
+matrix:
+  - name: default
+    docker-compose:
+      files:
+        - ./docker-compose.oats.yml
+  - name: self-contained
+    docker-compose:
+      files:
+        - ./docker-compose.self-contained.oats.yml
+  - name: net8
+    docker-compose:
+      files:
+        - ./docker-compose.net8.oats.yml
+```
+
+You can then make test cases depend on the matrix name:
+
+```yaml
+expected:
+  metrics:
+    - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
+      value: "== 10"
+      matrix-condition: default
+```
+
+`matrix-condition` is a regex that is applied to the matrix name.
 
 ## Docker Compose
 

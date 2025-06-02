@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -75,37 +76,47 @@ func RunTestCase(c *TestCase) {
 		})
 	}
 
-	// Assert logs traces first, because metrics and dashboards can take longer to appear
+	// Assert logs traces first, because metrics can take longer to appear
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {
-		slog.Info("searching loki", "logql", log.LogQL)
-		r.eventually(func() {
-			AssertLoki(r, log)
-		})
+		if r.MatchesMatrixCondition(log.MatrixCondition, log.LogQL) {
+			slog.Info("searching loki", "logql", log.LogQL)
+			r.eventually(func() {
+				AssertLoki(r, log)
+			})
+		}
 	}
 	for _, trace := range expected.Traces {
-		slog.Info("searching tempo", "traceql", trace.TraceQL)
-		r.eventually(func() {
-			AssertTempo(r, trace)
-		})
+		if r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
+			slog.Info("searching tempo", "traceql", trace.TraceQL)
+			r.eventually(func() {
+				AssertTempo(r, trace)
+			})
+		}
 	}
 	for _, metric := range expected.Metrics {
-		slog.Info("searching prometheus", "promql", metric.PromQL)
-		r.eventually(func() {
-			AssertProm(r, metric.PromQL, metric.Value)
-		})
+		if r.MatchesMatrixCondition(metric.MatrixCondition, metric.PromQL) {
+			slog.Info("searching prometheus", "promql", metric.PromQL)
+			r.eventually(func() {
+				AssertProm(r, metric.PromQL, metric.Value)
+			})
+		}
 	}
 	for _, profile := range expected.Profiles {
-		slog.Info("searching pyroscope", "query", profile.Query)
-		r.eventually(func() {
-			AssertPyroscope(r, profile)
-		})
+		if r.MatchesMatrixCondition(profile.MatrixCondition, profile.Query) {
+			slog.Info("searching pyroscope", "query", profile.Query)
+			r.eventually(func() {
+				AssertPyroscope(r, profile)
+			})
+		}
 	}
 	for _, customCheck := range expected.CustomChecks {
-		slog.Info("executing custom check", "check", customCheck.Script)
-		r.eventually(func() {
-			assertCustomCheck(r, customCheck)
-		})
+		if r.MatchesMatrixCondition(customCheck.MatrixCondition, customCheck.Script) {
+			slog.Info("executing custom check", "check", customCheck.Script)
+			r.eventually(func() {
+				assertCustomCheck(r, customCheck)
+			})
+		}
 	}
 }
 
@@ -198,4 +209,23 @@ func (r *runner) eventually(asserter func()) {
 	for _, a := range r.additionalAsserts {
 		a()
 	}
+}
+
+func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) bool {
+	if matrixCondition == "" {
+		return true
+	}
+	name := r.testCase.MatrixTestCaseName
+	if name == "" {
+		slog.Info("matrix condition ignored we're not in a matrix test", "condition", matrixCondition)
+		return true
+	}
+	if regexp.MustCompile(matrixCondition).MatchString(name) {
+		return true
+	}
+	slog.Info("matrix condition not matched - ignoring assertion",
+		"test case", r.testCase.Name,
+		"name", name,
+		"subject", subject)
+	return false
 }
