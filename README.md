@@ -74,7 +74,7 @@ oats /path/to/oats-tests/oats.yaml
 
 OATs can be run directly using the command-line interface:
 
-```sh          
+```sh
 # Basic usage
 go run main.go /path/to/oats-tests/oats.yaml
 
