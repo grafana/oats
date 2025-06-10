@@ -5,7 +5,7 @@ go 1.24
 require (
 	github.com/onsi/gomega v1.37.0
 	github.com/stretchr/testify v1.10.0
-	go.opentelemetry.io/collector/pdata v1.33.0
+	go.opentelemetry.io/collector/pdata v1.34.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.36.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.36.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.36.0
@@ -38,6 +38,6 @@ require (
 	golang.org/x/text v0.25.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250519155744-55703ea1f237 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250519155744-55703ea1f237 // indirect
-	google.golang.org/grpc v1.72.1 // indirect
+	google.golang.org/grpc v1.72.2 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )
