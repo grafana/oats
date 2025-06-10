@@ -129,7 +129,7 @@ docker-compose:
   file: ../docker-compose.yaml
 input:
   - path: /stock
-    status: 200 (expected status code, 200 is the default)
+    status: 200 # expected status code, 200 is the default
 interval: 500ms # interval between requests to the input URL
 expected:
   traces:
