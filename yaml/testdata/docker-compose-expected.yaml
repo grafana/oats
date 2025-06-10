@@ -6,7 +6,7 @@ networks:
                 - subnet: 172.16.57.0/24
 services:
     grafana:
-        image: grafana/grafana:10.0.0
+        image: grafana/grafana:10.4.19
         network_mode: host
         volumes:
             - ./configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
