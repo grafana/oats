@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var oatsFileRegex = regexp.MustCompile(`oats.*\.yaml`)
+var oatsFileRegex = regexp.MustCompile(`oats.*\.ya?ml`)
 
 func ReadTestCases(base string) ([]*TestCase, string) {
 	if base == "" {

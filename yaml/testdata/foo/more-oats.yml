@@ -1,0 +1,7 @@
+include:
+  - ../oats-template.yaml
+expected:
+  logs:
+    - logql: '{ service_name="foo" } |~ `Application started.`'
+      contains:
+        - 'Application started'
