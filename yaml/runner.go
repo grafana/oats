@@ -51,7 +51,7 @@ func RunTestCase(c *TestCase) {
 	r.deadline = time.Now().Add(c.Timeout)
 	r.endpoint = endpoint
 	if c.ManualDebug {
-		slog.Info(fmt.Sprintf("topping to let you manually debug on http://localhost:%d\n", r.testCase.PortConfig.GrafanaHTTPPort))
+		slog.Info(fmt.Sprintf("stopping to let you manually debug on http://%s:%d\n", r.host, r.testCase.PortConfig.GrafanaHTTPPort))
 
 		for {
 			r.eventually(func() {
