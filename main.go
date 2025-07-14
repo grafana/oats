@@ -19,7 +19,7 @@ func main() {
 }
 
 func run() error {
-	host := flag.String("host", "localhost", "host to run the test case against")
+	host := flag.String("host", "localhost", "host to run the test cases against")
 	lgtmVersion := flag.String("lgtm-version", "latest", "version of https://github.com/grafana/docker-otel-lgtm")
 
 	logAll := flag.Bool("lgtm-log-all", false, "enable logging for all LGTM components")
