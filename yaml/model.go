@@ -127,6 +127,7 @@ type TestCase struct {
 	Name               string
 	MatrixTestCaseName string
 	Dir                string
+	Host               string
 	OutputDir          string
 	Definition         TestCaseDefinition
 	PortConfig         *PortConfig

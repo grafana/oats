@@ -28,6 +28,7 @@ type runner struct {
 	testCase          *TestCase
 	endpoint          *remote.Endpoint
 	deadline          time.Time
+	host              string
 	Verbose           bool
 	gomegaInst        gomega.Gomega
 	additionalAsserts []func()
@@ -38,6 +39,7 @@ var VerboseLogging bool
 func RunTestCase(c *TestCase) {
 	format.MaxLength = 100000
 	r := &runner{
+		host:     c.Host,
 		testCase: c,
 	}
 
@@ -148,9 +150,9 @@ func startEndpoint(c *TestCase) (*remote.Endpoint, error) {
 	slog.Info("start test", "name", c.Name)
 	var endpoint *remote.Endpoint
 	if c.Definition.Kubernetes != nil {
-		endpoint = kubernetes.NewEndpoint(c.Definition.Kubernetes, ports, c.Name, c.Dir)
+		endpoint = kubernetes.NewEndpoint(c.Host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
 	} else {
-		endpoint = compose.NewEndpoint(c.CreateDockerComposeFile(), ports)
+		endpoint = compose.NewEndpoint(c.Host, c.CreateDockerComposeFile(), ports)
 	}
 
 	var ctx = context.Background()
@@ -199,7 +201,7 @@ func (r *runner) eventually(asserter func()) {
 			if i.Scheme != "" {
 				scheme = i.Scheme
 			}
-			host := "localhost"
+			host := r.host
 			if i.Host != "" {
 				host = i.Host
 			}

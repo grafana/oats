@@ -4,10 +4,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/grafana/oats/yaml"
-	"github.com/onsi/gomega"
 	"log/slog"
 	"time"
+
+	"github.com/grafana/oats/yaml"
+	"github.com/onsi/gomega"
 )
 
 func main() {
@@ -18,6 +19,7 @@ func main() {
 }
 
 func run() error {
+	host := flag.String("host", "localhost", "host to run the test case against")
 	lgtmVersion := flag.String("lgtm-version", "latest", "version of https://github.com/grafana/docker-otel-lgtm")
 
 	logAll := flag.Bool("lgtm-log-all", false, "enable logging for all LGTM components")
@@ -58,6 +60,7 @@ func run() error {
 	}
 
 	for _, c := range cases {
+		c.Host = *host
 		c.LgtmVersion = *lgtmVersion
 		c.LgtmLogSettings = logSettings
 		c.Timeout = *timeout

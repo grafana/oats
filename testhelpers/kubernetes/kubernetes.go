@@ -3,12 +3,13 @@ package kubernetes
 import (
 	"context"
 	"fmt"
-	"github.com/grafana/oats/testhelpers/remote"
 	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"sync"
+
+	"github.com/grafana/oats/testhelpers/remote"
 )
 
 type Kubernetes struct {
@@ -21,7 +22,7 @@ type Kubernetes struct {
 	ImportImages     []string `yaml:"import-images"`
 }
 
-func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, testName string, dir string) *remote.Endpoint {
+func NewEndpoint(host string, model *Kubernetes, ports remote.PortsConfig, testName string, dir string) *remote.Endpoint {
 	var killList []*os.Process
 	run := func(cmd *exec.Cmd, background bool) error {
 		slog.Info("running", "command", cmd.String(), "dir", dir)
@@ -38,7 +39,7 @@ func NewEndpoint(model *Kubernetes, ports remote.PortsConfig, testName string, d
 		}
 		return cmd.Run()
 	}
-	return remote.NewEndpoint(ports, func(ctx context.Context) error {
+	return remote.NewEndpoint(host, ports, func(ctx context.Context) error {
 		return start(model, ports, testName, run)
 	}, func(ctx context.Context) error {
 		for _, p := range killList {
