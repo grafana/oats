@@ -1,9 +1,10 @@
 package yaml
 
 import (
-	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadTestCaseDefinition(t *testing.T) {
