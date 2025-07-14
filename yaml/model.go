@@ -80,6 +80,8 @@ type DockerCompose struct {
 }
 
 type Input struct {
+	Scheme  string            `yaml:"scheme"`
+	Host    string            `yaml:"host"`
 	Method  string            `yaml:"method"`
 	Path    string            `yaml:"path"`
 	Headers map[string]string `yaml:"headers"`
@@ -240,6 +242,12 @@ func validateInput(input []Input) {
 		}
 		if (i.Method == "" || i.Method == http.MethodGet) && i.Body != "" {
 			gomega.Expect(i.Body).To(gomega.BeEmpty(), "body must be empty for GET requests")
+		}
+		if i.Scheme != "" {
+			gomega.Expect(strings.ToLower(i.Scheme)).To(gomega.Or(
+				gomega.Equal("http"),
+				gomega.Equal("https"),
+			), "scheme must be http, https or be empty")
 		}
 	}
 }

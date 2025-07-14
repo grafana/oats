@@ -195,7 +195,15 @@ func (r *runner) eventually(asserter func()) {
 		r.LogQueryResult("waiting for telemetry data\n")
 
 		for _, i := range r.testCase.Definition.Input {
-			url := fmt.Sprintf("http://localhost:%d%s", r.testCase.PortConfig.ApplicationPort, i.Path)
+			scheme := "http"
+			if i.Scheme != "" {
+				scheme = i.Scheme
+			}
+			host := "localhost"
+			if i.Host != "" {
+				host = i.Host
+			}
+			url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.testCase.PortConfig.ApplicationPort, i.Path)
 			body := i.Body
 			method := http.MethodGet
 			if i.Method != "" {
