@@ -3,15 +3,16 @@ package yaml
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
-var oatsFileRegex = regexp.MustCompile(`oats.*\.yaml`)
+var oatsFileRegex = regexp.MustCompile(`oats.*\.ya?ml`)
 
 func ReadTestCases(base string) ([]*TestCase, string) {
 	if base == "" {
