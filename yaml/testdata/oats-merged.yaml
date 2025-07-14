@@ -2,6 +2,18 @@ docker-compose:
 input:
   - path: /stock
     status: 200
+  - path: /buy
+    method: POST
+    headers:
+      Authorization: Bearer user-token
+      Content-Type: application/json
+    body: '{"id": "42", "quantity": 10}'
+    status: 201
+  - path: /delist/42
+    method: DELETE
+    headers:
+      Authorization: Bearer admin-token
+    status: 204
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*cart"}'

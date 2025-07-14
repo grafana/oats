@@ -2,11 +2,14 @@ package yaml
 
 import (
 	"fmt"
-	"github.com/grafana/oats/testhelpers/kubernetes"
 	"log/slog"
+	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/grafana/oats/testhelpers/kubernetes"
 
 	"github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
@@ -77,8 +80,11 @@ type DockerCompose struct {
 }
 
 type Input struct {
-	Path   string `yaml:"path"`
-	Status string `yaml:"status"`
+	Method  string            `yaml:"method"`
+	Path    string            `yaml:"path"`
+	Headers map[string]string `yaml:"headers"`
+	Body    string            `yaml:"body"`
+	Status  string            `yaml:"status"`
 }
 
 type TestCaseDefinition struct {
@@ -218,6 +224,22 @@ func validateInput(input []Input) {
 		if i.Status != "" {
 			_, err := strconv.ParseInt(i.Status, 10, 32)
 			gomega.Expect(err).To(gomega.BeNil(), "status must parse as integer or be empty")
+		}
+		if i.Method != "" {
+			gomega.Expect(strings.ToUpper(i.Method)).To(gomega.Or(
+				gomega.Equal(http.MethodConnect),
+				gomega.Equal(http.MethodDelete),
+				gomega.Equal(http.MethodGet),
+				gomega.Equal(http.MethodHead),
+				gomega.Equal(http.MethodOptions),
+				gomega.Equal(http.MethodPatch),
+				gomega.Equal(http.MethodPost),
+				gomega.Equal(http.MethodPut),
+				gomega.Equal(http.MethodTrace),
+			), "method must be a supported HTTP method or be empty")
+		}
+		if (i.Method == "" || i.Method == http.MethodGet) && i.Body != "" {
+			gomega.Expect(i.Body).To(gomega.BeEmpty(), "body must be empty for GET requests")
 		}
 	}
 }

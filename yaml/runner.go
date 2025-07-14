@@ -3,16 +3,21 @@ package yaml
 import (
 	"context"
 	"fmt"
-	"github.com/grafana/oats/testhelpers/kubernetes"
-	"github.com/grafana/oats/testhelpers/remote"
-	"github.com/onsi/gomega/format"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/grafana/oats/testhelpers/kubernetes"
+	"github.com/grafana/oats/testhelpers/remote"
+	"github.com/onsi/gomega/format"
+
+	"maps"
 
 	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/requests"
@@ -191,6 +196,11 @@ func (r *runner) eventually(asserter func()) {
 
 		for _, i := range r.testCase.Definition.Input {
 			url := fmt.Sprintf("http://localhost:%d%s", r.testCase.PortConfig.ApplicationPort, i.Path)
+			body := i.Body
+			method := http.MethodGet
+			if i.Method != "" {
+				method = strings.ToUpper(i.Method)
+			}
 			status := 200
 			if i.Status != "" {
 				parsedStatus, err := strconv.ParseInt(i.Status, 10, 64)
@@ -198,7 +208,13 @@ func (r *runner) eventually(asserter func()) {
 					status = int(parsedStatus)
 				}
 			}
-			err := requests.DoHTTPGet(url, status)
+			headers := make(map[string]string)
+			if i.Headers != nil {
+				maps.Copy(headers, i.Headers)
+			} else {
+				headers["Accept"] = "application/json"
+			}
+			err := requests.DoHTTPRequest(url, method, headers, body, status)
 			g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
 		}
 
