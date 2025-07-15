@@ -124,6 +124,7 @@ type PortConfig struct {
 }
 
 type TestCase struct {
+	Path               string
 	Name               string
 	MatrixTestCaseName string
 	Dir                string
@@ -152,44 +153,45 @@ func (c *TestCase) validateAndSetVariables() {
 		validateK8s(c.Definition.Kubernetes)
 		gomega.Expect(c.Definition.DockerCompose).To(gomega.BeNil(), "kubernetes and docker-compose are mutually exclusive")
 	} else {
+		gomega.Expect(c.Definition.DockerCompose).ToNot(gomega.BeNil(), "%s does not appear to be a valid OATS YAML file", c.Path)
 		validateDockerCompose(c.Definition.DockerCompose, c.Dir)
 	}
 	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
-	gomega.Expect(len(expected.Metrics) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0 && len(expected.Profiles) == 0).To(gomega.BeFalse())
+	gomega.Expect(len(expected.Metrics)+len(expected.Traces)+len(expected.Logs)+len(expected.Profiles)).NotTo(gomega.BeZero(), "%s does not contain any expected metrics, traces, logs or profiles", c.Path)
 
 	for _, c := range expected.CustomChecks {
-		gomega.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in "+string(c.Script))
+		gomega.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in %s", string(c.Script))
 	}
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
-		gomega.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in "+string(out))
+		gomega.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in %s", string(out))
 		gomega.Expect(l.Equals == "" && l.Contains == nil && l.Regexp == "").To(gomega.BeFalse())
 		for _, s := range l.Contains {
-			gomega.Expect(s).ToNot(gomega.BeEmpty(), "contains string is empty in "+string(out))
+			gomega.Expect(s).ToNot(gomega.BeEmpty(), "contains string is empty in %s", string(out))
 		}
 	}
 	for _, d := range expected.Metrics {
 		out, _ := yaml.Marshal(d)
-		gomega.Expect(d.PromQL).ToNot(gomega.BeEmpty(), "promQL is empty in "+string(out))
-		gomega.Expect(d.Value).ToNot(gomega.BeEmpty(), "value is empty in "+string(out))
+		gomega.Expect(d.PromQL).ToNot(gomega.BeEmpty(), "promQL is empty in %s", string(out))
+		gomega.Expect(d.Value).ToNot(gomega.BeEmpty(), "value is empty in %s", string(out))
 	}
 	for _, d := range expected.Traces {
 		out, _ := yaml.Marshal(d)
-		gomega.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in "+string(out))
-		gomega.Expect(d.Spans).ToNot(gomega.BeEmpty(), "spans are empty in "+string(out))
+		gomega.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in %s", string(out))
+		gomega.Expect(d.Spans).ToNot(gomega.BeEmpty(), "spans are empty in %s", string(out))
 		for _, span := range d.Spans {
-			gomega.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in "+string(out))
+			gomega.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in %s", string(out))
 			for k, v := range span.Attributes {
-				gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in "+string(out))
-				gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in "+string(out))
+				gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
+				gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
 			}
 		}
 	}
 	for _, p := range expected.Profiles {
 		out, _ := yaml.Marshal(p)
-		gomega.Expect(p.Query).ToNot(gomega.BeEmpty(), "query is empty in "+string(out))
-		gomega.Expect(p.Flamebearers.Contains).ToNot(gomega.BeEmpty(), "Flamebearers.contains is empty in "+string(out))
+		gomega.Expect(p.Query).ToNot(gomega.BeEmpty(), "query is empty in %s", string(out))
+		gomega.Expect(p.Flamebearers.Contains).ToNot(gomega.BeEmpty(), "Flamebearers.contains is empty in %s", string(out))
 	}
 
 	if c.PortConfig == nil {
