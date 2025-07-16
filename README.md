@@ -29,6 +29,7 @@ oats
 
 ## Getting Started
 
+> [!TIP]
 > You can use the test cases in [prom_client_java](https://github.com/prometheus/client_java/tree/main/examples/example-exporter-opentelemetry/oats-tests) as a reference.
 > The [GitHub action](https://github.com/prometheus/client_java/blob/main/.github/workflows/acceptance-tests.yml)
 > uses a [script](https://github.com/prometheus/client_java/blob/main/scripts/run-acceptance-tests.sh) to run the tests.
