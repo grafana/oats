@@ -50,7 +50,7 @@ func collectTestCases(base string, evaluateIgnoreFile bool) ([]*TestCase, error)
 			}
 		}
 
-		if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") {
+		if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") || strings.Contains(d.Name(), "-template.yml") {
 			return nil
 		}
 

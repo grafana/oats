@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
@@ -13,15 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/kubernetes"
 	"github.com/grafana/oats/testhelpers/remote"
-	"github.com/onsi/gomega/format"
-
-	"maps"
-
-	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/requests"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 )
 
 type runner struct {

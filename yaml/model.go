@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/grafana/oats/testhelpers/kubernetes"
-
 	"github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 )
