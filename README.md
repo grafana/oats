@@ -35,15 +35,13 @@ oats
 
 1. Create a folder `oats-tests` for the following files
 2. Create `Dockerfile` to build the application you want to test
-    ```Dockerfile         
+    ```Dockerfile
     FROM eclipse-temurin:21-jre
     COPY target/example-exporter-opentelemetry.jar ./app.jar
     ENTRYPOINT [ "java", "-jar", "./app.jar" ]
     ```
 3. Create `docker-compose.yaml` to start the application and any dependencies
-    ```yaml         
-    version: '3.4'
-    
+    ```yaml
     services:
       java:
         build:
@@ -55,7 +53,7 @@ oats
           OTEL_METRIC_EXPORT_INTERVAL: "5000"  # so we don't have to wait 60s for metrics
     ```
 4. Create `oats.yaml` with the test cases
-    ```yaml         
+    ```yaml
     # OATs is an acceptance testing framework for OpenTelemetry - https://github.com/grafana/oats
     docker-compose:
       files:
@@ -97,30 +95,31 @@ This will search all subdirectories for test files. The tests are defined in `oa
 The following flags are available:
 
 - `-timeout`: Set the timeout for test cases (default: 30s)
-- `-lgtm-version`: Specify the version of [docker-otel-lgtm] to use (default: "latest")
-- `-manual-debug`: Enable debug mode to keep containers running (default: false)
-- `-lgtm-log-all`: Enable logging for all containers (default: false)
-- `-lgtm-log-grafana`: Enable logging for Grafana (default: false)
-- `-lgtm-log-loki`: Enable logging for Loki (default: false)
-- `-lgtm-log-tempo`: Enable logging for Tempo (default: false)
-- `-lgtm-log-prometheus`: Enable logging for Prometheus (default: false)
-- `-lgtm-log-pyroscope`: Enable logging for Pyroscope (default: false)
-- `-lgtm-log-otel-collector`: Enable logging for OpenTelemetry Collector (default: false)
+- `-lgtm-version`: Specify the version of [docker-otel-lgtm] to use (default: `"latest"`)
+- `-manual-debug`: Enable debug mode to keep containers running (default: `false`)
+- `-lgtm-log-all`: Enable logging for all containers (default: `false`)
+- `-lgtm-log-grafana`: Enable logging for Grafana (default: `false`)
+- `-lgtm-log-loki`: Enable logging for Loki (default: `false`)
+- `-lgtm-log-tempo`: Enable logging for Tempo (default: `false`)
+- `-lgtm-log-prometheus`: Enable logging for Prometheus (default: `false`)
+- `-lgtm-log-pyroscope`: Enable logging for Pyroscope (default: `false`)
+- `-lgtm-log-otel-collector`: Enable logging for OpenTelemetry Collector (default:`false`)
+- `-host`: Override the host used to issue requests to applications and LGTM (default:`localhost`)
 
 ## Run OATs in GitHub Actions
 
-Here's an [script](https://github.com/grafana/docker-otel-lgtm/blob/main/scripts/run-acceptance-tests.sh) that is used 
-from GitHub Actions. It uses [mise](https://mise.jdx.dev/) to install OATs, but you also 
-[install OATs directly](#installation).
+Here's a [script](https://github.com/grafana/docker-otel-lgtm/blob/main/scripts/run-acceptance-tests.sh) that is used
+from GitHub Actions. It uses [mise](https://mise.jdx.dev/) to install OATs, but you also [install OATs directly](#installation).
 
 ## Test Case Syntax
 
+> [!TIP]
 > You can use any file name that matches `oats*.yaml` (e.g. `oats-test.yaml`), that doesn't end in `-template.yaml`.
 > `oats-template.yaml` is reserved for template files, which are used in the `include` section.
 
-The syntax is a bit similar to https://github.com/kubeshop/tracetest
+The syntax is a bit similar to [Tracetest](https://github.com/kubeshop/tracetest).
 
-This is an example:
+Here is an example:
 
 ```yaml
 include:
@@ -145,6 +144,36 @@ expected:
   metrics:
     - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
       value: "== 10"
+```
+
+Here is another example with a more specific input:
+
+```yaml
+include:
+  - ../oats-template.yaml
+docker-compose:
+  file: ../docker-compose.yaml
+input:
+  - path: /users
+    method: POST
+    scheme: https
+    host: 127.0.0.1
+    status: 201
+    headers:
+      Authorization: Bearer my-access-token
+      Content-Type: application/json
+    body: |-
+      {
+        "name": "Grot"
+      }
+interval: 500ms
+expected:
+  traces:
+    - traceql: '{ name =~ "SELECT .*product"}'
+      spans:
+        - name: 'regex:SELECT .*'
+          attributes:
+            db.system: h2
 ```
 
 ### Query traces
@@ -191,7 +220,7 @@ expected:
 
 ### Matrix of test cases
 
-Matrix tests are useful to test different configurations of the same application, 
+Matrix tests are useful to test different configurations of the same application,
 e.g. with different settings of the otel collector or different flags in the application.
 
 ```yaml
@@ -250,12 +279,10 @@ kubernetes:
   app-docker-port: 8080
 ```
 
-
 [Tempo]: https://github.com/grafana/tempo
-[OpenTelemetry Collector]: https://opentelemetry.io/docs/collector/ 
+[OpenTelemetry Collector]: https://opentelemetry.io/docs/collector/
 [Prometheus]: https://prometheus.io/
 [Grafana]: https://grafana.com/
 [Loki]: https://github.com/grafana/loki
 [docker-otel-lgtm]: https://github.com/grafana/docker-otel-lgtm/
 [k3d]: https://k3d.io/
-
