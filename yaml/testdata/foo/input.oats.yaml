@@ -1,0 +1,21 @@
+docker-compose:
+input:
+  - path: /stock
+  - path: /buy
+    method: POST
+    headers:
+      Authorization: Bearer user-token
+      Content-Type: application/json
+    body: '{"id": "42", "quantity": 10}'
+    status: 201
+  - path: /delist/42
+    method: DELETE
+    scheme: https
+    host: 127.0.0.1
+    headers:
+      Authorization: Bearer admin-token
+    status: 204
+expected:
+  metrics:
+    - promql: bar
+      value: '>= 0'
