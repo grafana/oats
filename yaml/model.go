@@ -2,12 +2,14 @@ package yaml
 
 import (
 	"fmt"
-	"github.com/grafana/oats/testhelpers/kubernetes"
 	"log/slog"
+	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/grafana/oats/testhelpers/kubernetes"
 	"github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 )
@@ -77,8 +79,13 @@ type DockerCompose struct {
 }
 
 type Input struct {
-	Path   string `yaml:"path"`
-	Status string `yaml:"status"`
+	Scheme  string            `yaml:"scheme"`
+	Host    string            `yaml:"host"`
+	Method  string            `yaml:"method"`
+	Path    string            `yaml:"path"`
+	Headers map[string]string `yaml:"headers"`
+	Body    string            `yaml:"body"`
+	Status  string            `yaml:"status"`
 }
 
 type TestCaseDefinition struct {
@@ -116,9 +123,11 @@ type PortConfig struct {
 }
 
 type TestCase struct {
+	Path               string
 	Name               string
 	MatrixTestCaseName string
 	Dir                string
+	Host               string
 	OutputDir          string
 	Definition         TestCaseDefinition
 	PortConfig         *PortConfig
@@ -143,44 +152,45 @@ func (c *TestCase) validateAndSetVariables() {
 		validateK8s(c.Definition.Kubernetes)
 		gomega.Expect(c.Definition.DockerCompose).To(gomega.BeNil(), "kubernetes and docker-compose are mutually exclusive")
 	} else {
+		gomega.Expect(c.Definition.DockerCompose).ToNot(gomega.BeNil(), "%s does not appear to be a valid OATS YAML file", c.Path)
 		validateDockerCompose(c.Definition.DockerCompose, c.Dir)
 	}
 	validateInput(c.Definition.Input)
 	expected := c.Definition.Expected
-	gomega.Expect(len(expected.Metrics) == 0 && len(expected.Traces) == 0 && len(expected.Logs) == 0 && len(expected.Profiles) == 0).To(gomega.BeFalse())
+	gomega.Expect(len(expected.Metrics)+len(expected.Traces)+len(expected.Logs)+len(expected.Profiles)).NotTo(gomega.BeZero(), "%s does not contain any expected metrics, traces, logs or profiles", c.Path)
 
 	for _, c := range expected.CustomChecks {
-		gomega.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in "+string(c.Script))
+		gomega.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in %s", string(c.Script))
 	}
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
-		gomega.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in "+string(out))
+		gomega.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in %s", string(out))
 		gomega.Expect(l.Equals == "" && l.Contains == nil && l.Regexp == "").To(gomega.BeFalse())
 		for _, s := range l.Contains {
-			gomega.Expect(s).ToNot(gomega.BeEmpty(), "contains string is empty in "+string(out))
+			gomega.Expect(s).ToNot(gomega.BeEmpty(), "contains string is empty in %s", string(out))
 		}
 	}
 	for _, d := range expected.Metrics {
 		out, _ := yaml.Marshal(d)
-		gomega.Expect(d.PromQL).ToNot(gomega.BeEmpty(), "promQL is empty in "+string(out))
-		gomega.Expect(d.Value).ToNot(gomega.BeEmpty(), "value is empty in "+string(out))
+		gomega.Expect(d.PromQL).ToNot(gomega.BeEmpty(), "promQL is empty in %s", string(out))
+		gomega.Expect(d.Value).ToNot(gomega.BeEmpty(), "value is empty in %s", string(out))
 	}
 	for _, d := range expected.Traces {
 		out, _ := yaml.Marshal(d)
-		gomega.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in "+string(out))
-		gomega.Expect(d.Spans).ToNot(gomega.BeEmpty(), "spans are empty in "+string(out))
+		gomega.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in %s", string(out))
+		gomega.Expect(d.Spans).ToNot(gomega.BeEmpty(), "spans are empty in %s", string(out))
 		for _, span := range d.Spans {
-			gomega.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in "+string(out))
+			gomega.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in %s", string(out))
 			for k, v := range span.Attributes {
-				gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in "+string(out))
-				gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in "+string(out))
+				gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
+				gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
 			}
 		}
 	}
 	for _, p := range expected.Profiles {
 		out, _ := yaml.Marshal(p)
-		gomega.Expect(p.Query).ToNot(gomega.BeEmpty(), "query is empty in "+string(out))
-		gomega.Expect(p.Flamebearers.Contains).ToNot(gomega.BeEmpty(), "Flamebearers.contains is empty in "+string(out))
+		gomega.Expect(p.Query).ToNot(gomega.BeEmpty(), "query is empty in %s", string(out))
+		gomega.Expect(p.Flamebearers.Contains).ToNot(gomega.BeEmpty(), "Flamebearers.contains is empty in %s", string(out))
 	}
 
 	if c.PortConfig == nil {
@@ -218,6 +228,28 @@ func validateInput(input []Input) {
 		if i.Status != "" {
 			_, err := strconv.ParseInt(i.Status, 10, 32)
 			gomega.Expect(err).To(gomega.BeNil(), "status must parse as integer or be empty")
+		}
+		if i.Method != "" {
+			gomega.Expect(strings.ToUpper(i.Method)).To(gomega.Or(
+				gomega.Equal(http.MethodConnect),
+				gomega.Equal(http.MethodDelete),
+				gomega.Equal(http.MethodGet),
+				gomega.Equal(http.MethodHead),
+				gomega.Equal(http.MethodOptions),
+				gomega.Equal(http.MethodPatch),
+				gomega.Equal(http.MethodPost),
+				gomega.Equal(http.MethodPut),
+				gomega.Equal(http.MethodTrace),
+			), "method must be a supported HTTP method or be empty")
+		}
+		if (i.Method == "" || i.Method == http.MethodGet) && i.Body != "" {
+			gomega.Expect(i.Body).To(gomega.BeEmpty(), "body must be empty for GET requests")
+		}
+		if i.Scheme != "" {
+			gomega.Expect(strings.ToLower(i.Scheme)).To(gomega.Or(
+				gomega.Equal("http"),
+				gomega.Equal("https"),
+			), "scheme must be http, https or be empty")
 		}
 	}
 }

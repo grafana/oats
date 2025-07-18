@@ -1,7 +1,6 @@
 docker-compose:
 input:
   - path: /stock
-    status: 200
   - path: /buy
     method: POST
     headers:
@@ -11,23 +10,12 @@ input:
     status: 201
   - path: /delist/42
     method: DELETE
+    scheme: https
+    host: 127.0.0.1
     headers:
       Authorization: Bearer admin-token
     status: 204
 expected:
-  traces:
-    - traceql: '{ name =~ "SELECT .*cart"}'
-      spans:
-        - name: 'regex:SELECT .*cart'
-          attributes:
-            db.system: h2
-    - traceql: '{ name =~ "SELECT .*product"}'
-      spans:
-        - name: 'regex:SELECT .*'
-          attributes:
-            db.system: h2
   metrics:
-    - promql: foo
-      value: '>= 0'
     - promql: bar
       value: '>= 0'

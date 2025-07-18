@@ -4,17 +4,18 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
+
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
 )
 
 type PortsConfig struct {
@@ -28,14 +29,16 @@ type PortsConfig struct {
 }
 
 type Endpoint struct {
+	host      string
 	ports     PortsConfig
 	start     func(context.Context) error
 	stop      func(context.Context) error
 	logReader func(func(io.ReadCloser, *sync.WaitGroup)) error
 }
 
-func NewEndpoint(ports PortsConfig, start func(context.Context) error, stop func(context.Context) error, logReader func(func(io.ReadCloser, *sync.WaitGroup)) error) *Endpoint {
+func NewEndpoint(host string, ports PortsConfig, start func(context.Context) error, stop func(context.Context) error, logReader func(func(io.ReadCloser, *sync.WaitGroup)) error) *Endpoint {
 	return &Endpoint{
+		host:      host,
 		ports:     ports,
 		start:     start,
 		stop:      stop,
@@ -48,12 +51,12 @@ func (e *Endpoint) TracerProvider(ctx context.Context, r *resource.Resource) (*t
 	var err error
 
 	if e.ports.TracesGRPCPort != 0 {
-		exporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure(), otlptracegrpc.WithEndpoint(fmt.Sprintf("localhost:%d", e.ports.TracesGRPCPort)))
+		exporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure(), otlptracegrpc.WithEndpoint(fmt.Sprintf("%s:%d", e.host, e.ports.TracesGRPCPort)))
 		if err != nil {
 			return nil, err
 		}
 	} else if e.ports.TracesHTTPPort != 0 {
-		exporter, err = otlptracehttp.New(ctx, otlptracehttp.WithInsecure(), otlptracehttp.WithEndpoint(fmt.Sprintf("localhost:%d/v1/traces", e.ports.TracesHTTPPort)))
+		exporter, err = otlptracehttp.New(ctx, otlptracehttp.WithInsecure(), otlptracehttp.WithEndpoint(fmt.Sprintf("%s:%d/v1/traces", e.host, e.ports.TracesHTTPPort)))
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +105,7 @@ func (e *Endpoint) GetTraceByID(ctx context.Context, id string) ([]byte, error) 
 		return nil, ctx.Err()
 	}
 
-	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/traces/%s", e.ports.TempoHTTPPort, id))
+	return e.makeGetRequest(fmt.Sprintf("http://%s:%d/api/traces/%s", e.host, e.ports.TempoHTTPPort, id))
 }
 
 func (e *Endpoint) SearchTempo(ctx context.Context, query string) ([]byte, error) {
@@ -110,7 +113,7 @@ func (e *Endpoint) SearchTempo(ctx context.Context, query string) ([]byte, error
 		return nil, ctx.Err()
 	}
 
-	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/search?q=%s", e.ports.TempoHTTPPort, url.QueryEscape(query)))
+	return e.makeGetRequest(fmt.Sprintf("http://%s:%d/api/search?q=%s", e.host, e.ports.TempoHTTPPort, url.QueryEscape(query)))
 }
 
 func (e *Endpoint) SearchTags(ctx context.Context, tags map[string]string) ([]byte, error) {
@@ -128,15 +131,15 @@ func (e *Endpoint) SearchTags(ctx context.Context, tags map[string]string) ([]by
 		tb.WriteString(url.QueryEscape(s))
 	}
 
-	return e.makeGetRequest(fmt.Sprintf("http://localhost:%d/api/search?tags=%s", e.ports.TempoHTTPPort, tb.String()))
+	return e.makeGetRequest(fmt.Sprintf("http://%s:%d/api/search?tags=%s", e.host, e.ports.TempoHTTPPort, tb.String()))
 }
 
 func (e *Endpoint) RunPromQL(promQL string) ([]byte, error) {
 	var u string
 	if e.ports.MimirHTTPPort != 0 {
-		u = fmt.Sprintf("http://localhost:%d/prometheus/api/v1/query?query=%s", e.ports.MimirHTTPPort, url.PathEscape(promQL))
+		u = fmt.Sprintf("http://%s:%d/prometheus/api/v1/query?query=%s", e.host, e.ports.MimirHTTPPort, url.PathEscape(promQL))
 	} else if e.ports.PrometheusHTTPPort != 0 {
-		u = fmt.Sprintf("http://localhost:%d/api/v1/query?query=%s", e.ports.PrometheusHTTPPort, url.PathEscape(promQL))
+		u = fmt.Sprintf("http://%s:%d/api/v1/query?query=%s", e.host, e.ports.PrometheusHTTPPort, url.PathEscape(promQL))
 	} else {
 		return nil, fmt.Errorf("to run PromQL you must configure a MimirHTTPPort or a PrometheusHTTPPort")
 	}
@@ -163,7 +166,7 @@ func (e *Endpoint) SearchLoki(query string) ([]byte, error) {
 		return nil, fmt.Errorf("to search Loki you must configure a LokiHttpPort")
 	}
 
-	u := fmt.Sprintf("http://localhost:%d/loki/api/v1/query_range?since=5m&limit=1&query=%s", e.ports.LokiHttpPort, url.PathEscape(query))
+	u := fmt.Sprintf("http://%s:%d/loki/api/v1/query_range?since=5m&limit=1&query=%s", e.host, e.ports.LokiHttpPort, url.PathEscape(query))
 
 	resp, err := http.Get(u)
 	if err != nil {
@@ -187,7 +190,7 @@ func (e *Endpoint) SearchPyroscope(query string) ([]byte, error) {
 		return nil, fmt.Errorf("to search Pyroscope you must configure a PyroscopeHttpPort")
 	}
 
-	u := fmt.Sprintf("http://localhost:%d/pyroscope/render?from=from=now-1m&query=%s", e.ports.PyroscopeHttpPort, url.PathEscape(query))
+	u := fmt.Sprintf("http://%s:%d/pyroscope/render?from=from=now-1m&query=%s", e.host, e.ports.PyroscopeHttpPort, url.PathEscape(query))
 
 	resp, err := http.Get(u)
 	if err != nil {

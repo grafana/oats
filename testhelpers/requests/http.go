@@ -3,7 +3,9 @@ package requests
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 )
 
 var tr = &http.Transport{
@@ -12,8 +14,6 @@ var tr = &http.Transport{
 var testHTTPClient = &http.Client{Transport: tr}
 
 func doRequest(req *http.Request, statusCode int) error {
-	req.Header.Set("Content-Type", "application/json")
-
 	r, err := testHTTPClient.Do(req)
 
 	if err != nil {
@@ -27,11 +27,21 @@ func doRequest(req *http.Request, statusCode int) error {
 	return nil
 }
 
-func DoHTTPGet(url string, statusCode int) error {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+func DoHTTPRequest(url string, method string, headers map[string]string, payload string, statusCode int) error {
+	var body io.Reader = nil
+
+	if payload != "" {
+		body = strings.NewReader(payload)
+	}
+
+	req, err := http.NewRequest(method, url, body)
 
 	if err != nil {
 		return err
+	}
+
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 
 	return doRequest(req, statusCode)

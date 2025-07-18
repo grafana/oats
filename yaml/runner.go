@@ -3,26 +3,30 @@ package yaml
 import (
 	"context"
 	"fmt"
-	"github.com/grafana/oats/testhelpers/kubernetes"
-	"github.com/grafana/oats/testhelpers/remote"
-	"github.com/onsi/gomega/format"
 	"log/slog"
+	"maps"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/grafana/oats/testhelpers/compose"
+	"github.com/grafana/oats/testhelpers/kubernetes"
+	"github.com/grafana/oats/testhelpers/remote"
 	"github.com/grafana/oats/testhelpers/requests"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 )
 
 type runner struct {
 	testCase          *TestCase
 	endpoint          *remote.Endpoint
 	deadline          time.Time
+	host              string
 	Verbose           bool
 	gomegaInst        gomega.Gomega
 	additionalAsserts []func()
@@ -33,6 +37,7 @@ var VerboseLogging bool
 func RunTestCase(c *TestCase) {
 	format.MaxLength = 100000
 	r := &runner{
+		host:     c.Host,
 		testCase: c,
 	}
 
@@ -44,7 +49,7 @@ func RunTestCase(c *TestCase) {
 	r.deadline = time.Now().Add(c.Timeout)
 	r.endpoint = endpoint
 	if c.ManualDebug {
-		slog.Info(fmt.Sprintf("topping to let you manually debug on http://localhost:%d\n", r.testCase.PortConfig.GrafanaHTTPPort))
+		slog.Info(fmt.Sprintf("stopping to let you manually debug on http://%s:%d\n", r.host, r.testCase.PortConfig.GrafanaHTTPPort))
 
 		for {
 			r.eventually(func() {
@@ -143,9 +148,9 @@ func startEndpoint(c *TestCase) (*remote.Endpoint, error) {
 	slog.Info("start test", "name", c.Name)
 	var endpoint *remote.Endpoint
 	if c.Definition.Kubernetes != nil {
-		endpoint = kubernetes.NewEndpoint(c.Definition.Kubernetes, ports, c.Name, c.Dir)
+		endpoint = kubernetes.NewEndpoint(c.Host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
 	} else {
-		endpoint = compose.NewEndpoint(c.CreateDockerComposeFile(), ports)
+		endpoint = compose.NewEndpoint(c.Host, c.CreateDockerComposeFile(), ports)
 	}
 
 	var ctx = context.Background()
@@ -190,7 +195,20 @@ func (r *runner) eventually(asserter func()) {
 		r.LogQueryResult("waiting for telemetry data\n")
 
 		for _, i := range r.testCase.Definition.Input {
-			url := fmt.Sprintf("http://localhost:%d%s", r.testCase.PortConfig.ApplicationPort, i.Path)
+			scheme := "http"
+			if i.Scheme != "" {
+				scheme = i.Scheme
+			}
+			host := r.host
+			if i.Host != "" {
+				host = i.Host
+			}
+			url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.testCase.PortConfig.ApplicationPort, i.Path)
+			body := i.Body
+			method := http.MethodGet
+			if i.Method != "" {
+				method = strings.ToUpper(i.Method)
+			}
 			status := 200
 			if i.Status != "" {
 				parsedStatus, err := strconv.ParseInt(i.Status, 10, 64)
@@ -198,7 +216,13 @@ func (r *runner) eventually(asserter func()) {
 					status = int(parsedStatus)
 				}
 			}
-			err := requests.DoHTTPGet(url, status)
+			headers := make(map[string]string)
+			if i.Headers != nil {
+				maps.Copy(headers, i.Headers)
+			} else {
+				headers["Accept"] = "application/json"
+			}
+			err := requests.DoHTTPRequest(url, method, headers, body, status)
 			g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
 		}
 

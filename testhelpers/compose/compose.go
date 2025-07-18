@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/grafana/oats/testhelpers/remote"
 	"io"
 	"log/slog"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"path"
 	"strings"
 	"sync"
+
+	"github.com/grafana/oats/testhelpers/remote"
 )
 
 type Compose struct {
@@ -132,9 +133,9 @@ func (c *Compose) Close() error {
 	return errors.New(strings.Join(errs, " / "))
 }
 
-func NewEndpoint(composeFilePath string, ports remote.PortsConfig) *remote.Endpoint {
+func NewEndpoint(host string, composeFilePath string, ports remote.PortsConfig) *remote.Endpoint {
 	var compose *Compose
-	return remote.NewEndpoint(ports, func(ctx context.Context) error {
+	return remote.NewEndpoint(host, ports, func(ctx context.Context) error {
 		var err error
 
 		if composeFilePath == "" {

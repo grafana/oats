@@ -4,10 +4,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
+	"slices"
+	"time"
+
 	"github.com/grafana/oats/yaml"
 	"github.com/onsi/gomega"
-	"log/slog"
-	"time"
 )
 
 func main() {
@@ -18,6 +20,7 @@ func main() {
 }
 
 func run() error {
+	host := flag.String("host", "localhost", "host to run the test cases against")
 	lgtmVersion := flag.String("lgtm-version", "latest", "version of https://github.com/grafana/docker-otel-lgtm")
 
 	logAll := flag.Bool("lgtm-log-all", false, "enable logging for all LGTM components")
@@ -50,6 +53,16 @@ func run() error {
 	})
 
 	cases, base := yaml.ReadTestCases(flag.Arg(0))
+
+	// Filter out all test cases that don't have a Kubernetes or Compose section, as that probably
+	// means we found unrelated YAML files in the directory that happen to end in ".oats.y{a}ml".
+	for i := len(cases) - 1; i >= 0; i-- {
+		testcase := cases[i]
+		if testcase.Definition.DockerCompose == nil && testcase.Definition.Kubernetes == nil {
+			cases = slices.Delete(cases, i, i+1)
+		}
+	}
+
 	if len(cases) == 0 {
 		return fmt.Errorf("no cases found in %s", base)
 	}
@@ -58,6 +71,7 @@ func run() error {
 	}
 
 	for _, c := range cases {
+		c.Host = *host
 		c.LgtmVersion = *lgtmVersion
 		c.LgtmLogSettings = logSettings
 		c.Timeout = *timeout

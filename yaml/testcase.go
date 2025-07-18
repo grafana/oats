@@ -50,7 +50,7 @@ func collectTestCases(base string, evaluateIgnoreFile bool) ([]*TestCase, error)
 			}
 		}
 
-		if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") {
+		if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") || strings.Contains(d.Name(), "-template.yml") {
 			return nil
 		}
 
@@ -96,13 +96,15 @@ func readTestCase(testBase, filePath string) (TestCase, error) {
 		return TestCase{}, err
 	}
 
-	dir := filepath.Dir(absolutePath(filePath))
+	absoluteFilePath := absolutePath(filePath)
+	dir := filepath.Dir(absoluteFilePath)
 	name := strings.TrimPrefix(dir, absolutePath(testBase)) + "-" + strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 	sep := string(filepath.Separator)
 	name = strings.TrimPrefix(name, sep)
 	name = strings.ReplaceAll(name, sep, "-")
 	name = "run" + name
 	testCase := TestCase{
+		Path:       absoluteFilePath,
 		Name:       name,
 		Dir:        dir,
 		Definition: def,
