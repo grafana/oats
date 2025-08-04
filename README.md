@@ -51,7 +51,6 @@ oats
           OTEL_SERVICE_NAME: "rolldice"
           OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
           OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-          OTEL_METRIC_EXPORT_INTERVAL: "5000"  # so we don't have to wait 60s for metrics
     ```
 4. Create `oats.yaml` with the test cases
     ```yaml

@@ -47,6 +47,11 @@ func (c *TestCase) generateDockerComposeFile() []byte {
 	vars["LgtmVersion"] = c.LgtmVersion
 	vars["LgtmLogSettings"] = c.LgtmLogSettings
 
+	// Overrides to make tests faster by exporting telemetry data more frequently
+	vars["OTEL_BLRP_SCHEDULE_DELAY"] = "5000"
+	vars["OTEL_BSP_SCHEDULE_DELAY"] = "5000"
+	vars["OTEL_METRIC_EXPORT_INTERVAL"] = "5000"
+
 	env := os.Environ()
 
 	for k, v := range vars {
