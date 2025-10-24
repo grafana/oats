@@ -34,6 +34,11 @@ type runner struct {
 
 var VerboseLogging bool
 
+// AbsentSpanTimeout is the timeout for checking that spans are absent from traces.
+// This is shorter than the default timeout because we're checking for non-existence,
+// and checking after we've finished other assertions.
+const AbsentSpanTimeout = 10 * time.Second
+
 func RunTestCase(c *TestCase) {
 	format.MaxLength = 100000
 	r := &runner{
@@ -91,12 +96,22 @@ func RunTestCase(c *TestCase) {
 			})
 		}
 	}
+	// First process traces with normal spans
 	for _, trace := range expected.Traces {
-		if r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
+		if !trace.HasExpectAbsentSpans() && r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
 			slog.Info("searching tempo", "traceql", trace.TraceQL)
 			r.eventually(func() {
 				AssertTempo(r, trace)
 			})
+		}
+	}
+	// Then process traces with ExpectAbsent spans (shorter timeout)
+	for _, trace := range expected.Traces {
+		if trace.HasExpectAbsentSpans() && r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
+			slog.Info("searching tempo for absent spans", "traceql", trace.TraceQL)
+			r.eventuallyWithTimeout(func() {
+				AssertTempoAbsent(r, trace)
+			}, AbsentSpanTimeout)
 		}
 	}
 	for _, metric := range expected.Metrics {
@@ -175,6 +190,10 @@ func prepareBuildDir(name string) string {
 
 func (r *runner) eventually(asserter func()) {
 	gomega.Expect(time.Now()).Should(gomega.BeTemporally("<", r.deadline))
+	r.eventuallyWithTimeout(asserter, time.Until(r.deadline))
+}
+
+func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
 	start := time.Now()
 	printTime := start
 	ctx := context.Background()
@@ -228,7 +247,7 @@ func (r *runner) eventually(asserter func()) {
 
 		r.gomegaInst = g
 		asserter()
-	}).WithTimeout(time.Until(r.deadline)).WithPolling(interval).Should(gomega.Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
+	}).WithTimeout(timeout).WithPolling(interval).Should(gomega.Succeed(), "assertion should succeed within %v", timeout)
 	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(start)))
 	for _, a := range r.additionalAsserts {
 		a()

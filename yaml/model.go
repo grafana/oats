@@ -21,9 +21,10 @@ type ExpectedMetrics struct {
 }
 
 type ExpectedSpan struct {
-	Name       string            `yaml:"name"`
-	Attributes map[string]string `yaml:"attributes"`
-	AllowDups  bool              `yaml:"allow-duplicates"`
+	Name         string            `yaml:"name"`
+	Attributes   map[string]string `yaml:"attributes"`
+	AllowDups    bool              `yaml:"allow-duplicates"`
+	ExpectAbsent bool              `yaml:"expect-absent"`
 }
 
 type ExpectedLogs struct {
@@ -51,6 +52,15 @@ type ExpectedTraces struct {
 	TraceQL         string         `yaml:"traceql"`
 	Spans           []ExpectedSpan `yaml:"spans"`
 	MatrixCondition string         `yaml:"matrix-condition"`
+}
+
+func (t ExpectedTraces) HasExpectAbsentSpans() bool {
+	for _, span := range t.Spans {
+		if span.ExpectAbsent {
+			return true
+		}
+	}
+	return false
 }
 
 type CustomCheck struct {
