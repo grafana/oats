@@ -36,8 +36,14 @@ func AssertTempoAbsent(r *runner, t ExpectedTraces) {
 	res, err := responses.ParseTempoSearchResult(b)
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 
-	// For ExpectAbsent, we expect NO traces to be found
-	g.Expect(res.Traces).To(gomega.BeEmpty(), "expected no traces matching %s, but found %d", t.TraceQL, len(res.Traces))
+	// For ExpectAbsent, not finding traces is success (the spans are indeed absent)
+	if len(res.Traces) == 0 {
+		r.LogQueryResult("no traces found matching %s - absent spans confirmed\n", t.TraceQL)
+		return
+	}
+
+	// If traces are found, verify that the expected absent spans are not within them
+	assertTrace(r, res.Traces[0], t.Spans)
 }
 
 func AssertTraceResponse(b []byte, wantSpans []ExpectedSpan, r *runner) {
@@ -51,7 +57,7 @@ func AssertTraceResponse(b []byte, wantSpans []ExpectedSpan, r *runner) {
 		spans, atts := responses.FindSpansWithAttributes(td, wantSpan.Name)
 
 		if wantSpan.ExpectAbsent {
-			g.Expect(spans).To(gomega.BeEmpty())
+			g.Expect(spans).To(gomega.BeEmpty(), "expected span %s to be absent, but found %d instance(s)", wantSpan.Name, len(spans))
 			continue
 		}
 

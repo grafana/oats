@@ -54,6 +54,15 @@ type ExpectedTraces struct {
 	MatrixCondition string         `yaml:"matrix-condition"`
 }
 
+func (t ExpectedTraces) HasExpectAbsentSpans() bool {
+	for _, span := range t.Spans {
+		if span.ExpectAbsent {
+			return true
+		}
+	}
+	return false
+}
+
 type CustomCheck struct {
 	Script          string `yaml:"script"`
 	MatrixCondition string `yaml:"matrix-condition"`
