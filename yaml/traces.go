@@ -24,21 +24,37 @@ func AssertTempo(r *runner, t ExpectedTraces) {
 	assertTrace(r, res.Traces[0], t.Spans)
 }
 
-func assertTrace(r *runner, tr responses.Trace, wantSpans []ExpectedSpan) {
+func AssertTempoAbsent(r *runner, t ExpectedTraces) {
 	ctx := context.Background()
 
-	b, err := r.endpoint.GetTraceByID(ctx, tr.TraceID)
-	r.LogQueryResult("traceQL traceID %v response %v err=%v\n", tr.TraceID, string(b), err)
-
+	b, err := r.endpoint.SearchTempo(ctx, t.TraceQL)
+	r.LogQueryResult("traceQL query %v response %v err=%v\n", t.TraceQL, string(b), err)
 	g := r.gomegaInst
-	g.Expect(err).ToNot(gomega.HaveOccurred(), "we should find the trace by traceID")
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0))
+
+	res, err := responses.ParseTempoSearchResult(b)
+	g.Expect(err).ToNot(gomega.HaveOccurred())
+
+	// For ExpectAbsent, we expect NO traces to be found
+	g.Expect(res.Traces).To(gomega.BeEmpty(), "expected no traces matching %s, but found %d", t.TraceQL, len(res.Traces))
+}
+
+func AssertTraceResponse(b []byte, wantSpans []ExpectedSpan, r *runner) {
+	g := r.gomegaInst
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0))
 
 	td, err := responses.ParseTraceDetails(b)
-	g.Expect(err).ToNot(gomega.HaveOccurred(), "we should be able to parse the GET trace by traceID API output")
+	g.Expect(err).ToNot(gomega.HaveOccurred())
 
 	for _, wantSpan := range wantSpans {
 		spans, atts := responses.FindSpansWithAttributes(td, wantSpan.Name)
+
+		if wantSpan.ExpectAbsent {
+			g.Expect(spans).To(gomega.BeEmpty())
+			continue
+		}
+
 		if wantSpan.AllowDups {
 			g.Expect(len(spans)).Should(gomega.BeNumerically(">", 0), "we should find at least one span with the name %s", wantSpan.Name)
 		} else {
@@ -56,4 +72,17 @@ func assertTrace(r *runner, tr responses.Trace, wantSpans []ExpectedSpan) {
 			g.Expect(err).ToNot(gomega.HaveOccurred(), "span attribute should match")
 		}
 	}
+}
+
+func assertTrace(r *runner, tr responses.Trace, wantSpans []ExpectedSpan) {
+	ctx := context.Background()
+
+	b, err := r.endpoint.GetTraceByID(ctx, tr.TraceID)
+	r.LogQueryResult("traceQL traceID %v response %v err=%v\n", tr.TraceID, string(b), err)
+
+	g := r.gomegaInst
+	g.Expect(err).ToNot(gomega.HaveOccurred(), "we should find the trace by traceID")
+	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0))
+
+	AssertTraceResponse(b, wantSpans, r)
 }
