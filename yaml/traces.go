@@ -43,7 +43,9 @@ func AssertTempoAbsent(r *runner, t ExpectedTraces) {
 	}
 
 	// If traces are found, verify that the expected absent spans are not within them
-	assertTrace(r, res.Traces[0], t.Spans)
+	for _, trace := range res.Traces {
+		assertTrace(r, trace, t.Spans)
+	}
 }
 
 func AssertTraceResponse(b []byte, wantSpans []ExpectedSpan, r *runner) {
