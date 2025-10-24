@@ -36,7 +36,7 @@ var VerboseLogging bool
 
 // AbsentSpanTimeout is the timeout for checking that spans are absent from traces.
 // This is shorter than the default timeout because we're checking for non-existence,
-// which should be determined relatively quickly.
+// and checking after we've finished other assertions.
 const AbsentSpanTimeout = 10 * time.Second
 
 func RunTestCase(c *TestCase) {
@@ -96,7 +96,7 @@ func RunTestCase(c *TestCase) {
 			})
 		}
 	}
-	// First: Process traces with normal spans (should exist)
+	// First process traces with normal spans
 	for _, trace := range expected.Traces {
 		if !trace.HasExpectAbsentSpans() && r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
 			slog.Info("searching tempo", "traceql", trace.TraceQL)
@@ -105,7 +105,7 @@ func RunTestCase(c *TestCase) {
 			})
 		}
 	}
-	// Second: Process traces with ExpectAbsent spans (shorter timeout)
+	// Then process traces with ExpectAbsent spans (shorter timeout)
 	for _, trace := range expected.Traces {
 		if trace.HasExpectAbsentSpans() && r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
 			slog.Info("searching tempo for absent spans", "traceql", trace.TraceQL)
