@@ -34,10 +34,10 @@ type runner struct {
 
 var VerboseLogging bool
 
-// AbsentSpanTimeout is the timeout for checking that spans are absent from traces.
+// AbsentTimeout is the timeout for checking that spans are absent from traces.
 // This is shorter than the default timeout because we're checking for non-existence,
 // and checking after we've finished other assertions.
-const AbsentSpanTimeout = 10 * time.Second
+const AbsentTimeout = 10 * time.Second
 
 func RunTestCase(c *TestCase) {
 	format.MaxLength = 100000
@@ -105,13 +105,13 @@ func RunTestCase(c *TestCase) {
 			})
 		}
 	}
-	// Then process traces with ExpectAbsent spans (shorter timeout)
+	// Then process traces with ExpectAbsent spans
 	for _, trace := range expected.Traces {
 		if trace.HasExpectAbsentSpans() && r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
 			slog.Info("searching tempo for absent spans", "traceql", trace.TraceQL)
-			r.eventuallyWithTimeout(func() {
-				AssertTempoAbsent(r, trace)
-			}, AbsentSpanTimeout)
+			r.consistentlyNot(func() {
+				AssertTempo(r, trace)
+			})
 		}
 	}
 	for _, metric := range expected.Metrics {
@@ -189,69 +189,101 @@ func prepareBuildDir(name string) string {
 }
 
 func (r *runner) eventually(asserter func()) {
-	gomega.Expect(time.Now()).Should(gomega.BeTemporally("<", r.deadline))
+	r.assertDeadline()
 	r.eventuallyWithTimeout(asserter, time.Until(r.deadline))
 }
 
+func (r *runner) assertDeadline() bool {
+	return gomega.Expect(time.Now()).Should(gomega.BeTemporally("<", r.deadline))
+}
+
 func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
-	start := time.Now()
-	printTime := start
-	ctx := context.Background()
+	caller := newAssertCaller(r)
+	r.additionalAsserts = nil
+	gomega.Eventually(context.Background(), func(g gomega.Gomega) {
+		r.callAsserter(g, caller, asserter)
+	}).WithTimeout(timeout).WithPolling(caller.interval).Should(gomega.Succeed(), "assertion should succeed within %v", timeout)
+	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(caller.start)))
+	for _, a := range r.additionalAsserts {
+		a()
+	}
+}
+
+func (r *runner) consistentlyNot(asserter func()) {
+	r.assertDeadline()
+	caller := newAssertCaller(r)
+	timeout := AbsentTimeout
+	gomega.Consistently(context.Background(), func(g gomega.Gomega) {
+		r.callAsserter(g, caller, asserter)
+	}).WithTimeout(timeout).WithPolling(caller.interval).ShouldNot(gomega.Succeed(), "assertion should not succeed for %v", timeout)
+}
+
+type asserterCaller struct {
+	iterations int
+	start      time.Time
+	printTime  time.Time
+	interval   time.Duration
+}
+
+func newAssertCaller(r *runner) *asserterCaller {
 	interval := r.testCase.Definition.Interval
 	if interval == 0 {
 		interval = DefaultTestCaseInterval
 	}
-	iterations := 0
-	r.additionalAsserts = nil
-	gomega.Eventually(ctx, func(g gomega.Gomega) {
-		verbose := VerboseLogging
-		if iterations == 0 || time.Since(printTime) > 10*time.Second {
-			verbose = true
-			printTime = time.Now()
-		}
-		iterations++
-		r.Verbose = verbose
-		r.LogQueryResult("waiting for telemetry data\n")
 
-		for _, i := range r.testCase.Definition.Input {
-			scheme := "http"
-			if i.Scheme != "" {
-				scheme = i.Scheme
-			}
-			host := r.host
-			if i.Host != "" {
-				host = i.Host
-			}
-			url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.testCase.PortConfig.ApplicationPort, i.Path)
-			body := i.Body
-			method := http.MethodGet
-			if i.Method != "" {
-				method = strings.ToUpper(i.Method)
-			}
-			status := 200
-			if i.Status != "" {
-				parsedStatus, err := strconv.ParseInt(i.Status, 10, 64)
-				if err == nil {
-					status = int(parsedStatus)
-				}
-			}
-			headers := make(map[string]string)
-			if i.Headers != nil {
-				maps.Copy(headers, i.Headers)
-			} else {
-				headers["Accept"] = "application/json"
-			}
-			err := requests.DoHTTPRequest(url, method, headers, body, status)
-			g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
-		}
-
-		r.gomegaInst = g
-		asserter()
-	}).WithTimeout(timeout).WithPolling(interval).Should(gomega.Succeed(), "assertion should succeed within %v", timeout)
-	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(start)))
-	for _, a := range r.additionalAsserts {
-		a()
+	now := time.Now()
+	return &asserterCaller{
+		iterations: 0,
+		start:      now,
+		printTime:  now,
+		interval:   interval,
 	}
+}
+
+func (r *runner) callAsserter(g gomega.Gomega, caller *asserterCaller, asserter func()) {
+	verbose := VerboseLogging
+	if caller.iterations == 0 || time.Since(caller.printTime) > 10*time.Second {
+		verbose = true
+		caller.printTime = time.Now()
+	}
+	caller.iterations++
+	r.Verbose = verbose
+	r.LogQueryResult("waiting for telemetry data\n")
+
+	for _, i := range r.testCase.Definition.Input {
+		scheme := "http"
+		if i.Scheme != "" {
+			scheme = i.Scheme
+		}
+		host := r.host
+		if i.Host != "" {
+			host = i.Host
+		}
+		url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.testCase.PortConfig.ApplicationPort, i.Path)
+		body := i.Body
+		method := http.MethodGet
+		if i.Method != "" {
+			method = strings.ToUpper(i.Method)
+		}
+		status := 200
+		if i.Status != "" {
+			parsedStatus, err := strconv.ParseInt(i.Status, 10, 64)
+			if err == nil {
+				status = int(parsedStatus)
+			}
+		}
+		headers := make(map[string]string)
+		if i.Headers != nil {
+			maps.Copy(headers, i.Headers)
+		} else {
+			headers["Accept"] = "application/json"
+		}
+		err := requests.DoHTTPRequest(url, method, headers, body, status)
+		g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
+	}
+
+	r.gomegaInst = g
+	asserter()
 }
 
 func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) bool {
