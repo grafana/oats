@@ -41,7 +41,7 @@ func assertTrace(r *runner, tr responses.Trace, wantSpans []ExpectedSpan) {
 		spans, atts := responses.FindSpansWithAttributes(td, wantSpan.Name)
 
 		if wantSpan.ExpectAbsent {
-			g.Expect(spans).To(gomega.BeEmpty(), "span %s should not exist in the trace", wantSpan.Name)
+			g.Expect(spans).To(gomega.BeEmpty(), "expected span %s to be absent, but found %d instance(s)", wantSpan.Name, len(spans))
 			continue
 		}
 
