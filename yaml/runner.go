@@ -202,7 +202,12 @@ func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
 	r.additionalAsserts = nil
 	gomega.Eventually(context.Background(), func(g gomega.Gomega) {
 		r.callAsserter(g, caller, asserter)
-	}).WithTimeout(timeout).WithPolling(caller.interval).Should(gomega.Succeed(), "assertion should succeed within %v", timeout)
+	}).WithTimeout(timeout).WithPolling(caller.interval).Should(
+		gomega.Succeed(),
+		"calling application for %s should cause telemetry to appear within %v",
+		r.testCase.Name,
+		timeout,
+	)
 	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(caller.start)))
 	for _, a := range r.additionalAsserts {
 		a()
