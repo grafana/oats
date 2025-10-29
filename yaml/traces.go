@@ -15,6 +15,22 @@ func AssertTempo(r *runner, t ExpectedTraces) {
 	r.LogQueryResult("traceQL query %v response %v err=%v\n", t.TraceQL, string(b), err)
 	g := r.gomegaInst
 	g.Expect(err).ToNot(gomega.HaveOccurred())
+
+	// If ALL spans have expect-absent, we expect NO traces to be found
+	if t.AllSpansExpectAbsent() {
+		res, err := responses.ParseTempoSearchResult(b)
+		if err != nil || len(res.Traces) == 0 {
+			// No traces found - this is expected, the spans are absent
+			return
+		}
+		// Traces were found - this is a failure
+		g.Expect(res.Traces).To(gomega.BeEmpty(),
+			"expected no traces matching TraceQL query %q (all spans should be absent), but found %d trace(s)",
+			t.TraceQL, len(res.Traces))
+		return
+	}
+
+	// Otherwise, we expect traces to be found
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0))
 
 	res, err := responses.ParseTempoSearchResult(b)
