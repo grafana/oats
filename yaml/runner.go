@@ -34,11 +34,6 @@ type runner struct {
 
 var VerboseLogging bool
 
-// AbsentTimeout is the timeout for checking that spans are absent from traces.
-// This is shorter than the default timeout because we're checking for non-existence,
-// and checking after we've finished other assertions.
-const AbsentTimeout = 10 * time.Second
-
 func RunTestCase(c *TestCase) {
 	format.MaxLength = 100000
 	r := &runner{
@@ -96,20 +91,14 @@ func RunTestCase(c *TestCase) {
 			})
 		}
 	}
-	// First process traces with normal spans
 	for _, trace := range expected.Traces {
-		if !trace.HasExpectAbsentSpans() && r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
-			slog.Info("searching tempo", "traceql", trace.TraceQL)
+		if r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
+			if trace.AllSpansExpectAbsent() {
+				slog.Info("searching tempo for absent spans (all absent)", "traceql", trace.TraceQL)
+			} else {
+				slog.Info("searching tempo", "traceql", trace.TraceQL)
+			}
 			r.eventually(func() {
-				AssertTempo(r, trace)
-			})
-		}
-	}
-	// Then process traces with ExpectAbsent spans
-	for _, trace := range expected.Traces {
-		if trace.HasExpectAbsentSpans() && r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
-			slog.Info("searching tempo for absent spans", "traceql", trace.TraceQL)
-			r.consistentlyNot(func() {
 				AssertTempo(r, trace)
 			})
 		}
@@ -214,15 +203,6 @@ func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
 	}
 }
 
-func (r *runner) consistentlyNot(asserter func()) {
-	r.assertDeadline()
-	caller := newAssertCaller(r)
-	timeout := AbsentTimeout
-	gomega.Consistently(context.Background(), func(g gomega.Gomega) {
-		r.callAsserter(g, caller, asserter)
-	}).WithTimeout(timeout).WithPolling(caller.interval).ShouldNot(gomega.Succeed(), "assertion should not succeed for %v", timeout)
-}
-
 type asserterCaller struct {
 	iterations int
 	start      time.Time
@@ -283,6 +263,7 @@ func (r *runner) callAsserter(g gomega.Gomega, caller *asserterCaller, asserter 
 		} else {
 			headers["Accept"] = "application/json"
 		}
+		r.LogQueryResult("Making HTTP request: %s %s\n", method, url)
 		err := requests.DoHTTPRequest(url, method, headers, body, status)
 		g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
 	}
