@@ -189,7 +189,16 @@ expected:
           attributes:
             db.system: h2
           allow-duplicates: true # allow multiple spans with the same attributes
+        - name: 'dropped-span'
+          expect-absent: true # assert this span does NOT exist (e.g., filtered/dropped spans)
 ```
+
+#### Span assertion options
+
+- **`name`**: Span name to match. Prefix with `regex:` for regex matching (e.g., `regex:SELECT .*`)
+- **`attributes`**: Key-value pairs that must match exactly on the span
+- **`allow-duplicates`**: Set to `true` to allow multiple spans with the same name and attributes (default: `false`)
+- **`expect-absent`**: Set to `true` to assert the span does NOT exist in the trace. Useful for verifying spans were filtered, dropped, or suppressed (default: `false`)
 
 ### Query logs
 
@@ -202,12 +211,22 @@ expected:
       equals: 'Anonymous player is rolling the dice'
       attributes:
         service_name: rolldice
-      attribute-regexp:  
+      attribute-regexp:
         container_id: ".*"
       no-extra-attributes: true # fail if there are extra attributes
     - logql: '{service_name="rolldice"} |~ `Anonymous player is rolling the dice.*`'
       regexp: 'Anonymous player is .*'
 ```
+
+#### Log assertion options
+
+- **`logql`**: LogQL query to find the log line (required)
+- **`equals`**: Exact string match for the log line
+- **`contains`**: Array of substrings that must all appear in the log line
+- **`regexp`**: Regular expression pattern to match against the log line
+- **`attributes`**: Key-value pairs that must match exactly on the log labels
+- **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against log labels
+- **`no-extra-attributes`**: Set to `true` to fail if the log has labels beyond those specified in `attributes` and `attribute-regexp`
 
 ### Query metrics
 
@@ -217,6 +236,11 @@ expected:
     - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
       value: "== 10"
 ```
+
+#### Metric assertion options
+
+- **`promql`**: PromQL query to retrieve the metric (required)
+- **`value`**: Expected value with comparison operator. Supported operators: `==`, `!=`, `>`, `<`, `>=`, `<=` (e.g., `">= 0"`, `"== 10"`)
 
 ### Matrix of test cases
 
@@ -249,7 +273,7 @@ expected:
       matrix-condition: default
 ```
 
-`matrix-condition` is a regex that is applied to the matrix name.
+`matrix-condition` is a regex that is applied to the matrix name. This field is available for all assertion types (traces, logs, metrics, profiles).
 
 ## Docker Compose
 

@@ -1,0 +1,21 @@
+docker-compose:
+input:
+  - path: /api/test
+expected:
+  traces:
+    - traceql: '{ name =~ "SELECT .*" }'
+      spans:
+        - name: 'regex:SELECT .*product'
+          attributes:
+            db.system: h2
+        - name: 'nonexistent-span'
+          expect-absent: true
+    - traceql: '{ span.kind = "client" }'
+      spans:
+        - name: 'HTTP GET'
+          expect-absent: false
+        - name: 'filtered-span'
+          expect-absent: true
+  metrics:
+    - promql: test_metric
+      value: '>= 0'
