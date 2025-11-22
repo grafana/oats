@@ -93,7 +93,11 @@ func RunTestCase(c *TestCase) {
 	}
 	for _, trace := range expected.Traces {
 		if r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
-			slog.Info("searching tempo", "traceql", trace.TraceQL)
+			if trace.AllSpansExpectAbsent() {
+				slog.Info("searching tempo for absent spans (all absent)", "traceql", trace.TraceQL)
+			} else {
+				slog.Info("searching tempo", "traceql", trace.TraceQL)
+			}
 			r.eventually(func() {
 				AssertTempo(r, trace)
 			})
@@ -174,65 +178,98 @@ func prepareBuildDir(name string) string {
 }
 
 func (r *runner) eventually(asserter func()) {
-	gomega.Expect(time.Now()).Should(gomega.BeTemporally("<", r.deadline))
-	start := time.Now()
-	printTime := start
-	ctx := context.Background()
+	r.assertDeadline()
+	r.eventuallyWithTimeout(asserter, time.Until(r.deadline))
+}
+
+func (r *runner) assertDeadline() bool {
+	return gomega.Expect(time.Now()).Should(gomega.BeTemporally("<", r.deadline))
+}
+
+func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
+	caller := newAssertCaller(r)
+	r.additionalAsserts = nil
+	gomega.Eventually(context.Background(), func(g gomega.Gomega) {
+		r.callAsserter(g, caller, asserter)
+	}).WithTimeout(timeout).WithPolling(caller.interval).Should(
+		gomega.Succeed(),
+		"calling application for %s should cause telemetry to appear within %v",
+		r.testCase.Name,
+		timeout,
+	)
+	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(caller.start)))
+	for _, a := range r.additionalAsserts {
+		a()
+	}
+}
+
+type asserterCaller struct {
+	iterations int
+	start      time.Time
+	printTime  time.Time
+	interval   time.Duration
+}
+
+func newAssertCaller(r *runner) *asserterCaller {
 	interval := r.testCase.Definition.Interval
 	if interval == 0 {
 		interval = DefaultTestCaseInterval
 	}
-	iterations := 0
-	r.additionalAsserts = nil
-	gomega.Eventually(ctx, func(g gomega.Gomega) {
-		verbose := VerboseLogging
-		if iterations == 0 || time.Since(printTime) > 10*time.Second {
-			verbose = true
-			printTime = time.Now()
-		}
-		iterations++
-		r.Verbose = verbose
-		r.LogQueryResult("waiting for telemetry data\n")
 
-		for _, i := range r.testCase.Definition.Input {
-			scheme := "http"
-			if i.Scheme != "" {
-				scheme = i.Scheme
-			}
-			host := r.host
-			if i.Host != "" {
-				host = i.Host
-			}
-			url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.testCase.PortConfig.ApplicationPort, i.Path)
-			body := i.Body
-			method := http.MethodGet
-			if i.Method != "" {
-				method = strings.ToUpper(i.Method)
-			}
-			status := 200
-			if i.Status != "" {
-				parsedStatus, err := strconv.ParseInt(i.Status, 10, 64)
-				if err == nil {
-					status = int(parsedStatus)
-				}
-			}
-			headers := make(map[string]string)
-			if i.Headers != nil {
-				maps.Copy(headers, i.Headers)
-			} else {
-				headers["Accept"] = "application/json"
-			}
-			err := requests.DoHTTPRequest(url, method, headers, body, status)
-			g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
-		}
-
-		r.gomegaInst = g
-		asserter()
-	}).WithTimeout(time.Until(r.deadline)).WithPolling(interval).Should(gomega.Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
-	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(start)))
-	for _, a := range r.additionalAsserts {
-		a()
+	now := time.Now()
+	return &asserterCaller{
+		iterations: 0,
+		start:      now,
+		printTime:  now,
+		interval:   interval,
 	}
+}
+
+func (r *runner) callAsserter(g gomega.Gomega, caller *asserterCaller, asserter func()) {
+	verbose := VerboseLogging
+	if caller.iterations == 0 || time.Since(caller.printTime) > 10*time.Second {
+		verbose = true
+		caller.printTime = time.Now()
+	}
+	caller.iterations++
+	r.Verbose = verbose
+	r.LogQueryResult("waiting for telemetry data\n")
+
+	for _, i := range r.testCase.Definition.Input {
+		scheme := "http"
+		if i.Scheme != "" {
+			scheme = i.Scheme
+		}
+		host := r.host
+		if i.Host != "" {
+			host = i.Host
+		}
+		url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.testCase.PortConfig.ApplicationPort, i.Path)
+		body := i.Body
+		method := http.MethodGet
+		if i.Method != "" {
+			method = strings.ToUpper(i.Method)
+		}
+		status := 200
+		if i.Status != "" {
+			parsedStatus, err := strconv.ParseInt(i.Status, 10, 64)
+			if err == nil {
+				status = int(parsedStatus)
+			}
+		}
+		headers := make(map[string]string)
+		if i.Headers != nil {
+			maps.Copy(headers, i.Headers)
+		} else {
+			headers["Accept"] = "application/json"
+		}
+		r.LogQueryResult("Making HTTP request: %s %s\n", method, url)
+		err := requests.DoHTTPRequest(url, method, headers, body, status)
+		g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
+	}
+
+	r.gomegaInst = g
+	asserter()
 }
 
 func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) bool {

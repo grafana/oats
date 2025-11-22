@@ -64,9 +64,10 @@ func TestInputDefinitionsAreCorrect(t *testing.T) {
 func TestCollectTestCases(t *testing.T) {
 	cases, err := collectTestCases("testdata", false)
 	require.NoError(t, err)
-	require.Len(t, cases, 4)
-	require.Equal(t, "runfoo-input.oats", cases[0].Name)
-	require.Equal(t, "runfoo-more-oats", cases[1].Name)
-	require.Equal(t, "runfoo-oats", cases[2].Name)
-	require.Equal(t, "run-oats-merged", cases[3].Name)
+	require.Len(t, cases, 5)
+	require.Equal(t, "runfoo-expect-absent.oats", cases[0].Name)
+	require.Equal(t, "runfoo-input.oats", cases[1].Name)
+	require.Equal(t, "runfoo-more-oats", cases[2].Name)
+	require.Equal(t, "runfoo-oats", cases[3].Name)
+	require.Equal(t, "run-oats-merged", cases[4].Name)
 }
