@@ -31,7 +31,7 @@ func run() error {
 	logPyroscope := flag.Bool("lgtm-log-pyroscope", false, "enable logging for Pyroscope")
 	logCollector := flag.Bool("lgtm-log-collector", false, "enable logging for OTel Collector")
 
-	timeout := flag.Duration("timeout", 30*time.Second, "timeout for the test case")
+	timeout := flag.Duration("timeout", 30*time.Second, "timeout for each test case")
 	manualDebug := flag.Bool("manual-debug", false, "debug mode")
 	flag.Parse()
 
