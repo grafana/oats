@@ -11,6 +11,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/grafana/oats/model"
 	"github.com/onsi/gomega"
 	"go.yaml.in/yaml/v3"
 )
@@ -21,19 +22,15 @@ var lgtmTemplate []byte
 //go:embed docker-compose-include-base.yml
 var lgtmTemplateIncludeBase []byte
 
-func (c *TestCase) CreateDockerComposeFile() string {
+func CreateDockerComposeFile(c *model.TestCase) string {
 	p := filepath.Join(c.OutputDir, "docker-compose.yml")
-	content := c.getContent()
+	content := getContent(c)
 	err := os.WriteFile(p, content, 0644)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	return p
 }
 
-func (c *TestCase) getContent() []byte {
-	return c.generateDockerComposeFile()
-}
-
-func (c *TestCase) generateDockerComposeFile() []byte {
+func getContent(c *model.TestCase) []byte {
 	compose := c.Definition.DockerCompose
 	slog.Info("using docker-compose", "lgtm-version", c.LgtmVersion)
 

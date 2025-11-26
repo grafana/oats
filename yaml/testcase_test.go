@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/grafana/oats/model"
 	"github.com/stretchr/testify/require"
 )
 
@@ -70,4 +71,15 @@ func TestCollectTestCases(t *testing.T) {
 	require.Equal(t, "runfoo-more-oats", cases[2].Name)
 	require.Equal(t, "runfoo-oats", cases[3].Name)
 	require.Equal(t, "run-oats-merged", cases[4].Name)
+}
+
+func TestTestCasesAreValid(t *testing.T) {
+	cases, err := collectTestCases("testdata", false)
+	require.NoError(t, err)
+	require.NotEmpty(t, cases)
+	for _, c := range cases {
+		require.NotEqual(t, nil, c.Definition)
+		require.NotEmpty(t, c.Definition.Input)
+		model.ValidateInput(c.Definition.Input)
+	}
 }

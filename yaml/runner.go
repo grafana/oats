@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/oats/model"
 	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/kubernetes"
 	"github.com/grafana/oats/testhelpers/remote"
@@ -23,18 +24,22 @@ import (
 )
 
 type runner struct {
-	testCase          *TestCase
-	endpoint          *remote.Endpoint
-	deadline          time.Time
-	host              string
-	Verbose           bool
-	gomegaInst        gomega.Gomega
-	additionalAsserts []func()
+	testCase   *model.TestCase
+	endpoint   *remote.Endpoint
+	deadline   time.Time
+	host       string
+	Verbose    bool
+	gomegaInst gomega.Gomega
 }
 
 var VerboseLogging bool
 
-func RunTestCase(c *TestCase) {
+// AbsentTimeout is the timeout for checking that spans are absent from traces.
+// This is shorter than the default timeout because we're checking for non-existence,
+// and checking after we've finished other assertions.
+const AbsentTimeout = 10 * time.Second
+
+func RunTestCase(c *model.TestCase) {
 	format.MaxLength = 100000
 	r := &runner{
 		host:     c.Host,
@@ -42,7 +47,7 @@ func RunTestCase(c *TestCase) {
 	}
 
 	c.OutputDir = prepareBuildDir(c.Name)
-	c.validateAndSetVariables()
+	c.ValidateAndSetVariables()
 	endpoint, err := startEndpoint(c)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting an observability endpoint")
 
@@ -84,24 +89,22 @@ func RunTestCase(c *TestCase) {
 	// Assert logs traces first, because metrics can take longer to appear
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {
-		if r.MatchesMatrixCondition(log.MatrixCondition, log.LogQL) {
-			slog.Info("searching loki", "logql", log.LogQL)
-			r.eventually(func() {
+		r.assertSignal(log.Signal, log.LogQL,
+			func() {
+				slog.Info("searching loki", "logql", log.LogQL)
+			},
+			func() {
 				AssertLoki(r, log)
 			})
-		}
 	}
 	for _, trace := range expected.Traces {
-		if r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
-			if trace.AllSpansExpectAbsent() {
-				slog.Info("searching tempo for absent spans (all absent)", "traceql", trace.TraceQL)
-			} else {
+		r.assertSignal(trace.Signal, trace.TraceQL,
+			func() {
 				slog.Info("searching tempo", "traceql", trace.TraceQL)
-			}
-			r.eventually(func() {
+			},
+			func() {
 				AssertTempo(r, trace)
 			})
-		}
 	}
 	for _, metric := range expected.Metrics {
 		if r.MatchesMatrixCondition(metric.MatrixCondition, metric.PromQL) {
@@ -129,7 +132,7 @@ func RunTestCase(c *TestCase) {
 	}
 }
 
-func assertCustomCheck(r *runner, c CustomCheck) {
+func assertCustomCheck(r *runner, c model.CustomCheck) {
 	r.LogQueryResult("running custom check %v\n", c.Script)
 	cmd := exec.Command(c.Script)
 	cmd.Dir = r.testCase.Dir
@@ -141,7 +144,7 @@ func assertCustomCheck(r *runner, c CustomCheck) {
 	r.gomegaInst.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
-func startEndpoint(c *TestCase) (*remote.Endpoint, error) {
+func startEndpoint(c *model.TestCase) (*remote.Endpoint, error) {
 	ports := remote.PortsConfig{
 		PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
 		TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
@@ -154,7 +157,7 @@ func startEndpoint(c *TestCase) (*remote.Endpoint, error) {
 	if c.Definition.Kubernetes != nil {
 		endpoint = kubernetes.NewEndpoint(c.Host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
 	} else {
-		endpoint = compose.NewEndpoint(c.Host, c.CreateDockerComposeFile(), ports)
+		endpoint = compose.NewEndpoint(c.Host, CreateDockerComposeFile(c), ports)
 	}
 
 	var ctx = context.Background()
@@ -177,6 +180,17 @@ func prepareBuildDir(name string) string {
 	return dir
 }
 
+func (r *runner) assertSignal(signal model.ExpectedSignal, query string, startLog func(), asserter func()) {
+	if r.MatchesMatrixCondition(signal.MatrixCondition, query) {
+		startLog()
+		if signal.ExpectAbsent() {
+			r.consistentlyNot(asserter)
+		} else {
+			r.eventually(asserter)
+		}
+	}
+}
+
 func (r *runner) eventually(asserter func()) {
 	r.assertDeadline()
 	r.eventuallyWithTimeout(asserter, time.Until(r.deadline))
@@ -188,7 +202,6 @@ func (r *runner) assertDeadline() bool {
 
 func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
 	caller := newAssertCaller(r)
-	r.additionalAsserts = nil
 	gomega.Eventually(context.Background(), func(g gomega.Gomega) {
 		r.callAsserter(g, caller, asserter)
 	}).WithTimeout(timeout).WithPolling(caller.interval).Should(
@@ -198,9 +211,15 @@ func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
 		timeout,
 	)
 	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(caller.start)))
-	for _, a := range r.additionalAsserts {
-		a()
-	}
+}
+
+func (r *runner) consistentlyNot(asserter func()) {
+	r.assertDeadline()
+	caller := newAssertCaller(r)
+	timeout := AbsentTimeout
+	gomega.Consistently(context.Background(), func(g gomega.Gomega) {
+		r.callAsserter(g, caller, asserter)
+	}).WithTimeout(timeout).WithPolling(caller.interval).ShouldNot(gomega.Succeed(), "assertion should not succeed for %v", timeout)
 }
 
 type asserterCaller struct {
@@ -213,7 +232,7 @@ type asserterCaller struct {
 func newAssertCaller(r *runner) *asserterCaller {
 	interval := r.testCase.Definition.Interval
 	if interval == 0 {
-		interval = DefaultTestCaseInterval
+		interval = model.DefaultTestCaseInterval
 	}
 
 	now := time.Now()
@@ -289,4 +308,14 @@ func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) 
 		"name", name,
 		"subject", subject)
 	return false
+}
+
+func (r *runner) LogQueryResult(format string, a ...any) {
+	if r.Verbose {
+		result := fmt.Sprintf(format, a...)
+		if len(result) > 1000 {
+			result = result[:1000] + ".."
+		}
+		slog.Info(result)
+	}
 }

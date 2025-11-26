@@ -1,7 +1,6 @@
-package yaml
+package model
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"path/filepath"
@@ -14,21 +13,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-type ExpectedMetrics struct {
-	PromQL          string `yaml:"promql"`
-	Value           string `yaml:"value"`
-	MatrixCondition string `yaml:"matrix-condition"`
-}
-
-type ExpectedSpan struct {
-	Name         string            `yaml:"name"`
-	Attributes   map[string]string `yaml:"attributes"`
-	AllowDups    bool              `yaml:"allow-duplicates"`
-	ExpectAbsent bool              `yaml:"expect-absent"`
-}
-
-type ExpectedLogs struct {
-	LogQL             string            `yaml:"logql"`
+type ExpectedSignal struct {
 	Equals            string            `yaml:"equals"`
 	Contains          []string          `yaml:"contains"`
 	Regexp            string            `yaml:"regexp"`
@@ -36,6 +21,27 @@ type ExpectedLogs struct {
 	AttributeRegexp   map[string]string `yaml:"attribute-regexp"`
 	NoExtraAttributes bool              `yaml:"no-extra-attributes"`
 	MatrixCondition   string            `yaml:"matrix-condition"`
+	Count             *ExpectedRange    `yaml:"count"`
+}
+
+func (s ExpectedSignal) ExpectAbsent() bool {
+	return s.Count != nil && s.Count.Min == 0 && s.Count.Max == 0
+}
+
+type ExpectedMetrics struct {
+	PromQL          string `yaml:"promql"`
+	Value           string `yaml:"value"`
+	MatrixCondition string `yaml:"matrix-condition"`
+}
+
+// Deprecated: use ExpectedSignal instead
+type ExpectedSpan struct {
+	Name string `yaml:"name"`
+}
+
+type ExpectedLogs struct {
+	LogQL  string         `yaml:"logql"`
+	Signal ExpectedSignal `yaml:",inline"`
 }
 
 type Flamebearers struct {
@@ -48,22 +54,15 @@ type ExpectedProfiles struct {
 	MatrixCondition string       `yaml:"matrix-condition"`
 }
 
-type ExpectedTraces struct {
-	TraceQL         string         `yaml:"traceql"`
-	Spans           []ExpectedSpan `yaml:"spans"`
-	MatrixCondition string         `yaml:"matrix-condition"`
+type ExpectedRange struct {
+	Min int `yaml:"min"`
+	Max int `yaml:"max"`
 }
 
-func (t ExpectedTraces) AllSpansExpectAbsent() bool {
-	if len(t.Spans) == 0 {
-		return false
-	}
-	for _, span := range t.Spans {
-		if !span.ExpectAbsent {
-			return false
-		}
-	}
-	return true
+type ExpectedTraces struct {
+	TraceQL string         `yaml:"traceql"`
+	Spans   []ExpectedSpan `yaml:"spans"` // deprecated, use fields below instead
+	Signal  ExpectedSignal `yaml:",inline"`
 }
 
 type CustomCheck struct {
@@ -150,17 +149,7 @@ type TestCase struct {
 	ManualDebug        bool
 }
 
-func (r *runner) LogQueryResult(format string, a ...any) {
-	if r.Verbose {
-		result := fmt.Sprintf(format, a...)
-		if len(result) > 1000 {
-			result = result[:1000] + ".."
-		}
-		slog.Info(result)
-	}
-}
-
-func (c *TestCase) validateAndSetVariables() {
+func (c *TestCase) ValidateAndSetVariables() {
 	if c.Definition.Kubernetes != nil {
 		validateK8s(c.Definition.Kubernetes)
 		gomega.Expect(c.Definition.DockerCompose).To(gomega.BeNil(), "kubernetes and docker-compose are mutually exclusive")
@@ -168,7 +157,7 @@ func (c *TestCase) validateAndSetVariables() {
 		gomega.Expect(c.Definition.DockerCompose).ToNot(gomega.BeNil(), "%s does not appear to be a valid OATS YAML file", c.Path)
 		validateDockerCompose(c.Definition.DockerCompose, c.Dir)
 	}
-	validateInput(c.Definition.Input)
+	ValidateInput(c.Definition.Input)
 	expected := c.Definition.Expected
 	gomega.Expect(len(expected.Metrics)+len(expected.Traces)+len(expected.Logs)+len(expected.Profiles)).NotTo(gomega.BeZero(), "%s does not contain any expected metrics, traces, logs or profiles", c.Path)
 
@@ -178,10 +167,7 @@ func (c *TestCase) validateAndSetVariables() {
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
 		gomega.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in %s", string(out))
-		gomega.Expect(l.Equals == "" && l.Contains == nil && l.Regexp == "").To(gomega.BeFalse())
-		for _, s := range l.Contains {
-			gomega.Expect(s).ToNot(gomega.BeEmpty(), "contains string is empty in %s", string(out))
-		}
+		validateSignal(l.Signal, out)
 	}
 	for _, d := range expected.Metrics {
 		out, _ := yaml.Marshal(d)
@@ -191,13 +177,11 @@ func (c *TestCase) validateAndSetVariables() {
 	for _, d := range expected.Traces {
 		out, _ := yaml.Marshal(d)
 		gomega.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in %s", string(out))
-		gomega.Expect(d.Spans).ToNot(gomega.BeEmpty(), "spans are empty in %s", string(out))
+		gomega.Expect(d.Spans).To(gomega.BeEmpty(), "spans are deprecated, add to 'traces' directly: %s", string(out))
+		validateSignal(d.Signal, out)
+
 		for _, span := range d.Spans {
 			gomega.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in %s", string(out))
-			for k, v := range span.Attributes {
-				gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
-				gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
-			}
 		}
 	}
 	for _, p := range expected.Profiles {
@@ -227,6 +211,45 @@ func (c *TestCase) validateAndSetVariables() {
 		"application", c.PortConfig.ApplicationPort)
 }
 
+func validateSignal(signal ExpectedSignal, out []byte) {
+	if signal.ExpectAbsent() {
+		// expect all fields to be empty
+		gomega.Expect(signal.Equals).To(gomega.BeNil(), "expected 'equals' to be nil when count min=0 and max=0 in %s", string(out))
+		gomega.Expect(signal.Contains).To(gomega.BeNil(), "expected 'contains' to be nil when count min=0 and max=0 in %s", string(out))
+		gomega.Expect(signal.Regexp).To(gomega.BeNil(), "expected 'regexp' to be nil when count min=0 and max=0 in %s", string(out))
+		gomega.Expect(len(signal.Attributes)).To(gomega.BeZero(), "expected 'attributes' to be empty when count min=0 and max=0 in %s", string(out))
+		gomega.Expect(len(signal.AttributeRegexp)).To(gomega.BeZero(), "expected 'attribute-regexp' to be empty when count min=0 and max=0 in %s", string(out))
+	} else {
+		gomega.Expect(signal.Equals == "" && signal.Contains == nil && signal.Regexp == "").To(gomega.BeFalse())
+		for _, s := range signal.Contains {
+			gomega.Expect(s).ToNot(gomega.BeEmpty(), "contains string is empty in %s", string(out))
+		}
+		for k, v := range signal.Attributes {
+			gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
+			gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
+		}
+		for k, v := range signal.AttributeRegexp {
+			gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
+			gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
+		}
+	}
+
+	// cases
+	// count if nil -> 1 or more
+	// min=0, max>0 -> not supported
+	// min=0, max=0 -> exactly 0
+	// min>0, max=0 -> min or more
+	// min>0, max>=min -> between min and max
+	c := signal.Count
+	if c != nil {
+		// 0..1+ is not supported
+		gomega.Expect(c.Min == 0 && c.Max > 0).To(gomega.BeFalse(), "count min=0 and max>0 is not supported in %s", string(out))
+
+		gomega.Expect(c.Min).To(gomega.BeNumerically(">=", 0), "count.min is negative in %s", string(out))
+		gomega.Expect(c.Max).To(gomega.Or(gomega.Equal(0), gomega.BeNumerically(">=", c.Min)), "count.max is less than count.min in %s", string(out))
+	}
+}
+
 func validateK8s(kubernetes *kubernetes.Kubernetes) {
 	gomega.Expect(kubernetes.Dir).ToNot(gomega.BeEmpty(), "k8s-dir is empty")
 	gomega.Expect(kubernetes.AppService).ToNot(gomega.BeEmpty(), "k8s-app-service is empty")
@@ -235,7 +258,7 @@ func validateK8s(kubernetes *kubernetes.Kubernetes) {
 	gomega.Expect(kubernetes.AppDockerPort).ToNot(gomega.BeZero(), "app-docker-port is zero")
 }
 
-func validateInput(input []Input) {
+func ValidateInput(input []Input) {
 	for _, i := range input {
 		gomega.Expect(i.Path).ToNot(gomega.BeEmpty(), "input path is empty")
 		if i.Status != "" {
