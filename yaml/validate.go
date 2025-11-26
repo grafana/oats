@@ -24,14 +24,10 @@ func assertCount(g gomega.Gomega, expectedRange *model.ExpectedRange, got int) {
 
 func assertName(g gomega.Gomega, s model.ExpectedSignal, name string) {
 	if len(s.Equals) > 0 {
-		// check for exact match in additional asserts
-		g.Expect(name).To(gomega.ContainSubstring(s.Equals))
+		g.Expect(name).To(gomega.Equal(s.Equals))
 	}
 	if len(s.Regexp) > 0 {
 		g.Expect(name).To(gomega.MatchRegexp(s.Regexp))
-	}
-	for _, s := range s.Contains {
-		g.Expect(name).To(gomega.ContainSubstring(s))
 	}
 }
 

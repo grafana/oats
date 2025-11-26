@@ -15,7 +15,6 @@ func TestAssertLokiResponse(t *testing.T) {
 	file, err := os.ReadFile("testdata/loki_response.json")
 	require.NoError(t, err)
 	logs := model.ExpectedSignal{
-		Contains: []string{"simulating an error"},
 		Attributes: map[string]string{
 			"deployment_environment": "staging",
 			"exception_message":      "simulating an error",

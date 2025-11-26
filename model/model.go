@@ -15,7 +15,7 @@ import (
 
 type ExpectedSignal struct {
 	Equals            string            `yaml:"equals"`
-	Contains          []string          `yaml:"contains"`
+	Contains          []string          `yaml:"contains"` // deprecated, use regexp instead
 	Regexp            string            `yaml:"regexp"`
 	Attributes        map[string]string `yaml:"attributes"`
 	AttributeRegexp   map[string]string `yaml:"attribute-regexp"`
@@ -212,18 +212,15 @@ func (c *TestCase) ValidateAndSetVariables() {
 }
 
 func validateSignal(signal ExpectedSignal, out []byte) {
+	gomega.Expect(signal.Contains).To(gomega.BeNil(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
 	if signal.ExpectAbsent() {
 		// expect all fields to be empty
 		gomega.Expect(signal.Equals).To(gomega.BeNil(), "expected 'equals' to be nil when count min=0 and max=0 in %s", string(out))
-		gomega.Expect(signal.Contains).To(gomega.BeNil(), "expected 'contains' to be nil when count min=0 and max=0 in %s", string(out))
 		gomega.Expect(signal.Regexp).To(gomega.BeNil(), "expected 'regexp' to be nil when count min=0 and max=0 in %s", string(out))
 		gomega.Expect(len(signal.Attributes)).To(gomega.BeZero(), "expected 'attributes' to be empty when count min=0 and max=0 in %s", string(out))
 		gomega.Expect(len(signal.AttributeRegexp)).To(gomega.BeZero(), "expected 'attribute-regexp' to be empty when count min=0 and max=0 in %s", string(out))
 	} else {
-		gomega.Expect(signal.Equals == "" && signal.Contains == nil && signal.Regexp == "").To(gomega.BeFalse())
-		for _, s := range signal.Contains {
-			gomega.Expect(s).ToNot(gomega.BeEmpty(), "contains string is empty in %s", string(out))
-		}
+		gomega.Expect(signal.Equals == "" && signal.Regexp == "").To(gomega.BeFalse())
 		for k, v := range signal.Attributes {
 			gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
 			gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
