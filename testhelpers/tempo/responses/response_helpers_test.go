@@ -17,12 +17,12 @@ func TestParseTraceDetails(t *testing.T) {
 	i := spans.Len()
 	require.NotZero(t, i)
 	require.NotEmpty(t, details)
-	findSpans, _ := FindSpans(details, model.ExpectedSignal{
+	name, _ := FindSpans(details, model.ExpectedSignal{
 		Equals: "kafkaTopic publish",
 	})
-	require.Len(t, findSpans, 1)
-	findSpans, _ = FindSpans(details, model.ExpectedSignal{
+	require.Equal(t, "kafkaTopic publish", name)
+	name, _ = FindSpans(details, model.ExpectedSignal{
 		Regexp: "kafkaTopic publish",
 	})
-	require.Len(t, findSpans, 1)
+	require.Equal(t, "kafkaTopic publish", name)
 }

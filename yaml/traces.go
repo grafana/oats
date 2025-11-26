@@ -38,10 +38,6 @@ func assertTrace(r *runner, tr responses.Trace, wantTraces model.ExpectedTraces)
 	td, err := responses.ParseTraceDetails(b)
 	g.Expect(err).ToNot(gomega.HaveOccurred(), "we should be able to parse the GET trace by traceID API output")
 
-	spans, atts := responses.FindSpans(td, wantTraces.Signal)
-	name := ""
-	if len(spans) > 0 {
-		name = spans[0].Name()
-	}
-	assertSignal(g, wantTraces.Signal, len(spans), name, atts)
+	name, atts := responses.FindSpans(td, wantTraces.Signal)
+	assertSignal(g, wantTraces.Signal, td.ResourceSpans().Len(), name, atts)
 }

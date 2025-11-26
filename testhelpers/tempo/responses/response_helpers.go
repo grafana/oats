@@ -51,16 +51,8 @@ func ParseTempoSearchResult(body []byte) (TempoSearchResult, error) {
 	return st, err
 }
 
-func FindSpans(td ptrace.Traces, signal model.ExpectedSignal) ([]ptrace.Span, map[string]string) {
-	m := matcherMaybeRegex(signal)
-	return FindSpansFunc(td, func(span *ptrace.Span) bool {
-		return m(span.Name())
-	})
-}
-
-func FindSpansFunc(td ptrace.Traces, pred func(*ptrace.Span) bool) ([]ptrace.Span, map[string]string) {
-	var result []ptrace.Span
-	atts := map[string]string{}
+func FindSpans(td ptrace.Traces, signal model.ExpectedSignal) (string, map[string]string) {
+	matcher := nameMatcher(signal)
 	resourceSpans := td.ResourceSpans()
 	for i := 0; i < resourceSpans.Len(); i++ {
 		resourceSpan := resourceSpans.At(i)
@@ -70,8 +62,8 @@ func FindSpansFunc(td ptrace.Traces, pred func(*ptrace.Span) bool) ([]ptrace.Spa
 			spans := scopeSpan.Spans()
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
-				if pred(&span) {
-					result = append(result, span)
+				if matcher(span.Name()) {
+					atts := map[string]string{}
 					resourceSpan.Resource().Attributes().Range(func(k string, v pcommon.Value) bool {
 						atts[k] = v.AsString()
 						return true
@@ -84,14 +76,19 @@ func FindSpansFunc(td ptrace.Traces, pred func(*ptrace.Span) bool) ([]ptrace.Spa
 					//this is how the scope name is shown in tempo
 					atts["otel.library.name"] = scope.Name()
 					atts["otel.library.version"] = scope.Version()
+					span.Attributes().Range(func(k string, v pcommon.Value) bool {
+						atts[k] = v.AsString()
+						return true
+					})
+					return span.Name(), atts
 				}
 			}
 		}
 	}
-	return result, atts
+	return "", nil
 }
 
-func matcherMaybeRegex(signal model.ExpectedSignal) func(got string) bool {
+func nameMatcher(signal model.ExpectedSignal) func(got string) bool {
 	var re *regexp.Regexp
 	if signal.Regexp != "" {
 		re = regexp.MustCompile(signal.Regexp)
