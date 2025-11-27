@@ -47,7 +47,7 @@ func RunTestCase(c *model.TestCase) {
 	}
 
 	c.OutputDir = prepareBuildDir(c.Name)
-	c.ValidateAndSetVariables()
+	c.ValidateAndSetVariables(gomega.Default)
 	endpoint, err := startEndpoint(c)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting an observability endpoint")
 

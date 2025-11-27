@@ -149,45 +149,45 @@ type TestCase struct {
 	ManualDebug        bool
 }
 
-func (c *TestCase) ValidateAndSetVariables() {
+func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
 	if c.Definition.Kubernetes != nil {
-		validateK8s(c.Definition.Kubernetes)
-		gomega.Expect(c.Definition.DockerCompose).To(gomega.BeNil(), "kubernetes and docker-compose are mutually exclusive")
+		validateK8s(c.Definition.Kubernetes, g)
+		g.Expect(c.Definition.DockerCompose).To(gomega.BeNil(), "kubernetes and docker-compose are mutually exclusive")
 	} else {
-		gomega.Expect(c.Definition.DockerCompose).ToNot(gomega.BeNil(), "%s does not appear to be a valid OATS YAML file", c.Path)
-		validateDockerCompose(c.Definition.DockerCompose, c.Dir)
+		g.Expect(c.Definition.DockerCompose).ToNot(gomega.BeNil(), "%s does not appear to be a valid OATS YAML file", c.Path)
+		validateDockerCompose(c.Definition.DockerCompose, c.Dir, g)
 	}
 	ValidateInput(gomega.Default, c.Definition.Input)
 	expected := c.Definition.Expected
-	gomega.Expect(len(expected.Metrics)+len(expected.Traces)+len(expected.Logs)+len(expected.Profiles)).NotTo(gomega.BeZero(), "%s does not contain any expected metrics, traces, logs or profiles", c.Path)
+	g.Expect(len(expected.Metrics)+len(expected.Traces)+len(expected.Logs)+len(expected.Profiles)).NotTo(gomega.BeZero(), "%s does not contain any expected metrics, traces, logs or profiles", c.Path)
 
 	for _, c := range expected.CustomChecks {
-		gomega.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in %s", string(c.Script))
+		g.Expect(c.Script).ToNot(gomega.BeEmpty(), "script is empty in %s", string(c.Script))
 	}
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
-		gomega.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in %s", string(out))
+		g.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in %s", string(out))
 		validateSignal(gomega.Default, l.Signal, out)
 	}
 	for _, d := range expected.Metrics {
 		out, _ := yaml.Marshal(d)
-		gomega.Expect(d.PromQL).ToNot(gomega.BeEmpty(), "promQL is empty in %s", string(out))
-		gomega.Expect(d.Value).ToNot(gomega.BeEmpty(), "value is empty in %s", string(out))
+		g.Expect(d.PromQL).ToNot(gomega.BeEmpty(), "promQL is empty in %s", string(out))
+		g.Expect(d.Value).ToNot(gomega.BeEmpty(), "value is empty in %s", string(out))
 	}
 	for _, d := range expected.Traces {
 		out, _ := yaml.Marshal(d)
-		gomega.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in %s", string(out))
-		gomega.Expect(d.Spans).To(gomega.BeEmpty(), "spans are deprecated, add to 'traces' directly: %s", string(out))
+		g.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in %s", string(out))
+		g.Expect(d.Spans).To(gomega.BeEmpty(), "spans are deprecated, add to 'traces' directly: %s", string(out))
 		validateSignal(gomega.Default, d.Signal, out)
 
 		for _, span := range d.Spans {
-			gomega.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in %s", string(out))
+			g.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in %s", string(out))
 		}
 	}
 	for _, p := range expected.Profiles {
 		out, _ := yaml.Marshal(p)
-		gomega.Expect(p.Query).ToNot(gomega.BeEmpty(), "query is empty in %s", string(out))
-		gomega.Expect(p.Flamebearers.Contains).ToNot(gomega.BeEmpty(), "Flamebearers.contains is empty in %s", string(out))
+		g.Expect(p.Query).ToNot(gomega.BeEmpty(), "query is empty in %s", string(out))
+		g.Expect(p.Flamebearers.Contains).ToNot(gomega.BeEmpty(), "Flamebearers.contains is empty in %s", string(out))
 	}
 
 	if c.PortConfig == nil {
@@ -247,12 +247,12 @@ func validateSignal(g gomega.Gomega, signal ExpectedSignal, out []byte) {
 	}
 }
 
-func validateK8s(kubernetes *kubernetes.Kubernetes) {
-	gomega.Expect(kubernetes.Dir).ToNot(gomega.BeEmpty(), "k8s-dir is empty")
-	gomega.Expect(kubernetes.AppService).ToNot(gomega.BeEmpty(), "k8s-app-service is empty")
-	gomega.Expect(kubernetes.AppDockerFile).ToNot(gomega.BeEmpty(), "app-docker-file is empty")
-	gomega.Expect(kubernetes.AppDockerTag).ToNot(gomega.BeEmpty(), "app-docker-tag is empty")
-	gomega.Expect(kubernetes.AppDockerPort).ToNot(gomega.BeZero(), "app-docker-port is zero")
+func validateK8s(kubernetes *kubernetes.Kubernetes, g gomega.Gomega) {
+	g.Expect(kubernetes.Dir).ToNot(gomega.BeEmpty(), "k8s-dir is empty")
+	g.Expect(kubernetes.AppService).ToNot(gomega.BeEmpty(), "k8s-app-service is empty")
+	g.Expect(kubernetes.AppDockerFile).ToNot(gomega.BeEmpty(), "app-docker-file is empty")
+	g.Expect(kubernetes.AppDockerTag).ToNot(gomega.BeEmpty(), "app-docker-tag is empty")
+	g.Expect(kubernetes.AppDockerPort).ToNot(gomega.BeZero(), "app-docker-port is zero")
 }
 
 func ValidateInput(g gomega.Gomega, input []Input) {
@@ -287,11 +287,11 @@ func ValidateInput(g gomega.Gomega, input []Input) {
 	}
 }
 
-func validateDockerCompose(d *DockerCompose, dir string) {
+func validateDockerCompose(d *DockerCompose, dir string, g gomega.Gomega) {
 	if len(d.Files) > 0 {
 		for i, filename := range d.Files {
 			d.Files[i] = filepath.Join(dir, filename)
-			gomega.Expect(d.Files[i]).To(gomega.BeARegularFile())
+			g.Expect(d.Files[i]).To(gomega.BeARegularFile())
 		}
 	}
 }
