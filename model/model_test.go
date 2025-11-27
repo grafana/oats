@@ -917,6 +917,99 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 			},
 			shouldFail: false,
 		},
+		{
+			name: "valid profile",
+			testCase: TestCase{
+				Path: "testdata/valid-profile.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected: Expected{
+						Profiles: []ExpectedProfiles{{
+							Query:        "memory:alloc_space:bytes:space:bytes{service_name=\"my-service\"}",
+							Flamebearers: Flamebearers{Contains: "main"},
+						}},
+					},
+				},
+			},
+			shouldFail: false,
+		},
+		{
+			name: "profile with empty query should fail",
+			testCase: TestCase{
+				Path: "testdata/invalid-profile-query.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected: Expected{
+						Profiles: []ExpectedProfiles{{
+							Query:        "",
+							Flamebearers: Flamebearers{Contains: "main"},
+						}},
+					},
+				},
+			},
+			shouldFail:  true,
+			description: "profile query is required",
+		},
+		{
+			name: "profile with empty flamebearers contains should fail",
+			testCase: TestCase{
+				Path: "testdata/invalid-profile-flamebearers.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected: Expected{
+						Profiles: []ExpectedProfiles{{
+							Query:        "memory:alloc_space:bytes:space:bytes{service_name=\"my-service\"}",
+							Flamebearers: Flamebearers{Contains: ""},
+						}},
+					},
+				},
+			},
+			shouldFail:  true,
+			description: "profile flamebearers.contains is required",
+		},
+		{
+			name: "profiles only (no metrics/logs/traces)",
+			testCase: TestCase{
+				Path: "testdata/profiles-only.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected: Expected{
+						Profiles: []ExpectedProfiles{{
+							Query:        "memory:alloc_space:bytes:space:bytes{service_name=\"my-service\"}",
+							Flamebearers: Flamebearers{Contains: "main"},
+						}},
+					},
+				},
+			},
+			shouldFail: false,
+		},
+		{
+			name: "multiple profiles",
+			testCase: TestCase{
+				Path: "testdata/multiple-profiles.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected: Expected{
+						Profiles: []ExpectedProfiles{
+							{
+								Query:        "memory:alloc_space:bytes:space:bytes{service_name=\"my-service\"}",
+								Flamebearers: Flamebearers{Contains: "main"},
+							},
+							{
+								Query:        "cpu:samples:count:cpu:nanoseconds{service_name=\"my-service\"}",
+								Flamebearers: Flamebearers{Contains: "handler"},
+							},
+						},
+					},
+				},
+			},
+			shouldFail: false,
+		},
 	}
 
 	for _, tt := range tests {
