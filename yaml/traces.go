@@ -22,10 +22,10 @@ func AssertTempo(r *runner, t model.ExpectedTraces) {
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(res.Traces).ToNot(gomega.BeEmpty())
 
-	assertTrace(r, res.Traces[0], t)
+	assertTrace(r, res.Traces[0], t, len(res.Traces))
 }
 
-func assertTrace(r *runner, tr responses.Trace, wantTraces model.ExpectedTraces) {
+func assertTrace(r *runner, tr responses.Trace, wantTraces model.ExpectedTraces, count int) {
 	ctx := context.Background()
 
 	b, err := r.endpoint.GetTraceByID(ctx, tr.TraceID)
@@ -42,5 +42,5 @@ func assertTrace(r *runner, tr responses.Trace, wantTraces model.ExpectedTraces)
 	if name == "" && !wantTraces.Signal.ExpectAbsent() {
 		g.Expect(name).ToNot(gomega.BeEmpty(), "no spans matching the signal were found")
 	}
-	assertSignal(g, wantTraces.Signal, td.ResourceSpans().Len(), name, atts)
+	assertSignal(g, wantTraces.Signal, count, name, atts)
 }
