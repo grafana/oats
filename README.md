@@ -282,7 +282,8 @@ expected:
 
 - **`query`**: Pyroscope query to retrieve the profile (required)
 - **`flamebearers`**: Assertions on the flamebearer response
-  - **`contains`**: String that must appear in the flamebearer names
+  - **`equals`**: String that must appear in the flamebearer names
+  - **`regexp`**: Regular expression pattern to match against the flamebearer names
 - **`matrix-condition`**: Regex to match against matrix test case names
 
 ### Custom checks
