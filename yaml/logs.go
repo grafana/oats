@@ -47,5 +47,9 @@ func AssertLokiResponse(b []byte, l model.ExpectedSignal, r *runner) {
 		line = streams[0].Values[0][1]
 		atts = streams[0].Stream
 	}
-	assertSignal(g, l, len(streams), line, atts)
+	totalLines := 0
+	for _, stream := range streams {
+		totalLines += len(stream.Values)
+	}
+	assertSignal(g, l, totalLines, line, atts)
 }
