@@ -227,7 +227,19 @@ expected:
 - **`attributes`**: Key-value pairs that must match exactly on the log labels
 - **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against log labels
 - **`no-extra-attributes`**: Set to `true` to fail if the log has labels beyond those specified in `attributes` and `attribute-regexp`
+- **`count`**: Expected count range for matching signals
+  - **`min`**: Minimum expected count (required)
+  - **`max`**: Maximum expected count. Set to `0` for no upper limit. To assert absence, set both `min: 0` and `max: 0`
 
+Example:
+```yaml
+expected:
+  logs:
+    - logql: '{service_name="rolldice"}'
+      equals: 'Rolling dice'
+      count:
+        min: 1
+        max: 5  # expect between 1-5 matching logs
 ### Query metrics
 
 ```yaml
