@@ -212,22 +212,26 @@ func (c *TestCase) ValidateAndSetVariables() {
 }
 
 func validateSignal(signal ExpectedSignal, out []byte) {
-	gomega.Expect(signal.Contains).To(gomega.BeNil(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
+	validateSignalWithGomega(gomega.Default, signal, out)
+}
+
+func validateSignalWithGomega(g gomega.Gomega, signal ExpectedSignal, out []byte) {
+	g.Expect(signal.Contains).To(gomega.BeNil(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
 	if signal.ExpectAbsent() {
 		// expect all fields to be empty
-		gomega.Expect(signal.Equals).To(gomega.BeNil(), "expected 'equals' to be nil when count min=0 and max=0 in %s", string(out))
-		gomega.Expect(signal.Regexp).To(gomega.BeNil(), "expected 'regexp' to be nil when count min=0 and max=0 in %s", string(out))
-		gomega.Expect(len(signal.Attributes)).To(gomega.BeZero(), "expected 'attributes' to be empty when count min=0 and max=0 in %s", string(out))
-		gomega.Expect(len(signal.AttributeRegexp)).To(gomega.BeZero(), "expected 'attribute-regexp' to be empty when count min=0 and max=0 in %s", string(out))
+		g.Expect(signal.Equals).To(gomega.BeNil(), "expected 'equals' to be nil when count min=0 and max=0 in %s", string(out))
+		g.Expect(signal.Regexp).To(gomega.BeNil(), "expected 'regexp' to be nil when count min=0 and max=0 in %s", string(out))
+		g.Expect(len(signal.Attributes)).To(gomega.BeZero(), "expected 'attributes' to be empty when count min=0 and max=0 in %s", string(out))
+		g.Expect(len(signal.AttributeRegexp)).To(gomega.BeZero(), "expected 'attribute-regexp' to be empty when count min=0 and max=0 in %s", string(out))
 	} else {
-		gomega.Expect(signal.Equals == "" && signal.Regexp == "").To(gomega.BeFalse())
+		g.Expect(signal.Equals == "" && signal.Regexp == "").To(gomega.BeFalse())
 		for k, v := range signal.Attributes {
-			gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
-			gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
+			g.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
+			g.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
 		}
 		for k, v := range signal.AttributeRegexp {
-			gomega.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
-			gomega.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
+			g.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
+			g.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
 		}
 	}
 
@@ -240,10 +244,10 @@ func validateSignal(signal ExpectedSignal, out []byte) {
 	c := signal.Count
 	if c != nil {
 		// 0..1+ is not supported
-		gomega.Expect(c.Min == 0 && c.Max > 0).To(gomega.BeFalse(), "count min=0 and max>0 is not supported in %s", string(out))
+		g.Expect(c.Min == 0 && c.Max > 0).To(gomega.BeFalse(), "count min=0 and max>0 is not supported in %s", string(out))
 
-		gomega.Expect(c.Min).To(gomega.BeNumerically(">=", 0), "count.min is negative in %s", string(out))
-		gomega.Expect(c.Max).To(gomega.Or(gomega.Equal(0), gomega.BeNumerically(">=", c.Min)), "count.max is less than count.min in %s", string(out))
+		g.Expect(c.Min).To(gomega.BeNumerically(">=", 0), "count.min is negative in %s", string(out))
+		g.Expect(c.Max).To(gomega.Or(gomega.Equal(0), gomega.BeNumerically(">=", c.Min)), "count.max is less than count.min in %s", string(out))
 	}
 }
 
@@ -256,14 +260,18 @@ func validateK8s(kubernetes *kubernetes.Kubernetes) {
 }
 
 func ValidateInput(input []Input) {
+	ValidateInputWithGomega(gomega.Default, input)
+}
+
+func ValidateInputWithGomega(g gomega.Gomega, input []Input) {
 	for _, i := range input {
-		gomega.Expect(i.Path).ToNot(gomega.BeEmpty(), "input path is empty")
+		g.Expect(i.Path).ToNot(gomega.BeEmpty(), "input path is empty")
 		if i.Status != "" {
 			_, err := strconv.ParseInt(i.Status, 10, 32)
-			gomega.Expect(err).To(gomega.BeNil(), "status must parse as integer or be empty")
+			g.Expect(err).To(gomega.BeNil(), "status must parse as integer or be empty")
 		}
 		if i.Method != "" {
-			gomega.Expect(strings.ToUpper(i.Method)).To(gomega.Or(
+			g.Expect(strings.ToUpper(i.Method)).To(gomega.Or(
 				gomega.Equal(http.MethodConnect),
 				gomega.Equal(http.MethodDelete),
 				gomega.Equal(http.MethodGet),
@@ -276,10 +284,10 @@ func ValidateInput(input []Input) {
 			), "method must be a supported HTTP method or be empty")
 		}
 		if (i.Method == "" || i.Method == http.MethodGet) && i.Body != "" {
-			gomega.Expect(i.Body).To(gomega.BeEmpty(), "body must be empty for GET requests")
+			g.Expect(i.Body).To(gomega.BeEmpty(), "body must be empty for GET requests")
 		}
 		if i.Scheme != "" {
-			gomega.Expect(strings.ToLower(i.Scheme)).To(gomega.Or(
+			g.Expect(strings.ToLower(i.Scheme)).To(gomega.Or(
 				gomega.Equal("http"),
 				gomega.Equal("https"),
 			), "scheme must be http, https or be empty")
