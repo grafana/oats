@@ -219,11 +219,11 @@ func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
 }
 
 func validateSignal(g gomega.Gomega, signal ExpectedSignal, out []byte) {
-	g.Expect(signal.Contains).To(gomega.BeNil(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
+	g.Expect(signal.Contains).To(gomega.BeEmpty(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
 	if signal.ExpectAbsent() {
 		// expect all fields to be empty
-		g.Expect(signal.NameEquals).To(gomega.BeNil(), "expected 'equals' to be nil when count min=0 and max=0 in %s", string(out))
-		g.Expect(signal.NameRegexp).To(gomega.BeNil(), "expected 'regexp' to be nil when count min=0 and max=0 in %s", string(out))
+		g.Expect(signal.NameEquals).To(gomega.BeEmpty(), "expected 'equals' to be nil when count min=0 and max=0 in %s", string(out))
+		g.Expect(signal.NameRegexp).To(gomega.BeEmpty(), "expected 'regexp' to be nil when count min=0 and max=0 in %s", string(out))
 		g.Expect(len(signal.Attributes)).To(gomega.BeZero(), "expected 'attributes' to be empty when count min=0 and max=0 in %s", string(out))
 		g.Expect(len(signal.AttributeRegexp)).To(gomega.BeZero(), "expected 'attribute-regexp' to be empty when count min=0 and max=0 in %s", string(out))
 	} else {

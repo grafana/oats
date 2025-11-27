@@ -367,14 +367,6 @@ func TestValidateSignal(t *testing.T) {
 			description: "max=0 means no upper limit",
 		},
 		{
-			name: "count with min=0 max=0 expects absent but will fail due to BeNil check on string",
-			signal: ExpectedSignal{
-				Count: &ExpectedRange{Min: 0, Max: 0},
-			},
-			shouldPanic: true,
-			description: "min=0 max=0 with empty strings fails BeNil() check (potential validation bug)",
-		},
-		{
 			name: "expect absent should not have equals",
 			signal: ExpectedSignal{
 				NameEquals: "test",
