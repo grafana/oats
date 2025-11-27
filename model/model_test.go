@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/grafana/oats/testhelpers/kubernetes"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -705,6 +706,141 @@ func TestTestCaseDefinition_Merge(t *testing.T) {
 			if tt.expected.DockerCompose != nil {
 				require.NotNil(t, base.DockerCompose)
 				assert.Equal(t, tt.expected.DockerCompose.Files, base.DockerCompose.Files)
+			}
+		})
+	}
+}
+
+func TestTestCase_ValidateAndSetVariables(t *testing.T) {
+	makeValidDockerCompose := func() *DockerCompose {
+		return &DockerCompose{Files: []string{"model_test.go"}}
+	}
+
+	makeValidExpected := func() Expected {
+		return Expected{
+			Metrics: []ExpectedMetrics{{PromQL: "up", Value: "1"}},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		testCase    TestCase
+		shouldFail  bool
+		description string
+		check       func(t *testing.T, tc *TestCase)
+	}{
+		{
+			name: "docker-compose only, valid expected, ports defaulted",
+			testCase: TestCase{
+				Path: "testdata/valid.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected:      makeValidExpected(),
+				},
+			},
+			shouldFail: false,
+			check: func(t *testing.T, tc *TestCase) {
+				require.NotNil(t, tc.PortConfig)
+				assert.Equal(t, 8080, tc.PortConfig.ApplicationPort)
+				assert.Equal(t, 3000, tc.PortConfig.GrafanaHTTPPort)
+				assert.Equal(t, 9090, tc.PortConfig.PrometheusHTTPPort)
+				assert.Equal(t, 3100, tc.PortConfig.LokiHTTPPort)
+				assert.Equal(t, 3200, tc.PortConfig.TempoHTTPPort)
+				assert.Equal(t, 4040, tc.PortConfig.PyroscopeHttpPort)
+			},
+		},
+		{
+			name: "kubernetes and docker-compose together should fail",
+			testCase: TestCase{
+				Path: "testdata/k8s-and-compose.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Kubernetes:    &kubernetes.Kubernetes{Dir: "dir", AppService: "svc", AppDockerFile: "Dockerfile", AppDockerTag: "tag", AppDockerPort: 80},
+					Expected:      makeValidExpected(),
+				},
+			},
+			shouldFail:  true,
+			description: "kubernetes and docker-compose are mutually exclusive",
+		},
+		{
+			name: "missing docker-compose when kubernetes nil should fail",
+			testCase: TestCase{
+				Path: "testdata/missing-compose.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					Expected: makeValidExpected(),
+				},
+			},
+			shouldFail:  true,
+			description: "docker-compose must be set when kubernetes is nil",
+		},
+		{
+			name: "no expected signals should fail",
+			testCase: TestCase{
+				Path: "testdata/no-expected.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+				},
+			},
+			shouldFail:  true,
+			description: "at least one of metrics, traces, logs or profiles must be set",
+		},
+		{
+			name: "log with empty LogQL should fail",
+			testCase: TestCase{
+				Path: "testdata/invalid-log.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected: Expected{
+						Logs: []ExpectedLogs{{}},
+					},
+				},
+			},
+			shouldFail:  true,
+			description: "logQL is required",
+		},
+		{
+			name: "trace with deprecated spans should fail",
+			testCase: TestCase{
+				Path: "testdata/invalid-trace.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected: Expected{
+						Traces: []ExpectedTraces{{TraceQL: "{service.name=\"svc\"}", Spans: []ExpectedSpan{{Name: "span"}}}},
+					},
+				},
+			},
+			shouldFail:  true,
+			description: "spans field is deprecated",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			failed := false
+			g := gomega.NewGomega(func(message string, callerSkip ...int) {
+				if !tt.shouldFail {
+					t.Error(message)
+				}
+				failed = true
+			})
+
+			tc := tt.testCase
+			tc.ValidateAndSetVariables(g)
+
+			if tt.shouldFail {
+				require.True(t, failed, tt.description)
+			} else {
+				require.False(t, failed, tt.description)
+			}
+
+			if tt.check != nil {
+				tt.check(t, &tc)
 			}
 		})
 	}
