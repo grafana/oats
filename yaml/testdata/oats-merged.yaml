@@ -17,15 +17,13 @@ input:
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*cart"}'
-      spans:
-        - name: 'regex:SELECT .*cart'
-          attributes:
-            db.system: h2
+      regexp: 'SELECT .*cart'
+      attributes:
+        db.system: h2
     - traceql: '{ name =~ "SELECT .*product"}'
-      spans:
-        - name: 'regex:SELECT .*'
-          attributes:
-            db.system: h2
+      regexp: 'SELECT .*cart'
+      attributes:
+        db.system: h2
   metrics:
     - promql: foo
       value: '>= 0'
