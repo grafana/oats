@@ -157,7 +157,7 @@ func (c *TestCase) ValidateAndSetVariables() {
 		gomega.Expect(c.Definition.DockerCompose).ToNot(gomega.BeNil(), "%s does not appear to be a valid OATS YAML file", c.Path)
 		validateDockerCompose(c.Definition.DockerCompose, c.Dir)
 	}
-	ValidateInput(c.Definition.Input)
+	ValidateInput(gomega.Default, c.Definition.Input)
 	expected := c.Definition.Expected
 	gomega.Expect(len(expected.Metrics)+len(expected.Traces)+len(expected.Logs)+len(expected.Profiles)).NotTo(gomega.BeZero(), "%s does not contain any expected metrics, traces, logs or profiles", c.Path)
 
@@ -167,7 +167,7 @@ func (c *TestCase) ValidateAndSetVariables() {
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
 		gomega.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in %s", string(out))
-		validateSignal(l.Signal, out)
+		validateSignal(gomega.Default, l.Signal, out)
 	}
 	for _, d := range expected.Metrics {
 		out, _ := yaml.Marshal(d)
@@ -178,7 +178,7 @@ func (c *TestCase) ValidateAndSetVariables() {
 		out, _ := yaml.Marshal(d)
 		gomega.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in %s", string(out))
 		gomega.Expect(d.Spans).To(gomega.BeEmpty(), "spans are deprecated, add to 'traces' directly: %s", string(out))
-		validateSignal(d.Signal, out)
+		validateSignal(gomega.Default, d.Signal, out)
 
 		for _, span := range d.Spans {
 			gomega.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in %s", string(out))
@@ -211,11 +211,7 @@ func (c *TestCase) ValidateAndSetVariables() {
 		"application", c.PortConfig.ApplicationPort)
 }
 
-func validateSignal(signal ExpectedSignal, out []byte) {
-	validateSignalWithGomega(gomega.Default, signal, out)
-}
-
-func validateSignalWithGomega(g gomega.Gomega, signal ExpectedSignal, out []byte) {
+func validateSignal(g gomega.Gomega, signal ExpectedSignal, out []byte) {
 	g.Expect(signal.Contains).To(gomega.BeNil(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
 	if signal.ExpectAbsent() {
 		// expect all fields to be empty
@@ -259,11 +255,7 @@ func validateK8s(kubernetes *kubernetes.Kubernetes) {
 	gomega.Expect(kubernetes.AppDockerPort).ToNot(gomega.BeZero(), "app-docker-port is zero")
 }
 
-func ValidateInput(input []Input) {
-	ValidateInputWithGomega(gomega.Default, input)
-}
-
-func ValidateInputWithGomega(g gomega.Gomega, input []Input) {
+func ValidateInput(g gomega.Gomega, input []Input) {
 	for _, i := range input {
 		g.Expect(i.Path).ToNot(gomega.BeEmpty(), "input path is empty")
 		if i.Status != "" {

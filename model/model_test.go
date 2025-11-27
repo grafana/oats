@@ -222,7 +222,7 @@ func TestValidateInput(t *testing.T) {
 				failed = true
 			})
 
-			ValidateInputWithGomega(g, tt.input)
+			ValidateInput(g, tt.input)
 
 			if tt.shouldPanic {
 				require.True(t, failed, tt.description)
@@ -449,7 +449,7 @@ func TestValidateSignal(t *testing.T) {
 				failed = true
 			})
 
-			validateSignalWithGomega(g, tt.signal, out)
+			validateSignal(g, tt.signal, out)
 
 			if tt.shouldPanic {
 				require.True(t, failed, tt.description)

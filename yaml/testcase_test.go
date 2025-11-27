@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/grafana/oats/model"
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,6 +81,6 @@ func TestTestCasesAreValid(t *testing.T) {
 	for _, c := range cases {
 		require.NotEqual(t, nil, c.Definition)
 		require.NotEmpty(t, c.Definition.Input)
-		model.ValidateInput(c.Definition.Input)
+		model.ValidateInput(gomega.Default, c.Definition.Input)
 	}
 }
