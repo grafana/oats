@@ -7,8 +7,8 @@ matrix:
         - docker-compose-template.yaml
   - name: k8s
     kubernetes:
-      namespace: test-namespace
-      manifests:
-        - manifest.yaml
+      dir: k8s-manifests
+      app-service: test-app
+      app-docker-file: Dockerfile
 
 

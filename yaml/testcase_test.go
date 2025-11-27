@@ -70,28 +70,28 @@ func TestCollectTestCases(t *testing.T) {
 		evaluateIgnoreFile bool
 		expectedCount      int
 		expectedNames      []string
-		notExpectedNames   []string
 	}{
 		{
 			name:               "without ignore file evaluation",
 			basePath:           "testdata",
 			evaluateIgnoreFile: false,
-			expectedCount:      7, // includes matrix expansions (2) and ignored file (1)
+			expectedCount:      8, // includes matrix expansions (2) and ignored file (1)
 			expectedNames: []string{
 				"runfoo-expect-absent.oats",
 				"runfoo-input.oats",
 				"runfoo-more-oats",
 				"runfoo-oats",
 				"run-oats-merged",
-				"run-matrix-test.oats-docker", // matrix expansion
-				"run-matrix-test.oats-k8s",    // matrix expansion
+				"run-matrix-test.oats-docker",       // matrix expansion
+				"run-matrix-test.oats-k8s",          // matrix expansion
+				"runignored-should-not-appear.oats", // included when not evaluating ignore
 			},
 		},
 		{
 			name:               "with ignore file evaluation",
 			basePath:           "testdata",
 			evaluateIgnoreFile: true,
-			expectedCount:      6, // excludes ignored directory
+			expectedCount:      7, // excludes ignored directory
 			expectedNames: []string{
 				"runfoo-expect-absent.oats",
 				"runfoo-input.oats",
@@ -108,7 +108,6 @@ func TestCollectTestCases(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cases, err := collectTestCases(tc.basePath, tc.evaluateIgnoreFile)
 			require.NoError(t, err)
-			require.Len(t, cases, tc.expectedCount, "expected %d test cases", tc.expectedCount)
 
 			// Collect all case names for easier assertion
 			actualNames := make([]string, len(cases))
@@ -117,7 +116,7 @@ func TestCollectTestCases(t *testing.T) {
 			}
 
 			// Check that all expected names are present
-			require.ElementsMatch(t, actualNames, tc.expectedNames, "expected test case %s to be present", tc.expectedNames)
+			require.ElementsMatch(t, tc.expectedNames, actualNames, "test case names should match")
 		})
 	}
 }
@@ -155,6 +154,9 @@ func TestCollectTestCasesWithMatrix(t *testing.T) {
 	require.Equal(t, "run-matrix-test.oats-k8s", k8sCase.Name)
 	require.Equal(t, "k8s", k8sCase.MatrixTestCaseName)
 	require.NotNil(t, k8sCase.Definition.Kubernetes)
+	require.Equal(t, "k8s-manifests", k8sCase.Definition.Kubernetes.Dir)
+	require.Equal(t, "test-app", k8sCase.Definition.Kubernetes.AppService)
+	require.Equal(t, "Dockerfile", k8sCase.Definition.Kubernetes.AppDockerFile)
 	require.Nil(t, k8sCase.Definition.DockerCompose)
 }
 
