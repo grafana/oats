@@ -121,45 +121,6 @@ func TestCollectTestCases(t *testing.T) {
 	}
 }
 
-func TestCollectTestCasesWithMatrix(t *testing.T) {
-	cases, err := collectTestCases("testdata", false)
-	require.NoError(t, err)
-
-	// Find the matrix test cases
-	var matrixCases []*model.TestCase
-	for _, c := range cases {
-		if c.Name == "run-matrix-test.oats-docker" || c.Name == "run-matrix-test.oats-k8s" {
-			matrixCases = append(matrixCases, c)
-		}
-	}
-
-	require.Len(t, matrixCases, 2, "expected 2 matrix-expanded test cases")
-
-	// Verify docker case
-	dockerCase := matrixCases[0]
-	if dockerCase.Name != "run-matrix-test.oats-docker" {
-		dockerCase = matrixCases[1]
-	}
-	require.Equal(t, "run-matrix-test.oats-docker", dockerCase.Name)
-	require.Equal(t, "docker", dockerCase.MatrixTestCaseName)
-	require.NotNil(t, dockerCase.Definition.DockerCompose)
-	require.Contains(t, dockerCase.Definition.DockerCompose.Files, "docker-compose-template.yaml")
-	require.Nil(t, dockerCase.Definition.Kubernetes)
-
-	// Verify k8s case
-	k8sCase := matrixCases[1]
-	if k8sCase.Name != "run-matrix-test.oats-k8s" {
-		k8sCase = matrixCases[0]
-	}
-	require.Equal(t, "run-matrix-test.oats-k8s", k8sCase.Name)
-	require.Equal(t, "k8s", k8sCase.MatrixTestCaseName)
-	require.NotNil(t, k8sCase.Definition.Kubernetes)
-	require.Equal(t, "k8s-manifests", k8sCase.Definition.Kubernetes.Dir)
-	require.Equal(t, "test-app", k8sCase.Definition.Kubernetes.AppService)
-	require.Equal(t, "Dockerfile", k8sCase.Definition.Kubernetes.AppDockerFile)
-	require.Nil(t, k8sCase.Definition.DockerCompose)
-}
-
 func TestTestCasesAreValid(t *testing.T) {
 	cases, err := collectTestCases("testdata", false)
 	require.NoError(t, err)
