@@ -103,8 +103,8 @@ The following flags are available:
 - `-lgtm-log-tempo`: Enable logging for Tempo (default: `false`)
 - `-lgtm-log-prometheus`: Enable logging for Prometheus (default: `false`)
 - `-lgtm-log-pyroscope`: Enable logging for Pyroscope (default: `false`)
-- `-lgtm-log-otel-collector`: Enable logging for OpenTelemetry Collector (default:`false`)
-- `-host`: Override the host used to issue requests to applications and LGTM (default:`localhost`)
+- `-lgtm-log-collector`: Enable logging for OpenTelemetry Collector (default: `false`)
+- `-host`: Override the host used to issue requests to applications and LGTM (default: `localhost`)
 
 ## Run OATs in GitHub Actions
 
@@ -125,7 +125,8 @@ Here is an example:
 include:
   - ../oats-template.yaml
 docker-compose:
-  file: ../docker-compose.yaml
+  files:
+    - ../docker-compose.yaml
 input:
   - path: /stock
     status: 200 # expected status code, 200 is the default
@@ -150,7 +151,8 @@ Here is another example with a more specific input:
 include:
   - ../oats-template.yaml
 docker-compose:
-  file: ../docker-compose.yaml
+  files:
+    - ../docker-compose.yaml
 input:
   - path: /users
     method: POST
@@ -168,10 +170,9 @@ interval: 500ms
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*product"}'
-      spans:
-        - name: 'regex:SELECT .*'
-          attributes:
-            db.system: h2
+      regexp: 'SELECT .*'
+      attributes:
+        db.system: h2
 ```
 
 ### Query traces
@@ -182,21 +183,35 @@ Each entry in the `traces` array is a test case for traces.
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*product"}'
-      spans:
-        - name: 'regex:SELECT .*' # regex match
-          attributes:
-            db.system: h2
-          allow-duplicates: true # allow multiple spans with the same attributes
-        - name: 'dropped-span'
-          expect-absent: true # assert this span does NOT exist (e.g., filtered/dropped spans)
+      regexp: 'SELECT .*'
+      attributes:
+        db.system: h2
+      count:
+        min: 1 # allow multiple spans with the same attributes
+    - traceql: '{ span.kind = "client" }'
+      equals: 'HTTP GET'
+    - traceql: '{ name =~ "dropped-span" }'
+      count:
+        max: 0  # assert this span does NOT exist (e.g., filtered/dropped spans)
 ```
 
-#### Span assertion options
+#### Trace assertion options
 
-- **`name`**: Span name to match. Prefix with `regex:` for regex matching (e.g., `regex:SELECT .*`)
+- **`traceql`**: TraceQL query to find the trace (required)
+- **`equals`**: Exact string match for the span name
+- **`regexp`**: Regular expression pattern to match against the span name
 - **`attributes`**: Key-value pairs that must match exactly on the span
-- **`allow-duplicates`**: Set to `true` to allow multiple spans with the same name and attributes (default: `false`)
-- **`expect-absent`**: Set to `true` to assert the span does NOT exist in the trace. Useful for verifying spans were filtered, dropped, or suppressed (default: `false`)
+- **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against span attributes
+- **`no-extra-attributes`**: Set to `true` to fail if the span has attributes beyond those specified in `attributes` and `attribute-regexp`
+- **`count`**: Control expected number of matching spans
+  - **`min`**: Minimum number of spans expected (default: 1 if not specified)
+  - **`max`**: Maximum number of spans expected (0 means no upper limit, or exactly 0 when min is also 0)
+  - Examples:
+    - Not specified: at least 1 span expected
+    - `{ min: 2, max: 5 }`: between 2 and 5 spans
+    - `{ min: 3 }`: 3 or more spans
+    - `{ max: 0 }`: exactly 0 spans (assert absence)
+- **`matrix-condition`**: Regex to match against matrix test case names (only run this assertion for matching matrix cases)
 
 ### Query logs
 
@@ -220,7 +235,6 @@ expected:
 
 - **`logql`**: LogQL query to find the log line (required)
 - **`equals`**: Exact string match for the log line
-- **`contains`**: Array of substrings that must all appear in the log line
 - **`regexp`**: Regular expression pattern to match against the log line
 - **`attributes`**: Key-value pairs that must match exactly on the log labels
 - **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against log labels
@@ -228,6 +242,7 @@ expected:
 - **`count`**: Expected count range for matching signals
   - **`min`**: Minimum expected count (required)
   - **`max`**: Maximum expected count. Set to `0` for no upper limit. To assert absence, set both `min: 0` and `max: 0`
+- **`matrix-condition`**: Regex to match against matrix test case names
 
 Example:
 ```yaml
@@ -251,6 +266,42 @@ expected:
 
 - **`promql`**: PromQL query to retrieve the metric (required)
 - **`value`**: Expected value with comparison operator. Supported operators: `==`, `!=`, `>`, `<`, `>=`, `<=` (e.g., `">= 0"`, `"== 10"`)
+- **`matrix-condition`**: Regex to match against matrix test case names
+
+### Query profiles
+
+```yaml
+expected:
+  profiles:
+    - query: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="my-service"}'
+      flamebearers:
+        contains: 'main'
+```
+
+#### Profile assertion options
+
+- **`query`**: Pyroscope query to retrieve the profile (required)
+- **`flamebearers`**: Assertions on the flamebearer response
+  - **`contains`**: String that must appear in the flamebearer names
+- **`matrix-condition`**: Regex to match against matrix test case names
+
+### Custom checks
+
+Custom checks allow you to run arbitrary scripts for advanced validation scenarios.
+
+```yaml
+expected:
+  custom-checks:
+    - script: |
+        #!/bin/bash
+        # Your custom validation script here
+        exit 0
+```
+
+#### Custom check options
+
+- **`script`**: Script to execute (required)
+- **`matrix-condition`**: Regex to match against matrix test case names
 
 ### Matrix of test cases
 
