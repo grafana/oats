@@ -14,9 +14,9 @@ import (
 )
 
 type ExpectedSignal struct {
-	Equals            string            `yaml:"equals"`
 	Contains          []string          `yaml:"contains"` // deprecated, use regexp instead
-	Regexp            string            `yaml:"regexp"`
+	NameEquals        string            `yaml:"equals"`
+	NameRegexp        string            `yaml:"regexp"`
 	Attributes        map[string]string `yaml:"attributes"`
 	AttributeRegexp   map[string]string `yaml:"attribute-regexp"`
 	NoExtraAttributes bool              `yaml:"no-extra-attributes"`
@@ -45,7 +45,9 @@ type ExpectedLogs struct {
 }
 
 type Flamebearers struct {
-	Contains string `yaml:"contains"`
+	Contains   string `yaml:"contains"` // deprecated, use regexp instead
+	NameEquals string `yaml:"equals"`
+	NameRegexp string `yaml:"regexp"`
 }
 
 type ExpectedProfiles struct {
@@ -189,7 +191,10 @@ func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
 	for _, p := range expected.Profiles {
 		out, _ := yaml.Marshal(p)
 		g.Expect(p.Query).ToNot(gomega.BeEmpty(), "query is empty in %s", string(out))
-		g.Expect(p.Flamebearers.Contains).ToNot(gomega.BeEmpty(), "Flamebearers.contains is empty in %s", string(out))
+		f := p.Flamebearers
+		g.Expect(f.Contains).To(gomega.BeNil(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
+		g.Expect(f.NameEquals == "" && f.NameRegexp == "").To(gomega.BeFalse(),
+			"either 'equals' or 'regexp' must be set in %s", string(out))
 	}
 
 	if c.PortConfig == nil {
@@ -217,12 +222,13 @@ func validateSignal(g gomega.Gomega, signal ExpectedSignal, out []byte) {
 	g.Expect(signal.Contains).To(gomega.BeNil(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
 	if signal.ExpectAbsent() {
 		// expect all fields to be empty
-		g.Expect(signal.Equals).To(gomega.BeNil(), "expected 'equals' to be nil when count min=0 and max=0 in %s", string(out))
-		g.Expect(signal.Regexp).To(gomega.BeNil(), "expected 'regexp' to be nil when count min=0 and max=0 in %s", string(out))
+		g.Expect(signal.NameEquals).To(gomega.BeNil(), "expected 'equals' to be nil when count min=0 and max=0 in %s", string(out))
+		g.Expect(signal.NameRegexp).To(gomega.BeNil(), "expected 'regexp' to be nil when count min=0 and max=0 in %s", string(out))
 		g.Expect(len(signal.Attributes)).To(gomega.BeZero(), "expected 'attributes' to be empty when count min=0 and max=0 in %s", string(out))
 		g.Expect(len(signal.AttributeRegexp)).To(gomega.BeZero(), "expected 'attribute-regexp' to be empty when count min=0 and max=0 in %s", string(out))
 	} else {
-		g.Expect(signal.Equals == "" && signal.Regexp == "").To(gomega.BeFalse())
+		g.Expect(signal.NameEquals == "" && signal.NameRegexp == "").To(gomega.BeFalse(),
+			"either 'equals' or 'regexp' must be set in %s", string(out))
 		for k, v := range signal.Attributes {
 			g.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
 			g.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))

@@ -275,7 +275,7 @@ expected:
   profiles:
     - query: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="my-service"}'
       flamebearers:
-        contains: 'main'
+        equals: 'main'
 ```
 
 #### Profile assertion options

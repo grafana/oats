@@ -242,7 +242,7 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "valid signal with equals",
 			signal: ExpectedSignal{
-				Equals: "test-value",
+				NameEquals: "test-value",
 			},
 			shouldPanic: false,
 			description: "signal with equals should be valid",
@@ -250,7 +250,7 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "valid signal with regexp",
 			signal: ExpectedSignal{
-				Regexp: "test-.*",
+				NameRegexp: "test-.*",
 			},
 			shouldPanic: false,
 			description: "signal with regexp should be valid",
@@ -258,8 +258,8 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "valid signal with both equals and regexp",
 			signal: ExpectedSignal{
-				Equals: "test",
-				Regexp: "test",
+				NameEquals: "test",
+				NameRegexp: "test",
 			},
 			shouldPanic: false,
 			description: "signal with both equals and regexp should be valid",
@@ -275,8 +275,8 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "deprecated contains field should fail",
 			signal: ExpectedSignal{
-				Equals:   "test",
-				Contains: []string{"deprecated"},
+				NameEquals: "test",
+				Contains:   []string{"deprecated"},
 			},
 			shouldPanic: true,
 			description: "contains field is deprecated",
@@ -284,7 +284,7 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "valid attributes",
 			signal: ExpectedSignal{
-				Equals: "test",
+				NameEquals: "test",
 				Attributes: map[string]string{
 					"service.name": "my-service",
 					"environment":  "prod",
@@ -296,7 +296,7 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "empty attribute key should fail",
 			signal: ExpectedSignal{
-				Equals: "test",
+				NameEquals: "test",
 				Attributes: map[string]string{
 					"": "value",
 				},
@@ -307,7 +307,7 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "empty attribute value should fail",
 			signal: ExpectedSignal{
-				Equals: "test",
+				NameEquals: "test",
 				Attributes: map[string]string{
 					"key": "",
 				},
@@ -318,7 +318,7 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "valid attribute regexp",
 			signal: ExpectedSignal{
-				Regexp: "test",
+				NameRegexp: "test",
 				AttributeRegexp: map[string]string{
 					"trace.id": "^[a-f0-9]{32}$",
 				},
@@ -329,7 +329,7 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "empty attribute regexp key should fail",
 			signal: ExpectedSignal{
-				Equals: "test",
+				NameEquals: "test",
 				AttributeRegexp: map[string]string{
 					"": "^[a-f0-9]+$",
 				},
@@ -340,7 +340,7 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "empty attribute regexp value should fail",
 			signal: ExpectedSignal{
-				Equals: "test",
+				NameEquals: "test",
 				AttributeRegexp: map[string]string{
 					"key": "",
 				},
@@ -351,8 +351,8 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "valid count range",
 			signal: ExpectedSignal{
-				Equals: "test",
-				Count:  &ExpectedRange{Min: 1, Max: 5},
+				NameEquals: "test",
+				Count:      &ExpectedRange{Min: 1, Max: 5},
 			},
 			shouldPanic: false,
 			description: "valid count range should pass",
@@ -360,8 +360,8 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "count with max 0 means no upper limit",
 			signal: ExpectedSignal{
-				Equals: "test",
-				Count:  &ExpectedRange{Min: 1, Max: 0},
+				NameEquals: "test",
+				Count:      &ExpectedRange{Min: 1, Max: 0},
 			},
 			shouldPanic: false,
 			description: "max=0 means no upper limit",
@@ -377,8 +377,8 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "expect absent should not have equals",
 			signal: ExpectedSignal{
-				Equals: "test",
-				Count:  &ExpectedRange{Min: 0, Max: 0},
+				NameEquals: "test",
+				Count:      &ExpectedRange{Min: 0, Max: 0},
 			},
 			shouldPanic: true,
 			description: "expect-absent signals should not have equals",
@@ -386,8 +386,8 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "expect absent should not have regexp",
 			signal: ExpectedSignal{
-				Regexp: "test",
-				Count:  &ExpectedRange{Min: 0, Max: 0},
+				NameRegexp: "test",
+				Count:      &ExpectedRange{Min: 0, Max: 0},
 			},
 			shouldPanic: true,
 			description: "expect-absent signals should not have regexp",
@@ -413,8 +413,8 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "invalid count range min=0 max>0",
 			signal: ExpectedSignal{
-				Equals: "test",
-				Count:  &ExpectedRange{Min: 0, Max: 5},
+				NameEquals: "test",
+				Count:      &ExpectedRange{Min: 0, Max: 5},
 			},
 			shouldPanic: true,
 			description: "min=0 with max>0 is not supported",
@@ -422,8 +422,8 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "negative min should fail",
 			signal: ExpectedSignal{
-				Equals: "test",
-				Count:  &ExpectedRange{Min: -1, Max: 5},
+				NameEquals: "test",
+				Count:      &ExpectedRange{Min: -1, Max: 5},
 			},
 			shouldPanic: true,
 			description: "negative min is not allowed",
@@ -431,8 +431,8 @@ func TestValidateSignal(t *testing.T) {
 		{
 			name: "max less than min should fail",
 			signal: ExpectedSignal{
-				Equals: "test",
-				Count:  &ExpectedRange{Min: 5, Max: 3},
+				NameEquals: "test",
+				Count:      &ExpectedRange{Min: 5, Max: 3},
 			},
 			shouldPanic: true,
 			description: "max must be >= min (or 0)",
@@ -875,7 +875,7 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 						Traces: []ExpectedTraces{{
 							TraceQL: "{service.name=\"svc\"}",
 							Signal: ExpectedSignal{
-								Equals: "test-value",
+								NameEquals: "test-value",
 							},
 						}},
 					},

@@ -79,39 +79,39 @@ func TestAssertName(t *testing.T) {
 	}{
 		{
 			name:       "equals does not match substring",
-			signal:     model.ExpectedSignal{Equals: "test"},
+			signal:     model.ExpectedSignal{NameEquals: "test"},
 			inputName:  "test-name",
 			shouldFail: true,
 		},
 		{
 			name:       "equals exact match",
-			signal:     model.ExpectedSignal{Equals: "test"},
+			signal:     model.ExpectedSignal{NameEquals: "test"},
 			inputName:  "test",
 			shouldFail: false,
 		},
 		{
 			name:       "equals fails when not found",
-			signal:     model.ExpectedSignal{Equals: "missing"},
+			signal:     model.ExpectedSignal{NameEquals: "missing"},
 			inputName:  "test-name",
 			shouldFail: true,
 		},
 		{
 			name:       "regexp matches",
-			signal:     model.ExpectedSignal{Regexp: "^test-.*$"},
+			signal:     model.ExpectedSignal{NameRegexp: "^test-.*$"},
 			inputName:  "test-name",
 			shouldFail: false,
 		},
 		{
 			name:       "regexp fails when not matching",
-			signal:     model.ExpectedSignal{Regexp: "^xyz-.*$"},
+			signal:     model.ExpectedSignal{NameRegexp: "^xyz-.*$"},
 			inputName:  "test-name",
 			shouldFail: true,
 		},
 		{
 			name: "multiple conditions all pass",
 			signal: model.ExpectedSignal{
-				Equals: "test-name",
-				Regexp: "^test-.*$",
+				NameEquals: "test-name",
+				NameRegexp: "^test-.*$",
 			},
 			inputName:  "test-name",
 			shouldFail: false,
@@ -133,7 +133,7 @@ func TestAssertName(t *testing.T) {
 				}
 				failed = true
 			})
-			assertName(g, tt.signal, tt.inputName)
+			assertSignalName(g, tt.signal, tt.inputName)
 			if tt.shouldFail {
 				require.True(t, failed, "expected assertion to fail")
 			}
@@ -310,8 +310,8 @@ func TestAssertSignal(t *testing.T) {
 		{
 			name: "all validations pass",
 			signal: model.ExpectedSignal{
-				Equals: "test-span",
-				Count:  &model.ExpectedRange{Min: 1, Max: 5},
+				NameEquals: "test-span",
+				Count:      &model.ExpectedRange{Min: 1, Max: 5},
 				Attributes: map[string]string{
 					"service.name": "test-service",
 				},
@@ -336,7 +336,7 @@ func TestAssertSignal(t *testing.T) {
 		{
 			name: "name validation fails",
 			signal: model.ExpectedSignal{
-				Equals: "expected-name",
+				NameEquals: "expected-name",
 			},
 			count:      1,
 			signalName: "wrong-name",
@@ -358,7 +358,7 @@ func TestAssertSignal(t *testing.T) {
 		{
 			name: "count is optional",
 			signal: model.ExpectedSignal{
-				Equals: "test-name",
+				NameEquals: "test-name",
 			},
 			count:      100,
 			signalName: "test-name",
@@ -368,9 +368,9 @@ func TestAssertSignal(t *testing.T) {
 		{
 			name: "complex signal with all fields",
 			signal: model.ExpectedSignal{
-				Equals: "test-span",
-				Regexp: "^test-.*$",
-				Count:  &model.ExpectedRange{Min: 1, Max: 10},
+				NameEquals: "test-span",
+				NameRegexp: "^test-.*$",
+				Count:      &model.ExpectedRange{Min: 1, Max: 10},
 				Attributes: map[string]string{
 					"service.name": "test-service",
 					"environment":  "test",

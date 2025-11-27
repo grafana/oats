@@ -3,5 +3,4 @@ include:
 expected:
   logs:
     - logql: '{ service_name="foo" } |~ `Application started.`'
-      contains:
-        - 'Application started'
+      equals: 'Application started'

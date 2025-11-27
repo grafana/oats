@@ -33,5 +33,13 @@ func assertPyroscopeResponse(b []byte, p model.ExpectedProfiles, r *runner) {
 	}
 
 	g.Expect(err).ToNot(gomega.HaveOccurred())
-	g.Expect(response.Flamebearer.Names).To(gomega.ContainElement(gomega.ContainSubstring(p.Flamebearers.Contains)))
+	f := p.Flamebearers
+	equals := f.NameEquals
+	if len(equals) > 0 {
+		g.Expect(response.Flamebearer.Names).To(gomega.ContainElement(gomega.Equal(equals)))
+	}
+	regexp := f.NameRegexp
+	if len(regexp) > 0 {
+		g.Expect(response.Flamebearer.Names).To(gomega.ContainElement(gomega.MatchRegexp(regexp)))
+	}
 }

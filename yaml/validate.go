@@ -9,7 +9,7 @@ func assertSignal(g gomega.Gomega, s model.ExpectedSignal, count int, name strin
 	if s.Count != nil {
 		assertCount(g, s.Count, count)
 	}
-	assertName(g, s, name)
+	assertSignalName(g, s, name)
 	assertAttributes(g, s, atts)
 }
 
@@ -22,12 +22,12 @@ func assertCount(g gomega.Gomega, expectedRange *model.ExpectedRange, got int) {
 	}
 }
 
-func assertName(g gomega.Gomega, s model.ExpectedSignal, name string) {
-	if len(s.Equals) > 0 {
-		g.Expect(name).To(gomega.Equal(s.Equals))
+func assertSignalName(g gomega.Gomega, s model.ExpectedSignal, name string) {
+	if len(s.NameEquals) > 0 {
+		g.Expect(name).To(gomega.Equal(s.NameEquals))
 	}
-	if len(s.Regexp) > 0 {
-		g.Expect(name).To(gomega.MatchRegexp(s.Regexp))
+	if len(s.NameRegexp) > 0 {
+		g.Expect(name).To(gomega.MatchRegexp(s.NameRegexp))
 	}
 }
 
