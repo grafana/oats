@@ -98,6 +98,9 @@ func nameMatcher(signal model.ExpectedSignal) func(got string) bool {
 		if re != nil {
 			return re.MatchString(got)
 		}
+		if signal.NameEquals == "" {
+			return false // or handle expect-absent case explicitly
+		}
 		return signal.NameEquals == got
 	}
 }
