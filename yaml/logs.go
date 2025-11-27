@@ -47,6 +47,9 @@ func AssertLokiResponse(b []byte, l model.ExpectedSignal, r *runner) {
 		line = streams[0].Values[0][1]
 		atts = streams[0].Stream
 	}
+	if line == "" && !l.ExpectAbsent() {
+		g.Expect(line).ToNot(gomega.BeEmpty(), "no log lines were found in the Loki response")
+	}
 	totalLines := 0
 	for _, stream := range streams {
 		totalLines += len(stream.Values)
