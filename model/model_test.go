@@ -927,7 +927,7 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 					Expected: Expected{
 						Profiles: []ExpectedProfiles{{
 							Query:        "memory:alloc_space:bytes:space:bytes{service_name=\"my-service\"}",
-							Flamebearers: Flamebearers{Contains: "main"},
+							Flamebearers: Flamebearers{NameEquals: "main"},
 						}},
 					},
 				},
@@ -944,7 +944,7 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 					Expected: Expected{
 						Profiles: []ExpectedProfiles{{
 							Query:        "",
-							Flamebearers: Flamebearers{Contains: "main"},
+							Flamebearers: Flamebearers{},
 						}},
 					},
 				},
@@ -953,7 +953,7 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 			description: "profile query is required",
 		},
 		{
-			name: "profile with empty flamebearers contains should fail",
+			name: "profile with empty flamebearers equals/regexp should fail",
 			testCase: TestCase{
 				Path: "testdata/invalid-profile-flamebearers.oats.yaml",
 				Dir:  ".",
@@ -962,13 +962,31 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 					Expected: Expected{
 						Profiles: []ExpectedProfiles{{
 							Query:        "memory:alloc_space:bytes:space:bytes{service_name=\"my-service\"}",
-							Flamebearers: Flamebearers{Contains: ""},
+							Flamebearers: Flamebearers{},
 						}},
 					},
 				},
 			},
 			shouldFail:  true,
-			description: "profile flamebearers.contains is required",
+			description: "profile flamebearers.equals or regexp is required",
+		},
+		{
+			name: "profile with deprecated contains field should fail",
+			testCase: TestCase{
+				Path: "testdata/deprecated-profile-contains.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected: Expected{
+						Profiles: []ExpectedProfiles{{
+							Query:        "memory:alloc_space:bytes:space:bytes{service_name=\"my-service\"}",
+							Flamebearers: Flamebearers{Contains: "main"},
+						}},
+					},
+				},
+			},
+			shouldFail:  true,
+			description: "profile flamebearers.contains is deprecated, use equals or regexp",
 		},
 		{
 			name: "profiles only (no metrics/logs/traces)",
@@ -980,7 +998,7 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 					Expected: Expected{
 						Profiles: []ExpectedProfiles{{
 							Query:        "memory:alloc_space:bytes:space:bytes{service_name=\"my-service\"}",
-							Flamebearers: Flamebearers{Contains: "main"},
+							Flamebearers: Flamebearers{NameEquals: "main"},
 						}},
 					},
 				},
@@ -998,11 +1016,11 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 						Profiles: []ExpectedProfiles{
 							{
 								Query:        "memory:alloc_space:bytes:space:bytes{service_name=\"my-service\"}",
-								Flamebearers: Flamebearers{Contains: "main"},
+								Flamebearers: Flamebearers{NameEquals: "main"},
 							},
 							{
 								Query:        "cpu:samples:count:cpu:nanoseconds{service_name=\"my-service\"}",
-								Flamebearers: Flamebearers{Contains: "handler"},
+								Flamebearers: Flamebearers{NameRegexp: "handler.*"},
 							},
 						},
 					},

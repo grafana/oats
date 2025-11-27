@@ -192,7 +192,7 @@ func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
 		out, _ := yaml.Marshal(p)
 		g.Expect(p.Query).ToNot(gomega.BeEmpty(), "query is empty in %s", string(out))
 		f := p.Flamebearers
-		g.Expect(f.Contains).To(gomega.BeNil(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
+		g.Expect(f.Contains).To(gomega.BeEmpty(), "'contains' is deprecated, use 'equals' or 'regexp' instead in %s", string(out))
 		g.Expect(f.NameEquals == "" && f.NameRegexp == "").To(gomega.BeFalse(),
 			"either 'equals' or 'regexp' must be set in %s", string(out))
 	}
