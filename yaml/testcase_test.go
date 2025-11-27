@@ -81,6 +81,8 @@ func TestTestCasesAreValid(t *testing.T) {
 	for _, c := range cases {
 		require.NotEqual(t, nil, c.Definition)
 		require.NotEmpty(t, c.Definition.Input)
-		model.ValidateInput(gomega.Default, c.Definition.Input)
+		model.ValidateInput(gomega.NewGomega(func(message string, callerSkip ...int) {
+			t.Error(message)
+		}), c.Definition.Input)
 	}
 }
