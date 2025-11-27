@@ -1,0 +1,14 @@
+include:
+  - oats-template.yaml
+matrix:
+  - name: docker
+    docker-compose:
+      files:
+        - docker-compose-template.yaml
+  - name: k8s
+    kubernetes:
+      namespace: test-namespace
+      manifests:
+        - manifest.yaml
+
+

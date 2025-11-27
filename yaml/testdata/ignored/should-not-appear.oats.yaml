@@ -1,0 +1,7 @@
+include:
+  - ../oats-template.yaml
+expected:
+  metrics:
+    - promql: should_be_ignored
+      value: '>= 0'
+
