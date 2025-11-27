@@ -78,7 +78,7 @@ func TestAssertName(t *testing.T) {
 		shouldFail bool
 	}{
 		{
-			name:       "equals matches substring",
+			name:       "equals does not match substring",
 			signal:     model.ExpectedSignal{Equals: "test"},
 			inputName:  "test-name",
 			shouldFail: true,
