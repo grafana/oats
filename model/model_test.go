@@ -751,6 +751,32 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 			},
 		},
 		{
+			name: "pre-populated PortConfig preserved",
+			testCase: TestCase{
+				Path: "testdata/custom-ports.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected:      makeValidExpected(),
+				},
+				PortConfig: &PortConfig{
+					ApplicationPort:    9999,
+					GrafanaHTTPPort:    3001,
+					PrometheusHTTPPort: 9091,
+					LokiHTTPPort:       3101,
+					TempoHTTPPort:      3201,
+					PyroscopeHttpPort:  4041,
+				},
+			},
+			shouldFail: false,
+			check: func(t *testing.T, tc *TestCase) {
+				require.NotNil(t, tc.PortConfig)
+				assert.Equal(t, 9999, tc.PortConfig.ApplicationPort)
+				assert.Equal(t, 3001, tc.PortConfig.GrafanaHTTPPort)
+				assert.Equal(t, 9091, tc.PortConfig.PrometheusHTTPPort)
+			},
+		},
+		{
 			name: "kubernetes and docker-compose together should fail",
 			testCase: TestCase{
 				Path: "testdata/k8s-and-compose.oats.yaml",
@@ -804,6 +830,26 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 			description: "logQL is required",
 		},
 		{
+			name: "log with invalid signal should fail",
+			testCase: TestCase{
+				Path: "testdata/invalid-signal.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected: Expected{
+						Logs: []ExpectedLogs{{
+							LogQL: "{job=\"test\"}",
+							Signal: ExpectedSignal{
+								Attributes: map[string]string{"key": "value"},
+							},
+						}},
+					},
+				},
+			},
+			shouldFail:  true,
+			description: "signal must have equals or regexp",
+		},
+		{
 			name: "trace with deprecated spans should fail",
 			testCase: TestCase{
 				Path: "testdata/invalid-trace.oats.yaml",
@@ -817,6 +863,59 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 			},
 			shouldFail:  true,
 			description: "spans field is deprecated",
+		},
+		{
+			name: "valid trace with signal",
+			testCase: TestCase{
+				Path: "testdata/valid-trace.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected: Expected{
+						Traces: []ExpectedTraces{{
+							TraceQL: "{service.name=\"svc\"}",
+							Signal: ExpectedSignal{
+								Equals: "test-value",
+							},
+						}},
+					},
+				},
+			},
+			shouldFail: false,
+		},
+		{
+			name: "invalid input with empty path should fail",
+			testCase: TestCase{
+				Path: "testdata/invalid-input.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected:      makeValidExpected(),
+					Input: []Input{{
+						Method: http.MethodGet,
+						Path:   "",
+					}},
+				},
+			},
+			shouldFail:  true,
+			description: "input path cannot be empty",
+		},
+		{
+			name: "valid input with POST body",
+			testCase: TestCase{
+				Path: "testdata/valid-input.oats.yaml",
+				Dir:  ".",
+				Definition: TestCaseDefinition{
+					DockerCompose: makeValidDockerCompose(),
+					Expected:      makeValidExpected(),
+					Input: []Input{{
+						Method: http.MethodPost,
+						Path:   "/api/test",
+						Body:   `{"key":"value"}`,
+					}},
+				},
+			},
+			shouldFail: false,
 		},
 	}
 

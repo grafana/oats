@@ -155,9 +155,11 @@ func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
 		g.Expect(c.Definition.DockerCompose).To(gomega.BeNil(), "kubernetes and docker-compose are mutually exclusive")
 	} else {
 		g.Expect(c.Definition.DockerCompose).ToNot(gomega.BeNil(), "%s does not appear to be a valid OATS YAML file", c.Path)
-		validateDockerCompose(c.Definition.DockerCompose, c.Dir, g)
+		if c.Definition.DockerCompose != nil {
+			validateDockerCompose(c.Definition.DockerCompose, c.Dir, g)
+		}
 	}
-	ValidateInput(gomega.Default, c.Definition.Input)
+	ValidateInput(g, c.Definition.Input)
 	expected := c.Definition.Expected
 	g.Expect(len(expected.Metrics)+len(expected.Traces)+len(expected.Logs)+len(expected.Profiles)).NotTo(gomega.BeZero(), "%s does not contain any expected metrics, traces, logs or profiles", c.Path)
 
@@ -167,7 +169,7 @@ func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
 	for _, l := range expected.Logs {
 		out, _ := yaml.Marshal(l)
 		g.Expect(l.LogQL).ToNot(gomega.BeEmpty(), "logQL is empty in %s", string(out))
-		validateSignal(gomega.Default, l.Signal, out)
+		validateSignal(g, l.Signal, out)
 	}
 	for _, d := range expected.Metrics {
 		out, _ := yaml.Marshal(d)
@@ -178,7 +180,7 @@ func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
 		out, _ := yaml.Marshal(d)
 		g.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in %s", string(out))
 		g.Expect(d.Spans).To(gomega.BeEmpty(), "spans are deprecated, add to 'traces' directly: %s", string(out))
-		validateSignal(gomega.Default, d.Signal, out)
+		validateSignal(g, d.Signal, out)
 
 		for _, span := range d.Spans {
 			g.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in %s", string(out))
