@@ -137,8 +137,11 @@ type PortConfig struct {
 }
 
 type Settings struct {
-	Host            string
-	Timeout         time.Duration
+	Host    string
+	Timeout time.Duration
+	// AbsentTimeout is the timeout for checking that no results exist.
+	// This is shorter than the default timeout because we're checking for non-existence over the entire period.
+	AbsentTimeout   time.Duration
 	LgtmVersion     string
 	LgtmLogSettings map[string]bool
 	ManualDebug     bool

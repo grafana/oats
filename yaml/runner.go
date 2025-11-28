@@ -35,11 +35,6 @@ type runner struct {
 
 var VerboseLogging bool
 
-// AbsentTimeout is the timeout for checking that spans are absent from traces.
-// This is shorter than the default timeout because we're checking for non-existence,
-// and checking after we've finished other assertions.
-const AbsentTimeout = 10 * time.Second
-
 func RunTestCase(c *model.TestCase, s model.Settings) {
 	format.MaxLength = 100000
 	r := &runner{
@@ -229,7 +224,7 @@ func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
 func (r *runner) consistentlyNot(asserter func()) {
 	r.assertDeadline()
 	caller := newAssertCaller(r)
-	timeout := AbsentTimeout
+	timeout := r.settings.AbsentTimeout
 	gomega.Consistently(context.Background(), func(g gomega.Gomega) {
 		r.callAsserter(g, caller, asserter)
 	}).WithTimeout(timeout).WithPolling(caller.interval).ShouldNot(gomega.Succeed(), "assertion should not succeed for %v", timeout)

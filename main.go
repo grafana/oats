@@ -68,6 +68,7 @@ func parseSettings() (model.Settings, error) {
 	logCollector := flag.Bool("lgtm-log-collector", false, "enable logging for OTel Collector")
 
 	timeout := flag.Duration("timeout", 30*time.Second, "timeout for each test case")
+	absentTimeout := flag.Duration("absent-timeout", 10*time.Second, "timeout for tests that assert absence")
 	manualDebug := flag.Bool("manual-debug", false, "debug mode")
 	logLimit := flag.Int("log-limit", 1000, "maximum log output length per log entry")
 	flag.Parse()
@@ -88,6 +89,7 @@ func parseSettings() (model.Settings, error) {
 	return model.Settings{
 		Host:            *host,
 		Timeout:         *timeout,
+		AbsentTimeout:   *absentTimeout,
 		LgtmVersion:     *lgtmVersion,
 		LgtmLogSettings: logSettings,
 		ManualDebug:     *manualDebug,

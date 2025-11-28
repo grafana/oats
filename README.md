@@ -95,6 +95,7 @@ This will search all subdirectories for test files. The tests are defined in `oa
 The following flags are available:
 
 - `-timeout`: Set the timeout for test cases (default: 30s)
+- `-absent-timeout`: Set the timeout for tests that assert absence (default: 10s)
 - `-lgtm-version`: Specify the version of [docker-otel-lgtm] to use (default: `"latest"`)
 - `-manual-debug`: Enable debug mode to keep containers running (default: `false`)
 - `-lgtm-log-all`: Enable logging for all containers (default: `false`)
