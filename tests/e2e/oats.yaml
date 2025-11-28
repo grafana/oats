@@ -8,6 +8,9 @@ expected:
     - traceql: '{name="GET /vets.html"}'
       attributes:
         otel.library.name: io.opentelemetry.tomcat-7.0
+    - traceql: '{name="GET /foo"}'
+      count:
+        max: 0
   metrics:
     - promql: 'histogram_quantile(0.95, sum by(le) (rate(http_server_request_duration_seconds_bucket{http_route="/vets.html"}[5m])))'
       value: "> 0"
@@ -16,3 +19,6 @@ expected:
       count:
         min: 1
         max: 1
+    - logql: '{service_name="spring-pet-clinic"} |= `Crashed during startup`'
+      count:
+        max: 0
