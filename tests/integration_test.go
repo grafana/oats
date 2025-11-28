@@ -304,7 +304,7 @@ func TestIntegration(t *testing.T) {
 			failed = ""
 			r.ExecuteChecks()
 
-			// docker compose is already started, so speed up the checks
+			// docker compose is already started, so speed up the checks for all subsequent tests
 			r.Settings.PresentTimeout = checkTimeout
 
 			if tt.shouldPanic {

@@ -1,5 +1,5 @@
 ---
-name: Integration tests
+name: End-to-end tests
 
 on: [pull_request]
 
