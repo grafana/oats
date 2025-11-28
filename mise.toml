@@ -10,6 +10,10 @@ run = "go test $(go list ./...)"
 description = "Format code"
 run = "gofmt -w ."
 
+[tasks.check-fmt]
+description = "Check code formatting"
+run = "gofmt -l . | grep . && exit 1 || exit 0"
+
 [tasks.lint]
 description = "Lint code"
 run = "golangci-lint run"
@@ -20,7 +24,7 @@ run = "go mod tidy"
 
 [tasks.check]
 description = "Run all checks"
-depends = ['lint', 'test']
+depends = ['lint', 'test', 'check-fmt']
 
 [tasks.build]
 description = "Build the project"

@@ -95,6 +95,7 @@ This will search all subdirectories for test files. The tests are defined in `oa
 The following flags are available:
 
 - `-timeout`: Set the timeout for test cases (default: 30s)
+- `-absent-timeout`: Set the timeout for tests that assert absence (default: 10s)
 - `-lgtm-version`: Specify the version of [docker-otel-lgtm] to use (default: `"latest"`)
 - `-manual-debug`: Enable debug mode to keep containers running (default: `false`)
 - `-lgtm-log-all`: Enable logging for all containers (default: `false`)
@@ -103,8 +104,9 @@ The following flags are available:
 - `-lgtm-log-tempo`: Enable logging for Tempo (default: `false`)
 - `-lgtm-log-prometheus`: Enable logging for Prometheus (default: `false`)
 - `-lgtm-log-pyroscope`: Enable logging for Pyroscope (default: `false`)
-- `-lgtm-log-otel-collector`: Enable logging for OpenTelemetry Collector (default:`false`)
-- `-host`: Override the host used to issue requests to applications and LGTM (default:`localhost`)
+- `-lgtm-log-collector`: Enable logging for OpenTelemetry Collector (default: `false`)
+- `-host`: Override the host used to issue requests to applications and LGTM (default: `localhost`)
+- `-log-limit`: Maximum log output length per log entry
 
 ## Run OATs in GitHub Actions
 
@@ -125,7 +127,8 @@ Here is an example:
 include:
   - ../oats-template.yaml
 docker-compose:
-  file: ../docker-compose.yaml
+  files:
+    - ../docker-compose.yaml
 input:
   - path: /stock
     status: 200 # expected status code, 200 is the default
@@ -133,14 +136,12 @@ interval: 500ms # interval between requests to the input URL
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*product"}'
-      spans:
-        - name: 'regex:SELECT .*'
-          attributes:
-            db.system: h2
+      regexp: 'SELECT .*'
+      attributes:
+        db.system: h2
   logs:
     - logql: '{exporter = "OTLP"}'
-      contains: 
-        - 'hello LGTM'
+      equals: 'hello LGTM'
   metrics:
     - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
       value: "== 10"
@@ -152,7 +153,8 @@ Here is another example with a more specific input:
 include:
   - ../oats-template.yaml
 docker-compose:
-  file: ../docker-compose.yaml
+  files:
+    - ../docker-compose.yaml
 input:
   - path: /users
     method: POST
@@ -170,10 +172,9 @@ interval: 500ms
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*product"}'
-      spans:
-        - name: 'regex:SELECT .*'
-          attributes:
-            db.system: h2
+      regexp: 'SELECT .*'
+      attributes:
+        db.system: h2
 ```
 
 ### Query traces
@@ -184,12 +185,35 @@ Each entry in the `traces` array is a test case for traces.
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*product"}'
-      spans:
-        - name: 'regex:SELECT .*' # regex match
-          attributes:
-            db.system: h2
-          allow-duplicates: true # allow multiple spans with the same attributes
+      regexp: 'SELECT .*'
+      attributes:
+        db.system: h2
+      count:
+        min: 1 # allow multiple spans with the same attributes
+    - traceql: '{ span.kind = "client" }'
+      equals: 'HTTP GET'
+    - traceql: '{ name =~ "dropped-span" }'
+      count:
+        max: 0  # assert this span does NOT exist (e.g., filtered/dropped spans)
 ```
+
+#### Trace assertion options
+
+- **`traceql`**: TraceQL query to find the trace (required)
+- **`equals`**: Exact string match for the span name (any span in the trace)
+- **`regexp`**: Regular expression pattern to match against the span name (any span in the trace)
+- **`attributes`**: Key-value pairs that must match exactly on the span (the span name matched by `equals` or `regexp`)
+- **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against span attributes (the span name matched by `equals` or `regexp`)
+- **`no-extra-attributes`**: Set to `true` to fail if the span has attributes beyond those specified in `attributes` and `attribute-regexp`
+- **`count`**: Control expected number of matching spans, ignoring if they match other criteria
+  - **`min`**: Minimum number of spans expected (default: `1` if not specified)
+  - **`max`**: Maximum number of spans expected (`0` means no upper limit, or exactly `0` when `min` is also `0`)
+  - Examples:
+    - Not specified: at least 1 span expected
+    - `{ min: 2, max: 5 }`: between 2 and 5 spans (inclusive)
+    - `{ min: 3 }`: 3 or more spans
+    - `{ max: 0 }`: exactly 0 spans (assert absence)
+- **`matrix-condition`**: Regex to match against matrix test case names (only run this assertion for matching matrix cases)
 
 ### Query logs
 
@@ -202,11 +226,35 @@ expected:
       equals: 'Anonymous player is rolling the dice'
       attributes:
         service_name: rolldice
-      attribute-regexp:  
+      attribute-regexp:
         container_id: ".*"
       no-extra-attributes: true # fail if there are extra attributes
     - logql: '{service_name="rolldice"} |~ `Anonymous player is rolling the dice.*`'
       regexp: 'Anonymous player is .*'
+```
+
+#### Log assertion options
+
+- **`logql`**: LogQL query to find the log line (required)
+- **`equals`**: Exact string match for the log line
+- **`regexp`**: Regular expression pattern to match against the log line
+- **`attributes`**: Key-value pairs that must match exactly on the log labels
+- **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against log labels
+- **`no-extra-attributes`**: Set to `true` to fail if the log has labels beyond those specified in `attributes` and `attribute-regexp`
+- **`count`**: Expected count range for returned log lines, ignoring if they match other criteria
+  - **`min`**: Minimum expected count (defaults to `0` if not specified)
+  - **`max`**: Maximum expected count. Set to `0` for no upper limit. To assert absence, set both `min: 0` and `max: 0`
+- **`matrix-condition`**: Regex to match against matrix test case names
+
+Example:
+```yaml
+expected:
+  logs:
+    - logql: '{service_name="rolldice"}'
+      equals: 'Rolling dice'
+      count:
+        min: 1
+        max: 5  # expect between 1-5 matching logs (inclusive)
 ```
 
 ### Query metrics
@@ -217,6 +265,48 @@ expected:
     - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
       value: "== 10"
 ```
+
+#### Metric assertion options
+
+- **`promql`**: PromQL query to retrieve the metric (required)
+- **`value`**: Expected value with comparison operator. Supported operators: `==`, `!=`, `>`, `<`, `>=`, `<=` (e.g., `">= 0"`, `"== 10"`)
+- **`matrix-condition`**: Regex to match against matrix test case names
+
+### Query profiles
+
+```yaml
+expected:
+  profiles:
+    - query: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="my-service"}'
+      flamebearers:
+        equals: 'main'
+```
+
+#### Profile assertion options
+
+- **`query`**: Pyroscope query to retrieve the profile (required)
+- **`flamebearers`**: Assertions on the flamebearer response
+  - **`equals`**: String that must appear in the flamebearer names
+  - **`regexp`**: Regular expression pattern to match against the flamebearer names
+- **`matrix-condition`**: Regex to match against matrix test case names
+
+### Custom checks
+
+Custom checks allow you to run arbitrary scripts for advanced validation scenarios.
+
+```yaml
+expected:
+  custom-checks:
+    - script: |
+        #!/bin/bash
+        # Your custom validation script here
+        exit 0
+```
+
+#### Custom check options
+
+- **`script`**: Script to execute (required)
+- **`matrix-condition`**: Regex to match against matrix test case names
 
 ### Matrix of test cases
 
@@ -249,7 +339,7 @@ expected:
       matrix-condition: default
 ```
 
-`matrix-condition` is a regex that is applied to the matrix name.
+`matrix-condition` is a regex that is applied to the matrix name. This field is available for all assertion types (traces, logs, metrics, profiles).
 
 ## Docker Compose
 

@@ -9,14 +9,15 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/grafana/oats/model"
 	"go.yaml.in/yaml/v3"
 )
 
 var oatsFileRegex = regexp.MustCompile(`oats.*\.ya?ml`)
 
-func ReadTestCases(base string) ([]*TestCase, string) {
+func ReadTestCases(base string) ([]*model.TestCase, string) {
 	if base == "" {
-		return []*TestCase{}, ""
+		return []*model.TestCase{}, ""
 	}
 
 	base = absolutePath(base)
@@ -29,8 +30,8 @@ func ReadTestCases(base string) ([]*TestCase, string) {
 	return cases, base
 }
 
-func collectTestCases(base string, evaluateIgnoreFile bool) ([]*TestCase, error) {
-	var cases []*TestCase
+func collectTestCases(base string, evaluateIgnoreFile bool) ([]*model.TestCase, error) {
+	var cases []*model.TestCase
 	var ignored []string
 	err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -90,10 +91,10 @@ func absolutePath(dir string) string {
 	return abs
 }
 
-func readTestCase(testBase, filePath string) (TestCase, error) {
+func readTestCase(testBase, filePath string) (model.TestCase, error) {
 	def, err := readTestCaseDefinition(filePath)
 	if err != nil {
-		return TestCase{}, err
+		return model.TestCase{}, err
 	}
 
 	absoluteFilePath := absolutePath(filePath)
@@ -103,7 +104,7 @@ func readTestCase(testBase, filePath string) (TestCase, error) {
 	name = strings.TrimPrefix(name, sep)
 	name = strings.ReplaceAll(name, sep, "-")
 	name = "run" + name
-	testCase := TestCase{
+	testCase := model.TestCase{
 		Path:       absoluteFilePath,
 		Name:       name,
 		Dir:        dir,
@@ -112,24 +113,24 @@ func readTestCase(testBase, filePath string) (TestCase, error) {
 	return testCase, nil
 }
 
-func readTestCaseDefinition(filePath string) (TestCaseDefinition, error) {
+func readTestCaseDefinition(filePath string) (model.TestCaseDefinition, error) {
 	filePath = absolutePath(filePath)
-	def := TestCaseDefinition{}
+	def := model.TestCaseDefinition{}
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return TestCaseDefinition{}, err
+		return model.TestCaseDefinition{}, err
 	}
 
 	err = yaml.Unmarshal(content, &def)
 	if err != nil {
-		return TestCaseDefinition{}, err
+		return model.TestCaseDefinition{}, err
 	}
 
 	for _, s := range def.Include {
 		p := includePath(filePath, s)
 		other, err := readTestCaseDefinition(p)
 		if err != nil {
-			return TestCaseDefinition{}, err
+			return model.TestCaseDefinition{}, err
 		}
 		def.Merge(other)
 	}

@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/grafana/oats/model"
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,11 +64,72 @@ func TestInputDefinitionsAreCorrect(t *testing.T) {
 }
 
 func TestCollectTestCases(t *testing.T) {
+	testCases := []struct {
+		name               string
+		basePath           string
+		evaluateIgnoreFile bool
+		expectedCount      int
+		expectedNames      []string
+	}{
+		{
+			name:               "without ignore file evaluation",
+			basePath:           "testdata",
+			evaluateIgnoreFile: false,
+			expectedCount:      8, // includes matrix expansions (2) and ignored file (1)
+			expectedNames: []string{
+				"runfoo-expect-absent.oats",
+				"runfoo-input.oats",
+				"runfoo-more-oats",
+				"runfoo-oats",
+				"run-oats-merged",
+				"run-matrix-test.oats-docker",       // matrix expansion
+				"run-matrix-test.oats-k8s",          // matrix expansion
+				"runignored-should-not-appear.oats", // included when not evaluating ignore
+			},
+		},
+		{
+			name:               "with ignore file evaluation",
+			basePath:           "testdata",
+			evaluateIgnoreFile: true,
+			expectedCount:      7, // excludes ignored directory
+			expectedNames: []string{
+				"runfoo-expect-absent.oats",
+				"runfoo-input.oats",
+				"runfoo-more-oats",
+				"runfoo-oats",
+				"run-oats-merged",
+				"run-matrix-test.oats-docker", // matrix expansion
+				"run-matrix-test.oats-k8s",    // matrix expansion
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cases, err := collectTestCases(tc.basePath, tc.evaluateIgnoreFile)
+			require.NoError(t, err)
+
+			// Collect all case names for easier assertion
+			actualNames := make([]string, len(cases))
+			for i, c := range cases {
+				actualNames[i] = c.Name
+			}
+
+			// Check that all expected names are present
+			require.ElementsMatch(t, tc.expectedNames, actualNames, "test case names should match")
+		})
+	}
+}
+
+func TestTestCasesAreValid(t *testing.T) {
 	cases, err := collectTestCases("testdata", false)
 	require.NoError(t, err)
-	require.Len(t, cases, 4)
-	require.Equal(t, "runfoo-input.oats", cases[0].Name)
-	require.Equal(t, "runfoo-more-oats", cases[1].Name)
-	require.Equal(t, "runfoo-oats", cases[2].Name)
-	require.Equal(t, "run-oats-merged", cases[3].Name)
+	require.NotEmpty(t, cases)
+	for _, c := range cases {
+		require.NotEqual(t, nil, c.Definition)
+		require.NotEmpty(t, c.Definition.Input)
+		model.ValidateInput(gomega.NewGomega(func(message string, callerSkip ...int) {
+			t.Error(message)
+		}), c.Definition.Input)
+	}
 }

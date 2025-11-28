@@ -1,9 +1,11 @@
 package responses
 
 import (
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/grafana/oats/model"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseTraceDetails(t *testing.T) {
@@ -15,6 +17,12 @@ func TestParseTraceDetails(t *testing.T) {
 	i := spans.Len()
 	require.NotZero(t, i)
 	require.NotEmpty(t, details)
-	require.Len(t, FindSpans(details, "kafkaTopic publish"), 1)
-	require.Len(t, FindSpans(details, "regex:.* publish"), 1)
+	name, _ := FindSpans(details, model.ExpectedSignal{
+		NameEquals: "kafkaTopic publish",
+	})
+	require.Equal(t, "kafkaTopic publish", name)
+	name, _ = FindSpans(details, model.ExpectedSignal{
+		NameRegexp: "kafkaTopic publish",
+	})
+	require.Equal(t, "kafkaTopic publish", name)
 }

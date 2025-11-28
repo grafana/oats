@@ -1,10 +1,12 @@
 package yaml
 
 import (
-	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/grafana/oats/model"
+	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAssertLokiResponse(t *testing.T) {
@@ -12,8 +14,7 @@ func TestAssertLokiResponse(t *testing.T) {
 
 	file, err := os.ReadFile("testdata/loki_response.json")
 	require.NoError(t, err)
-	logs := ExpectedLogs{
-		Contains: []string{"simulating an error"},
+	logs := model.ExpectedSignal{
 		Attributes: map[string]string{
 			"deployment_environment": "staging",
 			"exception_message":      "simulating an error",
@@ -45,7 +46,4 @@ func TestAssertLokiResponse(t *testing.T) {
 		}),
 	}
 	AssertLokiResponse(file, logs, r)
-
-	require.Len(t, r.additionalAsserts, 1)
-	r.additionalAsserts[0]()
 }

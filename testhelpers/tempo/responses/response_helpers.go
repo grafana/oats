@@ -8,27 +8,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/grafana/oats/model"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
-
-func MatchTraceAttribute(attributes pcommon.Map, attrType pcommon.ValueType, key, value string) error {
-	att, found := attributes.Get(key)
-	if !found {
-		return fmt.Errorf("couldn't find attribute %s", key)
-	}
-
-	// We convert to strings anyway, if this check is here you can't match Int values in traces
-	// valueType := att.Type()
-	// if valueType != attrType {
-	// 	return fmt.Errorf("value type for key %s is %s which doesn't match the expect type %s", key, valueType, attrType)
-	// }
-
-	if value != "" && !matcherMaybeRegex(value)(att.AsString()) {
-		return fmt.Errorf("value for key %s is %s which doesn't match the expect value %s", key, att.AsString(), value)
-	}
-	return nil
-}
 
 type AttributeMatch struct {
 	Key   string
@@ -68,20 +51,8 @@ func ParseTempoSearchResult(body []byte) (TempoSearchResult, error) {
 	return st, err
 }
 
-func FindSpans(td ptrace.Traces, name string) []ptrace.Span {
-	spans, _ := FindSpansWithAttributes(td, name)
-	return spans
-}
-func FindSpansWithAttributes(td ptrace.Traces, name string) ([]ptrace.Span, map[string]any) {
-	m := matcherMaybeRegex(name)
-	return FindSpansFunc(td, func(span *ptrace.Span) bool {
-		return m(span.Name())
-	})
-}
-
-func FindSpansFunc(td ptrace.Traces, pred func(*ptrace.Span) bool) ([]ptrace.Span, map[string]any) {
-	var result []ptrace.Span
-	atts := map[string]any{}
+func FindSpans(td ptrace.Traces, signal model.ExpectedSignal) (string, map[string]string) {
+	matcher := nameMatcher(signal)
 	resourceSpans := td.ResourceSpans()
 	for i := 0; i < resourceSpans.Len(); i++ {
 		resourceSpan := resourceSpans.At(i)
@@ -91,35 +62,45 @@ func FindSpansFunc(td ptrace.Traces, pred func(*ptrace.Span) bool) ([]ptrace.Spa
 			spans := scopeSpan.Spans()
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
-				if pred(&span) {
-					result = append(result, span)
-					for k, v := range resourceSpan.Resource().Attributes().AsRaw() {
-						atts[k] = v
-					}
+				if matcher(span.Name()) {
+					atts := map[string]string{}
+					resourceSpan.Resource().Attributes().Range(func(k string, v pcommon.Value) bool {
+						atts[k] = v.AsString()
+						return true
+					})
 					scope := scopeSpan.Scope()
-					for k, v := range scope.Attributes().AsRaw() {
-						atts[k] = v
-					}
+					scope.Attributes().Range(func(k string, v pcommon.Value) bool {
+						atts[k] = v.AsString()
+						return true
+					})
 					//this is how the scope name is shown in tempo
 					atts["otel.library.name"] = scope.Name()
 					atts["otel.library.version"] = scope.Version()
+					span.Attributes().Range(func(k string, v pcommon.Value) bool {
+						atts[k] = v.AsString()
+						return true
+					})
+					return span.Name(), atts
 				}
 			}
 		}
 	}
-	return result, atts
+	return "", nil
 }
 
-func matcherMaybeRegex(want string) func(got string) bool {
-	var re *regexp.Regexp
-	if strings.HasPrefix(want, "regex:") {
-		re = regexp.MustCompile(want[6:])
-	}
-
-	return func(got string) bool {
-		if re != nil {
+func nameMatcher(signal model.ExpectedSignal) func(got string) bool {
+	if signal.NameRegexp != "" {
+		re := regexp.MustCompile(signal.NameRegexp)
+		return func(got string) bool {
 			return re.MatchString(got)
 		}
-		return want == got
+	}
+	if signal.NameEquals != "" {
+		return func(got string) bool {
+			return signal.NameEquals == got
+		}
+	}
+	return func(got string) bool {
+		return true
 	}
 }

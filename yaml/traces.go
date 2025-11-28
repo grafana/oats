@@ -3,28 +3,29 @@ package yaml
 import (
 	"context"
 
+	"github.com/grafana/oats/model"
 	"github.com/grafana/oats/testhelpers/tempo/responses"
 	"github.com/onsi/gomega"
-	"go.opentelemetry.io/collector/pdata/pcommon"
 )
 
-func AssertTempo(r *runner, t ExpectedTraces) {
+func AssertTempo(r *runner, t model.ExpectedTraces) {
 	ctx := context.Background()
 
 	b, err := r.endpoint.SearchTempo(ctx, t.TraceQL)
 	r.LogQueryResult("traceQL query %v response %v err=%v\n", t.TraceQL, string(b), err)
 	g := r.gomegaInst
 	g.Expect(err).ToNot(gomega.HaveOccurred())
+
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0))
 
 	res, err := responses.ParseTempoSearchResult(b)
 	g.Expect(err).ToNot(gomega.HaveOccurred())
 	g.Expect(res.Traces).ToNot(gomega.BeEmpty())
 
-	assertTrace(r, res.Traces[0], t.Spans)
+	assertTrace(r, res.Traces[0], t, len(res.Traces))
 }
 
-func assertTrace(r *runner, tr responses.Trace, wantSpans []ExpectedSpan) {
+func assertTrace(r *runner, tr responses.Trace, wantTraces model.ExpectedTraces, count int) {
 	ctx := context.Background()
 
 	b, err := r.endpoint.GetTraceByID(ctx, tr.TraceID)
@@ -37,23 +38,11 @@ func assertTrace(r *runner, tr responses.Trace, wantSpans []ExpectedSpan) {
 	td, err := responses.ParseTraceDetails(b)
 	g.Expect(err).ToNot(gomega.HaveOccurred(), "we should be able to parse the GET trace by traceID API output")
 
-	for _, wantSpan := range wantSpans {
-		spans, atts := responses.FindSpansWithAttributes(td, wantSpan.Name)
-		if wantSpan.AllowDups {
-			g.Expect(len(spans)).Should(gomega.BeNumerically(">", 0), "we should find at least one span with the name %s", wantSpan.Name)
-		} else {
-			g.Expect(spans).To(gomega.HaveLen(1), "we should find a single span with the name %s", wantSpan.Name)
-		}
+	name, atts := responses.FindSpans(td, wantTraces.Signal)
+	r.LogQueryResult("found span name '%v' attributes %v for traceID %v\n", name, atts, tr.TraceID)
 
-		for k, v := range wantSpan.Attributes {
-			for k, v := range spans[0].Attributes().AsRaw() {
-				atts[k] = v
-			}
-			m := pcommon.NewMap()
-			err = m.FromRaw(atts)
-			g.Expect(err).ToNot(gomega.HaveOccurred(), "we should be able to convert the map to a pdata.Map")
-			err := responses.MatchTraceAttribute(m, pcommon.ValueTypeStr, k, v)
-			g.Expect(err).ToNot(gomega.HaveOccurred(), "span attribute should match")
-		}
+	if name == "" && !wantTraces.Signal.ExpectAbsent() {
+		g.Expect(name).ToNot(gomega.BeEmpty(), "no spans matching the signal were found")
 	}
+	assertSignal(g, wantTraces.Signal, count, name, atts)
 }

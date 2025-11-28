@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/oats/model"
 	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/kubernetes"
 	"github.com/grafana/oats/testhelpers/remote"
@@ -23,32 +24,34 @@ import (
 )
 
 type runner struct {
-	testCase          *TestCase
-	endpoint          *remote.Endpoint
-	deadline          time.Time
-	host              string
-	Verbose           bool
-	gomegaInst        gomega.Gomega
-	additionalAsserts []func()
+	testCase   *model.TestCase
+	endpoint   *remote.Endpoint
+	deadline   time.Time
+	host       string
+	Verbose    bool
+	gomegaInst gomega.Gomega
+	settings   model.Settings
 }
 
 var VerboseLogging bool
 
-func RunTestCase(c *TestCase) {
+func RunTestCase(c *model.TestCase, s model.Settings) {
 	format.MaxLength = 100000
 	r := &runner{
-		host:     c.Host,
+		host:     s.Host,
 		testCase: c,
+		settings: s,
 	}
 
 	c.OutputDir = prepareBuildDir(c.Name)
-	c.validateAndSetVariables()
-	endpoint, err := startEndpoint(c)
+	c.ValidateAndSetVariables(gomega.Default)
+	endpoint, end, err := r.startEndpoint()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting an observability endpoint")
+	defer end()
 
-	r.deadline = time.Now().Add(c.Timeout)
+	r.deadline = time.Now().Add(s.Timeout)
 	r.endpoint = endpoint
-	if c.ManualDebug {
+	if s.ManualDebug {
 		slog.Info(fmt.Sprintf("stopping to let you manually debug on http://%s:%d\n", r.host, r.testCase.PortConfig.GrafanaHTTPPort))
 
 		for {
@@ -61,16 +64,11 @@ func RunTestCase(c *TestCase) {
 
 	slog.Info("deadline", "time", r.deadline)
 
-	defer func() {
-		slog.Info("stopping observability endpoint")
+	r.ExecuteChecks()
+}
 
-		var ctx = context.Background()
-
-		stopErr := r.endpoint.Stop(ctx)
-		gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
-		slog.Info("stopped observability endpoint")
-	}()
-
+func (r *runner) ExecuteChecks() {
+	c := r.testCase
 	expected := c.Definition.Expected
 	for _, composeLog := range expected.ComposeLogs {
 		slog.Info("searching for compose log", "log", composeLog)
@@ -84,20 +82,22 @@ func RunTestCase(c *TestCase) {
 	// Assert logs traces first, because metrics can take longer to appear
 	// (depending on OTEL_METRIC_EXPORT_INTERVAL).
 	for _, log := range expected.Logs {
-		if r.MatchesMatrixCondition(log.MatrixCondition, log.LogQL) {
-			slog.Info("searching loki", "logql", log.LogQL)
-			r.eventually(func() {
+		r.assertSignal(log.Signal, log.LogQL,
+			func() {
+				slog.Info("searching loki", "logql", log.LogQL)
+			},
+			func() {
 				AssertLoki(r, log)
 			})
-		}
 	}
 	for _, trace := range expected.Traces {
-		if r.MatchesMatrixCondition(trace.MatrixCondition, trace.TraceQL) {
-			slog.Info("searching tempo", "traceql", trace.TraceQL)
-			r.eventually(func() {
+		r.assertSignal(trace.Signal, trace.TraceQL,
+			func() {
+				slog.Info("searching tempo", "traceql", trace.TraceQL)
+			},
+			func() {
 				AssertTempo(r, trace)
 			})
-		}
 	}
 	for _, metric := range expected.Metrics {
 		if r.MatchesMatrixCondition(metric.MatrixCondition, metric.PromQL) {
@@ -119,13 +119,13 @@ func RunTestCase(c *TestCase) {
 		if r.MatchesMatrixCondition(customCheck.MatrixCondition, customCheck.Script) {
 			slog.Info("executing custom check", "check", customCheck.Script)
 			r.eventually(func() {
-				assertCustomCheck(r, customCheck)
+				r.assertCustomCheck(customCheck)
 			})
 		}
 	}
 }
 
-func assertCustomCheck(r *runner, c CustomCheck) {
+func (r *runner) assertCustomCheck(c model.CustomCheck) {
 	r.LogQueryResult("running custom check %v\n", c.Script)
 	cmd := exec.Command(c.Script)
 	cmd.Dir = r.testCase.Dir
@@ -137,7 +137,9 @@ func assertCustomCheck(r *runner, c CustomCheck) {
 	r.gomegaInst.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
-func startEndpoint(c *TestCase) (*remote.Endpoint, error) {
+func (r *runner) startEndpoint() (endpoint *remote.Endpoint, end func(), err error) {
+	c := r.testCase
+	host := r.host
 	ports := remote.PortsConfig{
 		PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
 		TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
@@ -146,16 +148,29 @@ func startEndpoint(c *TestCase) (*remote.Endpoint, error) {
 	}
 
 	slog.Info("start test", "name", c.Name)
-	var endpoint *remote.Endpoint
 	if c.Definition.Kubernetes != nil {
-		endpoint = kubernetes.NewEndpoint(c.Host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
+		endpoint = kubernetes.NewEndpoint(host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
 	} else {
-		endpoint = compose.NewEndpoint(c.Host, c.CreateDockerComposeFile(), ports)
+		endpoint = compose.NewEndpoint(host, CreateDockerComposeFile(r), ports)
 	}
 
 	var ctx = context.Background()
 	startErr := endpoint.Start(ctx)
-	return endpoint, startErr
+	if startErr != nil {
+		return nil, nil, fmt.Errorf("error starting local observability endpoint: %w", startErr)
+	}
+
+	end = func() {
+		slog.Info("stopping observability endpoint")
+
+		var ctx = context.Background()
+
+		stopErr := endpoint.Stop(ctx)
+		gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
+		slog.Info("stopped observability endpoint")
+	}
+
+	return endpoint, end, nil
 }
 
 func prepareBuildDir(name string) string {
@@ -173,66 +188,115 @@ func prepareBuildDir(name string) string {
 	return dir
 }
 
+func (r *runner) assertSignal(signal model.ExpectedSignal, query string, startLog func(), asserter func()) {
+	if r.MatchesMatrixCondition(signal.MatrixCondition, query) {
+		startLog()
+		if signal.ExpectAbsent() {
+			r.consistentlyNot(asserter)
+		} else {
+			r.eventually(asserter)
+		}
+	}
+}
+
 func (r *runner) eventually(asserter func()) {
-	gomega.Expect(time.Now()).Should(gomega.BeTemporally("<", r.deadline))
-	start := time.Now()
-	printTime := start
-	ctx := context.Background()
+	r.assertDeadline()
+	r.eventuallyWithTimeout(asserter, time.Until(r.deadline))
+}
+
+func (r *runner) assertDeadline() bool {
+	return gomega.Expect(time.Now()).Should(gomega.BeTemporally("<", r.deadline))
+}
+
+func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
+	caller := newAssertCaller(r)
+	gomega.Eventually(context.Background(), func(g gomega.Gomega) {
+		r.callAsserter(g, caller, asserter)
+	}).WithTimeout(timeout).WithPolling(caller.interval).Should(
+		gomega.Succeed(),
+		"calling application for %s should cause telemetry to appear within %v",
+		r.testCase.Name,
+		timeout,
+	)
+	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(caller.start)))
+}
+
+func (r *runner) consistentlyNot(asserter func()) {
+	r.assertDeadline()
+	caller := newAssertCaller(r)
+	timeout := r.settings.AbsentTimeout
+	gomega.Consistently(context.Background(), func(g gomega.Gomega) {
+		r.callAsserter(g, caller, asserter)
+	}).WithTimeout(timeout).WithPolling(caller.interval).ShouldNot(gomega.Succeed(), "assertion should not succeed for %v", timeout)
+}
+
+type asserterCaller struct {
+	iterations int
+	start      time.Time
+	printTime  time.Time
+	interval   time.Duration
+}
+
+func newAssertCaller(r *runner) *asserterCaller {
 	interval := r.testCase.Definition.Interval
 	if interval == 0 {
-		interval = DefaultTestCaseInterval
+		interval = model.DefaultTestCaseInterval
 	}
-	iterations := 0
-	r.additionalAsserts = nil
-	gomega.Eventually(ctx, func(g gomega.Gomega) {
-		verbose := VerboseLogging
-		if iterations == 0 || time.Since(printTime) > 10*time.Second {
-			verbose = true
-			printTime = time.Now()
-		}
-		iterations++
-		r.Verbose = verbose
-		r.LogQueryResult("waiting for telemetry data\n")
 
-		for _, i := range r.testCase.Definition.Input {
-			scheme := "http"
-			if i.Scheme != "" {
-				scheme = i.Scheme
-			}
-			host := r.host
-			if i.Host != "" {
-				host = i.Host
-			}
-			url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.testCase.PortConfig.ApplicationPort, i.Path)
-			body := i.Body
-			method := http.MethodGet
-			if i.Method != "" {
-				method = strings.ToUpper(i.Method)
-			}
-			status := 200
-			if i.Status != "" {
-				parsedStatus, err := strconv.ParseInt(i.Status, 10, 64)
-				if err == nil {
-					status = int(parsedStatus)
-				}
-			}
-			headers := make(map[string]string)
-			if i.Headers != nil {
-				maps.Copy(headers, i.Headers)
-			} else {
-				headers["Accept"] = "application/json"
-			}
-			err := requests.DoHTTPRequest(url, method, headers, body, status)
-			g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
-		}
-
-		r.gomegaInst = g
-		asserter()
-	}).WithTimeout(time.Until(r.deadline)).WithPolling(interval).Should(gomega.Succeed(), "calling application for %v should cause telemetry to appear", r.testCase.Timeout)
-	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(start)))
-	for _, a := range r.additionalAsserts {
-		a()
+	now := time.Now()
+	return &asserterCaller{
+		iterations: 0,
+		start:      now,
+		printTime:  now,
+		interval:   interval,
 	}
+}
+
+func (r *runner) callAsserter(g gomega.Gomega, caller *asserterCaller, asserter func()) {
+	verbose := VerboseLogging
+	if caller.iterations == 0 || time.Since(caller.printTime) > 10*time.Second {
+		verbose = true
+		caller.printTime = time.Now()
+	}
+	caller.iterations++
+	r.Verbose = verbose
+	r.LogQueryResult("waiting for telemetry data\n")
+
+	for _, i := range r.testCase.Definition.Input {
+		scheme := "http"
+		if i.Scheme != "" {
+			scheme = i.Scheme
+		}
+		host := r.host
+		if i.Host != "" {
+			host = i.Host
+		}
+		url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.testCase.PortConfig.ApplicationPort, i.Path)
+		body := i.Body
+		method := http.MethodGet
+		if i.Method != "" {
+			method = strings.ToUpper(i.Method)
+		}
+		status := 200
+		if i.Status != "" {
+			parsedStatus, err := strconv.ParseInt(i.Status, 10, 64)
+			if err == nil {
+				status = int(parsedStatus)
+			}
+		}
+		headers := make(map[string]string)
+		if i.Headers != nil {
+			maps.Copy(headers, i.Headers)
+		} else {
+			headers["Accept"] = "application/json"
+		}
+		r.LogQueryResult("Making HTTP request: %s %s\n", method, url)
+		err := requests.DoHTTPRequest(url, method, headers, body, status)
+		g.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error calling application endpoint %s", url)
+	}
+
+	r.gomegaInst = g
+	asserter()
 }
 
 func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) bool {
@@ -252,4 +316,15 @@ func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) 
 		"name", name,
 		"subject", subject)
 	return false
+}
+
+func (r *runner) LogQueryResult(format string, a ...any) {
+	if r.Verbose {
+		limit := r.settings.LogLimit
+		result := fmt.Sprintf(format, a...)
+		if len(result) > limit {
+			result = result[:limit] + ".."
+		}
+		slog.Info(result)
+	}
 }

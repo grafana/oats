@@ -1,0 +1,24 @@
+
+input:
+  - path: /api/test
+expected:
+  traces:
+    - traceql: '{ name =~ "SELECT .*" }'
+      regexp: 'SELECT .*product'
+      attributes:
+        db.system: h2
+    - traceql: '{ name =~ "SELECT .*" }'
+      regexp: 'nonexistent-span'
+      count:
+        min: 0
+        max: 0
+    - traceql: '{ span.kind = "client" }'
+      regexp: 'HTTP GET'
+    - traceql: '{ span.kind = "client" }'
+      regexp: 'filtered-span'
+      count:
+        min: 0
+        max: 0
+  metrics:
+    - promql: test_metric
+      value: '>= 0'
