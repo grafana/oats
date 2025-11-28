@@ -1,4 +1,4 @@
-docker-compose:
+
 input:
   - path: /api/test
 expected:

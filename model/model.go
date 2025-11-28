@@ -203,7 +203,7 @@ func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
 	}
 
 	if c.PortConfig == nil {
-		// We're in non-parallel mode, so we can static ports here.
+		// We're in non-parallel mode, so we can use static ports here.
 		c.PortConfig = &PortConfig{
 			ApplicationPort:    8080,
 			GrafanaHTTPPort:    3000,
@@ -227,8 +227,8 @@ func validateSignal(g gomega.Gomega, signal ExpectedSignal, out []byte) {
 	g.Expect(signal.Contains).To(gomega.BeEmpty(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
 	if signal.ExpectAbsent() {
 		// expect all fields to be empty
-		g.Expect(signal.NameEquals).To(gomega.BeEmpty(), "expected 'equals' to be nil when count min=0 and max=0 in %s", string(out))
-		g.Expect(signal.NameRegexp).To(gomega.BeEmpty(), "expected 'regexp' to be nil when count min=0 and max=0 in %s", string(out))
+		g.Expect(signal.NameEquals).To(gomega.BeEmpty(), "expected 'equals' to be empty when count min=0 and max=0 in %s", string(out))
+		g.Expect(signal.NameRegexp).To(gomega.BeEmpty(), "expected 'regexp' to be empty when count min=0 and max=0 in %s", string(out))
 		g.Expect(len(signal.Attributes)).To(gomega.BeZero(), "expected 'attributes' to be empty when count min=0 and max=0 in %s", string(out))
 		g.Expect(len(signal.AttributeRegexp)).To(gomega.BeZero(), "expected 'attribute-regexp' to be empty when count min=0 and max=0 in %s", string(out))
 	} else {
@@ -286,7 +286,7 @@ func ValidateInput(g gomega.Gomega, input []Input) {
 				gomega.Equal(http.MethodTrace),
 			), "method must be a supported HTTP method or be empty")
 		}
-		if (i.Method == "" || i.Method == http.MethodGet) && i.Body != "" {
+		if (i.Method == "" || strings.ToUpper(i.Method) == http.MethodGet) && i.Body != "" {
 			g.Expect(i.Body).To(gomega.BeEmpty(), "body must be empty for GET requests")
 		}
 		if i.Scheme != "" {
