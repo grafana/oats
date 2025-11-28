@@ -1,0 +1,11 @@
+include:
+  - ../oats-template.yaml
+expected:
+  traces:
+    - traceql: '{ name =~ "SELECT .*cart"}'
+      spans:
+        - contains: 'outdated oats test'
+  metrics:
+    - promql: foo
+      value: '>= 0'
+

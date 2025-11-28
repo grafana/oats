@@ -14,7 +14,6 @@ import (
 )
 
 type ExpectedSignal struct {
-	Contains          []string          `yaml:"contains"` // deprecated, use regexp instead
 	NameEquals        string            `yaml:"equals"`
 	NameRegexp        string            `yaml:"regexp"`
 	Attributes        map[string]string `yaml:"attributes"`
@@ -34,18 +33,12 @@ type ExpectedMetrics struct {
 	MatrixCondition string `yaml:"matrix-condition"`
 }
 
-// Deprecated: use ExpectedSignal instead
-type ExpectedSpan struct {
-	Name string `yaml:"name"`
-}
-
 type ExpectedLogs struct {
 	LogQL  string         `yaml:"logql"`
 	Signal ExpectedSignal `yaml:",inline"`
 }
 
 type Flamebearers struct {
-	Contains   string `yaml:"contains"` // deprecated, use regexp instead
 	NameEquals string `yaml:"equals"`
 	NameRegexp string `yaml:"regexp"`
 }
@@ -63,7 +56,6 @@ type ExpectedRange struct {
 
 type ExpectedTraces struct {
 	TraceQL string         `yaml:"traceql"`
-	Spans   []ExpectedSpan `yaml:"spans"` // deprecated, use fields below instead
 	Signal  ExpectedSignal `yaml:",inline"`
 }
 
@@ -189,18 +181,12 @@ func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
 	for _, d := range expected.Traces {
 		out, _ := yaml.Marshal(d)
 		g.Expect(d.TraceQL).ToNot(gomega.BeEmpty(), "traceQL is empty in %s", string(out))
-		g.Expect(d.Spans).To(gomega.BeEmpty(), "spans are deprecated, add to 'traces' directly: %s", string(out))
 		validateSignal(g, d.Signal, out)
-
-		for _, span := range d.Spans {
-			g.Expect(span.Name).ToNot(gomega.BeEmpty(), "span name is empty in %s", string(out))
-		}
 	}
 	for _, p := range expected.Profiles {
 		out, _ := yaml.Marshal(p)
 		g.Expect(p.Query).ToNot(gomega.BeEmpty(), "query is empty in %s", string(out))
 		f := p.Flamebearers
-		g.Expect(f.Contains).To(gomega.BeEmpty(), "'contains' is deprecated, use 'equals' or 'regexp' instead in %s", string(out))
 		g.Expect(f.NameEquals == "" && f.NameRegexp == "").To(gomega.BeFalse(),
 			"either 'equals' or 'regexp' must be set in %s", string(out))
 	}
@@ -227,7 +213,6 @@ func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
 }
 
 func validateSignal(g gomega.Gomega, signal ExpectedSignal, out []byte) {
-	g.Expect(signal.Contains).To(gomega.BeEmpty(), "'contains' is deprecated, use 'regexp' instead in %s", string(out))
 	if signal.ExpectAbsent() {
 		// expect all fields to be empty
 		g.Expect(signal.NameEquals).To(gomega.BeEmpty(), "expected 'equals' to be empty when count min=0 and max=0 in %s", string(out))
