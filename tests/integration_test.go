@@ -26,6 +26,7 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 	}
+
 	tests := []struct {
 		name        string
 		shouldPanic bool
@@ -34,6 +35,66 @@ func TestIntegration(t *testing.T) {
 		{
 			name:     "prometheus metrics pass",
 			expected: promTest,
+		},
+		{
+			name: "multiple metrics pass",
+			expected: model.Expected{
+				Metrics: []model.ExpectedMetrics{
+					{
+						PromQL: "histogram_quantile(0.95, sum by(le) (rate(http_server_request_duration_seconds_bucket{http_route=\"/vets.html\"}[5m])))",
+						Value:  "> 0",
+					},
+					{
+						PromQL: "rate(http_server_request_duration_seconds_count{http_route=\"/vets.html\"}[5m])",
+						Value:  "> 0",
+					},
+				},
+			},
+		},
+		{
+			name: "logs check pass",
+			expected: model.Expected{
+				Logs: []model.ExpectedLogs{
+					{
+						LogQL: "{job=\"oats\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 1, Max: 1000},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "traces check pass",
+			expected: model.Expected{
+				Traces: []model.ExpectedTraces{
+					{
+						TraceQL: "{name=\"/vets.html\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 1, Max: 100},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "composed checks with metrics and logs",
+			expected: model.Expected{
+				Metrics: []model.ExpectedMetrics{
+					{
+						PromQL: "histogram_quantile(0.95, sum by(le) (rate(http_server_request_duration_seconds_bucket{http_route=\"/vets.html\"}[5m])))",
+						Value:  "> 0",
+					},
+				},
+				Logs: []model.ExpectedLogs{
+					{
+						LogQL: "{job=\"oats\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 1, Max: 1000},
+						},
+					},
+				},
+			},
 		},
 	}
 
