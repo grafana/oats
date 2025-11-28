@@ -270,7 +270,7 @@ func (r *Runner) callAsserter(g gomega.Gomega, caller *asserterCaller, asserter 
 	}
 	caller.iterations++
 	r.Verbose = verbose
-	r.LogQueryResult(fmt.Sprintf("waiting for telemetry data (timeout %v)\n", caller.timeout))
+	r.LogQueryResult("waiting for telemetry data (timeout %v)\n", caller.timeout)
 
 	for _, i := range r.testCase.Definition.Input {
 		scheme := "http"
