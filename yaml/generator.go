@@ -21,7 +21,7 @@ var lgtmTemplate []byte
 //go:embed docker-compose-include-base.yml
 var lgtmTemplateIncludeBase []byte
 
-func CreateDockerComposeFile(r *runner) string {
+func CreateDockerComposeFile(r *Runner) string {
 	p := filepath.Join(r.testCase.OutputDir, "docker-compose.yml")
 	content := getContent(r)
 	err := os.WriteFile(p, content, 0644)
@@ -29,10 +29,10 @@ func CreateDockerComposeFile(r *runner) string {
 	return p
 }
 
-func getContent(r *runner) []byte {
+func getContent(r *Runner) []byte {
 	c := r.testCase
 	compose := c.Definition.DockerCompose
-	slog.Info("using docker-compose", "lgtm-version", r.settings.LgtmVersion)
+	slog.Info("using docker-compose", "lgtm-version", r.Settings.LgtmVersion)
 
 	vars := map[string]any{}
 	vars["ApplicationPort"] = c.PortConfig.ApplicationPort
@@ -41,8 +41,8 @@ func getContent(r *runner) []byte {
 	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
 	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
 	vars["PyroscopeHttpPort"] = c.PortConfig.PyroscopeHttpPort
-	vars["LgtmVersion"] = r.settings.LgtmVersion
-	vars["LgtmLogSettings"] = r.settings.LgtmLogSettings
+	vars["LgtmVersion"] = r.Settings.LgtmVersion
+	vars["LgtmLogSettings"] = r.Settings.LgtmLogSettings
 
 	// Overrides to make tests faster by exporting telemetry data more frequently
 	vars["OTEL_BLRP_SCHEDULE_DELAY"] = "5000"
@@ -75,7 +75,8 @@ func getContent(r *runner) []byte {
 		addbuf := bytes.NewBufferString("")
 		err = t.Execute(addbuf, vars)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		name := strings.TrimSuffix(filename, filepath.Ext(filename)) + "-generated.yml"
+		name, err := filepath.Abs(strings.TrimSuffix(filename, filepath.Ext(filename)) + "-generated.yml")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = os.WriteFile(name, addbuf.Bytes(), 0644)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		defer func(name string) {

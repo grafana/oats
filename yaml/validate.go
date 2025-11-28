@@ -16,7 +16,8 @@ func assertSignal(g gomega.Gomega, s model.ExpectedSignal, count int, name strin
 func assertCount(g gomega.Gomega, expectedRange *model.ExpectedRange, got int) {
 	g.Expect(got).Should(gomega.BeNumerically(">=", expectedRange.Min),
 		"expected count to be at least %d, got %d", expectedRange.Min, got)
-	if expectedRange.Max != 0 {
+	if expectedRange.Max != 0 || expectedRange.Min == 0 {
+		// only check max if it's set (non-zero) or if checking for exact absence (min=0)
 		g.Expect(got).Should(gomega.BeNumerically("<=", expectedRange.Max),
 			"expected count to be at most %d, got %d", expectedRange.Max, got)
 	}

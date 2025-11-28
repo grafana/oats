@@ -18,7 +18,7 @@ type LokiQueryResponse struct {
 	} `json:"data"`
 }
 
-func AssertLoki(r *runner, l model.ExpectedLogs) {
+func AssertLoki(r *Runner, l model.ExpectedLogs) {
 	b, err := r.endpoint.SearchLoki(l.LogQL)
 	r.LogQueryResult("logQL query %v response %v err=%v\n", l.LogQL, string(b), err)
 	g := r.gomegaInst
@@ -26,7 +26,7 @@ func AssertLoki(r *runner, l model.ExpectedLogs) {
 	AssertLokiResponse(b, l.Signal, r)
 }
 
-func AssertLokiResponse(b []byte, l model.ExpectedSignal, r *runner) {
+func AssertLokiResponse(b []byte, l model.ExpectedSignal, r *Runner) {
 	g := r.gomegaInst
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0), "expected loki response to be non-empty")
 
@@ -39,8 +39,6 @@ func AssertLokiResponse(b []byte, l model.ExpectedSignal, r *runner) {
 
 	g.Expect(response.Status).To(gomega.Equal("success"))
 	streams := response.Data.Result
-	g.Expect(len(streams)).Should(gomega.BeNumerically(">", 0), "expected loki streams to be non-empty")
-
 	line := ""
 	atts := map[string]string{}
 	if len(streams) > 0 && len(streams[0].Values) > 0 {
@@ -48,7 +46,7 @@ func AssertLokiResponse(b []byte, l model.ExpectedSignal, r *runner) {
 		atts = streams[0].Stream
 	}
 	r.LogQueryResult("found log line '%v' attributes %v\n", line, atts)
-	if line == "" && !l.ExpectAbsent() {
+	if !l.ExpectAbsent() {
 		g.Expect(line).ToNot(gomega.BeEmpty(), "no log lines were found in the Loki response")
 	}
 	totalLines := 0
