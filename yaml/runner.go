@@ -192,7 +192,7 @@ func (r *runner) assertSignal(signal model.ExpectedSignal, query string, startLo
 	if r.MatchesMatrixCondition(signal.MatrixCondition, query) {
 		startLog()
 		if signal.ExpectAbsent() {
-			r.consistentlyNot(asserter)
+			r.consistently(asserter)
 		} else {
 			r.eventually(asserter)
 		}
@@ -227,7 +227,7 @@ func (r *runner) consistentlyNot(asserter func()) {
 	timeout := r.settings.AbsentTimeout
 	gomega.Consistently(context.Background(), func(g gomega.Gomega) {
 		r.callAsserter(g, caller, asserter)
-	}).WithTimeout(timeout).WithPolling(caller.interval).ShouldNot(gomega.Succeed(), "assertion should not succeed for %v", timeout)
+	}).WithTimeout(timeout).WithPolling(caller.interval).Should(gomega.Succeed(), "assertion should succeed for %v", timeout)
 }
 
 type asserterCaller struct {
