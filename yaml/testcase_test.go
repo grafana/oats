@@ -33,36 +33,37 @@ func TestIncludePath(t *testing.T) {
 func TestInputDefinitionsAreCorrect(t *testing.T) {
 	def, err := readTestCaseDefinition("testdata/valid-tests/input.oats.yaml", false)
 	require.NoError(t, err)
-	require.Len(t, def.Input, 3)
-	item := def.Input[0]
-	require.Equal(t, "/stock", item.Path)
-	require.Equal(t, "", item.Scheme)
-	require.Equal(t, "", item.Host)
-	require.Equal(t, "", item.Method)
-	require.Empty(t, item.Headers)
-	require.Equal(t, "", item.Body)
-	require.Equal(t, "", item.Status)
-	item = def.Input[1]
-	require.Equal(t, "/buy", item.Path)
-	require.Equal(t, "", item.Scheme)
-	require.Equal(t, "", item.Host)
-	require.Equal(t, "POST", item.Method)
-	require.Len(t, item.Headers, 2)
-	require.Equal(t, "Bearer user-token", item.Headers["Authorization"])
-	require.Equal(t, "application/json", item.Headers["Content-Type"])
-	require.Equal(t, "{\"id\": \"42\", \"quantity\": 10}", item.Body)
-	require.Equal(t, "201", item.Status)
-	item = def.Input[2]
-	require.Equal(t, "/delist/42", item.Path)
-	require.Equal(t, "https", item.Scheme)
-	require.Equal(t, "127.0.0.1", item.Host)
-	require.Equal(t, "DELETE", item.Method)
-	require.Len(t, item.Headers, 1)
-	require.Equal(t, "Bearer admin-token", item.Headers["Authorization"])
-	require.Equal(t, "", item.Body)
-	require.Equal(t, "204", item.Status)
-}
 
+	expected := &model.TestCaseDefinition{
+		Input: []model.Input{
+			{
+				Path: "/stock",
+			},
+			{
+				Path:   "/buy",
+				Method: "POST",
+				Headers: map[string]string{
+					"Authorization": "Bearer user-token",
+					"Content-Type":  "application/json",
+				},
+				Body:   `{"id": "42", "quantity": 10}`,
+				Status: "201",
+			},
+			{
+				Path:   "/delist/42",
+				Scheme: "https",
+				Host:   "127.0.0.1",
+				Method: "DELETE",
+				Headers: map[string]string{
+					"Authorization": "Bearer admin-token",
+				},
+				Status: "204",
+			},
+		},
+	}
+
+	require.Equal(t, expected.Input, def.Input)
+}
 func TestInputDefinitionsInvalidFiles(t *testing.T) {
 	tests := []struct {
 		name     string
