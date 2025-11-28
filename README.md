@@ -254,6 +254,8 @@ expected:
       count:
         min: 1
         max: 5  # expect between 1-5 matching logs
+```
+
 ### Query metrics
 
 ```yaml

@@ -232,6 +232,10 @@ func validateSignal(g gomega.Gomega, signal ExpectedSignal, out []byte) {
 		g.Expect(len(signal.Attributes)).To(gomega.BeZero(), "expected 'attributes' to be empty when count min=0 and max=0 in %s", string(out))
 		g.Expect(len(signal.AttributeRegexp)).To(gomega.BeZero(), "expected 'attribute-regexp' to be empty when count min=0 and max=0 in %s", string(out))
 	} else {
+		if signal.Count == nil {
+			g.Expect(signal.NameEquals == "" && signal.NameRegexp == "").To(gomega.BeFalse(),
+				"either 'equals' or 'regexp' must be set in %s if count is omitted", string(out))
+		}
 		for k, v := range signal.Attributes {
 			g.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
 			g.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))
@@ -243,7 +247,7 @@ func validateSignal(g gomega.Gomega, signal ExpectedSignal, out []byte) {
 	}
 
 	// cases
-	// count if nil -> 1 or more
+	// count is nil -> 1 or more (implicit, count is not checked, but name or regexp must match)
 	// min=0, max>0 -> not supported
 	// min=0, max=0 -> exactly 0
 	// min>0, max=0 -> min or more
