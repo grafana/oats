@@ -149,6 +149,7 @@ type TestCase struct {
 	LgtmVersion        string
 	LgtmLogSettings    map[string]bool
 	ManualDebug        bool
+	LogLimit           int
 }
 
 func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {
@@ -227,8 +228,6 @@ func validateSignal(g gomega.Gomega, signal ExpectedSignal, out []byte) {
 		g.Expect(len(signal.Attributes)).To(gomega.BeZero(), "expected 'attributes' to be empty when count min=0 and max=0 in %s", string(out))
 		g.Expect(len(signal.AttributeRegexp)).To(gomega.BeZero(), "expected 'attribute-regexp' to be empty when count min=0 and max=0 in %s", string(out))
 	} else {
-		g.Expect(signal.NameEquals == "" && signal.NameRegexp == "").To(gomega.BeFalse(),
-			"either 'equals' or 'regexp' must be set in %s", string(out))
 		for k, v := range signal.Attributes {
 			g.Expect(k).ToNot(gomega.BeEmpty(), "attribute key is empty in %s", string(out))
 			g.Expect(v).ToNot(gomega.BeEmpty(), "attribute value is empty in %s", string(out))

@@ -312,9 +312,10 @@ func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) 
 
 func (r *runner) LogQueryResult(format string, a ...any) {
 	if r.Verbose {
+		limit := r.testCase.LogLimit
 		result := fmt.Sprintf(format, a...)
-		if len(result) > 1000 {
-			result = result[:1000] + ".."
+		if len(result) > limit {
+			result = result[:limit] + ".."
 		}
 		slog.Info(result)
 	}

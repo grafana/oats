@@ -33,6 +33,7 @@ func run() error {
 
 	timeout := flag.Duration("timeout", 30*time.Second, "timeout for each test case")
 	manualDebug := flag.Bool("manual-debug", false, "debug mode")
+	logLimit := flag.Int("log-limit", 1000, "maximum log output length per log entry")
 	flag.Parse()
 
 	if flag.NArg() != 1 {
@@ -76,6 +77,7 @@ func run() error {
 		c.LgtmLogSettings = logSettings
 		c.Timeout = *timeout
 		c.ManualDebug = *manualDebug
+		c.LogLimit = *logLimit
 		yaml.RunTestCase(c)
 	}
 
