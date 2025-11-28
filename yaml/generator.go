@@ -32,7 +32,7 @@ func CreateDockerComposeFile(c *model.TestCase) string {
 
 func getContent(c *model.TestCase) []byte {
 	compose := c.Definition.DockerCompose
-	slog.Info("using docker-compose", "lgtm-version", c.LgtmVersion)
+	slog.Info("using docker-compose", "lgtm-version", c.Settings.LgtmVersion)
 
 	vars := map[string]any{}
 	vars["ApplicationPort"] = c.PortConfig.ApplicationPort
@@ -41,8 +41,8 @@ func getContent(c *model.TestCase) []byte {
 	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
 	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
 	vars["PyroscopeHttpPort"] = c.PortConfig.PyroscopeHttpPort
-	vars["LgtmVersion"] = c.LgtmVersion
-	vars["LgtmLogSettings"] = c.LgtmLogSettings
+	vars["LgtmVersion"] = c.Settings.LgtmVersion
+	vars["LgtmLogSettings"] = c.Settings.LgtmLogSettings
 
 	// Overrides to make tests faster by exporting telemetry data more frequently
 	vars["OTEL_BLRP_SCHEDULE_DELAY"] = "5000"

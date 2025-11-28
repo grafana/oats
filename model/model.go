@@ -136,20 +136,24 @@ type PortConfig struct {
 	PyroscopeHttpPort  int
 }
 
+type Settings struct {
+	Host            string
+	Timeout         time.Duration
+	LgtmVersion     string
+	LgtmLogSettings map[string]bool
+	ManualDebug     bool
+	LogLimit        int
+}
+
 type TestCase struct {
+	Settings           Settings
 	Path               string
 	Name               string
 	MatrixTestCaseName string
 	Dir                string
-	Host               string
 	OutputDir          string
 	Definition         TestCaseDefinition
 	PortConfig         *PortConfig
-	Timeout            time.Duration
-	LgtmVersion        string
-	LgtmLogSettings    map[string]bool
-	ManualDebug        bool
-	LogLimit           int
 }
 
 func (c *TestCase) ValidateAndSetVariables(g gomega.Gomega) {

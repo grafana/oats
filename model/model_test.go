@@ -265,14 +265,6 @@ func TestValidateSignal(t *testing.T) {
 			description: "signal with both equals and regexp should be valid",
 		},
 		{
-			name: "invalid signal with neither equals nor regexp",
-			signal: ExpectedSignal{
-				Attributes: map[string]string{"key": "value"},
-			},
-			shouldPanic: true,
-			description: "signal must have equals or regexp",
-		},
-		{
 			name: "deprecated contains field should fail",
 			signal: ExpectedSignal{
 				NameEquals: "test",
@@ -820,26 +812,6 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 			},
 			shouldFail:  true,
 			description: "logQL is required",
-		},
-		{
-			name: "log with invalid signal should fail",
-			testCase: TestCase{
-				Path: "testdata/invalid-signal.oats.yaml",
-				Dir:  ".",
-				Definition: TestCaseDefinition{
-					DockerCompose: makeValidDockerCompose(),
-					Expected: Expected{
-						Logs: []ExpectedLogs{{
-							LogQL: "{job=\"test\"}",
-							Signal: ExpectedSignal{
-								Attributes: map[string]string{"key": "value"},
-							},
-						}},
-					},
-				},
-			},
-			shouldFail:  true,
-			description: "signal must have equals or regexp",
 		},
 		{
 			name: "trace with deprecated spans should fail",

@@ -41,8 +41,9 @@ const AbsentTimeout = 10 * time.Second
 
 func RunTestCase(c *model.TestCase) {
 	format.MaxLength = 100000
+	s := c.Settings
 	r := &runner{
-		host:     c.Host,
+		host:     s.Host,
 		testCase: c,
 	}
 
@@ -51,9 +52,9 @@ func RunTestCase(c *model.TestCase) {
 	endpoint, err := startEndpoint(c)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting an observability endpoint")
 
-	r.deadline = time.Now().Add(c.Timeout)
+	r.deadline = time.Now().Add(s.Timeout)
 	r.endpoint = endpoint
-	if c.ManualDebug {
+	if s.ManualDebug {
 		slog.Info(fmt.Sprintf("stopping to let you manually debug on http://%s:%d\n", r.host, r.testCase.PortConfig.GrafanaHTTPPort))
 
 		for {
@@ -155,9 +156,9 @@ func startEndpoint(c *model.TestCase) (*remote.Endpoint, error) {
 	slog.Info("start test", "name", c.Name)
 	var endpoint *remote.Endpoint
 	if c.Definition.Kubernetes != nil {
-		endpoint = kubernetes.NewEndpoint(c.Host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
+		endpoint = kubernetes.NewEndpoint(c.Settings.Host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
 	} else {
-		endpoint = compose.NewEndpoint(c.Host, CreateDockerComposeFile(c), ports)
+		endpoint = compose.NewEndpoint(c.Settings.Host, CreateDockerComposeFile(c), ports)
 	}
 
 	var ctx = context.Background()
@@ -312,7 +313,7 @@ func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) 
 
 func (r *runner) LogQueryResult(format string, a ...any) {
 	if r.Verbose {
-		limit := r.testCase.LogLimit
+		limit := r.testCase.Settings.LogLimit
 		result := fmt.Sprintf(format, a...)
 		if len(result) > limit {
 			result = result[:limit] + ".."

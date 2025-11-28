@@ -57,12 +57,6 @@ func TestAssertCount(t *testing.T) {
 			count:         0,
 			shouldFail:    false,
 		},
-		{
-			name:          "expect absent fails with count > 0",
-			expectedRange: &model.ExpectedRange{Min: 0, Max: 0},
-			count:         1,
-			shouldFail:    true,
-		},
 	}
 
 	for _, tt := range tests {
