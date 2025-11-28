@@ -1,6 +1,7 @@
 package yaml
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -121,9 +122,13 @@ func readTestCaseDefinition(filePath string) (model.TestCaseDefinition, error) {
 		return model.TestCaseDefinition{}, err
 	}
 
-	err = yaml.Unmarshal(content, &def)
+	dec := yaml.NewDecoder(bytes.NewReader(content))
+	dec.KnownFields(true)
+	err = dec.Decode(&def)
 	if err != nil {
-		return model.TestCaseDefinition{}, err
+		return model.TestCaseDefinition{},
+			fmt.Errorf("error parsing test case definition %s - see migration notes at https://github.com/grafana/oats/releases/tag/v0.5.0: %w",
+				filePath, err)
 	}
 
 	for _, s := range def.Include {

@@ -265,15 +265,6 @@ func TestValidateSignal(t *testing.T) {
 			description: "signal with both equals and regexp should be valid",
 		},
 		{
-			name: "deprecated contains field should fail",
-			signal: ExpectedSignal{
-				NameEquals: "test",
-				Contains:   []string{"deprecated"},
-			},
-			shouldPanic: true,
-			description: "contains field is deprecated",
-		},
-		{
 			name: "valid attributes",
 			signal: ExpectedSignal{
 				NameEquals: "test",
@@ -814,21 +805,6 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 			description: "logQL is required",
 		},
 		{
-			name: "trace with deprecated spans should fail",
-			testCase: TestCase{
-				Path: "testdata/invalid-trace.oats.yaml",
-				Dir:  ".",
-				Definition: TestCaseDefinition{
-					DockerCompose: makeValidDockerCompose(),
-					Expected: Expected{
-						Traces: []ExpectedTraces{{TraceQL: "{service.name=\"svc\"}", Spans: []ExpectedSpan{{Name: "span"}}}},
-					},
-				},
-			},
-			shouldFail:  true,
-			description: "spans field is deprecated",
-		},
-		{
 			name: "valid trace with signal",
 			testCase: TestCase{
 				Path: "testdata/valid-trace.oats.yaml",
@@ -933,24 +909,6 @@ func TestTestCase_ValidateAndSetVariables(t *testing.T) {
 			},
 			shouldFail:  true,
 			description: "profile flamebearers.equals or regexp is required",
-		},
-		{
-			name: "profile with deprecated contains field should fail",
-			testCase: TestCase{
-				Path: "testdata/deprecated-profile-contains.oats.yaml",
-				Dir:  ".",
-				Definition: TestCaseDefinition{
-					DockerCompose: makeValidDockerCompose(),
-					Expected: Expected{
-						Profiles: []ExpectedProfiles{{
-							Query:        "memory:alloc_space:bytes:space:bytes{service_name=\"my-service\"}",
-							Flamebearers: Flamebearers{Contains: "main"},
-						}},
-					},
-				},
-			},
-			shouldFail:  true,
-			description: "profile flamebearers.contains is deprecated, use equals or regexp",
 		},
 		{
 			name: "profiles only (no metrics/logs/traces)",
