@@ -205,8 +205,8 @@ expected:
 - **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against span attributes (the span name matched by `equals` or `regexp`)
 - **`no-extra-attributes`**: Set to `true` to fail if the span has attributes beyond those specified in `attributes` and `attribute-regexp`
 - **`count`**: Control expected number of matching spans, ignoring if they match other criteria
-  - **`min`**: Minimum number of spans expected (default: 1 if not specified)
-  - **`max`**: Maximum number of spans expected (0 means no upper limit, or exactly 0 when min is also 0)
+  - **`min`**: Minimum number of spans expected (default: `1` if not specified)
+  - **`max`**: Maximum number of spans expected (`0` means no upper limit, or exactly `0` when `min` is also `0`)
   - Examples:
     - Not specified: at least 1 span expected
     - `{ min: 2, max: 5 }`: between 2 and 5 spans (inclusive)
@@ -241,7 +241,7 @@ expected:
 - **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against log labels
 - **`no-extra-attributes`**: Set to `true` to fail if the log has labels beyond those specified in `attributes` and `attribute-regexp`
 - **`count`**: Expected count range for returned log lines, ignoring if they match other criteria
-  - **`min`**: Minimum expected count (defaults to 0 if not specified)
+  - **`min`**: Minimum expected count (defaults to `0` if not specified)
   - **`max`**: Maximum expected count. Set to `0` for no upper limit. To assert absence, set both `min: 0` and `max: 0`
 - **`matrix-condition`**: Regex to match against matrix test case names
 
@@ -253,7 +253,7 @@ expected:
       equals: 'Rolling dice'
       count:
         min: 1
-        max: 5  # expect between 1-5 matching logs
+        max: 5  # expect between 1-5 matching logs (inclusive)
 ```
 
 ### Query metrics
