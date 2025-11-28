@@ -51,6 +51,10 @@ func assertAttributes(g gomega.Gomega, l model.ExpectedSignal, attributes map[st
 		for k := range attributes {
 			keys = append(keys, k)
 		}
+		if len(allowedKeys) == 0 {
+			g.Expect(keys).To(gomega.BeEmpty())
+			return
+		}
 		g.Expect(keys).To(gomega.ConsistOf(allowedKeys))
 	}
 }

@@ -278,6 +278,17 @@ func TestAssertAttributes(t *testing.T) {
 			shouldFail: false,
 		},
 		{
+			name: "no extra attributes without attributes fails when extra present",
+			signal: model.ExpectedSignal{
+				NoExtraAttributes: true,
+			},
+			attributes: map[string]string{
+				"service.name": "test-service",
+				"trace.id":     "0123456789abcdef0123456789abcdef",
+			},
+			shouldFail: true,
+		},
+		{
 			name:   "empty attributes signal does nothing",
 			signal: model.ExpectedSignal{},
 			attributes: map[string]string{
