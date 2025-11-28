@@ -6,6 +6,11 @@ golangci-lint = "2.6.2"
 description = "Run tests"
 run = "go test $(go list ./...)"
 
+[tasks.slow-test]
+description = "Run slow tests"
+env.SLOW_TESTS = "true"
+run = "mise run test"
+
 [tasks.fmt]
 description = "Format code"
 run = "gofmt -w ."

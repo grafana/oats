@@ -40,7 +40,7 @@ func TestAssertLokiResponse(t *testing.T) {
 		},
 		NoExtraAttributes: true,
 	}
-	r := &runner{
+	r := &Runner{
 		gomegaInst: gomega.NewGomega(func(message string, callerSkip ...int) {
 			t.Error(message)
 		}),

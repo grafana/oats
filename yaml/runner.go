@@ -23,7 +23,7 @@ import (
 	"github.com/onsi/gomega/format"
 )
 
-type runner struct {
+type Runner struct {
 	testCase   *model.TestCase
 	endpoint   *remote.Endpoint
 	deadline   time.Time
@@ -36,21 +36,17 @@ type runner struct {
 var VerboseLogging bool
 
 func RunTestCase(c *model.TestCase, s model.Settings) {
-	format.MaxLength = 100000
-	r := &runner{
-		host:     s.Host,
-		testCase: c,
-		settings: s,
-	}
+	slog.Info("start test", "name", c.Name)
 
-	c.OutputDir = prepareBuildDir(c.Name)
+	format.MaxLength = 100000
+	r := NewRunner(c, s)
+
+	c.OutputDir = PrepareBuildDir(c.Name)
 	c.ValidateAndSetVariables(gomega.Default)
-	endpoint, end, err := r.startEndpoint()
+	end, err := r.StartEndpoint()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting an observability endpoint")
 	defer end()
 
-	r.deadline = time.Now().Add(s.Timeout)
-	r.endpoint = endpoint
 	if s.ManualDebug {
 		slog.Info(fmt.Sprintf("stopping to let you manually debug on http://%s:%d\n", r.host, r.testCase.PortConfig.GrafanaHTTPPort))
 
@@ -67,8 +63,18 @@ func RunTestCase(c *model.TestCase, s model.Settings) {
 	r.ExecuteChecks()
 }
 
-func (r *runner) ExecuteChecks() {
+func NewRunner(c *model.TestCase, s model.Settings) *Runner {
+	r := &Runner{
+		host:     s.Host,
+		testCase: c,
+		settings: s,
+	}
+	return r
+}
+
+func (r *Runner) ExecuteChecks() {
 	c := r.testCase
+	r.deadline = time.Now().Add(r.settings.Timeout)
 	expected := c.Definition.Expected
 	for _, composeLog := range expected.ComposeLogs {
 		slog.Info("searching for compose log", "log", composeLog)
@@ -125,7 +131,7 @@ func (r *runner) ExecuteChecks() {
 	}
 }
 
-func (r *runner) assertCustomCheck(c model.CustomCheck) {
+func (r *Runner) assertCustomCheck(c model.CustomCheck) {
 	r.LogQueryResult("running custom check %v\n", c.Script)
 	cmd := exec.Command(c.Script)
 	cmd.Dir = r.testCase.Dir
@@ -137,7 +143,7 @@ func (r *runner) assertCustomCheck(c model.CustomCheck) {
 	r.gomegaInst.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
-func (r *runner) startEndpoint() (endpoint *remote.Endpoint, end func(), err error) {
+func (r *Runner) StartEndpoint() (end func(), err error) {
 	c := r.testCase
 	host := r.host
 	ports := remote.PortsConfig{
@@ -147,17 +153,16 @@ func (r *runner) startEndpoint() (endpoint *remote.Endpoint, end func(), err err
 		PyroscopeHttpPort:  c.PortConfig.PyroscopeHttpPort,
 	}
 
-	slog.Info("start test", "name", c.Name)
 	if c.Definition.Kubernetes != nil {
-		endpoint = kubernetes.NewEndpoint(host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
+		r.endpoint = kubernetes.NewEndpoint(host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
 	} else {
-		endpoint = compose.NewEndpoint(host, CreateDockerComposeFile(r), ports)
+		r.endpoint = compose.NewEndpoint(host, CreateDockerComposeFile(r), ports)
 	}
 
 	var ctx = context.Background()
-	startErr := endpoint.Start(ctx)
+	startErr := r.endpoint.Start(ctx)
 	if startErr != nil {
-		return nil, nil, fmt.Errorf("error starting local observability endpoint: %w", startErr)
+		return nil, fmt.Errorf("error starting local observability endpoint: %w", startErr)
 	}
 
 	end = func() {
@@ -165,15 +170,14 @@ func (r *runner) startEndpoint() (endpoint *remote.Endpoint, end func(), err err
 
 		var ctx = context.Background()
 
-		stopErr := endpoint.Stop(ctx)
+		stopErr := r.endpoint.Stop(ctx)
 		gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
 		slog.Info("stopped observability endpoint")
 	}
-
-	return endpoint, end, nil
+	return end, nil
 }
 
-func prepareBuildDir(name string) string {
+func PrepareBuildDir(name string) string {
 	dir := filepath.Join(".", "build", name)
 
 	fileinfo, err := os.Stat(dir)
@@ -188,7 +192,7 @@ func prepareBuildDir(name string) string {
 	return dir
 }
 
-func (r *runner) assertSignal(signal model.ExpectedSignal, query string, startLog func(), asserter func()) {
+func (r *Runner) assertSignal(signal model.ExpectedSignal, query string, startLog func(), asserter func()) {
 	if r.MatchesMatrixCondition(signal.MatrixCondition, query) {
 		startLog()
 		if signal.ExpectAbsent() {
@@ -199,16 +203,16 @@ func (r *runner) assertSignal(signal model.ExpectedSignal, query string, startLo
 	}
 }
 
-func (r *runner) eventually(asserter func()) {
+func (r *Runner) eventually(asserter func()) {
 	r.assertDeadline()
 	r.eventuallyWithTimeout(asserter, time.Until(r.deadline))
 }
 
-func (r *runner) assertDeadline() bool {
+func (r *Runner) assertDeadline() bool {
 	return gomega.Expect(time.Now()).Should(gomega.BeTemporally("<", r.deadline))
 }
 
-func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
+func (r *Runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
 	caller := newAssertCaller(r)
 	gomega.Eventually(context.Background(), func(g gomega.Gomega) {
 		r.callAsserter(g, caller, asserter)
@@ -221,7 +225,7 @@ func (r *runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
 	slog.Info(fmt.Sprintf("time to get telemetry data: %v", time.Since(caller.start)))
 }
 
-func (r *runner) consistentlyNot(asserter func()) {
+func (r *Runner) consistently(asserter func()) {
 	r.assertDeadline()
 	caller := newAssertCaller(r)
 	timeout := r.settings.AbsentTimeout
@@ -237,7 +241,7 @@ type asserterCaller struct {
 	interval   time.Duration
 }
 
-func newAssertCaller(r *runner) *asserterCaller {
+func newAssertCaller(r *Runner) *asserterCaller {
 	interval := r.testCase.Definition.Interval
 	if interval == 0 {
 		interval = model.DefaultTestCaseInterval
@@ -252,7 +256,7 @@ func newAssertCaller(r *runner) *asserterCaller {
 	}
 }
 
-func (r *runner) callAsserter(g gomega.Gomega, caller *asserterCaller, asserter func()) {
+func (r *Runner) callAsserter(g gomega.Gomega, caller *asserterCaller, asserter func()) {
 	verbose := VerboseLogging
 	if caller.iterations == 0 || time.Since(caller.printTime) > 10*time.Second {
 		verbose = true
@@ -299,7 +303,7 @@ func (r *runner) callAsserter(g gomega.Gomega, caller *asserterCaller, asserter 
 	asserter()
 }
 
-func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) bool {
+func (r *Runner) MatchesMatrixCondition(matrixCondition string, subject string) bool {
 	if matrixCondition == "" {
 		return true
 	}
@@ -318,7 +322,7 @@ func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) 
 	return false
 }
 
-func (r *runner) LogQueryResult(format string, a ...any) {
+func (r *Runner) LogQueryResult(format string, a ...any) {
 	if r.Verbose {
 		limit := r.settings.LogLimit
 		result := fmt.Sprintf(format, a...)

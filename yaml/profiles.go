@@ -14,7 +14,7 @@ type PyroscopeQueryResponse struct {
 	} `json:"flamebearer"`
 }
 
-func AssertPyroscope(r *runner, p model.ExpectedProfiles) {
+func AssertPyroscope(r *Runner, p model.ExpectedProfiles) {
 	b, err := r.endpoint.SearchPyroscope(p.Query)
 	r.LogQueryResult("query %v response %v err=%v\n", p.Query, string(b), err)
 	g := r.gomegaInst
@@ -22,7 +22,7 @@ func AssertPyroscope(r *runner, p model.ExpectedProfiles) {
 	assertPyroscopeResponse(b, p, r)
 }
 
-func assertPyroscopeResponse(b []byte, p model.ExpectedProfiles, r *runner) {
+func assertPyroscopeResponse(b []byte, p model.ExpectedProfiles, r *Runner) {
 	g := r.gomegaInst
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0), "expected pyroscope response to be non-empty")
 

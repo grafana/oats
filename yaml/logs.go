@@ -18,7 +18,7 @@ type LokiQueryResponse struct {
 	} `json:"data"`
 }
 
-func AssertLoki(r *runner, l model.ExpectedLogs) {
+func AssertLoki(r *Runner, l model.ExpectedLogs) {
 	b, err := r.endpoint.SearchLoki(l.LogQL)
 	r.LogQueryResult("logQL query %v response %v err=%v\n", l.LogQL, string(b), err)
 	g := r.gomegaInst
@@ -26,7 +26,7 @@ func AssertLoki(r *runner, l model.ExpectedLogs) {
 	AssertLokiResponse(b, l.Signal, r)
 }
 
-func AssertLokiResponse(b []byte, l model.ExpectedSignal, r *runner) {
+func AssertLokiResponse(b []byte, l model.ExpectedSignal, r *Runner) {
 	g := r.gomegaInst
 	g.Expect(len(b)).Should(gomega.BeNumerically(">", 0), "expected loki response to be non-empty")
 

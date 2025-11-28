@@ -17,7 +17,7 @@ func replaceVariables(promQL string) string {
 	return promQL
 }
 
-func AssertProm(r *runner, promQL string, value string) {
+func AssertProm(r *Runner, promQL string, value string) {
 	promQL = replaceVariables(promQL)
 	b, err := r.endpoint.RunPromQL(promQL)
 	r.LogQueryResult("promQL query '%v' response '%v' err='%v'\n", promQL, string(b), err)

@@ -8,7 +8,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-func AssertTempo(r *runner, t model.ExpectedTraces) {
+func AssertTempo(r *Runner, t model.ExpectedTraces) {
 	ctx := context.Background()
 
 	b, err := r.endpoint.SearchTempo(ctx, t.TraceQL)
@@ -30,7 +30,7 @@ func AssertTempo(r *runner, t model.ExpectedTraces) {
 	}
 }
 
-func assertTrace(r *runner, tr responses.Trace, wantTraces model.ExpectedTraces, count int) {
+func assertTrace(r *Runner, tr responses.Trace, s model.ExpectedSignal, count int) {
 	ctx := context.Background()
 
 	b, err := r.endpoint.GetTraceByID(ctx, tr.TraceID)
