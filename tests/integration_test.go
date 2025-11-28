@@ -13,7 +13,7 @@ import (
 )
 
 func TestIntegration(t *testing.T) {
-	key := "SLOW_TESTS"
+	key := "INTEGRATION_TESTS"
 	if os.Getenv(key) != "true" {
 		t.Skipf("skipping integration test; set %s=true to run", key)
 	}

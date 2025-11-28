@@ -8,7 +8,7 @@ run = "go test $(go list ./...)"
 
 [tasks.slow-test]
 description = "Run slow tests"
-env.SLOW_TESTS = "true"
+env.INTEGRATION_TESTS = "true"
 run = "mise run test"
 
 [tasks.fmt]

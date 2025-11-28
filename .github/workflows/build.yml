@@ -17,4 +17,4 @@ jobs:
       - name: Run tests
         run: mise run check
         env:
-          SLOW_TESTS: "true"
+          INTEGRATION_TESTS: "true"
