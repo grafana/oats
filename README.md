@@ -199,12 +199,12 @@ expected:
 #### Trace assertion options
 
 - **`traceql`**: TraceQL query to find the trace (required)
-- **`equals`**: Exact string match for the span name
-- **`regexp`**: Regular expression pattern to match against the span name
-- **`attributes`**: Key-value pairs that must match exactly on the span
-- **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against span attributes
+- **`equals`**: Exact string match for the span name (any span in the trace)
+- **`regexp`**: Regular expression pattern to match against the span name (any span in the trace)
+- **`attributes`**: Key-value pairs that must match exactly on the span (the span name matched by `equals` or `regexp`)
+- **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against span attributes (the span name matched by `equals` or `regexp`)
 - **`no-extra-attributes`**: Set to `true` to fail if the span has attributes beyond those specified in `attributes` and `attribute-regexp`
-- **`count`**: Control expected number of matching spans
+- **`count`**: Control expected number of matching spans, ignoring if they match other criteria
   - **`min`**: Minimum number of spans expected (default: 1 if not specified)
   - **`max`**: Maximum number of spans expected (0 means no upper limit, or exactly 0 when min is also 0)
   - Examples:
@@ -240,7 +240,7 @@ expected:
 - **`attributes`**: Key-value pairs that must match exactly on the log labels
 - **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against log labels
 - **`no-extra-attributes`**: Set to `true` to fail if the log has labels beyond those specified in `attributes` and `attribute-regexp`
-- **`count`**: Expected count range for matching signals
+- **`count`**: Expected count range for returned log lines, ignoring if they match other criteria
   - **`min`**: Minimum expected count (defaults to 0 if not specified)
   - **`max`**: Maximum expected count. Set to `0` for no upper limit. To assert absence, set both `min: 0` and `max: 0`
 - **`matrix-condition`**: Regex to match against matrix test case names
