@@ -18,6 +18,8 @@ func TestIntegration(t *testing.T) {
 		t.Skipf("skipping integration test; set %s=true to run", key)
 	}
 
+	// tests must not run in parallel because they share the same docker compose environment
+
 	promTest := model.Expected{
 		Metrics: []model.ExpectedMetrics{
 			{
