@@ -209,7 +209,7 @@ expected:
   - **`max`**: Maximum number of spans expected (0 means no upper limit, or exactly 0 when min is also 0)
   - Examples:
     - Not specified: at least 1 span expected
-    - `{ min: 2, max: 5 }`: between 2 and 5 spans
+    - `{ min: 2, max: 5 }`: between 2 and 5 spans (inclusive)
     - `{ min: 3 }`: 3 or more spans
     - `{ max: 0 }`: exactly 0 spans (assert absence)
 - **`matrix-condition`**: Regex to match against matrix test case names (only run this assertion for matching matrix cases)
