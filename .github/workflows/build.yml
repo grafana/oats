@@ -1,5 +1,5 @@
 ---
-name: Pull request checks
+name: Build, Lint, and Test
 
 on: [pull_request]
 
