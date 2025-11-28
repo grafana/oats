@@ -4,4 +4,4 @@
 set -euo pipefail
 
 mise run build
-./oats tests/e2e
+./oats -timeout 5m tests/e2e
