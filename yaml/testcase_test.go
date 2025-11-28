@@ -10,18 +10,18 @@ import (
 )
 
 func TestReadTestCaseDefinition(t *testing.T) {
-	def, err := readTestCaseDefinition("testdata/foo/oats.yaml")
+	def, err := readTestCaseDefinition("testdata/valid-tests/oats.yaml", false)
 	require.NoError(t, err)
-	merged, err := readTestCaseDefinition("testdata/oats-merged.yaml")
+	merged, err := readTestCaseDefinition("testdata/oats-merged.yaml", false)
 	require.NoError(t, err)
 	require.Equal(t, merged, def)
 }
 
 func TestReadTestCase(t *testing.T) {
-	tc, err := readTestCase("testdata", "testdata/foo/oats.yaml")
+	tc, err := readTestCase("testdata", "testdata/valid-tests/oats.yaml")
 	require.NoError(t, err)
-	require.Equal(t, "runfoo-oats", tc.Name)
-	require.Equal(t, absolutePath("testdata/foo"), tc.Dir)
+	require.Equal(t, "runvalid-tests-oats", tc.Name)
+	require.Equal(t, absolutePath("testdata/valid-tests"), tc.Dir)
 }
 
 func TestIncludePath(t *testing.T) {
@@ -31,7 +31,7 @@ func TestIncludePath(t *testing.T) {
 }
 
 func TestInputDefinitionsAreCorrect(t *testing.T) {
-	def, err := readTestCaseDefinition("testdata/foo/input.oats.yaml")
+	def, err := readTestCaseDefinition("testdata/valid-tests/input.oats.yaml", false)
 	require.NoError(t, err)
 	require.Len(t, def.Input, 3)
 	item := def.Input[0]
@@ -63,10 +63,45 @@ func TestInputDefinitionsAreCorrect(t *testing.T) {
 	require.Equal(t, "204", item.Status)
 }
 
-func TestInputDefinitionsWithDeprecatedSettings(t *testing.T) {
-	_, err := readTestCaseDefinition("testdata/foo/outdated.yaml")
-	require.ErrorContains(t, err, "see migration notes at https://github.com/grafana/oats/releases/tag/v0.5.0:"+
-		" yaml: unmarshal errors:\n  line 6: field spans not found in type model.ExpectedTraces")
+func TestInputDefinitionsInvalidFiles(t *testing.T) {
+	tests := []struct {
+		name     string
+		filePath string
+		errorMsg string
+	}{
+		{
+			name:     "malformed yaml",
+			filePath: "testdata/invalid-tests/malformed-yaml.yaml",
+			errorMsg: "failed to parse file .*/yaml/testdata/invalid-tests/malformed-yaml.yaml: yaml: mapping values are not allowed in this context",
+		},
+		{
+			name:     "outdated file version",
+			filePath: "testdata/invalid-tests/outdated-version.yaml",
+			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/outdated-version.yaml - " +
+				"see migration notes at https://github.com/grafana/oats/releases/tag/v0.5.0: unsupported oats-version '1' required version is '2'",
+		},
+		{
+			name:     "file version is not a string",
+			filePath: "testdata/invalid-tests/version-not-string.yaml",
+			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/version-not-string.yaml - " +
+				"see migration notes at https://github.com/grafana/oats/releases/tag/v0.5.0: oats-version '1' is not a string",
+		},
+		{
+			name:     "unknown field",
+			filePath: "testdata/invalid-tests/unknown-field.yaml",
+			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/unknown-field.yaml - " +
+				"see migration notes at https://github.com/grafana/oats/releases/tag/v0.5.0: yaml: unmarshal errors:\n" +
+				".*line 5: field spans not found in type model.ExpectedTraces",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := readTestCaseDefinition(tt.filePath, false)
+			require.NotNil(t, err)
+			require.Regexp(t, tt.errorMsg, err.Error())
+		})
+	}
 }
 
 func TestCollectTestCases(t *testing.T) {
@@ -79,15 +114,14 @@ func TestCollectTestCases(t *testing.T) {
 	}{
 		{
 			name:               "without ignore file evaluation",
-			basePath:           "testdata",
+			basePath:           "testdata/valid-tests",
 			evaluateIgnoreFile: false,
 			expectedCount:      8, // includes matrix expansions (2) and ignored file (1)
 			expectedNames: []string{
-				"runfoo-expect-absent.oats",
-				"runfoo-input.oats",
-				"runfoo-more-oats",
-				"runfoo-oats",
-				"run-oats-merged",
+				"run-expect-absent.oats",
+				"run-input.oats",
+				"run-more-oats",
+				"run-oats",
 				"run-matrix-test.oats-docker",       // matrix expansion
 				"run-matrix-test.oats-k8s",          // matrix expansion
 				"runignored-should-not-appear.oats", // included when not evaluating ignore
@@ -95,15 +129,14 @@ func TestCollectTestCases(t *testing.T) {
 		},
 		{
 			name:               "with ignore file evaluation",
-			basePath:           "testdata",
+			basePath:           "testdata/valid-tests",
 			evaluateIgnoreFile: true,
 			expectedCount:      7, // excludes ignored directory
 			expectedNames: []string{
-				"runfoo-expect-absent.oats",
-				"runfoo-input.oats",
-				"runfoo-more-oats",
-				"runfoo-oats",
-				"run-oats-merged",
+				"run-expect-absent.oats",
+				"run-input.oats",
+				"run-more-oats",
+				"run-oats",
 				"run-matrix-test.oats-docker", // matrix expansion
 				"run-matrix-test.oats-k8s",    // matrix expansion
 			},
@@ -122,13 +155,14 @@ func TestCollectTestCases(t *testing.T) {
 			}
 
 			// Check that all expected names are present
-			require.ElementsMatch(t, tc.expectedNames, actualNames, "test case names should match")
+			require.ElementsMatch(t, tc.expectedNames, actualNames)
+			require.Len(t, actualNames, len(tc.expectedNames))
 		})
 	}
 }
 
 func TestTestCasesAreValid(t *testing.T) {
-	cases, err := collectTestCases("testdata", false)
+	cases, err := collectTestCases("testdata/valid-tests", false)
 	require.NoError(t, err)
 	require.NotEmpty(t, cases)
 	for _, c := range cases {

@@ -1,5 +1,6 @@
+oats-version: "2"
 include:
-  - ../oats-template.yaml
+  - oats-template.yaml
 expected:
   logs:
     - logql: '{ service_name="foo" } |~ `Application started.`'

@@ -1,6 +1,7 @@
+oats-version: "2"
 docker-compose:
   files:
-    - ../docker-compose.oats.yml
+    - docker-compose.oats.yml
 input:
   - path: /vets.html
 expected:

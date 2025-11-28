@@ -259,7 +259,7 @@ func TestIntegration(t *testing.T) {
 		OutputDir: buildDir,
 		Definition: model.TestCaseDefinition{
 			DockerCompose: &model.DockerCompose{Files: []string{
-				"docker-compose.oats.yml",
+				"e2e/docker-compose.oats.yml",
 			}},
 			Input: []model.Input{{
 				Path: "/vets.html",

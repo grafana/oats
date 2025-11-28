@@ -1,6 +1,9 @@
+oats-version: "2"
+oats-template: true
 docker-compose:
 input:
   - path: /stock
+    status: 200
   - path: /buy
     method: POST
     headers:
@@ -10,12 +13,15 @@ input:
     status: 201
   - path: /delist/42
     method: DELETE
-    scheme: https
-    host: 127.0.0.1
     headers:
       Authorization: Bearer admin-token
     status: 204
 expected:
+  traces:
+    - traceql: '{ name =~ "SELECT .*product"}'
+      regexp: 'SELECT .*cart'
+      attributes:
+        db.system: h2
   metrics:
     - promql: bar
       value: '>= 0'

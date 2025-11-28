@@ -1,5 +1,6 @@
+oats-version: "2"
 include:
-  - ../oats-template.yaml
+  - oats-template.yaml
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*cart"}'

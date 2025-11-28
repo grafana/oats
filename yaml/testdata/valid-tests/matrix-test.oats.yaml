@@ -1,3 +1,4 @@
+oats-version: "2"
 include:
   - oats-template.yaml
 matrix:
@@ -10,4 +11,4 @@ matrix:
       dir: k8s-manifests
       app-service: test-app
       app-docker-file: Dockerfile
-  
+
