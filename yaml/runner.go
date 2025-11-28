@@ -235,6 +235,8 @@ func (r *Runner) consistently(asserter func()) {
 	caller := newAssertCaller(r, timeout)
 	gomega.Consistently(context.Background(), func(g gomega.Gomega) {
 		r.callAsserter(g, caller, asserter)
+	// For absence checks, the asserter function should succeed (return no error) when the signal is absent.
+	// We use Should(gomega.Succeed()) to assert that the asserter consistently validates the absence.
 	}).WithTimeout(timeout).WithPolling(caller.interval).Should(gomega.Succeed(), "assertion should succeed for %v", timeout)
 }
 
