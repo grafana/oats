@@ -65,8 +65,8 @@ func TestInputDefinitionsAreCorrect(t *testing.T) {
 
 func TestInputDefinitionsWithDeprecatedSettings(t *testing.T) {
 	_, err := readTestCaseDefinition("testdata/foo/outdated.yaml")
-	require.ErrorContains(t, err, "look at the release for migration notes: yaml: "+
-		"unmarshal errors:\n  line 6: field spans not found in type model.ExpectedTraces")
+	require.ErrorContains(t, err, "see migration notes at https://github.com/grafana/oats/releases/tag/v0.5.0:"+
+		" yaml: unmarshal errors:\n  line 6: field spans not found in type model.ExpectedTraces")
 }
 
 func TestCollectTestCases(t *testing.T) {
