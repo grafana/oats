@@ -89,18 +89,18 @@ func FindSpans(td ptrace.Traces, signal model.ExpectedSignal) (string, map[strin
 }
 
 func nameMatcher(signal model.ExpectedSignal) func(got string) bool {
-	var re *regexp.Regexp
 	if signal.NameRegexp != "" {
-		re = regexp.MustCompile(signal.NameRegexp)
-	}
-
-	return func(got string) bool {
-		if re != nil {
+		re := regexp.MustCompile(signal.NameRegexp)
+		return func(got string) bool {
 			return re.MatchString(got)
 		}
-		if signal.NameEquals == "" {
-			return false // or handle expect-absent case explicitly
+	}
+	if signal.NameEquals != "" {
+		return func(got string) bool {
+			return signal.NameEquals == got
 		}
-		return signal.NameEquals == got
+	}
+	return func(got string) bool {
+		return true
 	}
 }

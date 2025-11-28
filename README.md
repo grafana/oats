@@ -105,6 +105,7 @@ The following flags are available:
 - `-lgtm-log-pyroscope`: Enable logging for Pyroscope (default: `false`)
 - `-lgtm-log-collector`: Enable logging for OpenTelemetry Collector (default: `false`)
 - `-host`: Override the host used to issue requests to applications and LGTM (default: `localhost`)
+- `-log-limit`: Maximum log output length per log entry
 
 ## Run OATs in GitHub Actions
 

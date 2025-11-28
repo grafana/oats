@@ -1,0 +1,18 @@
+docker-compose:
+  files:
+    - ../docker-compose.oats.yml
+input:
+  - path: /vets.html
+expected:
+  traces:
+    - traceql: '{name="GET /vets.html"}'
+      attributes:
+        otel.library.name: io.opentelemetry.tomcat-7.0
+  metrics:
+    - promql: 'histogram_quantile(0.95, sum by(le) (rate(http_server_request_duration_seconds_bucket{http_route="/vets.html"}[5m])))'
+      value: "> 0"
+  logs:
+    - logql: '{service_name="spring-pet-clinic"} |= `Completed initialization`'
+      count:
+        min: 1
+        max: 1

@@ -39,6 +39,8 @@ func assertTrace(r *runner, tr responses.Trace, wantTraces model.ExpectedTraces,
 	g.Expect(err).ToNot(gomega.HaveOccurred(), "we should be able to parse the GET trace by traceID API output")
 
 	name, atts := responses.FindSpans(td, wantTraces.Signal)
+	r.LogQueryResult("found span name '%v' attributes %v for traceID %v\n", name, atts, tr.TraceID)
+
 	if name == "" && !wantTraces.Signal.ExpectAbsent() {
 		g.Expect(name).ToNot(gomega.BeEmpty(), "no spans matching the signal were found")
 	}
