@@ -73,7 +73,7 @@ func TestIntegration(t *testing.T) {
 			expected: model.Expected{
 				Traces: []model.ExpectedTraces{
 					{
-						TraceQL: "{name=\"/vets.html\"}",
+						TraceQL: "{name=\"GET /vets.html\"}",
 						Signal: model.ExpectedSignal{
 							Count: &model.ExpectedRange{Min: 1, Max: 100},
 						},
@@ -121,7 +121,7 @@ func TestIntegration(t *testing.T) {
 			expected: model.Expected{
 				Traces: []model.ExpectedTraces{
 					{
-						TraceQL: "{name=\"/vets.html\"}",
+						TraceQL: "{name=\"GET /vets.html\"}",
 						Signal: model.ExpectedSignal{
 							Count: &model.ExpectedRange{Min: 0, Max: 0},
 						},
