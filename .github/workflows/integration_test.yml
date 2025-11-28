@@ -1,5 +1,5 @@
 ---
-name: Pull request checks
+name: Integration tests
 
 on: [pull_request]
 
