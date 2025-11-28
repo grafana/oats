@@ -1,5 +1,5 @@
 ---
-name: Pull request checks
+name: Integration tests
 
 on: [pull_request]
 
@@ -14,5 +14,5 @@ jobs:
         with:
           persist-credentials: false
       - uses: jdx/mise-action@146a28175021df8ca24f8ee1828cc2a60f980bd5 # v3.5.1
-      - name: Run tests
-        run: mise run check
+      - name: Run integration test
+        run: mise run integration-test
