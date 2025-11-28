@@ -33,11 +33,13 @@ func TestIntegration(t *testing.T) {
 		expected    model.Expected
 	}{
 		{
-			name:     "prometheus metrics pass",
-			expected: promTest,
+			name:        "prometheus metrics pass",
+			shouldPanic: false,
+			expected:    promTest,
 		},
 		{
-			name: "multiple metrics pass",
+			name:        "multiple metrics pass",
+			shouldPanic: false,
 			expected: model.Expected{
 				Metrics: []model.ExpectedMetrics{
 					{
@@ -52,11 +54,12 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
-			name: "logs check pass",
+			name:        "logs check pass",
+			shouldPanic: false,
 			expected: model.Expected{
 				Logs: []model.ExpectedLogs{
 					{
-						LogQL: "{job=\"oats\"}",
+						LogQL: "{service_name=\"spring-pet-clinic\"}",
 						Signal: model.ExpectedSignal{
 							Count: &model.ExpectedRange{Min: 1, Max: 1000},
 						},
@@ -65,7 +68,8 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
-			name: "traces check pass",
+			name:        "traces check pass",
+			shouldPanic: false,
 			expected: model.Expected{
 				Traces: []model.ExpectedTraces{
 					{
@@ -78,7 +82,8 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
-			name: "composed checks with metrics and logs",
+			name:        "composed checks with metrics and logs",
+			shouldPanic: false,
 			expected: model.Expected{
 				Metrics: []model.ExpectedMetrics{
 					{
@@ -88,9 +93,91 @@ func TestIntegration(t *testing.T) {
 				},
 				Logs: []model.ExpectedLogs{
 					{
-						LogQL: "{job=\"oats\"}",
+						LogQL: "{service_name=\"spring-pet-clinic\"}",
 						Signal: model.ExpectedSignal{
 							Count: &model.ExpectedRange{Min: 1, Max: 1000},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "should fail - checking for absence when logs exist",
+			shouldPanic: true,
+			expected: model.Expected{
+				Logs: []model.ExpectedLogs{
+					{
+						LogQL: "{service_name=\"spring-pet-clinic\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 0, Max: 0},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "should fail - checking for absence when traces exist",
+			shouldPanic: true,
+			expected: model.Expected{
+				Traces: []model.ExpectedTraces{
+					{
+						TraceQL: "{name=\"/vets.html\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 0, Max: 0},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "should fail - metric value doesn't match condition",
+			shouldPanic: true,
+			expected: model.Expected{
+				Metrics: []model.ExpectedMetrics{
+					{
+						PromQL: "histogram_quantile(0.95, sum by(le) (rate(http_server_request_duration_seconds_bucket{http_route=\"/vets.html\"}[5m])))",
+						Value:  "< 0",
+					},
+				},
+			},
+		},
+		{
+			name:        "should fail - looking for non-existent logs",
+			shouldPanic: true,
+			expected: model.Expected{
+				Logs: []model.ExpectedLogs{
+					{
+						LogQL: "{job=\"nonexistent-job\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 1, Max: 1000},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "should fail - looking for non-existent traces",
+			shouldPanic: true,
+			expected: model.Expected{
+				Traces: []model.ExpectedTraces{
+					{
+						TraceQL: "{name=\"/nonexistent-endpoint\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 1, Max: 100},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "should fail - count range too restrictive",
+			shouldPanic: true,
+			expected: model.Expected{
+				Logs: []model.ExpectedLogs{
+					{
+						LogQL: "{service_name=\"spring-pet-clinic\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 10000, Max: 20000},
 						},
 					},
 				},
@@ -125,9 +212,10 @@ func TestIntegration(t *testing.T) {
 	c.ValidateAndSetVariables(gomega.Default)
 
 	settings := model.Settings{
-		Host:     "localhost",
-		Timeout:  5 * time.Minute,
-		LogLimit: 1000,
+		Host:          "localhost",
+		Timeout:       5 * time.Minute,
+		AbsentTimeout: 5 * time.Second,
+		LogLimit:      1000,
 		LgtmLogSettings: map[string]bool{
 			"ENABLE_LOGS_ALL": false,
 		},
