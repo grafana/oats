@@ -30,7 +30,7 @@ type Runner struct {
 	host       string
 	Verbose    bool
 	gomegaInst gomega.Gomega
-	settings   model.Settings
+	Settings   model.Settings
 }
 
 var VerboseLogging bool
@@ -67,14 +67,14 @@ func NewRunner(c *model.TestCase, s model.Settings) *Runner {
 	r := &Runner{
 		host:     s.Host,
 		testCase: c,
-		settings: s,
+		Settings: s,
 	}
 	return r
 }
 
 func (r *Runner) ExecuteChecks() {
 	c := r.testCase
-	r.deadline = time.Now().Add(r.settings.Timeout)
+	r.deadline = time.Now().Add(r.Settings.Timeout)
 	expected := c.Definition.Expected
 	for _, composeLog := range expected.ComposeLogs {
 		slog.Info("searching for compose log", "log", composeLog)
@@ -205,7 +205,11 @@ func (r *Runner) assertSignal(signal model.ExpectedSignal, query string, startLo
 
 func (r *Runner) eventually(asserter func()) {
 	r.assertDeadline()
-	r.eventuallyWithTimeout(asserter, time.Until(r.deadline))
+	timeout := time.Until(r.deadline)
+	if r.Settings.PresentTimeout > 0 {
+		timeout = r.Settings.PresentTimeout
+	}
+	r.eventuallyWithTimeout(asserter, timeout)
 }
 
 func (r *Runner) assertDeadline() bool {
@@ -213,7 +217,7 @@ func (r *Runner) assertDeadline() bool {
 }
 
 func (r *Runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
-	caller := newAssertCaller(r)
+	caller := newAssertCaller(r, timeout)
 	gomega.Eventually(context.Background(), func(g gomega.Gomega) {
 		r.callAsserter(g, caller, asserter)
 	}).WithTimeout(timeout).WithPolling(caller.interval).Should(
@@ -227,8 +231,8 @@ func (r *Runner) eventuallyWithTimeout(asserter func(), timeout time.Duration) {
 
 func (r *Runner) consistently(asserter func()) {
 	r.assertDeadline()
-	caller := newAssertCaller(r)
-	timeout := r.settings.AbsentTimeout
+	timeout := r.Settings.AbsentTimeout
+	caller := newAssertCaller(r, timeout)
 	gomega.Consistently(context.Background(), func(g gomega.Gomega) {
 		r.callAsserter(g, caller, asserter)
 	}).WithTimeout(timeout).WithPolling(caller.interval).Should(gomega.Succeed(), "assertion should succeed for %v", timeout)
@@ -236,12 +240,13 @@ func (r *Runner) consistently(asserter func()) {
 
 type asserterCaller struct {
 	iterations int
+	timeout    time.Duration
 	start      time.Time
 	printTime  time.Time
 	interval   time.Duration
 }
 
-func newAssertCaller(r *Runner) *asserterCaller {
+func newAssertCaller(r *Runner, timeout time.Duration) *asserterCaller {
 	interval := r.testCase.Definition.Interval
 	if interval == 0 {
 		interval = model.DefaultTestCaseInterval
@@ -250,6 +255,7 @@ func newAssertCaller(r *Runner) *asserterCaller {
 	now := time.Now()
 	return &asserterCaller{
 		iterations: 0,
+		timeout:    timeout,
 		start:      now,
 		printTime:  now,
 		interval:   interval,
@@ -264,7 +270,7 @@ func (r *Runner) callAsserter(g gomega.Gomega, caller *asserterCaller, asserter 
 	}
 	caller.iterations++
 	r.Verbose = verbose
-	r.LogQueryResult("waiting for telemetry data\n")
+	r.LogQueryResult(fmt.Sprintf("waiting for telemetry data (timeout %v)\n", caller.timeout))
 
 	for _, i := range r.testCase.Definition.Input {
 		scheme := "http"
@@ -324,7 +330,7 @@ func (r *Runner) MatchesMatrixCondition(matrixCondition string, subject string) 
 
 func (r *Runner) LogQueryResult(format string, a ...any) {
 	if r.Verbose {
-		limit := r.settings.LogLimit
+		limit := r.Settings.LogLimit
 		result := fmt.Sprintf(format, a...)
 		if len(result) > limit {
 			result = result[:limit] + ".."

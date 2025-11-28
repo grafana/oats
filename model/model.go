@@ -142,6 +142,7 @@ type Settings struct {
 	// AbsentTimeout is the timeout for checking that no results exist.
 	// This is shorter than the default timeout because we're checking for non-existence over the entire period.
 	AbsentTimeout   time.Duration
+	PresentTimeout  time.Duration // only used for integration tests
 	LgtmVersion     string
 	LgtmLogSettings map[string]bool
 	ManualDebug     bool

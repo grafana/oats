@@ -267,11 +267,15 @@ func TestIntegration(t *testing.T) {
 	}
 	c.ValidateAndSetVariables(gomega.Default)
 
+	checkTimeout := 2 * time.Second
+	startupTimeout := 2 * time.Minute
+
 	settings := model.Settings{
-		Host:          "localhost",
-		Timeout:       5 * time.Minute,
-		AbsentTimeout: 5 * time.Second,
-		LogLimit:      1000,
+		Host:           "localhost",
+		Timeout:        startupTimeout,
+		PresentTimeout: startupTimeout, // first test needs more time to allow docker compose to start
+		AbsentTimeout:  checkTimeout,
+		LogLimit:       1000,
 		LgtmLogSettings: map[string]bool{
 			"ENABLE_LOGS_ALL": false,
 		},
@@ -299,6 +303,9 @@ func TestIntegration(t *testing.T) {
 
 			failed = ""
 			r.ExecuteChecks()
+
+			// docker compose is already started, so speed up the checks
+			r.Settings.PresentTimeout = checkTimeout
 
 			if tt.shouldPanic {
 				require.NotEmpty(t, failed)
