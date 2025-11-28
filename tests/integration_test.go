@@ -102,6 +102,62 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
+			name:        "successfully check for absence - non-existent logs",
+			shouldPanic: false,
+			expected: model.Expected{
+				Logs: []model.ExpectedLogs{
+					{
+						LogQL: "{job=\"nonexistent-job\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 0, Max: 0},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "successfully check for absence - non-existent traces",
+			shouldPanic: false,
+			expected: model.Expected{
+				Traces: []model.ExpectedTraces{
+					{
+						TraceQL: "{name=\"/nonexistent-endpoint\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 0, Max: 0},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "successfully check for absence - non-existent service logs",
+			shouldPanic: false,
+			expected: model.Expected{
+				Logs: []model.ExpectedLogs{
+					{
+						LogQL: "{service_name=\"service-that-does-not-exist\"}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 0, Max: 0},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "successfully check for absence - traces with specific attribute",
+			shouldPanic: false,
+			expected: model.Expected{
+				Traces: []model.ExpectedTraces{
+					{
+						TraceQL: "{.http.status_code=999}",
+						Signal: model.ExpectedSignal{
+							Count: &model.ExpectedRange{Min: 0, Max: 0},
+						},
+					},
+				},
+			},
+		},
+		{
 			name:        "should fail - checking for absence when logs exist",
 			shouldPanic: true,
 			expected: model.Expected{
