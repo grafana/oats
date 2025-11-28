@@ -30,6 +30,7 @@ type runner struct {
 	host       string
 	Verbose    bool
 	gomegaInst gomega.Gomega
+	settings   model.Settings
 }
 
 var VerboseLogging bool
@@ -39,18 +40,19 @@ var VerboseLogging bool
 // and checking after we've finished other assertions.
 const AbsentTimeout = 10 * time.Second
 
-func RunTestCase(c *model.TestCase) {
+func RunTestCase(c *model.TestCase, s model.Settings) {
 	format.MaxLength = 100000
-	s := c.Settings
 	r := &runner{
 		host:     s.Host,
 		testCase: c,
+		settings: s,
 	}
 
 	c.OutputDir = prepareBuildDir(c.Name)
 	c.ValidateAndSetVariables(gomega.Default)
-	endpoint, err := startEndpoint(c)
+	endpoint, end, err := r.startEndpoint()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected no error starting an observability endpoint")
+	defer end()
 
 	r.deadline = time.Now().Add(s.Timeout)
 	r.endpoint = endpoint
@@ -67,16 +69,11 @@ func RunTestCase(c *model.TestCase) {
 
 	slog.Info("deadline", "time", r.deadline)
 
-	defer func() {
-		slog.Info("stopping observability endpoint")
+	r.ExecuteChecks()
+}
 
-		var ctx = context.Background()
-
-		stopErr := r.endpoint.Stop(ctx)
-		gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
-		slog.Info("stopped observability endpoint")
-	}()
-
+func (r *runner) ExecuteChecks() {
+	c := r.testCase
 	expected := c.Definition.Expected
 	for _, composeLog := range expected.ComposeLogs {
 		slog.Info("searching for compose log", "log", composeLog)
@@ -127,13 +124,13 @@ func RunTestCase(c *model.TestCase) {
 		if r.MatchesMatrixCondition(customCheck.MatrixCondition, customCheck.Script) {
 			slog.Info("executing custom check", "check", customCheck.Script)
 			r.eventually(func() {
-				assertCustomCheck(r, customCheck)
+				r.assertCustomCheck(customCheck)
 			})
 		}
 	}
 }
 
-func assertCustomCheck(r *runner, c model.CustomCheck) {
+func (r *runner) assertCustomCheck(c model.CustomCheck) {
 	r.LogQueryResult("running custom check %v\n", c.Script)
 	cmd := exec.Command(c.Script)
 	cmd.Dir = r.testCase.Dir
@@ -145,7 +142,9 @@ func assertCustomCheck(r *runner, c model.CustomCheck) {
 	r.gomegaInst.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
-func startEndpoint(c *model.TestCase) (*remote.Endpoint, error) {
+func (r *runner) startEndpoint() (endpoint *remote.Endpoint, end func(), err error) {
+	c := r.testCase
+	host := r.host
 	ports := remote.PortsConfig{
 		PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
 		TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
@@ -154,16 +153,29 @@ func startEndpoint(c *model.TestCase) (*remote.Endpoint, error) {
 	}
 
 	slog.Info("start test", "name", c.Name)
-	var endpoint *remote.Endpoint
 	if c.Definition.Kubernetes != nil {
-		endpoint = kubernetes.NewEndpoint(c.Settings.Host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
+		endpoint = kubernetes.NewEndpoint(host, c.Definition.Kubernetes, ports, c.Name, c.Dir)
 	} else {
-		endpoint = compose.NewEndpoint(c.Settings.Host, CreateDockerComposeFile(c), ports)
+		endpoint = compose.NewEndpoint(host, CreateDockerComposeFile(r), ports)
 	}
 
 	var ctx = context.Background()
 	startErr := endpoint.Start(ctx)
-	return endpoint, startErr
+	if startErr != nil {
+		return nil, nil, fmt.Errorf("error starting local observability endpoint: %w", startErr)
+	}
+
+	end = func() {
+		slog.Info("stopping observability endpoint")
+
+		var ctx = context.Background()
+
+		stopErr := endpoint.Stop(ctx)
+		gomega.Expect(stopErr).ToNot(gomega.HaveOccurred(), "expected no error stopping the local observability endpoint")
+		slog.Info("stopped observability endpoint")
+	}
+
+	return endpoint, end, nil
 }
 
 func prepareBuildDir(name string) string {
@@ -313,7 +325,7 @@ func (r *runner) MatchesMatrixCondition(matrixCondition string, subject string) 
 
 func (r *runner) LogQueryResult(format string, a ...any) {
 	if r.Verbose {
-		limit := r.testCase.Settings.LogLimit
+		limit := r.settings.LogLimit
 		result := fmt.Sprintf(format, a...)
 		if len(result) > limit {
 			result = result[:limit] + ".."

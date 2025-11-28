@@ -11,7 +11,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/grafana/oats/model"
 	"github.com/onsi/gomega"
 	"go.yaml.in/yaml/v3"
 )
@@ -22,17 +21,18 @@ var lgtmTemplate []byte
 //go:embed docker-compose-include-base.yml
 var lgtmTemplateIncludeBase []byte
 
-func CreateDockerComposeFile(c *model.TestCase) string {
-	p := filepath.Join(c.OutputDir, "docker-compose.yml")
-	content := getContent(c)
+func CreateDockerComposeFile(r *runner) string {
+	p := filepath.Join(r.testCase.OutputDir, "docker-compose.yml")
+	content := getContent(r)
 	err := os.WriteFile(p, content, 0644)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	return p
 }
 
-func getContent(c *model.TestCase) []byte {
+func getContent(r *runner) []byte {
+	c := r.testCase
 	compose := c.Definition.DockerCompose
-	slog.Info("using docker-compose", "lgtm-version", c.Settings.LgtmVersion)
+	slog.Info("using docker-compose", "lgtm-version", r.settings.LgtmVersion)
 
 	vars := map[string]any{}
 	vars["ApplicationPort"] = c.PortConfig.ApplicationPort
@@ -41,8 +41,8 @@ func getContent(c *model.TestCase) []byte {
 	vars["LokiHTTPPort"] = c.PortConfig.LokiHTTPPort
 	vars["TempoHTTPPort"] = c.PortConfig.TempoHTTPPort
 	vars["PyroscopeHttpPort"] = c.PortConfig.PyroscopeHttpPort
-	vars["LgtmVersion"] = c.Settings.LgtmVersion
-	vars["LgtmLogSettings"] = c.Settings.LgtmLogSettings
+	vars["LgtmVersion"] = r.settings.LgtmVersion
+	vars["LgtmLogSettings"] = r.settings.LgtmLogSettings
 
 	// Overrides to make tests faster by exporting telemetry data more frequently
 	vars["OTEL_BLRP_SCHEDULE_DELAY"] = "5000"

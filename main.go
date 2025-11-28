@@ -48,8 +48,7 @@ func run() error {
 		slog.Info("test case found", "test", testCase.Name)
 	}
 	for _, c := range cases {
-		c.Settings = settings
-		yaml.RunTestCase(c)
+		yaml.RunTestCase(c, settings)
 	}
 
 	slog.Info("all test cases passed")

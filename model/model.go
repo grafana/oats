@@ -146,7 +146,6 @@ type Settings struct {
 }
 
 type TestCase struct {
-	Settings           Settings
 	Path               string
 	Name               string
 	MatrixTestCaseName string
