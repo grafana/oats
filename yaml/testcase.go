@@ -153,13 +153,19 @@ func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCase
 		return nil, nil
 	}
 
-	versionInt, ok := schemaVersion.(int)
-	if !ok {
+	var version float64
+
+	if versionInt, ok := schemaVersion.(int); ok {
+		version = float64(versionInt)
+	} else if versionFloat, ok := schemaVersion.(float64); ok {
+		version = versionFloat
+	} else {
 		return nil, parsingError(filePath, fmt.Errorf("oats-schema-version '%v' is not a number", schemaVersion))
 	}
-	if versionInt != requiredSchemaVersion {
-		return nil, parsingError(filePath, fmt.Errorf("unsupported oats-schema-version '%d' required version is '%d'",
-			versionInt, requiredSchemaVersion))
+
+	if version != requiredSchemaVersion {
+		return nil, parsingError(filePath, fmt.Errorf("unsupported oats-schema-version '%f' required version is '%d'",
+			version, requiredSchemaVersion))
 	}
 
 	template := parsed["oats-template"] == true
