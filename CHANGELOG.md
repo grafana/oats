@@ -30,7 +30,8 @@ expected:
       value: '>= 0'
 ```
 
-**Why version "2"?** Version "1" represents the old format without an explicit version tag. The version number will only be incremented when migrations are needed.
+> [!TIP]
+> **Why version "2"?** Version "1" represents the old format without an explicit version tag. The version number will only be incremented when migrations are needed.
 
 ### File Discovery Changes
 
