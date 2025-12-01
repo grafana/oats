@@ -1,4 +1,4 @@
-oats-version: "2"
+oats-file-version: "2"
 oats-template: true
 docker-compose:
 input:

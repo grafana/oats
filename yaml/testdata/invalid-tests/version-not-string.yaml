@@ -1,4 +1,4 @@
-oats-version: 1
+oats-file-version: 1
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*cart"}'
