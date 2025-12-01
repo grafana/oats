@@ -94,10 +94,11 @@ func addTestCase(cases []model.TestCase, base string, path string) ([]model.Test
 	if testCase.Definition.Matrix != nil {
 		for _, matrix := range testCase.Definition.Matrix {
 			newCase := *testCase
-			newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
-			newCase.MatrixTestCaseName = matrix.Name
+			newCase.Definition = testCase.Definition
 			newCase.Definition.DockerCompose = matrix.DockerCompose
 			newCase.Definition.Kubernetes = matrix.Kubernetes
+			newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
+			newCase.MatrixTestCaseName = matrix.Name
 			cases = append(cases, newCase)
 		}
 	} else {
