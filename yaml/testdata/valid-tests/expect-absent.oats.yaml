@@ -1,4 +1,4 @@
-oats-file-version: "2"
+oats-schema-version: "2"
 input:
   - path: /api/test
 expected:

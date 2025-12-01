@@ -147,7 +147,7 @@ func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCase
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse file %s: %w", filePath, err)
 	}
-	fileVersion, ok := parsed["oats-file-version"]
+	fileVersion, ok := parsed["oats-schema-version"]
 	if !ok {
 		// not an oats file
 		return nil, nil
@@ -155,10 +155,10 @@ func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCase
 
 	fileVersionStr, ok := fileVersion.(string)
 	if !ok {
-		return nil, parsingError(filePath, fmt.Errorf("oats-file-version '%v' is not a string", fileVersion))
+		return nil, parsingError(filePath, fmt.Errorf("oats-schema-version '%v' is not a string", fileVersion))
 	}
 	if fileVersionStr != requiredOatsFileVersion {
-		return nil, parsingError(filePath, fmt.Errorf("unsupported oats-file-version '%s' required version is '%s'",
+		return nil, parsingError(filePath, fmt.Errorf("unsupported oats-schema-version '%s' required version is '%s'",
 			fileVersionStr, requiredOatsFileVersion))
 	}
 

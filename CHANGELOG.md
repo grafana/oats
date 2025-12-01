@@ -9,17 +9,17 @@ YAML test files.
 
 ⚠️ Breaking Changes - Migration Required: File Version Tag
 
-This release introduces explicit versioning for OATS test files. All test files must now include an `oats-file-version` tag.
+This release introduces explicit versioning for OATS test files. All test files must now include an `oats-schema-version` tag.
 
 Full release notes: https://github.com/grafana/oats/releases/tag/v0.6.0
 
-### Add `oats-file-version: "2"` to all test files
+### Add `oats-schema-version: "2"` to all test files
 
-All OATS test files must now include the `oats-file-version` field at the top level. The current version is `"2"`.
+All OATS test files must now include the `oats-schema-version` field at the top level. The current version is `"2"`.
 
 ```yaml
 # ✅ Required in all test files
-oats-file-version: "2"
+oats-schema-version: "2"
 
 docker-compose:
   files:
@@ -37,7 +37,7 @@ expected:
 
 **Before:** OATS would discover all `*oats*.yaml` files (except those ending in `-template.yaml`) in the specified directory.
 
-**Now:** OATS only considers files with a `.yaml` or `.yml` extension that contain the `oats-file-version` tag.
+**Now:** OATS only considers files with a `.yaml` or `.yml` extension that contain the `oats-schema-version` tag.
 
 ### New: `oats-template` Flag
 
@@ -45,7 +45,7 @@ Template files that should be included (via `include:`) but not run as entry poi
 
 ```yaml
 # Template file (e.g., oats-base.yaml)
-oats-file-version: "2"
+oats-schema-version: "2"
 oats-template: true
 
 docker-compose:
@@ -71,7 +71,7 @@ This is particularly useful when you have many YAML files in your repository and
 
 ### Migration Steps
 
-1. Add `oats-file-version: "2"` to all your test files
+1. Add `oats-schema-version: "2"` to all your test files
 2. Add `oats-template: true` to any template files (files that are included but not entry points)
 3. (Optional) Consider passing specific file paths instead of directories for better performance
 

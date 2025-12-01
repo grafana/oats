@@ -79,13 +79,13 @@ func TestInputDefinitionsInvalidFiles(t *testing.T) {
 			name:     "outdated file version",
 			filePath: "testdata/invalid-tests/outdated-version.yaml",
 			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/outdated-version.yaml - " +
-				"see migration notes at https://github.com/grafana/oats/blob/main/CHANGELOG.md - unsupported oats-file-version '1' required version is '2'",
+				"see migration notes at https://github.com/grafana/oats/blob/main/CHANGELOG.md - unsupported oats-schema-version '1' required version is '2'",
 		},
 		{
 			name:     "file version is not a string",
 			filePath: "testdata/invalid-tests/version-not-string.yaml",
 			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/version-not-string.yaml - " +
-				"see migration notes at https://github.com/grafana/oats/blob/main/CHANGELOG.md - oats-file-version '1' is not a string",
+				"see migration notes at https://github.com/grafana/oats/blob/main/CHANGELOG.md - oats-schema-version '1' is not a string",
 		},
 		{
 			name:     "unknown field",
