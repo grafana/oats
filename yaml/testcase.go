@@ -117,7 +117,7 @@ func readTestCase(testBase, filePath string) (*model.TestCase, error) {
 	return &testCase, nil
 }
 
-func readTestCaseDefinition(filePath string, include bool) (*model.TestCaseDefinition, error) {
+func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCaseDefinition, error) {
 	filePath = absolutePath(filePath)
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -144,10 +144,16 @@ func readTestCaseDefinition(filePath string, include bool) (*model.TestCaseDefin
 			fileVersionStr, requiredOatsFileVersion))
 	}
 
-	template := parsed["oats-template"]
-	if template != nil && !include {
-		// not a test case definition
-		return nil, nil
+	template := parsed["oats-template"] == true
+	if templateMode {
+		if !template {
+			return nil, fmt.Errorf("expected an oats template file %s", filePath)
+		}
+	} else {
+		if template {
+			// not a test case definition
+			return nil, nil
+		}
 	}
 
 	def := model.TestCaseDefinition{}
