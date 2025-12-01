@@ -110,14 +110,12 @@ func TestCollectTestCases(t *testing.T) {
 		name               string
 		input              []string
 		evaluateIgnoreFile bool
-		expectedCount      int
 		expectedNames      []string
 	}{
 		{
 			name:               "without ignore file evaluation",
 			input:              []string{"testdata/valid-tests"},
 			evaluateIgnoreFile: false,
-			expectedCount:      8, // includes matrix expansions (2) and ignored file (1)
 			expectedNames: []string{
 				"run-expect-absent.oats",
 				"run-input.oats",
@@ -132,7 +130,6 @@ func TestCollectTestCases(t *testing.T) {
 			name:               "with ignore file evaluation",
 			input:              []string{"testdata/valid-tests"},
 			evaluateIgnoreFile: true,
-			expectedCount:      7, // excludes ignored directory
 			expectedNames: []string{
 				"run-expect-absent.oats",
 				"run-input.oats",
@@ -146,7 +143,6 @@ func TestCollectTestCases(t *testing.T) {
 			name:               "2 explicit files",
 			input:              []string{"testdata/valid-tests/oats.yaml", "testdata/valid-tests/more-oats.yml"},
 			evaluateIgnoreFile: true,
-			expectedCount:      2,
 			expectedNames: []string{
 				"run-oats",
 				"run-more-oats",
