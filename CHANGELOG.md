@@ -15,7 +15,7 @@ Full release notes: https://github.com/grafana/oats/releases/tag/v0.6.0
 
 ### Add `oats-schema-version: 2` to all test files
 
-All OATS test files must now include the `oats-schema-version` field at the top level. The current version is `"2"`.
+All OATS test files must now include the `oats-schema-version` field at the top level. The current version is `2`.
 
 ```yaml
 # ✅ Required in all test files
