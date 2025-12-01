@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
-	"slices"
 	"strings"
 	"time"
 
@@ -39,15 +38,6 @@ func run() error {
 	cases, err := yaml.ReadTestCases(inputs, true)
 	if err != nil {
 		return fmt.Errorf("failed to read test cases: %w", err)
-	}
-
-	// Filter out all test cases that don't have a Kubernetes or Compose section, as that probably
-	// means we found unrelated YAML files in the directory that happen to end in ".oats.y{a}ml".
-	for i := len(cases) - 1; i >= 0; i-- {
-		testcase := cases[i]
-		if testcase.Definition.DockerCompose == nil && testcase.Definition.Kubernetes == nil {
-			cases = slices.Delete(cases, i, i+1)
-		}
 	}
 
 	if len(cases) == 0 {
