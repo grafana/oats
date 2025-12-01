@@ -115,6 +115,7 @@ traces:
       - name: "GET /api"
         attributes:
           http.method: "GET"
+          http.route: "regex:/api/.*"
 
 # ✅ New
 traces:
@@ -122,6 +123,8 @@ traces:
     equals: "GET /api"
     attributes:
       http.method: "GET"
+    attribute-regexp:
+      http.route: "/api/.*"
 ```
 
 ```diff
@@ -131,9 +134,12 @@ traces:
 -     - name: "GET /api"
 -       attributes:
 -         http.method: "GET"
+-         http.route: "regex:/api/.*"
 +   equals: "GET /api"
 +   attributes:
 +     http.method: "GET"
++   attribute-regexp:
++     http.route: "/api/.*"
 ```
 
 Span name with a regular expression:
