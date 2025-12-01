@@ -177,7 +177,7 @@ func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCase
 }
 
 func parsingError(filePath string, err error) error {
-	return fmt.Errorf("error parsing test case definition %s - see migration notes at https://github.com/grafana/oats/releases/tag/v0.5.0: %w",
+	return fmt.Errorf("error parsing test case definition %s - see migration notes at https://github.com/grafana/oats/blob/main/CHANGELOG.md - %w",
 		filePath, err)
 }
 
