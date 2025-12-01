@@ -95,7 +95,7 @@ type Input struct {
 }
 
 type TestCaseDefinition struct {
-	FileVersion   string                 `yaml:"oats-schema-version"` // is checked before unmarshalling
+	SchemaVersion int                    `yaml:"oats-schema-version"` // is checked before unmarshalling
 	Template      bool                   `yaml:"oats-template"`       // is checked before unmarshalling
 	Include       []string               `yaml:"include"`
 	DockerCompose *DockerCompose         `yaml:"docker-compose"`

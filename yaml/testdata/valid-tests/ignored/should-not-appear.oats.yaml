@@ -1,4 +1,4 @@
-oats-schema-version: "2"
+oats-schema-version: 2
 include:
   - ../oats-template.yaml
 expected:
