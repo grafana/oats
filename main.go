@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/grafana/oats/model"
@@ -50,7 +51,7 @@ func run() error {
 	}
 
 	if len(cases) == 0 {
-		return fmt.Errorf("no cases found in %s", input)
+		return fmt.Errorf("no cases found in %s", strings.Join(inputs, ", "))
 	}
 	for _, testCase := range cases {
 		slog.Info("test case found", "test", testCase.Name)
