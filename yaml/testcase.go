@@ -164,8 +164,8 @@ func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCase
 	}
 
 	if version != requiredSchemaVersion {
-		return nil, parsingError(filePath, fmt.Errorf("unsupported oats-schema-version '%f' required version is '%d'",
-			version, requiredSchemaVersion))
+		return nil, parsingError(filePath, fmt.Errorf("unsupported oats-schema-version '%v' required version is '%d'",
+			schemaVersion, requiredSchemaVersion))
 	}
 
 	template := parsed["oats-template"] == true
