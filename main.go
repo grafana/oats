@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/grafana/oats/model"
@@ -30,7 +31,15 @@ func run() error {
 		panic(message)
 	})
 
-	cases, base := yaml.ReadTestCases(flag.Arg(0))
+	if flag.NArg() != 1 {
+		return errors.New("you must pass a path to the test case yaml file")
+	}
+
+	input := flag.Arg(0)
+	cases, err := yaml.ReadTestCases(strings.Split(input, " "))
+	if err != nil {
+		return fmt.Errorf("failed to read test cases: %w", err)
+	}
 
 	// Filter out all test cases that don't have a Kubernetes or Compose section, as that probably
 	// means we found unrelated YAML files in the directory that happen to end in ".oats.y{a}ml".
@@ -42,7 +51,7 @@ func run() error {
 	}
 
 	if len(cases) == 0 {
-		return fmt.Errorf("no cases found in %s", base)
+		return fmt.Errorf("no cases found in %s", input)
 	}
 	for _, testCase := range cases {
 		slog.Info("test case found", "test", testCase.Name)
@@ -72,10 +81,6 @@ func parseSettings() (model.Settings, error) {
 	manualDebug := flag.Bool("manual-debug", false, "debug mode")
 	logLimit := flag.Int("log-limit", 1000, "maximum log output length per log entry")
 	flag.Parse()
-
-	if flag.NArg() != 1 {
-		return model.Settings{}, errors.New("you must pass a path to the test case yaml file")
-	}
 
 	logSettings := make(map[string]bool)
 	logSettings["ENABLE_LOGS_ALL"] = *logAll

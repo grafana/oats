@@ -142,6 +142,16 @@ func TestCollectTestCases(t *testing.T) {
 				"run-matrix-test.oats-k8s",    // matrix expansion
 			},
 		},
+		{
+			name:               "2 explicit files",
+			basePath:           "testdata/valid-tests/oats.yaml testdata/valid-tests/more-oats.oats.yaml",
+			evaluateIgnoreFile: true,
+			expectedCount:      2,
+			expectedNames: []string{
+				"run-oats",
+				"run-more-oats",
+			},
+		},
 	}
 
 	for _, tc := range testCases {

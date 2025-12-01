@@ -18,19 +18,20 @@ var yamlFileRegex = regexp.MustCompile(`\.ya?ml$`)
 
 const requiredOatsFileVersion = "2"
 
-func ReadTestCases(base string) ([]model.TestCase, string) {
-	if base == "" {
-		return []model.TestCase{}, ""
+func ReadTestCases(input []string) ([]model.TestCase, error) {
+	var cases []model.TestCase
+
+	for _, base := range input {
+		base = absolutePath(base)
+
+		c, err := collectTestCases(base, true)
+		if err != nil {
+			return nil, err
+		}
+		cases = append(cases, c...)
 	}
 
-	base = absolutePath(base)
-
-	cases, err := collectTestCases(base, true)
-	if err != nil {
-		panic(err)
-	}
-
-	return cases, base
+	return cases, nil
 }
 
 func collectTestCases(base string, evaluateIgnoreFile bool) ([]model.TestCase, error) {
