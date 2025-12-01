@@ -116,8 +116,11 @@ func absolutePath(dir string) string {
 
 func readTestCase(testBase, filePath string) (*model.TestCase, error) {
 	def, err := readTestCaseDefinition(filePath, false)
-	if def == nil {
+	if err != nil {
 		return nil, err
+	}
+	if def == nil {
+		return nil, nil
 	}
 
 	absoluteFilePath := absolutePath(filePath)
