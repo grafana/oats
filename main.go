@@ -32,7 +32,7 @@ func run() error {
 	})
 
 	if flag.NArg() < 1 {
-		return errors.New("you must pass at least one path to a test case yaml file")
+		return errors.New("you must pass at least one path to a test case yaml file or directory")
 	}
 
 	inputs := flag.Args()
