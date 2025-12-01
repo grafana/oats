@@ -84,7 +84,7 @@ You must update your test files when upgrading.
 
 Full release notes: https://github.com/grafana/oats/releases/tag/v0.5.0
 
-### 1. Replace `contains` with `regexp`
+### 1. Replace `contains` with `regexp` in `logs` assertions
 
 ```yaml
 # ❌ Old (no longer works)
@@ -113,11 +113,15 @@ traces:
   - traceql: '{}'
     spans:
       - name: "GET /api"
+        attributes:
+          http.method: "GET"
 
 # ✅ New
 traces:
   - traceql: '{}'
     equals: "GET /api"
+    attributes:
+      http.method: "GET"
 ```
 
 ```diff
@@ -125,7 +129,34 @@ traces:
   - traceql: '{}'
 -   spans:
 -     - name: "GET /api"
+-       attributes:
+-         http.method: "GET"
 +   equals: "GET /api"
++   attributes:
++     http.method: "GET"
+```
+
+Span name with a regular expression:
+
+```yaml
+# ❌ Old (no longer works)
+traces:
+  - traceql: '{}'
+    spans:
+      - name: "regex:GET /api.*"
+
+# ✅ New with regexp
+traces:
+  - traceql: '{}'
+    regexp: "GET /api.*"
+```
+
+```diff
+traces:
+  - traceql: '{}'
+-   spans:
+-     - name: "regex:GET /api.*"
++   regexp: "GET /api.*"
 ```
 
 ### 3. Update profile flamebearers
