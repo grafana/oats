@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/grafana/oats/model"
@@ -36,7 +35,7 @@ func run() error {
 	}
 
 	input := flag.Arg(0)
-	cases, err := yaml.ReadTestCases(strings.Split(input, " "))
+	cases, err := yaml.ReadTestCases(input, true)
 	if err != nil {
 		return fmt.Errorf("failed to read test cases: %w", err)
 	}

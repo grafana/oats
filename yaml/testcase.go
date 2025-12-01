@@ -18,13 +18,13 @@ var yamlFileRegex = regexp.MustCompile(`\.ya?ml$`)
 
 const requiredOatsFileVersion = "2"
 
-func ReadTestCases(input []string) ([]model.TestCase, error) {
+func ReadTestCases(input string, evaluateIgnoreFile bool) ([]model.TestCase, error) {
 	var cases []model.TestCase
 
-	for _, base := range input {
+	for _, base := range strings.Split(input, " ") {
 		base = absolutePath(base)
 
-		c, err := collectTestCases(base, true)
+		c, err := collectTestCases(base, evaluateIgnoreFile)
 		if err != nil {
 			return nil, err
 		}
@@ -36,6 +36,14 @@ func ReadTestCases(input []string) ([]model.TestCase, error) {
 
 func collectTestCases(base string, evaluateIgnoreFile bool) ([]model.TestCase, error) {
 	var cases []model.TestCase
+
+	if stat, err := os.Stat(base); err != nil {
+		return nil, fmt.Errorf("failed to stat path %s: %w", base, err)
+	} else if !stat.IsDir() {
+		// single file
+		return addTestCase(cases, filepath.Dir(base), base)
+	}
+
 	var ignored []string
 	err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -66,23 +74,34 @@ func collectTestCases(base string, evaluateIgnoreFile bool) ([]model.TestCase, e
 			return nil
 		}
 
-		testCase, err := readTestCase(base, p)
-		if testCase == nil {
+		cases, err = addTestCase(cases, base, p)
+		if err != nil {
 			return err
 		}
-		if testCase.Definition.Matrix != nil {
-			for _, matrix := range testCase.Definition.Matrix {
-				newCase := *testCase
-				newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
-				newCase.MatrixTestCaseName = matrix.Name
-				cases = append(cases, newCase)
-			}
-			return nil
-		}
-		cases = append(cases, *testCase)
 		return nil
 	})
 	return cases, err
+}
+
+func addTestCase(cases []model.TestCase, base string, path string) ([]model.TestCase, error) {
+	testCase, err := readTestCase(base, path)
+	if err != nil {
+		return nil, err
+	}
+	if testCase == nil {
+		return cases, nil
+	}
+	if testCase.Definition.Matrix != nil {
+		for _, matrix := range testCase.Definition.Matrix {
+			newCase := *testCase
+			newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
+			newCase.MatrixTestCaseName = matrix.Name
+			cases = append(cases, newCase)
+		}
+	} else {
+		cases = append(cases, *testCase)
+	}
+	return cases, nil
 }
 
 func absolutePath(dir string) string {

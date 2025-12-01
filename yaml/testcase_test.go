@@ -144,7 +144,7 @@ func TestCollectTestCases(t *testing.T) {
 		},
 		{
 			name:               "2 explicit files",
-			basePath:           "testdata/valid-tests/oats.yaml testdata/valid-tests/more-oats.oats.yaml",
+			basePath:           "testdata/valid-tests/oats.yaml testdata/valid-tests/more-oats.yml",
 			evaluateIgnoreFile: true,
 			expectedCount:      2,
 			expectedNames: []string{
@@ -156,7 +156,7 @@ func TestCollectTestCases(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cases, err := collectTestCases(tc.basePath, tc.evaluateIgnoreFile)
+			cases, err := ReadTestCases(tc.basePath, tc.evaluateIgnoreFile)
 			require.NoError(t, err)
 
 			// Collect all case names for easier assertion
@@ -173,7 +173,7 @@ func TestCollectTestCases(t *testing.T) {
 }
 
 func TestTestCasesAreValid(t *testing.T) {
-	cases, err := collectTestCases("testdata/valid-tests", false)
+	cases, err := ReadTestCases("testdata/valid-tests", false)
 	require.NoError(t, err)
 	require.NotEmpty(t, cases)
 	for _, c := range cases {
