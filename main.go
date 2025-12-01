@@ -30,12 +30,12 @@ func run() error {
 		panic(message)
 	})
 
-	if flag.NArg() != 1 {
-		return errors.New("you must pass a path to the test case yaml file")
+	if flag.NArg() < 1 {
+		return errors.New("you must pass at least one path to a test case yaml file")
 	}
 
-	input := flag.Arg(0)
-	cases, err := yaml.ReadTestCases(input, true)
+	inputs := flag.Args()
+	cases, err := yaml.ReadTestCases(inputs, true)
 	if err != nil {
 		return fmt.Errorf("failed to read test cases: %w", err)
 	}

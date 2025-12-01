@@ -96,6 +96,8 @@ func addTestCase(cases []model.TestCase, base string, path string) ([]model.Test
 			newCase := *testCase
 			newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
 			newCase.MatrixTestCaseName = matrix.Name
+			newCase.Definition.DockerCompose = matrix.DockerCompose
+			newCase.Definition.Kubernetes = matrix.Kubernetes
 			cases = append(cases, newCase)
 		}
 	} else {
