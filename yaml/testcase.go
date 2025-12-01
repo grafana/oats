@@ -195,7 +195,7 @@ func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCase
 			return nil, err
 		}
 		if other == nil {
-			return nil, fmt.Errorf("included file %s is not a valid oats test case definition", p)
+			return nil, fmt.Errorf("included file %s is not a valid oats template file", p)
 		}
 		def.Merge(*other)
 	}
