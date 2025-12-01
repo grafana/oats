@@ -165,7 +165,7 @@ func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCase
 	template := parsed["oats-template"] == true
 	if templateMode {
 		if !template {
-			return nil, fmt.Errorf("expected an oats template file %s", filePath)
+			return nil, parsingError(filePath, fmt.Errorf("expected an oats template file"))
 		}
 	} else {
 		if template {
