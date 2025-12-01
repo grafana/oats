@@ -1,3 +1,4 @@
+oats-schema-version: 2
 docker-compose:
 input:
   - path: /stock

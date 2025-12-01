@@ -14,25 +14,36 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-var oatsFileRegex = regexp.MustCompile(`oats.*\.ya?ml`)
+var yamlFileRegex = regexp.MustCompile(`\.ya?ml$`)
 
-func ReadTestCases(base string) ([]*model.TestCase, string) {
-	if base == "" {
-		return []*model.TestCase{}, ""
+const requiredSchemaVersion = 2
+
+func ReadTestCases(input []string, evaluateIgnoreFile bool) ([]model.TestCase, error) {
+	var cases []model.TestCase
+
+	for _, base := range input {
+		base = absolutePath(base)
+
+		c, err := collectTestCases(base, evaluateIgnoreFile)
+		if err != nil {
+			return nil, err
+		}
+		cases = append(cases, c...)
 	}
 
-	base = absolutePath(base)
-
-	cases, err := collectTestCases(base, true)
-	if err != nil {
-		panic(err)
-	}
-
-	return cases, base
+	return cases, nil
 }
 
-func collectTestCases(base string, evaluateIgnoreFile bool) ([]*model.TestCase, error) {
-	var cases []*model.TestCase
+func collectTestCases(base string, evaluateIgnoreFile bool) ([]model.TestCase, error) {
+	var cases []model.TestCase
+
+	if stat, err := os.Stat(base); err != nil {
+		return nil, fmt.Errorf("failed to stat path %s: %w", base, err)
+	} else if !stat.IsDir() {
+		// single file
+		return addTestCase(cases, filepath.Dir(base), base)
+	}
+
 	var ignored []string
 	err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -52,36 +63,47 @@ func collectTestCases(base string, evaluateIgnoreFile bool) ([]*model.TestCase, 
 			}
 		}
 
-		if !oatsFileRegex.MatchString(d.Name()) || strings.Contains(d.Name(), "-template.yaml") || strings.Contains(d.Name(), "-template.yml") {
-			return nil
-		}
-
-		for _, i := range ignored {
-			if strings.HasPrefix(p, i) {
+		for _, ignoredDir := range ignored {
+			// skip ignored directories
+			if strings.HasPrefix(p, ignoredDir) {
 				return nil
 			}
 		}
 
-		testCase, err := readTestCase(base, p)
+		if !yamlFileRegex.MatchString(d.Name()) {
+			return nil
+		}
+
+		cases, err = addTestCase(cases, base, p)
 		if err != nil {
 			return err
 		}
-		if testCase.Definition.Matrix != nil {
-			for _, matrix := range testCase.Definition.Matrix {
-				newCase := testCase
-				newCase.Definition = testCase.Definition
-				newCase.Definition.DockerCompose = matrix.DockerCompose
-				newCase.Definition.Kubernetes = matrix.Kubernetes
-				newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
-				newCase.MatrixTestCaseName = matrix.Name
-				cases = append(cases, &newCase)
-			}
-			return nil
-		}
-		cases = append(cases, &testCase)
 		return nil
 	})
 	return cases, err
+}
+
+func addTestCase(cases []model.TestCase, base string, path string) ([]model.TestCase, error) {
+	testCase, err := readTestCase(base, path)
+	if err != nil {
+		return nil, err
+	}
+	if testCase == nil {
+		return cases, nil
+	}
+	if testCase.Definition.Matrix != nil {
+		for _, matrix := range testCase.Definition.Matrix {
+			matrixCase := *testCase
+			matrixCase.Definition.DockerCompose = matrix.DockerCompose
+			matrixCase.Definition.Kubernetes = matrix.Kubernetes
+			matrixCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
+			matrixCase.MatrixTestCaseName = matrix.Name
+			cases = append(cases, matrixCase)
+		}
+	} else {
+		cases = append(cases, *testCase)
+	}
+	return cases, nil
 }
 
 func absolutePath(dir string) string {
@@ -92,10 +114,13 @@ func absolutePath(dir string) string {
 	return abs
 }
 
-func readTestCase(testBase, filePath string) (model.TestCase, error) {
-	def, err := readTestCaseDefinition(filePath)
+func readTestCase(testBase, filePath string) (*model.TestCase, error) {
+	def, err := readTestCaseDefinition(filePath, false)
 	if err != nil {
-		return model.TestCase{}, err
+		return nil, err
+	}
+	if def == nil {
+		return nil, nil
 	}
 
 	absoluteFilePath := absolutePath(filePath)
@@ -109,39 +134,82 @@ func readTestCase(testBase, filePath string) (model.TestCase, error) {
 		Path:       absoluteFilePath,
 		Name:       name,
 		Dir:        dir,
-		Definition: def,
+		Definition: *def,
 	}
-	return testCase, nil
+	return &testCase, nil
 }
 
-func readTestCaseDefinition(filePath string) (model.TestCaseDefinition, error) {
+func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCaseDefinition, error) {
 	filePath = absolutePath(filePath)
-	def := model.TestCaseDefinition{}
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return model.TestCaseDefinition{}, err
+		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+	var parsed map[string]interface{}
+	err = yaml.Unmarshal(content, &parsed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse file %s: %w", filePath, err)
+	}
+	schemaVersion, ok := parsed["oats-schema-version"]
+	if !ok {
+		// not an oats file
+		return nil, nil
 	}
 
+	var version float64
+
+	if versionInt, ok := schemaVersion.(int); ok {
+		version = float64(versionInt)
+	} else if versionFloat, ok := schemaVersion.(float64); ok {
+		version = versionFloat
+	} else {
+		return nil, parsingError(filePath, fmt.Errorf("oats-schema-version '%v' is not a number", schemaVersion))
+	}
+
+	if version != requiredSchemaVersion {
+		return nil, parsingError(filePath, fmt.Errorf("unsupported oats-schema-version '%v' required version is '%d'",
+			schemaVersion, requiredSchemaVersion))
+	}
+
+	template := parsed["oats-template"] == true
+	if templateMode {
+		if !template {
+			return nil, parsingError(filePath, fmt.Errorf("expected an oats template file"))
+		}
+	} else {
+		if template {
+			// not a test case definition
+			return nil, nil
+		}
+	}
+
+	def := model.TestCaseDefinition{}
 	dec := yaml.NewDecoder(bytes.NewReader(content))
 	dec.KnownFields(true)
 	err = dec.Decode(&def)
 	if err != nil {
-		return model.TestCaseDefinition{},
-			fmt.Errorf("error parsing test case definition %s - see migration notes at https://github.com/grafana/oats/releases/tag/v0.5.0: %w",
-				filePath, err)
+		return nil, parsingError(filePath, err)
 	}
 
 	for _, s := range def.Include {
 		p := includePath(filePath, s)
-		other, err := readTestCaseDefinition(p)
+		other, err := readTestCaseDefinition(p, true)
 		if err != nil {
-			return model.TestCaseDefinition{}, err
+			return nil, err
 		}
-		def.Merge(other)
+		if other == nil {
+			return nil, fmt.Errorf("included file %s is not a valid oats template file", p)
+		}
+		def.Merge(*other)
 	}
 	def.Include = []string{}
 
-	return def, nil
+	return &def, nil
+}
+
+func parsingError(filePath string, err error) error {
+	return fmt.Errorf("error parsing test case definition %s - see migration notes at https://github.com/grafana/oats/blob/main/CHANGELOG.md - %w",
+		filePath, err)
 }
 
 func includePath(filePath string, include string) string {

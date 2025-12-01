@@ -55,6 +55,7 @@ oats
 4. Create `oats.yaml` with the test cases
     ```yaml
     # OATs is an acceptance testing framework for OpenTelemetry - https://github.com/grafana/oats
+    oats-schema-version: 2
     docker-compose:
       files:
         - ./docker-compose.yaml
@@ -73,11 +74,17 @@ oats /path/to/oats-tests/oats.yaml
 OATs can be run directly using the command-line interface:
 
 ```sh
-# Basic usage
-go run main.go /path/to/oats-tests/oats.yaml
+# Run specific test files
+oats /path/to/oats-tests/oats.yaml
+
+# Run multiple specific test files
+oats /path/to/repo/test1.yaml /path/to/repo/test2.yaml
+
+# Run all tests in a directory (scans for .yaml/.yml files with oats-schema-version)
+oats /path/to/oats-tests
 
 # With flags
-go run main.go --timeout=1m --lgtm-version=latest --manual-debug=false /path/to/oats-tests/oats.yaml
+oats --timeout=1m --lgtm-version=latest --manual-debug=false /path/to/oats-tests/oats.yaml
 ```
 
 ## Running multiple tests
@@ -85,10 +92,14 @@ go run main.go --timeout=1m --lgtm-version=latest --manual-debug=false /path/to/
 It can run multiple tests:
 
 ```sh
+# Scan directory for all test files
 oats /path/to/repo
+
+# Or specify individual test files (better performance)
+oats /path/to/repo/test1.yaml /path/to/repo/test2.yaml
 ```
 
-This will search all subdirectories for test files. The tests are defined in `oats*.yaml` files.
+When scanning a directory, OATs will search for all `.yaml` and `.yml` files that contain the `oats-schema-version` tag. Files marked with `oats-template: true` will be skipped as entry points but can still be included by other test files.
 
 ## Flags 
 
@@ -116,14 +127,16 @@ from GitHub Actions. It uses [mise](https://mise.jdx.dev/) to install OATs, but 
 ## Test Case Syntax
 
 > [!TIP]
-> You can use any file name that matches `oats*.yaml` (e.g. `oats-test.yaml`), that doesn't end in `-template.yaml`.
-> `oats-template.yaml` is reserved for template files, which are used in the `include` section.
+> All test files must include `oats-schema-version: 2` at the top level.
+> Template files (used in `include` sections) must also include `oats-template: true` to prevent them from being run as entry points.
+> You can use any file name with `.yaml` or `.yml` extension.
 
 The syntax is a bit similar to [Tracetest](https://github.com/kubeshop/tracetest).
 
 Here is an example:
 
 ```yaml
+oats-schema-version: 2
 include:
   - ../oats-template.yaml
 docker-compose:
@@ -147,9 +160,24 @@ expected:
       value: "== 10"
 ```
 
+### Template Files
+
+Template files are used to share common configuration across multiple test files. They must include both `oats-schema-version` and `oats-template: true`:
+
+```yaml
+# oats-template.yaml
+oats-schema-version: 2
+oats-template: true
+
+docker-compose:
+  files:
+    - ./docker-compose.yaml
+```
+
 Here is another example with a more specific input:
 
 ```yaml
+oats-schema-version: 2
 include:
   - ../oats-template.yaml
 docker-compose:
