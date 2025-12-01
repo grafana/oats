@@ -72,9 +72,6 @@ func collectTestCases(base string, evaluateIgnoreFile bool) ([]model.TestCase, e
 		if testCase.Definition.Matrix != nil {
 			for _, matrix := range testCase.Definition.Matrix {
 				newCase := *testCase
-				newCase.Definition = testCase.Definition
-				newCase.Definition.DockerCompose = matrix.DockerCompose
-				newCase.Definition.Kubernetes = matrix.Kubernetes
 				newCase.Name = fmt.Sprintf("%s-%s", testCase.Name, matrix.Name)
 				newCase.MatrixTestCaseName = matrix.Name
 				cases = append(cases, newCase)
@@ -126,7 +123,6 @@ func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCase
 	var parsed map[string]interface{}
 	err = yaml.Unmarshal(content, &parsed)
 	if err != nil {
-		// ignore files that can't be parsed as yaml
 		return nil, fmt.Errorf("failed to parse file %s: %w", filePath, err)
 	}
 	fileVersion, ok := parsed["oats-version"]
