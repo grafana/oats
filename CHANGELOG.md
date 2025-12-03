@@ -82,6 +82,9 @@ This is particularly useful when you have many YAML files in your repository and
 This release enforces stricter validation and **removes support for deprecated YAML syntax**. 
 You must update your test files when upgrading.
 
+> [!WARNING]
+> Any unknown field in your YAML files will now cause validation errors instead of being ignored.
+
 Full release notes: https://github.com/grafana/oats/releases/tag/v0.5.0
 
 ### 1. Replace `contains` with `regexp` in `logs` assertions
@@ -113,6 +116,7 @@ traces:
   - traceql: '{}'
     spans:
       - name: "GET /api"
+        allow-duplicates: true # duplicate span names are now always allowed
         attributes:
           http.method: "GET"
           http.route: "regex:/api/.*"
@@ -132,6 +136,7 @@ traces:
   - traceql: '{}'
 -   spans:
 -     - name: "GET /api"
+-       allow-duplicates: true # duplicate span names are now always allowed
 -       attributes:
 -         http.method: "GET"
 -         http.route: "regex:/api/.*"
