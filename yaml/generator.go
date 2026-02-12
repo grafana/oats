@@ -18,9 +18,6 @@ import (
 //go:embed docker-compose-docker-lgtm-template.yml
 var lgtmTemplate []byte
 
-//go:embed docker-compose-include-base.yml
-var lgtmTemplateIncludeBase []byte
-
 func CreateDockerComposeFile(r *Runner) string {
 	p := filepath.Join(r.testCase.OutputDir, "docker-compose.yml")
 	content := getContent(r)
@@ -85,22 +82,8 @@ func getContent(r *Runner) []byte {
 		files = append(files, name)
 	}
 
-	t = template.Must(template.New("docker-compose-base").Parse(string(lgtmTemplateIncludeBase)))
-	buf = bytes.NewBufferString("")
-	vars = map[string]any{}
-	vars["files"] = files
-	err = t.Execute(buf, vars)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	f, err := os.CreateTemp("", "docker-compose-base.yml")
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	_, err = f.Write(buf.Bytes())
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	defer func(name string) {
-		_ = os.Remove(name)
-	}(f.Name())
-
-	// uses docker compose to merge templates
-	args := []string{"compose", "-f", f.Name(), "config"}
+	// uses docker compose to merge templates (multiple -f flags allow service overrides)
+	args := buildComposeArgs(files, compose.Files)
 	cmd := exec.Command("docker", args...)
 	cmd.Env = env
 	cmd.Stderr = os.Stderr
@@ -110,6 +93,21 @@ func getContent(r *Runner) []byte {
 	}
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	return content
+}
+
+// buildComposeArgs constructs the docker compose arguments for merging compose
+// files. When user compose files are present, --project-directory is set to the
+// directory of the first user file so that relative paths resolve correctly.
+func buildComposeArgs(generatedFiles []string, userFiles []string) []string {
+	args := []string{"compose"}
+	if len(userFiles) > 0 {
+		args = append(args, "--project-directory", filepath.Dir(userFiles[0]))
+	}
+	for _, file := range generatedFiles {
+		args = append(args, "-f", file)
+	}
+	args = append(args, "config")
+	return args
 }
 
 func joinComposeFiles(template []byte, addition []byte) ([]byte, error) {
