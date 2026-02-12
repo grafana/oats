@@ -83,16 +83,7 @@ func getContent(r *Runner) []byte {
 	}
 
 	// uses docker compose to merge templates (multiple -f flags allow service overrides)
-	args := []string{"compose"}
-	// Set project directory from the first user compose file so that relative
-	// paths (build contexts, dockerfiles, etc.) resolve correctly.
-	if len(compose.Files) > 0 {
-		args = append(args, "--project-directory", filepath.Dir(compose.Files[0]))
-	}
-	for _, file := range files {
-		args = append(args, "-f", file)
-	}
-	args = append(args, "config")
+	args := buildComposeArgs(files, compose.Files)
 	cmd := exec.Command("docker", args...)
 	cmd.Env = env
 	cmd.Stderr = os.Stderr
@@ -102,6 +93,21 @@ func getContent(r *Runner) []byte {
 	}
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	return content
+}
+
+// buildComposeArgs constructs the docker compose arguments for merging compose
+// files. When user compose files are present, --project-directory is set to the
+// directory of the first user file so that relative paths resolve correctly.
+func buildComposeArgs(generatedFiles []string, userFiles []string) []string {
+	args := []string{"compose"}
+	if len(userFiles) > 0 {
+		args = append(args, "--project-directory", filepath.Dir(userFiles[0]))
+	}
+	for _, file := range generatedFiles {
+		args = append(args, "-f", file)
+	}
+	args = append(args, "config")
+	return args
 }
 
 func joinComposeFiles(template []byte, addition []byte) ([]byte, error) {
