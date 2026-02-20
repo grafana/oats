@@ -11,5 +11,8 @@ include_fragments = true
 
 exclude = [
   # Google Docs links are often rate-limited
-  "https://docs.google.com/.*"
+  "https://docs.google.com/.*",
+  # Scripts have been removed/moved from these repos
+  "https://github.com/grafana/docker-otel-lgtm/blob/main/scripts/run-acceptance-tests.sh",
+  "https://github.com/prometheus/client_java/blob/main/scripts/run-acceptance-tests.sh"
 ]
