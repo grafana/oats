@@ -73,7 +73,7 @@ func FindSpans(td ptrace.Traces, signal model.ExpectedSignal) (string, map[strin
 						atts[k] = v.AsString()
 						return true
 					})
-					//this is how the scope name is shown in tempo
+					// this is how the scope name is shown in tempo
 					atts["otel.library.name"] = scope.Name()
 					atts["otel.library.version"] = scope.Version()
 					span.Attributes().Range(func(k string, v pcommon.Value) bool {
