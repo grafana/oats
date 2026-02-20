@@ -1,4 +1,9 @@
 {
+  ".github/renovate.json5": {
+    "renovate-config-presets": [
+      "grafana/flint"
+    ]
+  },
   "go.mod": {
     "gomod": [
       "github.com/cenkalti/backoff/v5",
@@ -47,6 +52,10 @@
       "lychee",
       "node",
       "npm:renovate"
+    ],
+    "regex": [
+      "ghcr.io/super-linter/super-linter",
+      "grafana/flint"
     ]
   },
   "yaml/testdata/docker-compose-addition.yaml": {
