@@ -56,7 +56,7 @@ run = "go mod tidy"
 
 [tasks.check]
 description = "Run all checks"
-depends = ['lint', 'test', 'check-fmt']
+depends = ['lint:go', 'test', 'check-fmt']
 
 [tasks.build]
 description = "Build the project"
