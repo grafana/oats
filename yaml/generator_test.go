@@ -1,9 +1,10 @@
 package yaml
 
 import (
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildComposeArgs(t *testing.T) {

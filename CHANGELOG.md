@@ -2,7 +2,7 @@
 
 The changelog is available in the [releases section](https://github.com/grafana/oats/releases).
 
-This file only contains upgrade notes for breaking changes that require you to modify your existing 
+This file only contains upgrade notes for breaking changes that require you to modify your existing
 YAML test files.
 
 ## 0.6.0
@@ -11,7 +11,7 @@ YAML test files.
 
 This release introduces explicit versioning for OATS test files. All test files must now include an `oats-schema-version` tag.
 
-Full release notes: https://github.com/grafana/oats/releases/tag/v0.6.0
+Full release notes: <https://github.com/grafana/oats/releases/tag/v0.6.0>
 
 ### Add `oats-schema-version: 2` to all test files
 
@@ -26,8 +26,8 @@ docker-compose:
     - ./docker-compose.yaml
 expected:
   metrics:
-    - promql: 'uptime_seconds_total{}'
-      value: '>= 0'
+    - promql: "uptime_seconds_total{}"
+      value: ">= 0"
 ```
 
 > [!TIP]
@@ -79,13 +79,13 @@ This is particularly useful when you have many YAML files in your repository and
 
 ⚠️ Breaking Changes - Migration Required Changes to Your YAML Files
 
-This release enforces stricter validation and **removes support for deprecated YAML syntax**. 
+This release enforces stricter validation and **removes support for deprecated YAML syntax**.
 You must update your test files when upgrading.
 
 > [!WARNING]
 > Any unknown field in your YAML files will now cause validation errors instead of being ignored.
 
-Full release notes: https://github.com/grafana/oats/releases/tag/v0.5.0
+Full release notes: <https://github.com/grafana/oats/releases/tag/v0.5.0>
 
 ### 1. Replace `contains` with `regexp` in `logs` assertions
 
@@ -195,4 +195,3 @@ profiles:
 ```
 
 ---
-

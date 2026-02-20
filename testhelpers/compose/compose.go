@@ -41,7 +41,7 @@ func Suite(composeFile string) (*Compose, error) {
 }
 
 func (c *Compose) Up() error {
-	//networks accumulate over time and can cause issues with the tests
+	// networks accumulate over time and can cause issues with the tests
 	err := c.runDocker(newCommand("network", "prune", "-f", "--filter", "until=5m").withCompose(false))
 	if err != nil {
 		return fmt.Errorf("failed to prune docker networks: %w", err)

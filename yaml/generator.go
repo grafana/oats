@@ -123,7 +123,7 @@ func joinComposeFiles(template []byte, addition []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	//not a generic solution, but works for our use case
+	// not a generic solution, but works for our use case
 	addFromBase(base, add, "services")
 	addFromBase(base, add, "networks")
 

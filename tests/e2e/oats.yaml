@@ -7,7 +7,7 @@ input:
 expected:
   traces:
     - traceql: '{name="GET /vets.html"}'
-      equals: 'GET /vets.html'
+      equals: "GET /vets.html"
       attributes:
         otel.library.name: io.opentelemetry.tomcat-7.0
     - traceql: '{name="GET /foo"}'

@@ -32,39 +32,40 @@ oats
 > [!TIP]
 > You can use the test cases in [prom_client_java](https://github.com/prometheus/client_java/tree/main/examples/example-exporter-opentelemetry/oats-tests) as a reference.
 > The [GitHub action](https://github.com/prometheus/client_java/blob/main/.github/workflows/acceptance-tests.yml)
-> uses a [script](https://github.com/prometheus/client_java/blob/main/scripts/run-acceptance-tests.sh) to run the tests.
+> uses `mise run acceptance-test` to run the tests.
 
 1. Create a folder `oats-tests` for the following files
 2. Create `Dockerfile` to build the application you want to test
-    ```Dockerfile
-    FROM eclipse-temurin:21-jre
-    COPY target/example-exporter-opentelemetry.jar ./app.jar
-    ENTRYPOINT [ "java", "-jar", "./app.jar" ]
-    ```
+   ```Dockerfile
+   FROM eclipse-temurin:21-jre
+   COPY target/example-exporter-opentelemetry.jar ./app.jar
+   ENTRYPOINT [ "java", "-jar", "./app.jar" ]
+   ```
 3. Create `docker-compose.yaml` to start the application and any dependencies
-    ```yaml
-    services:
-      java:
-        build:
-          dockerfile: Dockerfile
-        environment:
-          OTEL_SERVICE_NAME: "rolldice"
-          OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
-          OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-    ```
+   ```yaml
+   services:
+     java:
+       build:
+         dockerfile: Dockerfile
+       environment:
+         OTEL_SERVICE_NAME: "rolldice"
+         OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+         OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+   ```
 4. Create `oats.yaml` with the test cases
-    ```yaml
-    # OATs is an acceptance testing framework for OpenTelemetry - https://github.com/grafana/oats
-    oats-schema-version: 2
-    docker-compose:
-      files:
-        - ./docker-compose.yaml
-    expected:
-      metrics:
-        - promql: 'uptime_seconds_total{}'
-          value: '>= 0'
-    ```
+   ```yaml
+   # OATs is an acceptance testing framework for OpenTelemetry - https://github.com/grafana/oats
+   oats-schema-version: 2
+   docker-compose:
+     files:
+       - ./docker-compose.yaml
+   expected:
+     metrics:
+       - promql: "uptime_seconds_total{}"
+         value: ">= 0"
+   ```
 5. Run the tests:
+
 ```sh
 oats /path/to/oats-tests/oats.yaml
 ```
@@ -101,7 +102,7 @@ oats /path/to/repo/test1.yaml /path/to/repo/test2.yaml
 
 When scanning a directory, OATs will search for all `.yaml` and `.yml` files that contain the `oats-schema-version` tag. Files marked with `oats-template: true` will be skipped as entry points but can still be included by other test files.
 
-## Flags 
+## Flags
 
 The following flags are available:
 
@@ -121,8 +122,7 @@ The following flags are available:
 
 ## Run OATs in GitHub Actions
 
-Here's a [script](https://github.com/grafana/docker-otel-lgtm/blob/main/scripts/run-acceptance-tests.sh) that is used
-from GitHub Actions. It uses [mise](https://mise.jdx.dev/) to install OATs, but you also [install OATs directly](#installation).
+The [docker-otel-lgtm](https://github.com/grafana/docker-otel-lgtm) repo uses [mise](https://mise.jdx.dev/) to install and run OATs from GitHub Actions. You can also [install OATs directly](#installation).
 
 ## Test Case Syntax
 
@@ -149,12 +149,12 @@ interval: 500ms # interval between requests to the input URL
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*product"}'
-      regexp: 'SELECT .*'
+      regexp: "SELECT .*"
       attributes:
         db.system: h2
   logs:
     - logql: '{exporter = "OTLP"}'
-      equals: 'hello LGTM'
+      equals: "hello LGTM"
   metrics:
     - promql: 'db_client_connections_max{pool_name="HikariPool-1"}'
       value: "== 10"
@@ -200,7 +200,7 @@ interval: 500ms
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*product"}'
-      regexp: 'SELECT .*'
+      regexp: "SELECT .*"
       attributes:
         db.system: h2
 ```
@@ -213,16 +213,16 @@ Each entry in the `traces` array is a test case for traces.
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*product"}'
-      regexp: 'SELECT .*'
+      regexp: "SELECT .*"
       attributes:
         db.system: h2
       count:
         min: 1 # allow multiple spans with the same attributes
     - traceql: '{ span.kind = "client" }'
-      equals: 'HTTP GET'
+      equals: "HTTP GET"
     - traceql: '{ name =~ "dropped-span" }'
       count:
-        max: 0  # assert this span does NOT exist (e.g., filtered/dropped spans)
+        max: 0 # assert this span does NOT exist (e.g., filtered/dropped spans)
 ```
 
 #### Trace assertion options
@@ -251,14 +251,14 @@ Each entry in the `logs` array is a test case for logs.
 expected:
   logs:
     - logql: '{service_name="rolldice"} |~ `Anonymous player is rolling the dice.*`'
-      equals: 'Anonymous player is rolling the dice'
+      equals: "Anonymous player is rolling the dice"
       attributes:
         service_name: rolldice
       attribute-regexp:
         container_id: ".*"
       no-extra-attributes: true # fail if there are extra attributes
     - logql: '{service_name="rolldice"} |~ `Anonymous player is rolling the dice.*`'
-      regexp: 'Anonymous player is .*'
+      regexp: "Anonymous player is .*"
 ```
 
 #### Log assertion options
@@ -275,14 +275,15 @@ expected:
 - **`matrix-condition`**: Regex to match against matrix test case names
 
 Example:
+
 ```yaml
 expected:
   logs:
     - logql: '{service_name="rolldice"}'
-      equals: 'Rolling dice'
+      equals: "Rolling dice"
       count:
         min: 1
-        max: 5  # expect between 1-5 matching logs (inclusive)
+        max: 5 # expect between 1-5 matching logs (inclusive)
 ```
 
 ### Query metrics
@@ -307,7 +308,7 @@ expected:
   profiles:
     - query: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="my-service"}'
       flamebearers:
-        equals: 'main'
+        equals: "main"
 ```
 
 #### Profile assertion options
