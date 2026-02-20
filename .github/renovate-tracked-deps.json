@@ -4,6 +4,26 @@
       "grafana/flint"
     ]
   },
+  ".github/workflows/build.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
+  ".github/workflows/e2e_test.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
+  ".github/workflows/integration_test.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
+  ".github/workflows/lint.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
   "go.mod": {
     "gomod": [
       "github.com/cenkalti/backoff/v5",
