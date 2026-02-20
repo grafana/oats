@@ -32,7 +32,7 @@ oats
 > [!TIP]
 > You can use the test cases in [prom_client_java](https://github.com/prometheus/client_java/tree/main/examples/example-exporter-opentelemetry/oats-tests) as a reference.
 > The [GitHub action](https://github.com/prometheus/client_java/blob/main/.github/workflows/acceptance-tests.yml)
-> uses a [script](https://github.com/prometheus/client_java/blob/main/scripts/run-acceptance-tests.sh) to run the tests.
+> uses `mise run acceptance-test` to run the tests.
 
 1. Create a folder `oats-tests` for the following files
 2. Create `Dockerfile` to build the application you want to test
@@ -122,8 +122,7 @@ The following flags are available:
 
 ## Run OATs in GitHub Actions
 
-Here's a [script](https://github.com/grafana/docker-otel-lgtm/blob/main/scripts/run-acceptance-tests.sh) that is used
-from GitHub Actions. It uses [mise](https://mise.jdx.dev/) to install OATs, but you also [install OATs directly](#installation).
+The [docker-otel-lgtm](https://github.com/grafana/docker-otel-lgtm) repo uses [mise](https://mise.jdx.dev/) to install and run OATs from GitHub Actions. You can also [install OATs directly](#installation).
 
 ## Test Case Syntax
 
