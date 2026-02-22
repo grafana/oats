@@ -64,6 +64,7 @@ Lint tasks are sourced from [grafana/flint](https://github.com/grafana/flint).
 ### Test Case Schema
 
 Required fields:
+
 - `oats-schema-version: 2` (must be present in all test files)
 - `oats-template: true` (for template files used in `include`)
 
