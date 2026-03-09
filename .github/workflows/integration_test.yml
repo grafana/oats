@@ -15,7 +15,7 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@e79ddf65a11cec7b0e882bedced08d6e976efb2d # v3.6.2
         with:
-          version: v2026.2.21
-          sha256: 5ada586f83b9f106baffb7c2b4cf84abd8511803b0c27e174a20b142c14f4792
+          version: v2026.3.3
+          sha256: ed251b4588512ab64e2372fd3dacffd6bad574ae9e20c311fb864ff65c2a6c8a
       - name: Run integration test
         run: mise run integration-test
