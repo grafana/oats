@@ -1,0 +1,4 @@
+{
+  // MD013 (line-length) is handled by editorconfig
+  "MD013": false
+}
