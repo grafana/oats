@@ -27,28 +27,19 @@ mise run integration-test
 
 # Run end-to-end tests
 mise run e2e-test
-
-# Run all checks (lint + test + format check)
-mise run check
 ```
 
 ## Linting
 
 ```bash
-# Auto-fix and verify (recommended dev workflow)
-mise run fix
+# Auto-fix lint issues (recommended dev workflow)
+mise run lint:fix
 
 # Verify only (same command used in CI)
 mise run lint
-
-# Go linting only
-mise run lint:go
-
-# Format Go code
-mise run fmt
 ```
 
-Lint tasks are sourced from [grafana/flint](https://github.com/grafana/flint).
+Linting is handled by [flint v2](https://github.com/grafana/flint) — runs shellcheck, shfmt, actionlint, hadolint, markdownlint, prettier, codespell, editorconfig, lychee, renovate-deps, and gofmt.
 
 ## Architecture
 
@@ -103,6 +94,6 @@ Key flags: `-timeout` (default 30s), `-lgtm-version` (default "latest"), `-manua
 
 ## CI
 
-- Build + lint + test on PRs (`mise run check`)
+- Lint on PRs (`mise run lint`), tests on PRs (`mise run test`)
 - Integration tests and e2e tests in separate workflows
-- Linting via flint (super-linter, lychee, golangci-lint)
+- Linting via flint v2

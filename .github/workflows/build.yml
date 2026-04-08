@@ -18,4 +18,4 @@ jobs:
           version: v2026.4.15
           sha256: c55befc52e5694f388b927ef304362ca7b9e919d97d43c342fca57f2eccea255
       - name: Run tests
-        run: mise run check
+        run: mise run test
