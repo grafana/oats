@@ -1,5 +1,5 @@
 [tools]
-go = "1.26.1"
+go = "1.26.2"
 golangci-lint = "2.11.4"
 lychee = "0.22.0"
 node = "24.14.1"
