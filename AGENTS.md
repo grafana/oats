@@ -100,6 +100,6 @@ Key flags: `-timeout` (default 30s), `-lgtm-version` (default "latest"), `-manua
 
 ## CI
 
-- Lint on PRs (`mise run lint`), tests on PRs (`mise run test`)
+- Lint on PRs (`mise run lint`), build on PRs (`mise run build`), tests on PRs (`mise run test`)
 - Integration tests and e2e tests in separate workflows
 - Linting via flint v2
