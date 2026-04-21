@@ -2,13 +2,13 @@
 go = "1.26.2"
 
 # Tools
-"github:grafana/flint" = "0.20.3"
 node = "24.15.0"
 "npm:renovate" = "43.127.1"
 
 # Linters
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.0"
+"github:grafana/flint" = "0.20.3"
 golangci-lint = "2.11.4"
 hadolint = "v2.14.0"
 lychee = "0.22.0"
