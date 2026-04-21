@@ -1,7 +1,7 @@
 [tools]
 go = "1.26.2"
 
-# Linters
+# Tools
 actionlint = "1.7.10"
 editorconfig-checker = "v3.6.0"
 "github:grafana/flint" = "0.20.3"
