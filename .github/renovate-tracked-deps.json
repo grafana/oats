@@ -71,6 +71,7 @@
       "cargo:https://github.com/grafana/flint",
       "editorconfig-checker",
       "go",
+      "golangci-lint",
       "hadolint",
       "lychee",
       "node",
