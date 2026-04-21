@@ -1,7 +1,6 @@
 [tools]
 go = "1.26.2"
 
-# Tools
 node = "24.15.0"
 "npm:renovate" = "43.127.1"
 
