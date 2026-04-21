@@ -68,8 +68,8 @@
   "mise.toml": {
     "mise": [
       "actionlint",
-      "cargo:https://github.com/grafana/flint",
       "editorconfig-checker",
+      "github:grafana/flint",
       "go",
       "golangci-lint",
       "hadolint",

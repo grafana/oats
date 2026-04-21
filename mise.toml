@@ -12,7 +12,7 @@ hadolint = "v2.14.0"
 "npm:prettier" = "3.8.1"
 "pipx:codespell" = "2.4.1"
 editorconfig-checker = "v3.6.0"
-"cargo:https://github.com/grafana/flint" = "rev:ae763aa491a26b3005dc25bfd3aabda1a2f16954"
+"github:grafana/flint" = "0.20.3"
 
 [env]
 FLINT_CONFIG_DIR = ".github/config"
