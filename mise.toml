@@ -27,7 +27,10 @@ run = "flint run"
 
 [tasks."lint:fix"]
 description = "Auto-fix lint issues"
-run = "flint run --fix"
+run = """
+flint run --fix
+mise run lint:go
+"""
 
 [tasks."lint:go"]
 description = "Lint Go code"
@@ -45,6 +48,10 @@ run = "go test github.com/grafana/oats/tests"
 [tasks.build]
 description = "Build the project"
 run = "go build"
+
+[tasks.check]
+description = "Run all checks"
+depends = ["lint", "test"]
 
 [tasks.deps]
 description = "Update dependencies"
