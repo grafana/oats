@@ -75,6 +75,7 @@
       "hadolint",
       "lychee",
       "node",
+      "npm:@biomejs/biome",
       "npm:markdownlint-cli2",
       "npm:prettier",
       "npm:renovate",
