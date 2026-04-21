@@ -37,6 +37,9 @@ mise run lint:fix
 
 # Verify only (same command used in CI)
 mise run lint
+
+# Run all checks
+mise run check
 ```
 
 Linting is handled by [flint v2](https://github.com/grafana/flint).
