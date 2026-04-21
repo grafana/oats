@@ -24,19 +24,11 @@ FLINT_CONFIG_DIR = ".github/config"
 
 [tasks.lint]
 description = "Run all lints"
-depends = ["lint:go"]
 run = "flint run"
 
 [tasks."lint:fix"]
 description = "Auto-fix lint issues"
-run = """
-flint run --fix
-mise run lint:go
-"""
-
-[tasks."lint:go"]
-description = "Lint Go code"
-run = "golangci-lint run"
+run = "flint run --fix"
 
 [tasks.test]
 description = "Run tests"

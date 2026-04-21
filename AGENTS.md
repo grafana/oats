@@ -39,7 +39,7 @@ mise run lint:fix
 mise run lint
 ```
 
-Linting is handled by [flint v2](https://github.com/grafana/flint) plus `golangci-lint`.
+Linting is handled by [flint v2](https://github.com/grafana/flint).
 Flint runs shellcheck, shfmt, actionlint, hadolint, markdownlint, prettier,
 codespell, editorconfig, lychee, renovate-deps, and gofmt. EditorConfig rules
 live in `.editorconfig`.
