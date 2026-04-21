@@ -1,7 +1,6 @@
 [tools]
 go = "1.26.2"
 node = "24.15.0"
-"npm:renovate" = "43.127.1"
 
 # Linters
 actionlint = "1.7.10"
@@ -13,6 +12,7 @@ lychee = "0.22.0"
 "npm:@biomejs/biome" = "2.4.12"
 "npm:markdownlint-cli2" = "0.17.2"
 "npm:prettier" = "3.8.1"
+"npm:renovate" = "43.127.1"
 "pipx:codespell" = "2.4.1"
 shellcheck = "v0.11.0"
 shfmt = "v3.12.0"
