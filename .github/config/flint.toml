@@ -2,7 +2,7 @@
 exclude = [
   "CHANGELOG.md",
   "yaml/testdata/**",
-  "docker-compose-docker-lgtm-template.yml",
+  "yaml/docker-compose-docker-lgtm-template.yml",
 ]
 
 [checks.renovate-deps]
