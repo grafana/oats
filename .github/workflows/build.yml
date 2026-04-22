@@ -1,12 +1,12 @@
 ---
-name: Build, Lint, and Test
+name: Build and Test
 
 on: [pull_request]
 
 permissions: {}
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out
@@ -17,5 +17,7 @@ jobs:
         with:
           version: v2026.4.15
           sha256: c55befc52e5694f388b927ef304362ca7b9e919d97d43c342fca57f2eccea255
+      - name: Build
+        run: mise run build
       - name: Run tests
-        run: mise run check
+        run: mise run test

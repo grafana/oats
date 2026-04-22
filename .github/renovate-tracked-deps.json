@@ -67,15 +67,21 @@
   },
   "mise.toml": {
     "mise": [
+      "actionlint",
+      "editorconfig-checker",
+      "github:grafana/flint",
       "go",
       "golangci-lint",
+      "hadolint",
       "lychee",
       "node",
-      "npm:renovate"
-    ],
-    "regex": [
-      "ghcr.io/super-linter/super-linter",
-      "grafana/flint"
+      "npm:@biomejs/biome",
+      "npm:markdownlint-cli2",
+      "npm:prettier",
+      "npm:renovate",
+      "pipx:codespell",
+      "shellcheck",
+      "shfmt"
     ]
   },
   "yaml/testdata/docker-compose-addition.yaml": {

@@ -1,44 +1,32 @@
 [tools]
 go = "1.26.2"
-golangci-lint = "2.11.4"
-lychee = "0.22.0"
 node = "24.15.0"
+
+# Linters
+actionlint = "1.7.10"
+editorconfig-checker = "v3.6.0"
+"github:grafana/flint" = "0.20.3"
+golangci-lint = "2.11.4"
+hadolint = "v2.14.0"
+lychee = "0.22.0"
+"npm:@biomejs/biome" = "2.4.12"
+"npm:markdownlint-cli2" = "0.17.2"
+"npm:prettier" = "3.8.1"
 "npm:renovate" = "43.127.1"
+"pipx:codespell" = "2.4.1"
+shellcheck = "v0.11.0"
+shfmt = "v3.12.0"
 
 [env]
-RENOVATE_TRACKED_DEPS_EXCLUDE="github-actions,github-runners"
-# renovate: datasource=docker depName=ghcr.io/super-linter/super-linter
-SUPER_LINTER_VERSION="v8.4.0@sha256:c5e3307932203ff9e1e8acfe7e92e894add6266605b5d7fb525fb371a59a26f4"
+FLINT_CONFIG_DIR = ".github/config"
 
-# Shared lint tasks from flint (https://github.com/grafana/flint)
-[tasks."lint:super-linter"]
-description = "Run Super-Linter on the repository"
-file = "https://raw.githubusercontent.com/grafana/flint/5af56d473d2f82ec5af0fad36b054bde2bd2f8cf/tasks/lint/super-linter.sh" # v0.20.1
-[tasks."lint:links"]
-description = "Check for broken links in changed files + all local links"
-file = "https://raw.githubusercontent.com/grafana/flint/5af56d473d2f82ec5af0fad36b054bde2bd2f8cf/tasks/lint/links.sh" # v0.20.1
-[tasks."lint:renovate-deps"]
-description = "Verify renovate-tracked-deps.json is up to date"
-file = "https://raw.githubusercontent.com/grafana/flint/5af56d473d2f82ec5af0fad36b054bde2bd2f8cf/tasks/lint/renovate-deps.py" # v0.20.1
+[tasks.lint]
+description = "Run all lints"
+run = "flint run"
 
-[tasks."setup:native-lint-tools"]
-description = "Install native lint tools matching the pinned super-linter version"
-file = "https://raw.githubusercontent.com/grafana/flint/5af56d473d2f82ec5af0fad36b054bde2bd2f8cf/tasks/setup/native-lint-tools.sh" # v0.20.1
-[tasks."lint:fast"]
-description = "Run fast lints (no Renovate)"
-depends = ["lint:super-linter", "lint:links", "lint:go"]
-
-[tasks.native-lint]
-description = "Run lints natively (no container)"
-run = "NATIVE=true mise run lint:fast"
-
-[tasks.pre-commit]
-description = "Pre-commit hook: native lint"
-depends = ["setup:native-lint-tools"]
-run = "NATIVE=true mise run lint:fast"
-[tasks."setup:pre-commit-hook"]
-description = "Install git pre-commit hook that runs native linting"
-run = "mise generate git-pre-commit --write --task=pre-commit"
+[tasks."lint:fix"]
+description = "Auto-fix lint issues"
+run = "flint run --fix"
 
 [tasks.test]
 description = "Run tests"
@@ -49,34 +37,14 @@ description = "Run integration tests"
 env.INTEGRATION_TESTS = "true"
 run = "go test github.com/grafana/oats/tests"
 
-[tasks.fmt]
-description = "Format code"
-run = "gofmt -w ."
+[tasks.build]
+description = "Build the project"
+run = "go build"
 
-[tasks.check-fmt]
-description = "Check code formatting"
-run = "gofmt -l . | grep . && exit 1 || exit 0"
-
-[tasks."lint:go"]
-description = "Lint Go code"
-run = "golangci-lint run"
-
-[tasks."lint"]
-description = "Run all lints"
-depends = ["lint:fast", "lint:renovate-deps"]
-
-[tasks.fix]
-description = "Auto-fix lint issues and regenerate tracked deps"
-run = "AUTOFIX=true mise run lint"
+[tasks.check]
+description = "Run all checks"
+depends = ["lint", "test"]
 
 [tasks.deps]
 description = "Update dependencies"
 run = "go mod tidy"
-
-[tasks.check]
-description = "Run all checks"
-depends = ['lint:go', 'test', 'check-fmt']
-
-[tasks.build]
-description = "Build the project"
-run = "go build"
