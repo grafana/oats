@@ -19,4 +19,4 @@ input:
 expected:
   metrics:
     - promql: bar
-      value: '>= 0'
+      value: ">= 0"

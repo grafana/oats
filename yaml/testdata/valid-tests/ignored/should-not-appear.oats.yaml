@@ -4,5 +4,4 @@ include:
 expected:
   metrics:
     - promql: should_be_ignored
-      value: '>= 0'
-
+      value: ">= 0"

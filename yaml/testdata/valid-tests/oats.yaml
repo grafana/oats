@@ -4,10 +4,9 @@ include:
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*cart"}'
-      regexp: 'SELECT .*cart'
+      regexp: "SELECT .*cart"
       attributes:
         db.system: h2
   metrics:
     - promql: foo
-      value: '>= 0'
-
+      value: ">= 0"

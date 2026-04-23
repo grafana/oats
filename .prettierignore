@@ -1,0 +1,2 @@
+yaml/docker-compose-docker-lgtm-template.yml
+yaml/testdata/invalid-tests/malformed-yaml.yaml

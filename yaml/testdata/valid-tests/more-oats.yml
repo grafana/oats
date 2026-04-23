@@ -4,4 +4,4 @@ include:
 expected:
   logs:
     - logql: '{ service_name="foo" } |~ `Application started.`'
-      equals: 'Application started'
+      equals: "Application started"
