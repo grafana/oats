@@ -20,7 +20,7 @@ OpenTelemetry Acceptance Tests (OATs), or OATs for short, is a test framework fo
 go install github.com/grafana/oats@latest
 ```
 
-2. You can confirm it was installed with:
+1. You can confirm it was installed with:
 
 ```sh
 ❯ ls $GOPATH/bin
@@ -35,13 +35,16 @@ oats
 > uses `mise run acceptance-test` to run the tests.
 
 1. Create a folder `oats-tests` for the following files
-2. Create `Dockerfile` to build the application you want to test
+1. Create `Dockerfile` to build the application you want to test
+
    ```Dockerfile
    FROM eclipse-temurin:21-jre
    COPY target/example-exporter-opentelemetry.jar ./app.jar
    ENTRYPOINT [ "java", "-jar", "./app.jar" ]
    ```
-3. Create `docker-compose.yaml` to start the application and any dependencies
+
+1. Create `docker-compose.yaml` to start the application and any dependencies
+
    ```yaml
    services:
      java:
@@ -52,7 +55,9 @@ oats
          OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
          OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
    ```
-4. Create `oats.yaml` with the test cases
+
+1. Create `oats.yaml` with the test cases
+
    ```yaml
    # OATs is an acceptance testing framework for OpenTelemetry - https://github.com/grafana/oats
    oats-schema-version: 2
@@ -64,7 +69,8 @@ oats
        - promql: "uptime_seconds_total{}"
          value: ">= 0"
    ```
-5. Run the tests:
+
+1. Run the tests:
 
 ```sh
 oats /path/to/oats-tests/oats.yaml

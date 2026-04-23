@@ -4,21 +4,21 @@ input:
 expected:
   traces:
     - traceql: '{ name =~ "SELECT .*" }'
-      regexp: 'SELECT .*product'
+      regexp: "SELECT .*product"
       attributes:
         db.system: h2
     - traceql: '{ name =~ "SELECT .*" }'
-      regexp: 'nonexistent-span'
+      regexp: "nonexistent-span"
       count:
         min: 0
         max: 0
     - traceql: '{ span.kind = "client" }'
-      regexp: 'HTTP GET'
+      regexp: "HTTP GET"
     - traceql: '{ span.kind = "client" }'
-      regexp: 'filtered-span'
+      regexp: "filtered-span"
       count:
         min: 0
         max: 0
   metrics:
     - promql: test_metric
-      value: '>= 0'
+      value: ">= 0"

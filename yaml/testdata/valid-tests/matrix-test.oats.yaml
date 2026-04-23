@@ -11,4 +11,3 @@ matrix:
       dir: k8s-manifests
       app-service: test-app
       app-docker-file: Dockerfile
-

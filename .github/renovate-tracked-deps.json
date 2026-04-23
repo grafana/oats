@@ -1,28 +1,18 @@
 {
   ".github/renovate.json5": {
-    "renovate-config-presets": [
-      "grafana/flint"
-    ]
+    "renovate-config-presets": ["grafana/flint"]
   },
   ".github/workflows/build.yml": {
-    "regex": [
-      "mise"
-    ]
+    "regex": ["mise"]
   },
   ".github/workflows/e2e_test.yml": {
-    "regex": [
-      "mise"
-    ]
+    "regex": ["mise"]
   },
   ".github/workflows/integration_test.yml": {
-    "regex": [
-      "mise"
-    ]
+    "regex": ["mise"]
   },
   ".github/workflows/lint.yml": {
-    "regex": [
-      "mise"
-    ]
+    "regex": ["mise"]
   },
   "go.mod": {
     "gomod": [
@@ -85,19 +75,12 @@
     ]
   },
   "yaml/testdata/docker-compose-addition.yaml": {
-    "docker-compose": [
-      "mongo"
-    ]
+    "docker-compose": ["mongo"]
   },
   "yaml/testdata/docker-compose-expected.yaml": {
-    "docker-compose": [
-      "grafana/grafana",
-      "mongo"
-    ]
+    "docker-compose": ["grafana/grafana", "mongo"]
   },
   "yaml/testdata/docker-compose-template.yaml": {
-    "docker-compose": [
-      "grafana/grafana"
-    ]
+    "docker-compose": ["grafana/grafana"]
   }
 }

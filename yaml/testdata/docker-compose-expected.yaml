@@ -1,31 +1,31 @@
 networks:
-    default:
-        driver: bridge
-        ipam:
-            config:
-                - subnet: 172.16.57.0/24
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.57.0/24
 services:
-    grafana:
-        image: grafana/grafana:13.0.1@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
-        network_mode: host
-        volumes:
-            - ./configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
-    mongodb:
-        image: mongo:7-jammy
-        logging:
-            driver: json-file
-            options:
-                max-file: "2"
-                max-size: 5m
-        ports:
-            - 27017:27017
-        volumes:
-            - dbdata6:/data/db
-version: "3.9"
-volumes:
-    dbdata6: null
-x-default-logging:
-    driver: json-file
-    options:
+  grafana:
+    image: grafana/grafana:13.0.1@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
+    network_mode: host
+    volumes:
+      - ./configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
+  mongodb:
+    image: mongo:7-jammy
+    logging:
+      driver: json-file
+      options:
         max-file: "2"
         max-size: 5m
+    ports:
+      - 27017:27017
+    volumes:
+      - dbdata6:/data/db
+version: "3.9"
+volumes:
+  dbdata6: null
+x-default-logging:
+  driver: json-file
+  options:
+    max-file: "2"
+    max-size: 5m
