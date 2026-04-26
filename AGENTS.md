@@ -53,7 +53,8 @@ live in `.editorconfig`.
 
 - **`main.go`** — CLI entry point. Parses flags, discovers YAML test files, runs them sequentially
 - **`model/`** — Core data models (`TestCaseDefinition`, expected signals)
-- **`yaml/`** — Test case parsing, execution, signal-specific assertions (`runner.go`, `traces.go`, `metrics.go`, `logs.go`, `profiles.go`)
+- **`yaml/`** — Test case parsing, execution, signal-specific assertions
+  (`runner.go`, `traces.go`, `metrics.go`, `logs.go`, `profiles.go`)
 - **`testhelpers/`** — Docker Compose management, Kubernetes (k3d), HTTP request helpers, response parsing
 - **`observability/`** — Observability endpoint interface
 - **`tests/`** — Integration and e2e test fixtures
@@ -67,7 +68,9 @@ Required fields:
 
 Core sections: `include`, `docker-compose`, `kubernetes`, `matrix`, `input`, `interval`, `expected`
 
-File discovery scans for `.yaml`/`.yml` files containing `oats-schema-version`. Files with `oats-template: true` are skipped as entry points. `.oatsignore` causes a directory to be ignored.
+File discovery scans for `.yaml`/`.yml` files containing
+`oats-schema-version`. Files with `oats-template: true` are skipped as entry
+points. `.oatsignore` causes a directory to be ignored.
 
 ## CLI Usage
 

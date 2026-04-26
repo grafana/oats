@@ -1,1 +1,12 @@
 root = true
+
+[*]
+max_line_length = 120
+
+[*.md]
+# Markdown line length is handled by rumdl
+max_line_length = off
+
+[tests/e2e/Dockerfile]
+# Pinned image digests do not wrap cleanly in Dockerfile FROM lines
+max_line_length = off

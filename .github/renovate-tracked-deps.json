@@ -67,12 +67,13 @@
   },
   "mise.toml": {
     "mise": [
-      "go",
       "actionlint",
+      "aqua:owenlamont/ryl",
       "biome",
-      "cargo:yaml-lint",
+      "cargo:https://github.com/grafana/flint",
       "editorconfig-checker",
-      "github:grafana/flint",
+      "github:koalaman/shellcheck",
+      "go",
       "golangci-lint",
       "hadolint",
       "lychee",
@@ -80,8 +81,8 @@
       "npm:renovate",
       "pipx:codespell",
       "rumdl",
-      "shellcheck",
-      "shfmt"
+      "shfmt",
+      "taplo"
     ]
   },
   "yaml/testdata/docker-compose-addition.yaml": {
