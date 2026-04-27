@@ -49,7 +49,3 @@ depends = ["lint", "test"]
 [tasks.deps]
 description = "Update dependencies"
 run = "go mod tidy"
-
-[tasks."lint:pre-commit"]
-description = "Fast auto-fix lint (skips slow checks) — for pre-commit/pre-push hooks"
-run = "flint run --fix --fast-only"
