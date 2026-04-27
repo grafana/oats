@@ -5,7 +5,7 @@ node = "24.15.0"
 # Linters
 actionlint = "1.7.10"
 "aqua:owenlamont/ryl" = "0.6.0"
-biome = "2.4.12"
+biome = "2.4.13"
 editorconfig-checker = "v3.6.0"
 "github:grafana/flint" = "0.21.0"
 "github:koalaman/shellcheck" = "0.11.0"
