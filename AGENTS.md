@@ -42,7 +42,7 @@ mise run lint
 mise run check
 ```
 
-Linting is handled by [flint v2](https://github.com/grafana/flint).
+Linting is handled by [flint](https://github.com/grafana/flint).
 Flint runs shellcheck, shfmt, actionlint, hadolint, markdownlint, prettier,
 codespell, editorconfig, lychee, renovate-deps, and gofmt. EditorConfig rules
 live in `.editorconfig`.
@@ -105,4 +105,4 @@ Key flags: `-timeout` (default 30s), `-lgtm-version` (default "latest"), `-manua
 
 - Lint on PRs (`mise run lint`), build on PRs (`mise run build`), tests on PRs (`mise run test`)
 - Integration tests and e2e tests in separate workflows
-- Linting via flint v2
+- Linting via flint
