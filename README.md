@@ -106,7 +106,10 @@ oats /path/to/repo
 oats /path/to/repo/test1.yaml /path/to/repo/test2.yaml
 ```
 
-When scanning a directory, OATs will search for all `.yaml` and `.yml` files that contain the `oats-schema-version` tag. Files marked with `oats-template: true` will be skipped as entry points but can still be included by other test files.
+When scanning a directory, OATs will search for all `.yaml` and `.yml` files
+that contain the `oats-schema-version` tag. Files marked with
+`oats-template: true` will be skipped as entry points but can still be included
+by other test files.
 
 ## Flags
 
@@ -128,13 +131,16 @@ The following flags are available:
 
 ## Run OATs in GitHub Actions
 
-The [docker-otel-lgtm](https://github.com/grafana/docker-otel-lgtm) repo uses [mise](https://mise.jdx.dev/) to install and run OATs from GitHub Actions. You can also [install OATs directly](#installation).
+The [docker-otel-lgtm](https://github.com/grafana/docker-otel-lgtm) repo uses
+[mise](https://mise.jdx.dev/) to install and run OATs from GitHub Actions. You
+can also [install OATs directly](#installation).
 
 ## Test Case Syntax
 
 > [!TIP]
 > All test files must include `oats-schema-version: 2` at the top level.
-> Template files (used in `include` sections) must also include `oats-template: true` to prevent them from being run as entry points.
+> Template files (used in `include` sections) must also include
+> `oats-template: true` to prevent them from being run as entry points.
 > You can use any file name with `.yaml` or `.yml` extension.
 
 The syntax is a bit similar to [Tracetest](https://github.com/kubeshop/tracetest).
@@ -168,7 +174,8 @@ expected:
 
 ### Template Files
 
-Template files are used to share common configuration across multiple test files. They must include both `oats-schema-version` and `oats-template: true`:
+Template files are used to share common configuration across multiple test
+files. They must include both `oats-schema-version` and `oats-template: true`:
 
 ```yaml
 # oats-template.yaml
@@ -237,8 +244,11 @@ expected:
 - **`equals`**: Exact string match for the span name (any span in the trace)
 - **`regexp`**: Regular expression pattern to match against the span name (any span in the trace)
 - **`attributes`**: Key-value pairs that must match exactly on the span (the span name matched by `equals` or `regexp`)
-- **`attribute-regexp`**: Key-value pairs where values are regex patterns to match against span attributes (the span name matched by `equals` or `regexp`)
-- **`no-extra-attributes`**: Set to `true` to fail if the span has attributes beyond those specified in `attributes` and `attribute-regexp`
+- **`attribute-regexp`**: Key-value pairs where values are regex patterns to
+  match against span attributes (the span name matched by `equals` or
+  `regexp`)
+- **`no-extra-attributes`**: Set to `true` to fail if the span has attributes
+  beyond those specified in `attributes` and `attribute-regexp`
 - **`count`**: Control expected number of matching spans, ignoring if they match other criteria
   - **`min`**: Minimum number of spans expected (default: `1` if not specified)
   - **`max`**: Maximum number of spans expected (`0` means no upper limit, or exactly `0` when `min` is also `0`)
@@ -304,7 +314,8 @@ expected:
 #### Metric assertion options
 
 - **`promql`**: PromQL query to retrieve the metric (required)
-- **`value`**: Expected value with comparison operator. Supported operators: `==`, `!=`, `>`, `<`, `>=`, `<=` (e.g., `">= 0"`, `"== 10"`)
+- **`value`**: Expected value with comparison operator. Supported operators:
+  `==`, `!=`, `>`, `<`, `>=`, `<=` (e.g., `">= 0"`, `"== 10"`)
 - **`matrix-condition`**: Regex to match against matrix test case names
 
 ### Query profiles
@@ -374,7 +385,8 @@ expected:
       matrix-condition: default
 ```
 
-`matrix-condition` is a regex that is applied to the matrix name. This field is available for all assertion types (traces, logs, metrics, profiles).
+`matrix-condition` is a regex that is applied to the matrix name. This field is
+available for all assertion types (traces, logs, metrics, profiles).
 
 ## Docker Compose
 
