@@ -7,7 +7,7 @@ max_retries = 2
 max_concurrency = 4
 
 # Check link anchors
-include_fragments = true
+include_fragments = "anchor-only"
 
 exclude = [
   # Google Docs links are often rate-limited
