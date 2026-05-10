@@ -1,5 +1,5 @@
 [tools]
-go = "1.26.2"
+go = "1.26.3"
 node = "24.15.0"
 
 # Linters
