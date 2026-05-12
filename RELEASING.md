@@ -6,7 +6,7 @@ Releases are automated with `release-please` and GoReleaser.
 
 1. Enable immutable releases in GitHub repository settings.
 2. Make sure releases are merged through the `main` branch.
-3. Use Conventional Commits for releaseable changes (`feat:`, `fix:`, `feat!:`).
+3. Use Conventional Commits for releasable changes (`feat:`, `fix:`, `feat!:`).
 
 ## Normal release flow
 
