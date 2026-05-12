@@ -42,7 +42,7 @@ func run() error {
 
 	if len(cases) == 0 {
 		return fmt.Errorf("no cases found in %s - see migration notes at "+
-			"https://github.com/grafana/oats/blob/main/CHANGELOG.md", strings.Join(inputs, ", "))
+			"https://github.com/grafana/oats/blob/main/UPGRADING.md", strings.Join(inputs, ", "))
 	}
 	for _, testCase := range cases {
 		slog.Info("test case found", "test", testCase.Name)

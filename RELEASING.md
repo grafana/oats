@@ -23,5 +23,5 @@ Releases are automated with `release-please` and GoReleaser.
 The release is only immutable after publication, so the workflow intentionally
 uploads assets and attestations before publishing.
 
-`CHANGELOG.md` remains the hand-written upgrade guide. Automated release notes
-are written to `RELEASES.md` by `release-please`.
+`CHANGELOG.md` is managed by `release-please`. Hand-written migration and
+breaking-change notes live in `UPGRADING.md`.

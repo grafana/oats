@@ -4,8 +4,7 @@
   "force-tag-creation": true,
   "packages": {
     ".": {
-      "release-type": "go",
-      "changelog-path": "RELEASES.md"
+      "release-type": "go"
     }
   }
 }
