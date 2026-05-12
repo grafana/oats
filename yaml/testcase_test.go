@@ -78,21 +78,21 @@ func TestInputDefinitionsInvalidFiles(t *testing.T) {
 		{
 			name:     "outdated file version",
 			filePath: "testdata/invalid-tests/outdated-version.yaml",
-				errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/outdated-version.yaml - " +
-					"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - unsupported oats-schema-version '1' required version is '2'",
+			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/outdated-version.yaml - " +
+				"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - unsupported oats-schema-version '1' required version is '2'",
 		},
 		{
 			name:     "file version is not a number",
 			filePath: "testdata/invalid-tests/version-not-int.yaml",
-				errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/version-not-int.yaml - " +
-					"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - oats-schema-version '1' is not a number",
+			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/version-not-int.yaml - " +
+				"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - oats-schema-version '1' is not a number",
 		},
 		{
 			name:     "unknown field",
 			filePath: "testdata/invalid-tests/unknown-field.yaml",
-				errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/unknown-field.yaml - " +
-					"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - yaml: unmarshal errors:\n" +
-					".*line 5: field spans not found in type model.ExpectedTraces",
+			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/unknown-field.yaml - " +
+				"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - yaml: unmarshal errors:\n" +
+				".*line 5: field spans not found in type model.ExpectedTraces",
 		},
 	}
 
