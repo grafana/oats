@@ -1,0 +1,40 @@
+version: 2
+
+project_name: oats
+
+builds:
+  - binary: oats
+    main: .
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+release:
+  draft: true
+  use_existing_draft: true
+  mode: keep-existing
+
+changelog:
+  disable: true
