@@ -87,7 +87,7 @@ and want to avoid parsing all of them.
 
 ## 0.5.0
 
-⚠️ Breaking Changes - Migration Required Changes to Your YAML Files
+⚠️ Breaking Changes — Changes Required to Your YAML Files
 
 This release enforces stricter validation and **removes support for deprecated
 YAML syntax**.
