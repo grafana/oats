@@ -2,8 +2,8 @@
 
 The changelog is available in the [releases section](https://github.com/grafana/oats/releases).
 
-This file only contains upgrade notes for breaking changes that require you to modify your existing
-YAML test files.
+This file only contains upgrade notes for breaking changes that require you to
+modify your existing YAML test files.
 
 ## 0.6.0
 
@@ -16,7 +16,8 @@ Full release notes: <https://github.com/grafana/oats/releases/tag/v0.6.0>
 
 ### Add `oats-schema-version: 2` to all test files
 
-All OATS test files must now include the `oats-schema-version` field at the top level. The current version is `2`.
+All OATS test files must now include the `oats-schema-version` field at the
+top level. The current version is `2`.
 
 ```yaml
 # ✅ Required in all test files
@@ -38,9 +39,11 @@ expected:
 
 ### File Discovery Changes
 
-**Before:** OATS would discover all `*oats*.yaml` files (except those ending in `-template.yaml`) in the specified directory.
+**Before:** OATS would discover all `*oats*.yaml` files (except those ending in
+`-template.yaml`) in the specified directory.
 
-**Now:** OATS only considers files with a `.yaml` or `.yml` extension that contain the `oats-schema-version` tag.
+**Now:** OATS only considers files with a `.yaml` or `.yml` extension that
+contain the `oats-schema-version` tag.
 
 ### New: `oats-template` Flag
 
@@ -71,23 +74,28 @@ oats /path/to/repo/test1.yaml /path/to/repo/test2.yaml
 oats /path/to/repo
 ```
 
-This is particularly useful when you have many YAML files in your repository and want to avoid parsing all of them.
+This is particularly useful when you have many YAML files in your repository
+and want to avoid parsing all of them.
 
 ### Migration Steps
 
 1. Add `oats-schema-version: 2` to all your test files
-2. Add `oats-template: true` to any template files (files that are included but not entry points)
-3. (Optional) Consider passing specific file paths instead of directories for better performance
+2. Add `oats-template: true` to any template files (files that are included but
+   not entry points)
+3. (Optional) Consider passing specific file paths instead of directories for
+   better performance
 
 ## 0.5.0
 
 ⚠️ Breaking Changes - Migration Required Changes to Your YAML Files
 
-This release enforces stricter validation and **removes support for deprecated YAML syntax**.
+This release enforces stricter validation and **removes support for deprecated
+YAML syntax**.
 You must update your test files when upgrading.
 
 > [!WARNING]
-> Any unknown field in your YAML files will now cause validation errors instead of being ignored.
+> Any unknown field in your YAML files will now cause validation errors instead
+> of being ignored.
 
 Full release notes: <https://github.com/grafana/oats/releases/tag/v0.5.0>
 
