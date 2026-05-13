@@ -46,18 +46,15 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag_name || needs.release-please.outputs.tag_name }}
           persist-credentials: false
-      - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      - name: Setup mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
-          cache: false
-          go-version: '1.26.2'
+          version: v2026.4.28
+          sha256: 9655492db554e8f70a69830f54307ac0f4681d6c42f9844e862528b7853d09d1
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # v7.2.1
-        with:
-          version: v2.12.7
-          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mise exec -- goreleaser release --clean
       - name: Attest release assets
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:

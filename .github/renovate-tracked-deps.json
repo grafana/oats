@@ -24,6 +24,11 @@
       "mise"
     ]
   },
+  ".github/workflows/release.yml": {
+    "regex": [
+      "mise"
+    ]
+  },
   "go.mod": {
     "gomod": [
       "github.com/cenkalti/backoff/v5",
@@ -71,6 +76,7 @@
       "aqua:owenlamont/ryl",
       "biome",
       "editorconfig-checker",
+      "github:goreleaser/goreleaser",
       "github:grafana/flint",
       "github:koalaman/shellcheck",
       "go",
