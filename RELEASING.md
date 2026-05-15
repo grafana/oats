@@ -6,13 +6,19 @@ Releases are automated with `release-please` and GoReleaser.
 
 1. Enable immutable releases in GitHub repository settings.
 2. Make sure releases are merged through the `main` branch.
-3. Use Conventional Commits for releasable changes (`feat:`, `fix:`, `feat!:`).
+3. Only allow squash merges so the merge commit uses the PR title.
+4. Enforce semantic PR titles with `.github/workflows/pr-title.yml`.
+5. Use Conventional Commit prefixes for releasable changes, such as:
+   - `feat:`
+   - `fix:`
+   - `feat!:` / `fix!:` for breaking changes
+   - `chore:` / `docs:` / `test:` for non-release changes
 
 ## Normal release flow
 
 1. Merge changes into `main`.
 2. Wait for `release-please` to open or update the release PR.
-3. Review and merge the release PR.
+3. Review and squash-merge the release PR.
 4. The `Release` workflow will then:
    - create a draft GitHub release and tag
    - build binaries with GoReleaser
