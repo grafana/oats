@@ -29,7 +29,8 @@ Releases are automated with `release-please` and GoReleaser.
 ## Republish an existing tag
 
 Use `workflow_dispatch` with an existing `tag_name` to rebuild assets and
-publish that draft release without running `release-please` again.
+publish that draft release without running `release-please` again. Run the
+workflow from that same tag, or the workflow guard will fail before publishing.
 
 The release is only immutable after publication, so the workflow intentionally
 uploads assets and attestations before publishing.
