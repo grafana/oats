@@ -6,7 +6,7 @@ Releases are automated with `release-please` and GoReleaser.
 
 1. Enable immutable releases in GitHub repository settings.
 2. Make sure releases are merged through the `main` branch.
-3. Only allow squash merges so the merge commit uses the PR title.
+3. Use squash merges so the squash commit message uses the PR title.
 4. Enforce semantic PR titles with `.github/workflows/pr-title.yml`.
 5. Use Conventional Commit prefixes for releasable changes, such as:
    - `feat:`
@@ -25,6 +25,11 @@ Releases are automated with `release-please` and GoReleaser.
    - upload release assets and `checksums.txt`
    - create GitHub artifact attestations for the assets
    - publish the draft release
+
+## Republish an existing tag
+
+Use `workflow_dispatch` with an existing `tag_name` to rebuild assets and
+publish that draft release without running `release-please` again.
 
 The release is only immutable after publication, so the workflow intentionally
 uploads assets and attestations before publishing.
