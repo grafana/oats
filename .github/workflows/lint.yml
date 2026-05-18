@@ -15,7 +15,6 @@ jobs:
 
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      GITHUB_COM_TOKEN: ${{ github.token }}
       GITHUB_REPOSITORY: ${{ github.repository }}
       GITHUB_BASE_REF: ${{ github.base_ref }}
       GITHUB_HEAD_REF: ${{ github.head_ref }}
