@@ -34,7 +34,8 @@ checksum:
 release:
   draft: true
   use_existing_draft: true
-  mode: keep-existing
+  mode: replace
+  replace_existing_artifacts: true
 
 changelog:
   disable: true

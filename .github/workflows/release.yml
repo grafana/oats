@@ -74,6 +74,16 @@ jobs:
       contents: write
       id-token: write
     steps:
+      - name: Verify workflow ref matches requested tag
+        env:
+          EXPECTED_TAG: ${{ github.event.inputs.tag_name }}
+          WORKFLOW_REF: ${{ github.ref_name }}
+          WORKFLOW_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          if [ "$WORKFLOW_REF_TYPE" != "tag" ] || [ "$WORKFLOW_REF" != "$EXPECTED_TAG" ]; then
+            echo "workflow_dispatch must be run from tag '$EXPECTED_TAG' to produce attestations for the requested source revision" >&2
+            exit 1
+          fi
       - name: Check out
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
