@@ -1,104 +1,107 @@
 {
-  ".github/renovate.json5": {
-    "renovate-config-presets": [
-      "grafana/flint"
-    ]
-  },
-  ".github/workflows/build.yml": {
-    "regex": [
-      "mise"
-    ]
-  },
-  ".github/workflows/e2e_test.yml": {
-    "regex": [
-      "mise"
-    ]
-  },
-  ".github/workflows/integration_test.yml": {
-    "regex": [
-      "mise"
-    ]
-  },
-  ".github/workflows/lint.yml": {
-    "regex": [
-      "mise"
-    ]
-  },
-  "go.mod": {
-    "gomod": [
-      "github.com/cenkalti/backoff/v5",
-      "github.com/cespare/xxhash/v2",
-      "github.com/davecgh/go-spew",
-      "github.com/go-logr/logr",
-      "github.com/go-logr/stdr",
-      "github.com/google/go-cmp",
-      "github.com/google/uuid",
-      "github.com/grpc-ecosystem/grpc-gateway/v2",
-      "github.com/hashicorp/go-version",
-      "github.com/json-iterator/go",
-      "github.com/modern-go/concurrent",
-      "github.com/modern-go/reflect2",
-      "github.com/onsi/gomega",
-      "github.com/pmezard/go-difflib",
-      "github.com/stretchr/testify",
-      "go",
-      "go.opentelemetry.io/auto/sdk",
-      "go.opentelemetry.io/collector/featuregate",
-      "go.opentelemetry.io/collector/pdata",
-      "go.opentelemetry.io/otel",
-      "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
-      "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
-      "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp",
-      "go.opentelemetry.io/otel/metric",
-      "go.opentelemetry.io/otel/sdk",
-      "go.opentelemetry.io/otel/trace",
-      "go.opentelemetry.io/proto/otlp",
-      "go.uber.org/multierr",
-      "go.yaml.in/yaml/v3",
-      "golang.org/x/net",
-      "golang.org/x/sys",
-      "golang.org/x/text",
-      "google.golang.org/genproto/googleapis/api",
-      "google.golang.org/genproto/googleapis/rpc",
-      "google.golang.org/grpc",
-      "google.golang.org/protobuf",
-      "gopkg.in/yaml.v3"
-    ]
-  },
-  "mise.toml": {
-    "mise": [
-      "actionlint",
-      "aqua:owenlamont/ryl",
-      "biome",
-      "editorconfig-checker",
-      "github:grafana/flint",
-      "github:koalaman/shellcheck",
-      "go",
-      "golangci-lint",
-      "hadolint",
-      "lychee",
-      "node",
-      "npm:renovate",
-      "pipx:codespell",
-      "rumdl",
-      "shfmt",
-      "taplo"
-    ]
-  },
-  "yaml/testdata/docker-compose-addition.yaml": {
-    "docker-compose": [
-      "mongo"
-    ]
-  },
-  "yaml/testdata/docker-compose-expected.yaml": {
-    "docker-compose": [
-      "grafana/grafana",
-      "mongo"
-    ]
-  },
-  "yaml/testdata/docker-compose-template.yaml": {
-    "docker-compose": [
-      "grafana/grafana"
-    ]
+  "meta": {},
+  "files": {
+    ".github/renovate.json5": {
+      "renovate-config-presets": [
+        "grafana/flint"
+      ]
+    },
+    ".github/workflows/build.yml": {
+      "regex": [
+        "mise"
+      ]
+    },
+    ".github/workflows/e2e_test.yml": {
+      "regex": [
+        "mise"
+      ]
+    },
+    ".github/workflows/integration_test.yml": {
+      "regex": [
+        "mise"
+      ]
+    },
+    ".github/workflows/lint.yml": {
+      "regex": [
+        "mise"
+      ]
+    },
+    "go.mod": {
+      "gomod": [
+        "github.com/cenkalti/backoff/v5",
+        "github.com/cespare/xxhash/v2",
+        "github.com/davecgh/go-spew",
+        "github.com/go-logr/logr",
+        "github.com/go-logr/stdr",
+        "github.com/google/go-cmp",
+        "github.com/google/uuid",
+        "github.com/grpc-ecosystem/grpc-gateway/v2",
+        "github.com/hashicorp/go-version",
+        "github.com/json-iterator/go",
+        "github.com/modern-go/concurrent",
+        "github.com/modern-go/reflect2",
+        "github.com/onsi/gomega",
+        "github.com/pmezard/go-difflib",
+        "github.com/stretchr/testify",
+        "go",
+        "go.opentelemetry.io/auto/sdk",
+        "go.opentelemetry.io/collector/featuregate",
+        "go.opentelemetry.io/collector/pdata",
+        "go.opentelemetry.io/otel",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp",
+        "go.opentelemetry.io/otel/metric",
+        "go.opentelemetry.io/otel/sdk",
+        "go.opentelemetry.io/otel/trace",
+        "go.opentelemetry.io/proto/otlp",
+        "go.uber.org/multierr",
+        "go.yaml.in/yaml/v3",
+        "golang.org/x/net",
+        "golang.org/x/sys",
+        "golang.org/x/text",
+        "google.golang.org/genproto/googleapis/api",
+        "google.golang.org/genproto/googleapis/rpc",
+        "google.golang.org/grpc",
+        "google.golang.org/protobuf",
+        "gopkg.in/yaml.v3"
+      ]
+    },
+    "mise.toml": {
+      "mise": [
+        "actionlint",
+        "aqua:grafana/flint",
+        "aqua:owenlamont/ryl",
+        "biome",
+        "editorconfig-checker",
+        "go",
+        "golangci-lint",
+        "hadolint",
+        "lychee",
+        "node",
+        "npm:renovate",
+        "rumdl",
+        "shellcheck",
+        "shfmt",
+        "taplo",
+        "typos"
+      ]
+    },
+    "yaml/testdata/docker-compose-addition.yaml": {
+      "docker-compose": [
+        "mongo"
+      ]
+    },
+    "yaml/testdata/docker-compose-expected.yaml": {
+      "docker-compose": [
+        "grafana/grafana",
+        "mongo"
+      ]
+    },
+    "yaml/testdata/docker-compose-template.yaml": {
+      "docker-compose": [
+        "grafana/grafana"
+      ]
+    }
   }
 }
