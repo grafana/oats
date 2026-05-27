@@ -44,7 +44,7 @@ mise run check
 
 Linting is handled by [flint](https://github.com/grafana/flint).
 Flint runs shellcheck, shfmt, actionlint, hadolint, rumdl, taplo, ryl,
-biome, codespell, editorconfig, lychee, renovate-deps, and gofmt.
+biome, typos, editorconfig, lychee, renovate-deps, and gofmt.
 EditorConfig rules live in `.editorconfig`.
 
 ## Architecture
