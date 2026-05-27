@@ -1,6 +1,6 @@
 [tools]
 go = "1.26.3"
-node = "24.15.0"
+node = "24.16.0"
 
 # Linters
 actionlint = "1.7.10"
