@@ -1,6 +1,6 @@
 [tools]
-goreleaser = "2.16.0"
 go = "1.26.3"
+goreleaser = "2.16.0"
 node = "24.16.0"
 
 # Linters
