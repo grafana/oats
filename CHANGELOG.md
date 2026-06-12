@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.1](https://github.com/grafana/oats/compare/v0.7.0...v0.7.1) (2026-06-12)
+
+
+### Bug Fixes
+
+* **deps:** update module go.opentelemetry.io/collector/pdata to v1.60.0 ([#333](https://github.com/grafana/oats/issues/333)) ([daf4524](https://github.com/grafana/oats/commit/daf4524d6d9e0d5ce9b67cd7b7298a45e1d65c51))
+* **deps:** update opentelemetry-go monorepo to v1.44.0 ([#323](https://github.com/grafana/oats/issues/323)) ([098e2b2](https://github.com/grafana/oats/commit/098e2b247f0fd953f90637e7b7830c06e60f93d3))
+
 ## [0.7.0](https://github.com/grafana/oats/compare/v0.6.1...v0.7.0) (2026-05-28)
 
 
