@@ -10,10 +10,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/grafana/oats/assert"
+	"github.com/grafana/oats/cache"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/seed"
@@ -81,6 +83,22 @@ type Runner struct {
 	endpoint Endpoint
 	opts     Options
 	seeder   *seed.Sender
+
+	// Optional skip-when-unchanged cache. nil disables caching entirely.
+	cacheStore *cache.Store
+	cacheCtx   CacheContext
+}
+
+// CacheContext describes the per-run inputs that must contribute to the
+// cache key. They are passed in by the caller (typically cmd/v2) rather
+// than discovered by the Runner because they are global to the whole run:
+// the gcx version doesn't change between cases, and a fresh "gcx --version"
+// per case is wasted work.
+type CacheContext struct {
+	GCXVersion   string
+	OatsVersion  string
+	FixtureBytes []byte
+	Extra        map[string]string
 }
 
 // New constructs a Runner. exec is typically a configured engine.GCX;
@@ -96,10 +114,37 @@ func New(exec engine.Executor, rep report.Reporter, ep Endpoint, opts Options) *
 	}
 }
 
+// WithCache enables the skip-when-unchanged cache for this Runner. Cases
+// whose Key has been recorded green within the TTL emit a case.skip event
+// instead of running. Cases that newly pass have their Key recorded;
+// cases that fail have any prior Key entry evicted so a regression is
+// never masked by a stale green record.
+func (r *Runner) WithCache(store *cache.Store, ctx CacheContext) *Runner {
+	r.cacheStore = store
+	r.cacheCtx = ctx
+	return r
+}
+
+func (r *Runner) cacheKey(c *v2case.Case) cache.Key {
+	yamlBytes, _ := os.ReadFile(c.SourcePath) // best-effort; nil on error
+	return cache.Key{
+		CaseYAML:     yamlBytes,
+		FixtureBytes: r.cacheCtx.FixtureBytes,
+		GCXVersion:   r.cacheCtx.GCXVersion,
+		OatsVersion:  r.cacheCtx.OatsVersion,
+		Extra:        r.cacheCtx.Extra,
+	}
+}
+
 // RunCase runs one case. Returns true on pass, false on fail. Events are
 // emitted via the Reporter; errors that prevent the case from running at
 // all (e.g. inline-otlp seed without an OTLP endpoint) are also surfaced
 // as case.fail events with an explanatory msg.
+//
+// When a cache is configured (see WithCache), a hit short-circuits to
+// case.skip and returns true without running the case at all. A miss
+// runs the case as usual; passes are recorded, failures evict any stale
+// entry so a regression is never masked.
 func (r *Runner) RunCase(ctx context.Context, c *v2case.Case) bool {
 	caseStart := time.Now()
 	r.reporter.Emit(report.Event{
@@ -108,6 +153,19 @@ func (r *Runner) RunCase(ctx context.Context, c *v2case.Case) bool {
 		Source: c.SourcePath,
 		Ts:     caseStart,
 	})
+
+	if r.cacheStore != nil {
+		key := r.cacheKey(c)
+		if hit, _ := r.cacheStore.Lookup(key); hit {
+			r.reporter.Emit(report.Event{
+				Type:   report.EventCaseSkip,
+				Case:   c.Name,
+				Source: c.SourcePath,
+				Msg:    "cache hit (last green run within TTL)",
+			})
+			return true
+		}
+	}
 
 	// Seed.
 	if err := r.seedCase(c); err != nil {
@@ -157,8 +215,16 @@ func (r *Runner) RunCase(ctx context.Context, c *v2case.Case) bool {
 	durMs := time.Since(caseStart).Milliseconds()
 	if ok {
 		r.reporter.Emit(report.Event{Type: report.EventCasePass, Case: c.Name, DurationMs: durMs})
+		if r.cacheStore != nil {
+			_ = r.cacheStore.Record(r.cacheKey(c))
+		}
 	} else {
 		r.reporter.Emit(report.Event{Type: report.EventCaseFail, Case: c.Name, DurationMs: durMs})
+		if r.cacheStore != nil {
+			// Evict any prior green record so a flaky regression is not
+			// masked by a stale hit on the next run.
+			_ = r.cacheStore.Evict(r.cacheKey(c))
+		}
 	}
 	return ok
 }
