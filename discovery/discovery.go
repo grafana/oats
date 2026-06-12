@@ -22,10 +22,10 @@ import (
 // directly so a misnamed key surfaces as a "field not defined" error from
 // the toml decoder rather than a silent miss.
 type RootConfig struct {
-	Meta    Meta                      `toml:"meta"`
-	Suites  []SuiteConfig             `toml:"suite"`
-	Fixture map[string]FixtureConfig  `toml:"fixture"`
-	Cache   CacheConfig               `toml:"cache,omitempty"`
+	Meta    Meta                     `toml:"meta"`
+	Suites  []SuiteConfig            `toml:"suite"`
+	Fixture map[string]FixtureConfig `toml:"fixture"`
+	Cache   CacheConfig              `toml:"cache,omitempty"`
 
 	// SourceDir is the directory of the loaded oats.toml. Case glob
 	// expressions resolve relative to it.
