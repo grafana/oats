@@ -22,14 +22,18 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/grafana/oats/cache"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/report"
@@ -53,6 +57,8 @@ func run() int {
 	absentTimeout := flag.Duration("absent-timeout", 10*time.Second, "absence-check window")
 	seedSettle := flag.Duration("seed-settle", 2*time.Second, "post-seed wait before first assertion")
 	gcxContextOverride := flag.String("gcx-context", "", "override the gcx --context value (otherwise derived from fixture endpoint)")
+	noCache := flag.Bool("no-cache", false, "disable the skip-when-unchanged cache for this run")
+	cacheDir := flag.String("cache-dir", defaultCacheDir(), "directory for the skip-when-unchanged cache")
 
 	var verbose int
 	flag.IntVar(&verbose, "v", 0, "verbosity (0-3)")
@@ -116,13 +122,27 @@ func run() int {
 			CaseCount:   len(plan.Cases),
 		})
 
-		exec := &engine.GCX{Binary: *gcxBin, Context: ep.GCXContext}
-		r := runner.New(exec, rep, ep, runner.Options{
+		gcxExec := &engine.GCX{Binary: *gcxBin, Context: ep.GCXContext}
+		r := runner.New(gcxExec, rep, ep, runner.Options{
 			Timeout:         *timeout,
 			Interval:        *interval,
 			AbsentTimeout:   *absentTimeout,
 			SeedSettleDelay: *seedSettle,
 		})
+		if !*noCache && *cacheDir != "" {
+			ttl := time.Duration(cfg.Cache.TTLDays) * 24 * time.Hour
+			store, cacheErr := cache.New(*cacheDir, ttl, nil)
+			if cacheErr != nil {
+				fmt.Fprintln(os.Stderr, "cache disabled:", cacheErr)
+			} else {
+				fixtureBytes, _ := json.Marshal(plan.Fixture) // stable across calls
+				r = r.WithCache(store, runner.CacheContext{
+					GCXVersion:   gcxVersion(*gcxBin),
+					OatsVersion:  "v2-dev",
+					FixtureBytes: fixtureBytes,
+				})
+			}
+		}
 
 		var suitePass, suiteFail int
 		for _, c := range plan.Cases {
@@ -221,6 +241,30 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+// gcxVersion calls "gcx --version" once and returns the first line of
+// output, or "" if gcx is unreachable. The version contributes to the
+// cache key so an upgrade to gcx invalidates all green records.
+func gcxVersion(bin string) string {
+	out, err := exec.Command(bin, "--version").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
+}
+
+// defaultCacheDir returns $XDG_STATE_HOME/oats or ~/.cache/oats. The cache
+// lives under XDG_STATE_HOME on purpose (it is regeneratable state, not
+// configuration). Falls back to a relative path if HOME is unset.
+func defaultCacheDir() string {
+	if s := os.Getenv("XDG_STATE_HOME"); s != "" {
+		return filepath.Join(s, "oats")
+	}
+	if h, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(h, ".cache", "oats")
+	}
+	return ".oats-cache"
 }
 
 func signalAwareContext() (context.Context, context.CancelFunc) {
