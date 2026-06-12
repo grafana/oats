@@ -25,15 +25,15 @@ func (r *TextReporter) write(format string, args ...any) {
 // the same failure events that drive the human-readable blocks — no
 // duplicate accounting, no separate sink.
 type TextReporter struct {
-	w           io.Writer
-	v           Verbosity
-	ghaEnabled  bool
-	runStart    time.Time
-	pass        int
-	fail        int
-	skip        int
-	failBlocks  []string // buffered "FAIL ..." blocks, flushed at run.end
-	knownErrAt  map[string]struct{}
+	w          io.Writer
+	v          Verbosity
+	ghaEnabled bool
+	runStart   time.Time
+	pass       int
+	fail       int
+	skip       int
+	failBlocks []string // buffered "FAIL ..." blocks, flushed at run.end
+	knownErrAt map[string]struct{}
 }
 
 func NewTextReporter(w io.Writer, v Verbosity) *TextReporter {
