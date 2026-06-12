@@ -97,23 +97,23 @@ type AssertionCommon struct {
 }
 
 type TraceAssertion struct {
-	TraceQL string `yaml:"traceql"`
+	TraceQL         string `yaml:"traceql"`
 	AssertionCommon `yaml:",inline"`
 }
 
 type MetricAssertion struct {
-	PromQL string `yaml:"promql"`
-	Value  string `yaml:"value,omitempty"` // ">= 0", "== 42", ...
+	PromQL          string `yaml:"promql"`
+	Value           string `yaml:"value,omitempty"` // ">= 0", "== 42", ...
 	AssertionCommon `yaml:",inline"`
 }
 
 type LogAssertion struct {
-	LogQL string `yaml:"logql"`
+	LogQL           string `yaml:"logql"`
 	AssertionCommon `yaml:",inline"`
 }
 
 type ProfileAssertion struct {
-	Query string `yaml:"query"`
+	Query           string `yaml:"query"`
 	AssertionCommon `yaml:",inline"`
 }
 
