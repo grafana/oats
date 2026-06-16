@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
+	"github.com/grafana/oats/testhelpers/remote"
 )
 
 func TestResolveComposeFiles(t *testing.T) {
@@ -67,6 +69,112 @@ func TestResolveEndpoint_K3DUsesFixtureAppPort(t *testing.T) {
 	}
 	if ep.GCXContext != "cluster" || ep.AppPort != 18080 {
 		t.Fatalf("unexpected endpoint: %+v", ep)
+	}
+}
+
+func TestStartFixture_ComposeLifecycle(t *testing.T) {
+	oldFactory := newComposeSuite
+	defer func() { newComposeSuite = oldFactory }()
+
+	var gotFiles, gotEnv []string
+	fake := &fakeSuiteFixture{}
+	newComposeSuite = func(files []string, env []string) (suiteFixture, error) {
+		gotFiles = append([]string(nil), files...)
+		gotEnv = append([]string(nil), env...)
+		return fake, nil
+	}
+
+	fix, err := startFixture(context.Background(), "/tmp/work", discovery.Plan{
+		Suite: discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Fixture: discovery.FixtureConfig{
+			Type:         "compose",
+			ComposeFiles: []string{"a.yml", "b.yml"},
+			Env:          []string{"FOO=bar"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("startFixture compose: %v", err)
+	}
+	if fake.upCalls != 1 {
+		t.Fatalf("expected Up once, got %d", fake.upCalls)
+	}
+	if want := []string{"/tmp/work/a.yml", "/tmp/work/b.yml"}; !equalStrings(gotFiles, want) {
+		t.Fatalf("compose files: got %v want %v", gotFiles, want)
+	}
+	if want := []string{"FOO=bar"}; !equalStrings(gotEnv, want) {
+		t.Fatalf("compose env: got %v want %v", gotEnv, want)
+	}
+	if err := fix.Close(); err != nil {
+		t.Fatalf("fixture close: %v", err)
+	}
+	if fake.closeCalls != 1 {
+		t.Fatalf("expected Close once, got %d", fake.closeCalls)
+	}
+}
+
+func TestStartFixture_ComposeStartFailure(t *testing.T) {
+	oldFactory := newComposeSuite
+	defer func() { newComposeSuite = oldFactory }()
+
+	newComposeSuite = func(files []string, env []string) (suiteFixture, error) {
+		return &fakeSuiteFixture{upErr: fmt.Errorf("boom")}, nil
+	}
+
+	_, err := startFixture(context.Background(), "/tmp/work", discovery.Plan{
+		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Fixture: discovery.FixtureConfig{Type: "compose", ComposeFile: "compose.yml"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("expected compose startup error, got %v", err)
+	}
+}
+
+func TestStartFixture_K3DLifecycle(t *testing.T) {
+	oldFactory := newKubernetesEndpoint
+	defer func() { newKubernetesEndpoint = oldFactory }()
+
+	var capturedSource string
+	var capturedPlan discovery.Plan
+	var starts, stops int
+	newKubernetesEndpoint = func(sourceDir string, plan discovery.Plan) *remote.Endpoint {
+		capturedSource = sourceDir
+		capturedPlan = plan
+		return remote.NewEndpoint("localhost", remote.PortsConfig{}, func(ctx context.Context) error {
+			starts++
+			return nil
+		}, func(ctx context.Context) error {
+			stops++
+			return nil
+		}, nil)
+	}
+
+	fix, err := startFixture(context.Background(), "/tmp/work", discovery.Plan{
+		Suite: discovery.SuiteConfig{Name: "cluster-smoke", Fixture: "cluster"},
+		Fixture: discovery.FixtureConfig{
+			Type:             "k3d",
+			K8sDir:           "k8s",
+			AppService:       "dice",
+			AppDockerFile:    "Dockerfile",
+			AppDockerContext: ".",
+			AppDockerTag:     "dice:test",
+			AppPort:          18080,
+			ImportImages:     []string{"busybox:latest"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("startFixture k3d: %v", err)
+	}
+	if starts != 1 {
+		t.Fatalf("expected one endpoint start, got %d", starts)
+	}
+	if capturedSource != "/tmp/work" || capturedPlan.Suite.Name != "cluster-smoke" || capturedPlan.Fixture.AppPort != 18080 {
+		t.Fatalf("unexpected endpoint factory args: source=%q plan=%+v", capturedSource, capturedPlan)
+	}
+	if err := fix.Close(); err != nil {
+		t.Fatalf("fixture close: %v", err)
+	}
+	if stops != 1 {
+		t.Fatalf("expected one endpoint stop, got %d", stops)
 	}
 }
 
@@ -208,4 +316,33 @@ func rewrite(t *testing.T, path, old, new string) {
 	if err := os.WriteFile(path, bytes.ReplaceAll(data, []byte(old), []byte(new)), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+type fakeSuiteFixture struct {
+	upCalls    int
+	closeCalls int
+	upErr      error
+	closeErr   error
+}
+
+func (f *fakeSuiteFixture) Up() error {
+	f.upCalls++
+	return f.upErr
+}
+
+func (f *fakeSuiteFixture) Close() error {
+	f.closeCalls++
+	return f.closeErr
+}
+
+func equalStrings(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }

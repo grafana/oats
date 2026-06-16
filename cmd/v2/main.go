@@ -44,6 +44,29 @@ import (
 	"github.com/grafana/oats/testhelpers/remote"
 )
 
+var (
+	newComposeSuite = func(files []string, env []string) (suiteFixture, error) {
+		return compose.SuiteFiles(files, env)
+	}
+	newKubernetesEndpoint = func(sourceDir string, plan discovery.Plan) *remote.Endpoint {
+		model := &kubernetes.Kubernetes{
+			Dir:              filepath.Join(sourceDir, plan.Fixture.K8sDir),
+			AppService:       plan.Fixture.AppService,
+			AppDockerFile:    plan.Fixture.AppDockerFile,
+			AppDockerContext: plan.Fixture.AppDockerContext,
+			AppDockerTag:     plan.Fixture.AppDockerTag,
+			AppDockerPort:    plan.Fixture.AppPort,
+			ImportImages:     plan.Fixture.ImportImages,
+		}
+		return kubernetes.NewEndpoint("localhost", model, remote.PortsConfig{
+			PrometheusHTTPPort: 9090,
+			LokiHttpPort:       3100,
+			TempoHTTPPort:      3200,
+			PyroscopeHttpPort:  4040,
+		}, plan.Suite.Name, sourceDir)
+	}
+)
+
 func main() {
 	code := run()
 	os.Exit(code)
@@ -273,6 +296,11 @@ type suiteFixture interface {
 	Close() error
 }
 
+type startableSuiteFixture interface {
+	suiteFixture
+	Up() error
+}
+
 func startFixture(_ context.Context, sourceDir string, plan discovery.Plan) (suiteFixture, error) {
 	switch plan.Fixture.Type {
 	case "", "remote":
@@ -282,30 +310,16 @@ func startFixture(_ context.Context, sourceDir string, plan discovery.Plan) (sui
 		if err != nil {
 			return nil, err
 		}
-		suite, err := compose.SuiteFiles(composeFiles, plan.Fixture.Env)
+		suite, err := newComposeSuite(composeFiles, plan.Fixture.Env)
 		if err != nil {
 			return nil, err
 		}
-		if err := suite.Up(); err != nil {
+		if err := startSuiteFixture(suite); err != nil {
 			return nil, err
 		}
 		return suite, nil
 	case "k3d":
-		model := &kubernetes.Kubernetes{
-			Dir:              filepath.Join(sourceDir, plan.Fixture.K8sDir),
-			AppService:       plan.Fixture.AppService,
-			AppDockerFile:    plan.Fixture.AppDockerFile,
-			AppDockerContext: plan.Fixture.AppDockerContext,
-			AppDockerTag:     plan.Fixture.AppDockerTag,
-			AppDockerPort:    plan.Fixture.AppPort,
-			ImportImages:     plan.Fixture.ImportImages,
-		}
-		ep := kubernetes.NewEndpoint("localhost", model, remote.PortsConfig{
-			PrometheusHTTPPort: 9090,
-			LokiHttpPort:       3100,
-			TempoHTTPPort:      3200,
-			PyroscopeHttpPort:  4040,
-		}, plan.Suite.Name, sourceDir)
+		ep := newKubernetesEndpoint(sourceDir, plan)
 		if err := ep.Start(context.Background()); err != nil {
 			return nil, err
 		}
@@ -332,6 +346,14 @@ func resolveComposeFiles(sourceDir string, fixture discovery.FixtureConfig) ([]s
 		return nil, fmt.Errorf("unsupported compose fixture template %q", fixture.Template)
 	}
 	return files, nil
+}
+
+func startSuiteFixture(fix suiteFixture) error {
+	startable, ok := fix.(startableSuiteFixture)
+	if !ok {
+		return fmt.Errorf("fixture does not support startup")
+	}
+	return startable.Up()
 }
 
 type endpointFixture struct {
