@@ -44,13 +44,20 @@ type SuiteConfig struct {
 }
 
 type FixtureConfig struct {
-	Type         string   `toml:"type"` // "compose" | "k3d" | "remote"
-	Template     string   `toml:"template,omitempty"`
-	ComposeFile  string   `toml:"compose_file,omitempty"`
-	ComposeFiles []string `toml:"compose_files,omitempty"`
-	Env          []string `toml:"env,omitempty"`
-	PoolSize     int      `toml:"pool_size,omitempty"`
-	Endpoint     string   `toml:"endpoint,omitempty"` // remote only
+	Type             string   `toml:"type"` // "compose" | "k3d" | "remote"
+	Template         string   `toml:"template,omitempty"`
+	ComposeFile      string   `toml:"compose_file,omitempty"`
+	ComposeFiles     []string `toml:"compose_files,omitempty"`
+	Env              []string `toml:"env,omitempty"`
+	K8sDir           string   `toml:"k8s_dir,omitempty"`
+	AppService       string   `toml:"app_service,omitempty"`
+	AppDockerFile    string   `toml:"app_docker_file,omitempty"`
+	AppDockerContext string   `toml:"app_docker_context,omitempty"`
+	AppDockerTag     string   `toml:"app_docker_tag,omitempty"`
+	AppPort          int      `toml:"app_port,omitempty"`
+	ImportImages     []string `toml:"import_images,omitempty"`
+	PoolSize         int      `toml:"pool_size,omitempty"`
+	Endpoint         string   `toml:"endpoint,omitempty"` // remote only
 }
 
 type CacheConfig struct {
@@ -113,6 +120,9 @@ func (c *RootConfig) Validate() error {
 				return fmt.Errorf("fixture %q: use compose_file or compose_files, not both", name)
 			}
 		case "k3d":
+			if f.K8sDir == "" || f.AppService == "" || f.AppDockerFile == "" || f.AppDockerTag == "" || f.AppPort == 0 {
+				return fmt.Errorf("fixture %q: type=k3d requires k8s_dir, app_service, app_docker_file, app_docker_tag, and app_port", name)
+			}
 			// PoolSize=0 means "single ephemeral cluster" — valid.
 		case "remote":
 			if f.Endpoint == "" {

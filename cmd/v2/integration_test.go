@@ -57,6 +57,19 @@ func TestResolveEndpoint_ComposeDefaults(t *testing.T) {
 	}
 }
 
+func TestResolveEndpoint_K3DUsesFixtureAppPort(t *testing.T) {
+	ep, err := resolveEndpoint("/tmp/work", discovery.Plan{
+		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "cluster"},
+		Fixture: discovery.FixtureConfig{Type: "k3d", AppPort: 18080},
+	}, "", "localhost", 8080, "http://localhost:4318")
+	if err != nil {
+		t.Fatalf("resolveEndpoint: %v", err)
+	}
+	if ep.GCXContext != "cluster" || ep.AppPort != 18080 {
+		t.Fatalf("unexpected endpoint: %+v", ep)
+	}
+}
+
 // TestIntegration_FullPipelineWithFakeGCX wires the v2 chain end-to-end:
 // discovery → seed (against an httptest OTLP stub) → engine (against the
 // fake-gcx.sh shell script) → assertions → report. No real gcx, no real

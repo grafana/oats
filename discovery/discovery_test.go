@@ -206,6 +206,21 @@ func TestValidate_ComposeFilesConflict(t *testing.T) {
 	}
 }
 
+func TestValidate_K3DRequiresFields(t *testing.T) {
+	cfg := &RootConfig{
+		Meta: Meta{Version: 2},
+		Suites: []SuiteConfig{{
+			Name: "s", Cases: []string{"a.yaml"}, Fixture: "k",
+		}},
+		Fixture: map[string]FixtureConfig{"k": {
+			Type: "k3d",
+		}},
+	}
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "type=k3d requires") {
+		t.Errorf("expected k3d field error, got %v", err)
+	}
+}
+
 func TestPlanRun_EmptyGlobIsAnError(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats.toml", `

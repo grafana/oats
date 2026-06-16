@@ -40,6 +40,8 @@ import (
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
 	"github.com/grafana/oats/testhelpers/compose"
+	"github.com/grafana/oats/testhelpers/kubernetes"
+	"github.com/grafana/oats/testhelpers/remote"
 )
 
 func main() {
@@ -248,6 +250,11 @@ func resolveEndpoint(sourceDir string, plan discovery.Plan, gcxContextOverride, 
 		ep.OTLPHTTP = plan.Fixture.Endpoint
 	case "compose":
 		ep.GCXContext = plan.Suite.Fixture
+	case "k3d":
+		ep.GCXContext = plan.Suite.Fixture
+		if plan.Fixture.AppPort > 0 {
+			ep.AppPort = plan.Fixture.AppPort
+		}
 	case "":
 		// No fixture configured — caller (or --gcx-context) must supply
 		// everything. Useful while plumbing v2 against an external setup.
@@ -284,6 +291,26 @@ func startFixture(_ context.Context, sourceDir string, plan discovery.Plan) (sui
 			return nil, err
 		}
 		return suite, nil
+	case "k3d":
+		model := &kubernetes.Kubernetes{
+			Dir:              filepath.Join(sourceDir, plan.Fixture.K8sDir),
+			AppService:       plan.Fixture.AppService,
+			AppDockerFile:    plan.Fixture.AppDockerFile,
+			AppDockerContext: plan.Fixture.AppDockerContext,
+			AppDockerTag:     plan.Fixture.AppDockerTag,
+			AppDockerPort:    plan.Fixture.AppPort,
+			ImportImages:     plan.Fixture.ImportImages,
+		}
+		ep := kubernetes.NewEndpoint("localhost", model, remote.PortsConfig{
+			PrometheusHTTPPort: 9090,
+			LokiHttpPort:       3100,
+			TempoHTTPPort:      3200,
+			PyroscopeHttpPort:  4040,
+		}, plan.Suite.Name, sourceDir)
+		if err := ep.Start(context.Background()); err != nil {
+			return nil, err
+		}
+		return endpointFixture{ep: ep}, nil
 	default:
 		return nil, fmt.Errorf("fixture type %q is not yet supported in oats-v2 (k3d arrives in follow-up commits)", plan.Fixture.Type)
 	}
@@ -306,6 +333,14 @@ func resolveComposeFiles(sourceDir string, fixture discovery.FixtureConfig) ([]s
 		return nil, fmt.Errorf("unsupported compose fixture template %q", fixture.Template)
 	}
 	return files, nil
+}
+
+type endpointFixture struct {
+	ep *remote.Endpoint
+}
+
+func (e endpointFixture) Close() error {
+	return e.ep.Stop(context.Background())
 }
 
 func splitCSV(s string) []string {
