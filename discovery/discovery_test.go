@@ -187,6 +187,25 @@ func TestValidate_RemoteRequiresEndpoint(t *testing.T) {
 	}
 }
 
+func TestValidate_ComposeFilesConflict(t *testing.T) {
+	cfg := &RootConfig{
+		Meta: Meta{Version: 2},
+		Suites: []SuiteConfig{{
+			Name: "s", Cases: []string{"a.yaml"}, Fixture: "c",
+		}},
+		Fixture: map[string]FixtureConfig{"c": {
+			Type:        "compose",
+			ComposeFile: "one.yml",
+			ComposeFiles: []string{
+				"two.yml",
+			},
+		}},
+	}
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "compose_file or compose_files") {
+		t.Errorf("expected compose conflict error, got %v", err)
+	}
+}
+
 func TestPlanRun_EmptyGlobIsAnError(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats.toml", `

@@ -18,20 +18,28 @@ import (
 	"github.com/grafana/oats/runner"
 )
 
-func TestResolveComposeFile(t *testing.T) {
-	got, err := resolveComposeFile("/tmp/work", discovery.FixtureConfig{Type: "compose", ComposeFile: "stack/compose.yml"})
+func TestResolveComposeFiles(t *testing.T) {
+	got, err := resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", ComposeFile: "stack/compose.yml"})
 	if err != nil {
-		t.Fatalf("resolveComposeFile compose_file: %v", err)
+		t.Fatalf("resolveComposeFiles compose_file: %v", err)
 	}
-	if want := "/tmp/work/stack/compose.yml"; got != want {
+	if want := []string{"/tmp/work/stack/compose.yml"}; len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("got %q want %q", got, want)
 	}
 
-	got, err = resolveComposeFile("/tmp/work", discovery.FixtureConfig{Type: "compose", Template: "lgtm"})
+	got, err = resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", ComposeFiles: []string{"a.yml", "b.yml"}})
 	if err != nil {
-		t.Fatalf("resolveComposeFile template=lgtm: %v", err)
+		t.Fatalf("resolveComposeFiles compose_files: %v", err)
 	}
-	if want := "/tmp/work/docker-compose.yml"; got != want {
+	if len(got) != 2 || got[0] != "/tmp/work/a.yml" || got[1] != "/tmp/work/b.yml" {
+		t.Fatalf("unexpected compose_files resolution: %v", got)
+	}
+
+	got, err = resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", Template: "lgtm"})
+	if err != nil {
+		t.Fatalf("resolveComposeFiles template=lgtm: %v", err)
+	}
+	if want := []string{"/tmp/work/docker-compose.yml"}; len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("got %q want %q", got, want)
 	}
 }

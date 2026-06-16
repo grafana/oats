@@ -44,11 +44,13 @@ type SuiteConfig struct {
 }
 
 type FixtureConfig struct {
-	Type        string `toml:"type"` // "compose" | "k3d" | "remote"
-	Template    string `toml:"template,omitempty"`
-	ComposeFile string `toml:"compose_file,omitempty"`
-	PoolSize    int    `toml:"pool_size,omitempty"`
-	Endpoint    string `toml:"endpoint,omitempty"` // remote only
+	Type         string   `toml:"type"` // "compose" | "k3d" | "remote"
+	Template     string   `toml:"template,omitempty"`
+	ComposeFile  string   `toml:"compose_file,omitempty"`
+	ComposeFiles []string `toml:"compose_files,omitempty"`
+	Env          []string `toml:"env,omitempty"`
+	PoolSize     int      `toml:"pool_size,omitempty"`
+	Endpoint     string   `toml:"endpoint,omitempty"` // remote only
 }
 
 type CacheConfig struct {
@@ -104,8 +106,11 @@ func (c *RootConfig) Validate() error {
 	for name, f := range c.Fixture {
 		switch f.Type {
 		case "compose":
-			if f.Template == "" && f.ComposeFile == "" {
-				return fmt.Errorf("fixture %q: type=compose requires template or compose_file", name)
+			if f.Template == "" && f.ComposeFile == "" && len(f.ComposeFiles) == 0 {
+				return fmt.Errorf("fixture %q: type=compose requires template, compose_file, or compose_files", name)
+			}
+			if f.ComposeFile != "" && len(f.ComposeFiles) > 0 {
+				return fmt.Errorf("fixture %q: use compose_file or compose_files, not both", name)
 			}
 		case "k3d":
 			// PoolSize=0 means "single ephemeral cluster" — valid.

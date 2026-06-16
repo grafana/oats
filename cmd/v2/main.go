@@ -272,11 +272,11 @@ func startFixture(_ context.Context, sourceDir string, plan discovery.Plan) (sui
 	case "", "remote":
 		return nil, nil
 	case "compose":
-		composeFile, err := resolveComposeFile(sourceDir, plan.Fixture)
+		composeFiles, err := resolveComposeFiles(sourceDir, plan.Fixture)
 		if err != nil {
 			return nil, err
 		}
-		suite, err := compose.Suite(composeFile)
+		suite, err := compose.SuiteFiles(composeFiles, plan.Fixture.Env)
 		if err != nil {
 			return nil, err
 		}
@@ -289,18 +289,23 @@ func startFixture(_ context.Context, sourceDir string, plan discovery.Plan) (sui
 	}
 }
 
-func resolveComposeFile(sourceDir string, fixture discovery.FixtureConfig) (string, error) {
-	if fixture.ComposeFile != "" {
-		return filepath.Join(sourceDir, fixture.ComposeFile), nil
-	}
-	switch fixture.Template {
-	case "lgtm":
-		return filepath.Join(sourceDir, "docker-compose.yml"), nil
-	case "":
-		return "", fmt.Errorf("compose fixture requires compose_file or supported template")
+func resolveComposeFiles(sourceDir string, fixture discovery.FixtureConfig) ([]string, error) {
+	var files []string
+	switch {
+	case fixture.ComposeFile != "":
+		files = append(files, filepath.Join(sourceDir, fixture.ComposeFile))
+	case len(fixture.ComposeFiles) > 0:
+		for _, file := range fixture.ComposeFiles {
+			files = append(files, filepath.Join(sourceDir, file))
+		}
+	case fixture.Template == "lgtm":
+		files = append(files, filepath.Join(sourceDir, "docker-compose.yml"))
+	case fixture.Template == "":
+		return nil, fmt.Errorf("compose fixture requires compose_file, compose_files, or supported template")
 	default:
-		return "", fmt.Errorf("unsupported compose fixture template %q", fixture.Template)
+		return nil, fmt.Errorf("unsupported compose fixture template %q", fixture.Template)
 	}
+	return files, nil
 }
 
 func splitCSV(s string) []string {

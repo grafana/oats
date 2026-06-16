@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path"
 	"strings"
 	"sync"
 
@@ -20,7 +19,7 @@ import (
 type Compose struct {
 	Command     string
 	DefaultArgs []string
-	Path        string
+	Paths       []string
 	Env         []string
 }
 
@@ -29,14 +28,26 @@ func defaultEnv() []string {
 }
 
 func Suite(composeFile string) (*Compose, error) {
+	return SuiteFiles([]string{composeFile}, nil)
+}
+
+func SuiteFiles(composeFiles []string, env []string) (*Compose, error) {
 	command := "docker"
 	defaultArgs := []string{"compose"}
+	for _, file := range composeFiles {
+		defaultArgs = append(defaultArgs, "-f", file)
+	}
 
+	if len(composeFiles) == 0 {
+		return nil, fmt.Errorf("at least one compose file is required")
+	}
+	mergedEnv := defaultEnv()
+	mergedEnv = append(mergedEnv, env...)
 	return &Compose{
 		Command:     command,
 		DefaultArgs: defaultArgs,
-		Path:        path.Join(composeFile),
-		Env:         defaultEnv(),
+		Paths:       composeFiles,
+		Env:         mergedEnv,
 	}, nil
 }
 
@@ -70,7 +81,6 @@ func (c *Compose) runDocker(cc command) error {
 	var cmdArgs []string
 	if cc.compose {
 		cmdArgs = c.DefaultArgs
-		cmdArgs = append(cmdArgs, "-f", c.Path)
 	}
 	cmdArgs = append(cmdArgs, cc.args...)
 	cmd := exec.Command(c.Command, cmdArgs...)
@@ -88,7 +98,7 @@ func (c *Compose) runDocker(cc command) error {
 		}
 		wg.Wait()
 	} else if cc.background {
-		slog.Info("Running", "command", cmd.String(), "dir", c.Path)
+		slog.Info("Running", "command", cmd.String(), "dir", strings.Join(c.Paths, ","))
 		stdout, _ := cmd.StdoutPipe()
 		cmd.Stderr = cmd.Stdout
 		go func() {
@@ -105,7 +115,7 @@ func (c *Compose) runDocker(cc command) error {
 			return fmt.Errorf("failed to start docker command: %w", err)
 		}
 	} else {
-		slog.Info("Running", "command", cmd.String(), "dir", c.Path)
+		slog.Info("Running", "command", cmd.String(), "dir", strings.Join(c.Paths, ","))
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		err := cmd.Run()
