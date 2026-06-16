@@ -1,12 +1,15 @@
 package migrate
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/grafana/oats/model"
 	"github.com/grafana/oats/testhelpers/kubernetes"
+	"github.com/grafana/oats/v2case"
 )
 
 func TestConvertDefinition_MapsSignalsToMatchSchema(t *testing.T) {
@@ -90,6 +93,71 @@ func TestConvertFile_RendersYAML(t *testing.T) {
 		if !strings.Contains(text, want) {
 			fatalf(t, "expected migrated yaml to contain %q:\n%s", want, text)
 		}
+	}
+}
+
+func TestConvertFile_MatrixSampleIsParseable(t *testing.T) {
+	out, warnings, err := ConvertFile("/home/gregor/source/oats-v2/yaml/testdata/valid-tests/matrix-test.oats.yaml")
+	if err != nil {
+		fatalf(t, "ConvertFile matrix sample: %v", err)
+	}
+	joined := strings.Join(warnings, "\n")
+	for _, want := range []string{
+		`matrix definitions are not migrated automatically when multiple entries exist`,
+		`suggested matrix expansion for "matrix test.oats"`,
+		`[fixture.matrix-test-oats-docker]`,
+		`[fixture.matrix-test-oats-k8s]`,
+	} {
+		if !strings.Contains(joined, want) {
+			fatalf(t, "expected matrix warning to contain %q:\n%s", want, joined)
+		}
+	}
+	c, err := v2case.Parse(out)
+	if err != nil {
+		fatalf(t, "migrated matrix yaml should parse as v2: %v\n%s", err, string(out))
+	}
+	if c.Seed.Type != "inline-otlp" {
+		fatalf(t, "expected multi-matrix sample to fall back to inline-otlp placeholder, got %+v", c.Seed)
+	}
+	if len(c.Input) == 0 || len(c.Expected.Traces) == 0 || len(c.Expected.Metrics) == 0 {
+		fatalf(t, "expected included template fields to survive migration, got %+v", c)
+	}
+}
+
+func TestConvertFile_CustomChecksRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	legacy := filepath.Join(dir, "custom.oats.yaml")
+	if err := os.WriteFile(legacy, []byte(`
+oats-schema-version: 2
+docker-compose:
+  files:
+    - docker-compose.yml
+expected:
+  custom-checks:
+    - script: ./verify.sh
+    - script: |
+        #!/bin/sh
+        exit 0
+`), 0o644); err != nil {
+		fatalf(t, "WriteFile: %v", err)
+	}
+
+	out, warnings, err := ConvertFile(legacy)
+	if err != nil {
+		fatalf(t, "ConvertFile custom checks: %v", err)
+	}
+	if len(warnings) != 0 {
+		fatalf(t, "expected no warnings for straightforward custom checks, got %v", warnings)
+	}
+	c, err := v2case.Parse(out)
+	if err != nil {
+		fatalf(t, "migrated custom-check yaml should parse as v2: %v\n%s", err, string(out))
+	}
+	if got := len(c.Expected.Custom); got != 2 {
+		fatalf(t, "expected 2 migrated custom checks, got %+v", c.Expected.Custom)
+	}
+	if c.Expected.Custom[0].Script != "./verify.sh" || !strings.Contains(c.Expected.Custom[1].Script, "exit 0") {
+		fatalf(t, "unexpected custom check migration: %+v", c.Expected.Custom)
 	}
 }
 
