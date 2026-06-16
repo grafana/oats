@@ -15,6 +15,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/grafana/oats/v2case"
 )
 
 // Failure carries enough context to render a compact "FAIL <case>  <source>"
@@ -26,6 +28,15 @@ type Failure struct {
 }
 
 func (f Failure) Error() string { return f.Rule + ": " + f.Detail }
+
+// Row is the normalized structural unit used by collector-style `match`
+// assertions. Depending on the signal type, Name is the primary field
+// (`name` for traces, log body for logs, metric name for metrics) and
+// Attributes carries labels/attributes associated with that row.
+type Row struct {
+	Name       string
+	Attributes map[string]string
+}
 
 // Contains checks that each substring appears at least once in stdout.
 func Contains(stdout string, substrings []string) []Failure {
@@ -117,6 +128,91 @@ func Absent(actual int) []Failure {
 		}}
 	}
 	return nil
+}
+
+// MatchRows checks that each collector-style match entry is satisfied by at
+// least one row. Each entry is independent: one entry may match one row and
+// the next entry a different row.
+func MatchRows(rows []Row, entries []v2case.MatchEntry) []Failure {
+	var fails []Failure
+	for _, entry := range entries {
+		if !anyRowMatches(rows, entry) {
+			fails = append(fails, Failure{
+				Rule:   "match",
+				Detail: fmt.Sprintf("no row matched %s", describeMatch(entry)),
+			})
+		}
+	}
+	return fails
+}
+
+func anyRowMatches(rows []Row, entry v2case.MatchEntry) bool {
+	for _, row := range rows {
+		if rowMatches(row, entry) {
+			return true
+		}
+	}
+	return false
+}
+
+func rowMatches(row Row, entry v2case.MatchEntry) bool {
+	matchType := entry.EffectiveMatchType()
+	if entry.Name != nil {
+		if !matchesValue(row.Name, *entry.Name, matchType) {
+			return false
+		}
+	}
+	for key, expected := range entry.Attributes {
+		actual, ok := row.Attributes[key]
+		if expected.Present != nil {
+			if !ok {
+				return false
+			}
+			continue
+		}
+		if !ok || expected.Value == nil {
+			return false
+		}
+		if !matchesValue(actual, *expected.Value, matchType) {
+			return false
+		}
+	}
+	return true
+}
+
+func matchesValue(actual, expected string, matchType v2case.MatchType) bool {
+	switch matchType {
+	case v2case.MatchTypeRegexp:
+		re, err := regexp.Compile(expected)
+		if err != nil {
+			return false
+		}
+		return re.MatchString(actual)
+	default:
+		return actual == expected
+	}
+}
+
+func describeMatch(entry v2case.MatchEntry) string {
+	var parts []string
+	if entry.MatchType != "" {
+		parts = append(parts, fmt.Sprintf("match_type=%s", entry.MatchType))
+	}
+	if entry.Name != nil {
+		parts = append(parts, fmt.Sprintf("name=%q", *entry.Name))
+	}
+	for key, expected := range entry.Attributes {
+		switch {
+		case expected.Present != nil:
+			parts = append(parts, fmt.Sprintf("attribute %s present", key))
+		case expected.Value != nil:
+			parts = append(parts, fmt.Sprintf("attribute %s=%q", key, *expected.Value))
+		}
+	}
+	if len(parts) == 0 {
+		return "empty match entry"
+	}
+	return strings.Join(parts, ", ")
 }
 
 func retag(fails []Failure, rule string) []Failure {

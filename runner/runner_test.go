@@ -161,6 +161,66 @@ func TestRunCase_MetricsValueFail(t *testing.T) {
 	}
 }
 
+func TestRunCase_LogsStructuredMatchPass(t *testing.T) {
+	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"streams","result":[{"stream":{"service_name":"svc","trace_id":"abc123"},"values":[["1700000000","seed-log-line"]]}]}}`}
+	r, buf := newRunner(t, exec, Options{Timeout: 100 * time.Millisecond, Interval: 5 * time.Millisecond, SeedSettleDelay: 1})
+
+	c := mustParse(t, `
+oats: 2
+name: logs structured match
+seed:
+  type: app
+  compose: x.yml
+expected:
+  logs:
+    - logql: '{service_name="svc"}'
+      match:
+        - name: seed-log-line
+          attributes:
+            service_name: svc
+            trace_id:
+              present: true
+`)
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+
+	if !ok {
+		t.Fatalf("expected structured log match to pass:\n%s", buf.String())
+	}
+	if !containsSequence(exec.captured[0], "-o", "json") {
+		t.Fatalf("expected logs query to request json: %v", exec.captured[0])
+	}
+}
+
+func TestRunCase_MetricsStructuredMatchPass(t *testing.T) {
+	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"up","job":"svc"},"value":[1700000000,"1"]}]}}`}
+	r, _ := newRunner(t, exec, Options{Timeout: 100 * time.Millisecond, Interval: 5 * time.Millisecond, SeedSettleDelay: 1})
+
+	c := mustParse(t, `
+oats: 2
+name: metrics structured match
+seed:
+  type: app
+  compose: x.yml
+expected:
+  metrics:
+    - promql: 'up{job="svc"}'
+      match:
+        - attributes:
+            job: svc
+`)
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+
+	if !ok {
+		t.Fatalf("expected structured metric match to pass")
+	}
+}
+
 func TestRunCase_InlineOTLPSeedRequiresEndpoint(t *testing.T) {
 	c := mustParse(t, `
 oats: 2
@@ -210,4 +270,20 @@ func TestApproxRowCount(t *testing.T) {
 			t.Errorf("approxRowCount(%q): got %d, want %d", tc.in, got, tc.want)
 		}
 	}
+}
+
+func containsSequence(haystack []string, needles ...string) bool {
+	for i := 0; i+len(needles) <= len(haystack); i++ {
+		match := true
+		for j, needle := range needles {
+			if haystack[i+j] != needle {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
 }

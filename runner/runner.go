@@ -329,23 +329,34 @@ func (r *Runner) pollAssert(
 func (r *Runner) runTrace(ctx context.Context, c *v2case.Case, a *v2case.TraceAssertion) bool {
 	args := signalcmd.Traces(*a, r.opts.Timeout)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
-		return evalCommon(stdout, a.AssertionCommon)
+		if len(a.Match) == 0 {
+			return evalCommonText(stdout, a.AssertionCommon)
+		}
+		rows, count, err := extractTraceRows(stdout)
+		return evalCommonStructured(stdout, a.AssertionCommon, rows, count, err)
 	})
 }
 
 func (r *Runner) runLog(ctx context.Context, c *v2case.Case, a *v2case.LogAssertion) bool {
 	args := signalcmd.Logs(*a, r.opts.Timeout)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
-		return evalCommon(stdout, a.AssertionCommon)
+		if len(a.Match) == 0 {
+			return evalCommonText(stdout, a.AssertionCommon)
+		}
+		rows, count, err := extractLogRows(stdout)
+		return evalCommonStructured(stdout, a.AssertionCommon, rows, count, err)
 	})
 }
 
 func (r *Runner) runMetric(ctx context.Context, c *v2case.Case, a *v2case.MetricAssertion) bool {
 	args := signalcmd.Metrics(*a, r.opts.Timeout)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
-		fails := evalCommon(stdout, a.AssertionCommon)
+		if a.Value == "" && len(a.Match) == 0 {
+			return evalCommonText(stdout, a.AssertionCommon)
+		}
+		rows, count, actual, err := extractMetricRows(stdout)
+		fails := evalCommonStructured(stdout, a.AssertionCommon, rows, count, err)
 		if a.Value != "" {
-			actual, err := extractMetricValue(stdout)
 			if err != nil {
 				fails = append(fails, assert.Failure{Rule: "value", Detail: err.Error()})
 			} else {
@@ -359,12 +370,17 @@ func (r *Runner) runMetric(ctx context.Context, c *v2case.Case, a *v2case.Metric
 func (r *Runner) runProfile(ctx context.Context, c *v2case.Case, a *v2case.ProfileAssertion) bool {
 	args := signalcmd.Profiles(*a, r.opts.Timeout)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
-		return evalCommon(stdout, a.AssertionCommon)
+		if len(a.Match) == 0 {
+			return evalCommonText(stdout, a.AssertionCommon)
+		}
+		rows, count, err := extractGenericNamedRows(stdout)
+		return evalCommonStructured(stdout, a.AssertionCommon, rows, count, err)
 	})
 }
 
-// evalCommon runs the assertions that every signal type shares.
-func evalCommon(stdout string, c v2case.AssertionCommon) []assert.Failure {
+// evalCommonText runs the assertions that every signal type shares when gcx
+// output is plain text rather than JSON.
+func evalCommonText(stdout string, c v2case.AssertionCommon) []assert.Failure {
 	var fails []assert.Failure
 	fails = append(fails, assert.Contains(stdout, c.Contains)...)
 	fails = append(fails, assert.NotContains(stdout, c.NotContains)...)
@@ -374,6 +390,27 @@ func evalCommon(stdout string, c v2case.AssertionCommon) []assert.Failure {
 	}
 	if c.Absent {
 		fails = append(fails, assert.Absent(approxRowCount(stdout))...)
+	}
+	return fails
+}
+
+func evalCommonStructured(stdout string, c v2case.AssertionCommon, rows []assert.Row, count int, parseErr error) []assert.Failure {
+	var fails []assert.Failure
+	fails = append(fails, assert.Contains(stdout, c.Contains)...)
+	fails = append(fails, assert.NotContains(stdout, c.NotContains)...)
+	fails = append(fails, assert.Regex(stdout, c.Regex)...)
+	if parseErr != nil {
+		fails = append(fails, assert.Failure{Rule: "match", Detail: parseErr.Error()})
+		return fails
+	}
+	if len(c.Match) > 0 {
+		fails = append(fails, assert.MatchRows(rows, c.Match)...)
+	}
+	if c.Count != "" {
+		fails = append(fails, assert.Count(count, c.Count)...)
+	}
+	if c.Absent {
+		fails = append(fails, assert.Absent(count)...)
 	}
 	return fails
 }
@@ -401,20 +438,29 @@ func approxRowCount(stdout string) int {
 // extractMetricValue parses the first numeric data point out of `gcx metrics
 // query -o json` output. The schema follows gcx's JSON shape; we only look
 // at the fields we need so additions don't break us.
-func extractMetricValue(stdout string) (float64, error) {
+func extractMetricRows(stdout string) ([]assert.Row, int, float64, error) {
 	var generic struct {
 		Data struct {
 			Result []struct {
-				Value  [2]any   `json:"value"`
-				Values [][2]any `json:"values"`
+				Metric map[string]any `json:"metric"`
+				Value  [2]any         `json:"value"`
+				Values [][2]any       `json:"values"`
 			} `json:"result"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &generic); err != nil {
-		return 0, fmt.Errorf("metric value parse: %w", err)
+		return nil, 0, 0, fmt.Errorf("metric JSON parse: %w", err)
 	}
 	if len(generic.Data.Result) == 0 {
-		return 0, fmt.Errorf("metric value parse: empty result")
+		return nil, 0, 0, fmt.Errorf("metric value parse: empty result")
+	}
+	rows := make([]assert.Row, 0, len(generic.Data.Result))
+	for _, item := range generic.Data.Result {
+		attrs := stringifyMap(item.Metric)
+		rows = append(rows, assert.Row{
+			Name:       attrs["__name__"],
+			Attributes: attrs,
+		})
 	}
 	r := generic.Data.Result[0]
 	raw, ok := r.Value[1].(string)
@@ -422,13 +468,13 @@ func extractMetricValue(stdout string) (float64, error) {
 		raw, ok = r.Values[len(r.Values)-1][1].(string)
 	}
 	if !ok {
-		return 0, fmt.Errorf("metric value parse: result point has no scalar value")
+		return rows, len(generic.Data.Result), 0, fmt.Errorf("metric value parse: result point has no scalar value")
 	}
 	var f float64
 	if _, err := fmt.Sscanf(raw, "%f", &f); err != nil {
-		return 0, fmt.Errorf("metric value parse: %q is not a number", raw)
+		return rows, len(generic.Data.Result), 0, fmt.Errorf("metric value parse: %q is not a number", raw)
 	}
-	return f, nil
+	return rows, len(generic.Data.Result), f, nil
 }
 
 func (r *Runner) failCase(c *v2case.Case, msg, cmd string) {
@@ -439,4 +485,134 @@ func (r *Runner) failCase(c *v2case.Case, msg, cmd string) {
 		Msg:    msg,
 		Cmd:    cmd,
 	})
+}
+
+func extractLogRows(stdout string) ([]assert.Row, int, error) {
+	var generic struct {
+		Data struct {
+			Result []struct {
+				Stream map[string]any `json:"stream"`
+				Values [][]any        `json:"values"`
+			} `json:"result"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &generic); err != nil {
+		return nil, 0, fmt.Errorf("log JSON parse: %w", err)
+	}
+	var rows []assert.Row
+	for _, stream := range generic.Data.Result {
+		attrs := stringifyMap(stream.Stream)
+		for _, pair := range stream.Values {
+			body := ""
+			if len(pair) > 1 {
+				body = fmt.Sprint(pair[1])
+			}
+			rows = append(rows, assert.Row{Name: body, Attributes: attrs})
+		}
+	}
+	return rows, len(rows), nil
+}
+
+func extractTraceRows(stdout string) ([]assert.Row, int, error) {
+	var root any
+	if err := json.Unmarshal([]byte(stdout), &root); err != nil {
+		return nil, 0, fmt.Errorf("trace JSON parse: %w", err)
+	}
+	count := traceResultCount(root)
+	rows := collectNamedRows(root)
+	if count == 0 {
+		count = len(rows)
+	}
+	return rows, count, nil
+}
+
+func extractGenericNamedRows(stdout string) ([]assert.Row, int, error) {
+	var root any
+	if err := json.Unmarshal([]byte(stdout), &root); err != nil {
+		return nil, 0, fmt.Errorf("JSON parse: %w", err)
+	}
+	rows := collectNamedRows(root)
+	return rows, len(rows), nil
+}
+
+func traceResultCount(root any) int {
+	m, ok := root.(map[string]any)
+	if !ok {
+		return 0
+	}
+	data, ok := m["data"].(map[string]any)
+	if !ok {
+		return 0
+	}
+	result, ok := data["result"].([]any)
+	if !ok {
+		return 0
+	}
+	return len(result)
+}
+
+func collectNamedRows(v any) []assert.Row {
+	var rows []assert.Row
+	var walk func(any)
+	walk = func(cur any) {
+		switch t := cur.(type) {
+		case map[string]any:
+			if row, ok := maybeRow(t); ok {
+				rows = append(rows, row)
+			}
+			for _, child := range t {
+				walk(child)
+			}
+		case []any:
+			for _, child := range t {
+				walk(child)
+			}
+		}
+	}
+	walk(v)
+	return rows
+}
+
+func maybeRow(m map[string]any) (assert.Row, bool) {
+	row := assert.Row{Attributes: map[string]string{}}
+	for _, key := range []string{"name", "spanName", "span_name", "body"} {
+		if v, ok := m[key]; ok {
+			row.Name = fmt.Sprint(v)
+			break
+		}
+	}
+	for _, key := range []string{"attributes", "metric", "stream", "resourceAttributes", "resource_attributes"} {
+		if child, ok := m[key]; ok {
+			for k, v := range stringifyMapAny(child) {
+				row.Attributes[k] = v
+			}
+		}
+	}
+	if resource, ok := m["resource"].(map[string]any); ok {
+		if attrs, ok := resource["attributes"]; ok {
+			for k, v := range stringifyMapAny(attrs) {
+				row.Attributes[k] = v
+			}
+		}
+	}
+	if row.Name == "" && len(row.Attributes) == 0 {
+		return assert.Row{}, false
+	}
+	return row, true
+}
+
+func stringifyMap(m map[string]any) map[string]string {
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = fmt.Sprint(v)
+	}
+	return out
+}
+
+func stringifyMapAny(v any) map[string]string {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return map[string]string{}
+	}
+	return stringifyMap(m)
 }

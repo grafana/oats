@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"regexp"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -89,11 +90,59 @@ type Expected struct {
 // Embedded into each concrete assertion struct so a case author can mix and
 // match contains / regex / count / absent on any signal.
 type AssertionCommon struct {
-	Contains    []string `yaml:"contains,omitempty"`
-	NotContains []string `yaml:"not_contains,omitempty"`
-	Regex       []string `yaml:"regex,omitempty"`
-	Count       string   `yaml:"count,omitempty"` // ">= 1", "== 0", ...
-	Absent      bool     `yaml:"absent,omitempty"`
+	Contains    []string     `yaml:"contains,omitempty"`
+	NotContains []string     `yaml:"not_contains,omitempty"`
+	Regex       []string     `yaml:"regex,omitempty"`
+	Match       []MatchEntry `yaml:"match,omitempty"`
+	Count       string       `yaml:"count,omitempty"` // ">= 1", "== 0", ...
+	Absent      bool         `yaml:"absent,omitempty"`
+}
+
+type MatchType string
+
+const (
+	MatchTypeStrict MatchType = "strict"
+	MatchTypeRegexp MatchType = "regexp"
+)
+
+type MatchEntry struct {
+	MatchType  MatchType                       `yaml:"match_type,omitempty"`
+	Name       *string                         `yaml:"name,omitempty"`
+	Attributes map[string]AttributeExpectation `yaml:"attributes,omitempty"`
+}
+
+func (m MatchEntry) EffectiveMatchType() MatchType {
+	if m.MatchType == "" {
+		return MatchTypeStrict
+	}
+	return m.MatchType
+}
+
+type AttributeExpectation struct {
+	Value   *string
+	Present *bool
+}
+
+func (a *AttributeExpectation) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		v := node.Value
+		a.Value = &v
+		a.Present = nil
+		return nil
+	case yaml.MappingNode:
+		var aux struct {
+			Present *bool `yaml:"present"`
+		}
+		if err := node.Decode(&aux); err != nil {
+			return err
+		}
+		a.Value = nil
+		a.Present = aux.Present
+		return nil
+	default:
+		return fmt.Errorf("expected scalar string or mapping {present: true}")
+	}
 }
 
 type TraceAssertion struct {
@@ -177,6 +226,38 @@ func (c *Case) Validate() error {
 	if len(c.Expected.Traces)+len(c.Expected.Metrics)+len(c.Expected.Logs)+len(c.Expected.Profiles) == 0 {
 		return fmt.Errorf("expected: at least one signal assertion required (a case with no expectations cannot fail)")
 	}
+	for i := range c.Expected.Traces {
+		if c.Expected.Traces[i].TraceQL == "" {
+			return fmt.Errorf("expected.traces[%d].traceql: required, non-empty", i)
+		}
+		if err := validateAssertionCommon("expected.traces", i, c.Expected.Traces[i].AssertionCommon); err != nil {
+			return err
+		}
+	}
+	for i := range c.Expected.Logs {
+		if c.Expected.Logs[i].LogQL == "" {
+			return fmt.Errorf("expected.logs[%d].logql: required, non-empty", i)
+		}
+		if err := validateAssertionCommon("expected.logs", i, c.Expected.Logs[i].AssertionCommon); err != nil {
+			return err
+		}
+	}
+	for i := range c.Expected.Metrics {
+		if c.Expected.Metrics[i].PromQL == "" {
+			return fmt.Errorf("expected.metrics[%d].promql: required, non-empty", i)
+		}
+		if err := validateAssertionCommon("expected.metrics", i, c.Expected.Metrics[i].AssertionCommon); err != nil {
+			return err
+		}
+	}
+	for i := range c.Expected.Profiles {
+		if c.Expected.Profiles[i].Query == "" {
+			return fmt.Errorf("expected.profiles[%d].query: required, non-empty", i)
+		}
+		if err := validateAssertionCommon("expected.profiles", i, c.Expected.Profiles[i].AssertionCommon); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -188,4 +269,46 @@ func (c *Case) IsHermetic() bool {
 		return true
 	}
 	return *c.Hermetic
+}
+
+func validateAssertionCommon(path string, idx int, a AssertionCommon) error {
+	for j, p := range a.Regex {
+		if _, err := regexp.Compile(p); err != nil {
+			return fmt.Errorf("%s[%d].regex[%d]: invalid regexp %q: %v", path, idx, j, p, err)
+		}
+	}
+	for j, m := range a.Match {
+		matchPath := fmt.Sprintf("%s[%d].match[%d]", path, idx, j)
+		switch m.EffectiveMatchType() {
+		case MatchTypeStrict, MatchTypeRegexp:
+		default:
+			return fmt.Errorf("%s.match_type: unknown value %q (expected strict or regexp)", matchPath, m.MatchType)
+		}
+		if m.Name == nil && len(m.Attributes) == 0 {
+			return fmt.Errorf("%s: at least one of name or attributes is required", matchPath)
+		}
+		if m.EffectiveMatchType() == MatchTypeRegexp && m.Name != nil {
+			if _, err := regexp.Compile(*m.Name); err != nil {
+				return fmt.Errorf("%s.name: invalid regexp %q: %v", matchPath, *m.Name, err)
+			}
+		}
+		for key, attr := range m.Attributes {
+			attrPath := fmt.Sprintf("%s.attributes[%q]", matchPath, key)
+			if attr.Value != nil && attr.Present != nil {
+				return fmt.Errorf("%s: expected either scalar value or {present: true}, not both", attrPath)
+			}
+			if attr.Value == nil && attr.Present == nil {
+				return fmt.Errorf("%s: expected scalar value or {present: true}", attrPath)
+			}
+			if attr.Present != nil && !*attr.Present {
+				return fmt.Errorf("%s.present: only true is allowed", attrPath)
+			}
+			if m.EffectiveMatchType() == MatchTypeRegexp && attr.Value != nil {
+				if _, err := regexp.Compile(*attr.Value); err != nil {
+					return fmt.Errorf("%s: invalid regexp %q: %v", attrPath, *attr.Value, err)
+				}
+			}
+		}
+	}
+	return nil
 }

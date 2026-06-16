@@ -26,11 +26,15 @@ func Traces(a v2case.TraceAssertion, since time.Duration) []string {
 	if since <= 0 {
 		since = DefaultSince
 	}
-	return []string{
+	args := []string{
 		"traces", "search",
 		"--since", since.String(),
-		a.TraceQL,
 	}
+	if len(a.Match) > 0 {
+		args = append(args, "-o", "json")
+	}
+	args = append(args, a.TraceQL)
+	return args
 }
 
 // Logs builds the gcx args for a LogAssertion.
@@ -38,11 +42,15 @@ func Logs(a v2case.LogAssertion, since time.Duration) []string {
 	if since <= 0 {
 		since = DefaultSince
 	}
-	return []string{
+	args := []string{
 		"logs", "query",
 		"--since", since.String(),
-		a.LogQL,
 	}
+	if len(a.Match) > 0 {
+		args = append(args, "-o", "json")
+	}
+	args = append(args, a.LogQL)
+	return args
 }
 
 // Metrics builds the gcx args for a MetricAssertion. When the assertion
@@ -57,7 +65,7 @@ func Metrics(a v2case.MetricAssertion, since time.Duration) []string {
 		"metrics", "query",
 		"--since", since.String(),
 	}
-	if a.Value != "" {
+	if a.Value != "" || len(a.Match) > 0 {
 		args = append(args, "-o", "json")
 	}
 	args = append(args, a.PromQL)
@@ -69,11 +77,15 @@ func Profiles(a v2case.ProfileAssertion, since time.Duration) []string {
 	if since <= 0 {
 		since = DefaultSince
 	}
-	return []string{
+	args := []string{
 		"profiles", "query",
 		"--since", since.String(),
-		a.Query,
 	}
+	if len(a.Match) > 0 {
+		args = append(args, "-o", "json")
+	}
+	args = append(args, a.Query)
+	return args
 }
 
 // Render is a convenience used by the report layer to show the gcx

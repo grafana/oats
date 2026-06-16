@@ -65,6 +65,44 @@ expected:
 	}
 }
 
+func TestParse_MatchAssertions(t *testing.T) {
+	src := []byte(`
+oats: 2
+name: structured match
+seed:
+  type: app
+  compose: x.yml
+expected:
+  logs:
+    - logql: '{service_name="svc"}'
+      match:
+        - name: "seed-log-line"
+          attributes:
+            service_name: svc
+            trace_id:
+              present: true
+        - match_type: regexp
+          attributes:
+            level: "info|warn"
+`)
+	c, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := len(c.Expected.Logs[0].Match); got != 2 {
+		t.Fatalf("match entries: got %d, want 2", got)
+	}
+	if c.Expected.Logs[0].Match[0].EffectiveMatchType() != MatchTypeStrict {
+		t.Fatalf("default match_type should be strict")
+	}
+	if c.Expected.Logs[0].Match[0].Attributes["trace_id"].Present == nil {
+		t.Fatalf("trace_id.present should be set")
+	}
+	if c.Expected.Logs[0].Match[1].EffectiveMatchType() != MatchTypeRegexp {
+		t.Fatalf("second entry should be regexp")
+	}
+}
+
 func TestParse_RejectsUnknownFields(t *testing.T) {
 	src := []byte(`
 oats: 2
@@ -129,6 +167,64 @@ func TestValidate_NoExpectations(t *testing.T) {
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "expected:") {
 		t.Errorf("expected 'no expectations' error, got %v", err)
+	}
+}
+
+func TestValidate_RejectsUnknownMatchType(t *testing.T) {
+	_, err := Parse([]byte(`
+oats: 2
+name: bad match type
+seed:
+  type: app
+  compose: x.yml
+expected:
+  traces:
+    - traceql: '{}'
+      match:
+        - match_type: glob
+          name: x
+`))
+	if err == nil || !strings.Contains(err.Error(), "match_type") {
+		t.Fatalf("expected match_type error, got %v", err)
+	}
+}
+
+func TestValidate_RejectsPresentFalse(t *testing.T) {
+	_, err := Parse([]byte(`
+oats: 2
+name: bad present
+seed:
+  type: app
+  compose: x.yml
+expected:
+  logs:
+    - logql: '{job="x"}'
+      match:
+        - attributes:
+            trace_id:
+              present: false
+`))
+	if err == nil || !strings.Contains(err.Error(), "only true is allowed") {
+		t.Fatalf("expected present error, got %v", err)
+	}
+}
+
+func TestValidate_RejectsInvalidMatchRegexp(t *testing.T) {
+	_, err := Parse([]byte(`
+oats: 2
+name: bad regexp
+seed:
+  type: app
+  compose: x.yml
+expected:
+  traces:
+    - traceql: '{}'
+      match:
+        - match_type: regexp
+          name: '['
+`))
+	if err == nil || !strings.Contains(err.Error(), "invalid regexp") {
+		t.Fatalf("expected regexp error, got %v", err)
 	}
 }
 

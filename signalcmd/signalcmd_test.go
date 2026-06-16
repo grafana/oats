@@ -16,11 +16,35 @@ func TestTraces(t *testing.T) {
 	}
 }
 
+func TestTraces_WithMatchAsksForJSON(t *testing.T) {
+	got := Traces(v2case.TraceAssertion{
+		TraceQL: `{ span.http.route = "/x" }`,
+		AssertionCommon: v2case.AssertionCommon{
+			Match: []v2case.MatchEntry{{Name: strPtr("GET /x")}},
+		},
+	}, 0)
+	if !contains(got, "-o", "json") {
+		t.Errorf("expected -o json in: %v", got)
+	}
+}
+
 func TestLogs(t *testing.T) {
 	got := Logs(v2case.LogAssertion{LogQL: `{service_name="x"}`}, 5*time.Minute)
 	want := []string{"logs", "query", "--since", "5m0s", `{service_name="x"}`}
 	if !equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+func TestLogs_WithMatchAsksForJSON(t *testing.T) {
+	got := Logs(v2case.LogAssertion{
+		LogQL: `{service_name="x"}`,
+		AssertionCommon: v2case.AssertionCommon{
+			Match: []v2case.MatchEntry{{Name: strPtr("line")}},
+		},
+	}, 5*time.Minute)
+	if !contains(got, "-o", "json") {
+		t.Errorf("expected -o json in: %v", got)
 	}
 }
 
@@ -47,6 +71,18 @@ func TestProfiles(t *testing.T) {
 	got := Profiles(v2case.ProfileAssertion{Query: "process_cpu:cpu:nanoseconds:cpu:nanoseconds{}"}, 0)
 	if got[0] != "profiles" || got[1] != "query" {
 		t.Errorf("wrong verb chain: %v", got)
+	}
+}
+
+func TestProfiles_WithMatchAsksForJSON(t *testing.T) {
+	got := Profiles(v2case.ProfileAssertion{
+		Query: "process_cpu:cpu:nanoseconds:cpu:nanoseconds{}",
+		AssertionCommon: v2case.AssertionCommon{
+			Match: []v2case.MatchEntry{{Name: strPtr("main")}},
+		},
+	}, 0)
+	if !contains(got, "-o", "json") {
+		t.Errorf("expected -o json in: %v", got)
 	}
 }
 
@@ -101,3 +137,5 @@ func contains(haystack []string, needles ...string) bool {
 	}
 	return false
 }
+
+func strPtr(s string) *string { return &s }

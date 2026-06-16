@@ -2,6 +2,8 @@ package assert
 
 import (
 	"testing"
+
+	"github.com/grafana/oats/v2case"
 )
 
 func TestContains(t *testing.T) {
@@ -95,3 +97,55 @@ func TestAbsent(t *testing.T) {
 		t.Errorf("expected one absent-tagged failure, got %v", got)
 	}
 }
+
+func TestMatchRows(t *testing.T) {
+	present := true
+	rows := []Row{
+		{
+			Name: "seed-operation",
+			Attributes: map[string]string{
+				"service.name": "gcx-e2e-seed",
+				"trace_id":     "abc123",
+			},
+		},
+	}
+
+	got := MatchRows(rows, []v2case.MatchEntry{
+		{
+			Name: strPtr("seed-operation"),
+			Attributes: map[string]v2case.AttributeExpectation{
+				"service.name": {Value: strPtr("gcx-e2e-seed")},
+				"trace_id":     {Present: &present},
+			},
+		},
+	})
+	if len(got) != 0 {
+		t.Fatalf("expected match to pass, got %v", got)
+	}
+
+	got = MatchRows(rows, []v2case.MatchEntry{
+		{
+			MatchType: v2case.MatchTypeRegexp,
+			Name:      strPtr("^seed-.*$"),
+			Attributes: map[string]v2case.AttributeExpectation{
+				"trace_id": {Value: strPtr("^abc")},
+			},
+		},
+	})
+	if len(got) != 0 {
+		t.Fatalf("expected regexp match to pass, got %v", got)
+	}
+
+	got = MatchRows(rows, []v2case.MatchEntry{
+		{
+			Attributes: map[string]v2case.AttributeExpectation{
+				"missing": {Present: &present},
+			},
+		},
+	})
+	if len(got) != 1 || got[0].Rule != "match" {
+		t.Fatalf("expected one match failure, got %v", got)
+	}
+}
+
+func strPtr(s string) *string { return &s }
