@@ -391,6 +391,25 @@ expected:
 	}
 }
 
+func TestResolveCustomCheckPath(t *testing.T) {
+	dir := "/tmp/cases"
+	cases := []struct {
+		name   string
+		script string
+		want   string
+	}{
+		{name: "bare command stays bare", script: "verify", want: "verify"},
+		{name: "relative path resolved against case dir", script: "./scripts/verify.sh", want: filepath.Clean("/tmp/cases/scripts/verify.sh")},
+		{name: "parent path resolved against case dir", script: "../verify.sh", want: filepath.Clean("/tmp/verify.sh")},
+		{name: "absolute path preserved", script: "/opt/check.sh", want: "/opt/check.sh"},
+	}
+	for _, tc := range cases {
+		if got := resolveCustomCheckPath(dir, tc.script); got != tc.want {
+			t.Fatalf("%s: got %q want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 func TestApproxRowCount(t *testing.T) {
 	cases := []struct {
 		in   string

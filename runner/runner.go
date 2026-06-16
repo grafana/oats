@@ -318,7 +318,7 @@ func customCheckCommand(ctx context.Context, dir, script string) (*exec.Cmd, fun
 		cmd.Dir = dir
 		return cmd, cleanup, nil
 	}
-	cmd := exec.CommandContext(ctx, script)
+	cmd := exec.CommandContext(ctx, resolveCustomCheckPath(dir, script))
 	cmd.Dir = dir
 	return cmd, cleanup, nil
 }
@@ -326,6 +326,20 @@ func customCheckCommand(ctx context.Context, dir, script string) (*exec.Cmd, fun
 func looksLikeInlineScript(script string) bool {
 	trimmed := strings.TrimSpace(script)
 	return strings.Contains(trimmed, "\n") || strings.HasPrefix(trimmed, "#!")
+}
+
+func resolveCustomCheckPath(dir, script string) string {
+	script = strings.TrimSpace(script)
+	if script == "" {
+		return script
+	}
+	if filepath.IsAbs(script) {
+		return script
+	}
+	if strings.ContainsRune(script, os.PathSeparator) {
+		return filepath.Clean(filepath.Join(dir, script))
+	}
+	return script
 }
 
 func trimOutput(s string) string {
