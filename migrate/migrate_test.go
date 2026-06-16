@@ -139,6 +139,116 @@ func TestConvertDefinition_KubernetesProducesFixtureHint(t *testing.T) {
 	}
 }
 
+func TestConvertDefinition_FlattensSingleMatrixEntry(t *testing.T) {
+	def := model.TestCaseDefinition{
+		Matrix: []model.Matrix{{
+			Name: "docker",
+			DockerCompose: &model.DockerCompose{
+				Files: []string{"docker-compose.yml"},
+			},
+		}},
+		Expected: model.Expected{
+			Logs: []model.ExpectedLogs{
+				{
+					LogQL: `{service_name="dice"}`,
+					Signal: model.ExpectedSignal{
+						NameEquals:      "base",
+						MatrixCondition: "",
+					},
+				},
+				{
+					LogQL: `{service_name="dice"}`,
+					Signal: model.ExpectedSignal{
+						NameEquals:      "docker-only",
+						MatrixCondition: "docker",
+					},
+				},
+				{
+					LogQL: `{service_name="dice"}`,
+					Signal: model.ExpectedSignal{
+						NameEquals:      "k8s-only",
+						MatrixCondition: "k8s",
+					},
+				},
+			},
+		},
+	}
+
+	c, warnings, err := ConvertDefinition(def, "matrix case")
+	if err != nil {
+		fatalf(t, "ConvertDefinition single matrix: %v", err)
+	}
+	if c.Name != "matrix case [docker]" {
+		fatalf(t, "unexpected case name: %q", c.Name)
+	}
+	if c.Seed.Type != "app" {
+		fatalf(t, "expected app seed, got %+v", c.Seed)
+	}
+	if got := len(c.Expected.Logs); got != 2 {
+		fatalf(t, "expected 2 kept log assertions, got %d (%+v)", got, c.Expected.Logs)
+	}
+	joined := strings.Join(warnings, "\n")
+	for _, want := range []string{
+		`flattened single matrix entry "docker"`,
+		`[fixture.matrix-case-docker]`,
+		`compose_file = "docker-compose.yml"`,
+	} {
+		if !strings.Contains(joined, want) {
+			fatalf(t, "expected warning to contain %q:\n%s", want, joined)
+		}
+	}
+}
+
+func TestConvertDefinition_MultiMatrixEmitsExpansionHint(t *testing.T) {
+	def := model.TestCaseDefinition{
+		Matrix: []model.Matrix{
+			{
+				Name: "docker",
+				DockerCompose: &model.DockerCompose{
+					Files: []string{"docker-compose.yml"},
+				},
+			},
+			{
+				Name: "k8s",
+				Kubernetes: &kubernetes.Kubernetes{
+					Dir:           "k8s",
+					AppService:    "dice",
+					AppDockerFile: "Dockerfile",
+					AppDockerTag:  "dice:test",
+					AppDockerPort: 8080,
+				},
+			},
+		},
+		Expected: model.Expected{
+			Logs: []model.ExpectedLogs{{
+				LogQL: `{service_name="dice"}`,
+				Signal: model.ExpectedSignal{
+					NameEquals:      "any",
+					MatrixCondition: "docker|k8s",
+				},
+			}},
+		},
+	}
+
+	_, warnings, err := ConvertDefinition(def, "matrix case")
+	if err != nil {
+		fatalf(t, "ConvertDefinition multi matrix: %v", err)
+	}
+	joined := strings.Join(warnings, "\n")
+	for _, want := range []string{
+		`suggested matrix expansion for "matrix case"`,
+		`- docker`,
+		`[fixture.matrix-case-docker]`,
+		`- k8s`,
+		`[fixture.matrix-case-k8s]`,
+		`type = "k3d"`,
+	} {
+		if !strings.Contains(joined, want) {
+			fatalf(t, "expected warning to contain %q:\n%s", want, joined)
+		}
+	}
+}
+
 func fatalf(t *testing.T, format string, args ...any) {
 	t.Helper()
 	t.Fatalf(format, args...)

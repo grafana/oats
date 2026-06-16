@@ -3,6 +3,7 @@ package migrate
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/grafana/oats/model"
@@ -41,6 +42,7 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 		Name:        name,
 		Interval:    def.Interval,
 	}
+	selectedMatrix := (*model.Matrix)(nil)
 
 	if def.Kubernetes != nil {
 		c.Seed.Type = "app"
@@ -48,7 +50,25 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 		warnings = append(warnings, kubernetesFixtureHint(name, def))
 	}
 	if len(def.Matrix) > 0 {
-		warnings = append(warnings, "matrix definitions are not migrated; convert expanded matrix cases manually")
+		if len(def.Matrix) == 1 {
+			selectedMatrix = &def.Matrix[0]
+			c.Name = fmt.Sprintf("%s [%s]", name, selectedMatrix.Name)
+			warnings = append(warnings, fmt.Sprintf("flattened single matrix entry %q into the migrated case", selectedMatrix.Name))
+			if selectedMatrix.DockerCompose != nil {
+				c.Seed.Type = "app"
+				c.Seed.Compose = selectedMatrix.DockerCompose.Files[0]
+				warnings = append(warnings, "single matrix docker-compose fixture selected; paste the suggested [fixture] block below into oats.toml")
+				warnings = append(warnings, matrixFixtureHint(c.Name, *selectedMatrix))
+			}
+			if selectedMatrix.Kubernetes != nil {
+				c.Seed.Type = "app"
+				warnings = append(warnings, "single matrix kubernetes fixture selected; paste the suggested [fixture] block below into oats.toml")
+				warnings = append(warnings, matrixFixtureHint(c.Name, *selectedMatrix))
+			}
+		} else {
+			warnings = append(warnings, "matrix definitions are not migrated automatically when multiple entries exist; convert expanded matrix cases manually")
+			warnings = append(warnings, matrixExpansionHint(name, def.Matrix))
+		}
 	}
 	if len(def.Include) > 0 {
 		warnings = append(warnings, "include directives were resolved before migration; output is a flattened case")
@@ -70,7 +90,7 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 			warnings = append(warnings, "legacy docker-compose fixture uses suite-level config richer than case-level seed.compose; paste the suggested [fixture] block below into oats.toml")
 			warnings = append(warnings, composeFixtureHint(name, def))
 		}
-	} else if def.Kubernetes == nil {
+	} else if def.Kubernetes == nil && selectedMatrix == nil {
 		warnings = append(warnings, "no docker-compose fixture found; defaulting seed.type to inline-otlp placeholder")
 		c.Seed.Type = "inline-otlp"
 		c.Seed.Traces = []v2case.SeedTrace{{Service: "migrated-service", Spans: []v2case.SeedSpan{{Name: "replace-me"}}}}
@@ -89,22 +109,34 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 	}
 
 	for _, tr := range def.Expected.Traces {
+		if !keepForMatrix(tr.Signal.MatrixCondition, selectedMatrix) {
+			continue
+		}
 		assertion, ws := convertSignal(tr.TraceQL, tr.Signal)
 		warnings = append(warnings, ws...)
 		c.Expected.Traces = append(c.Expected.Traces, v2case.TraceAssertion{TraceQL: tr.TraceQL, AssertionCommon: assertion})
 	}
 	for _, lg := range def.Expected.Logs {
+		if !keepForMatrix(lg.Signal.MatrixCondition, selectedMatrix) {
+			continue
+		}
 		assertion, ws := convertSignal(lg.LogQL, lg.Signal)
 		warnings = append(warnings, ws...)
 		c.Expected.Logs = append(c.Expected.Logs, v2case.LogAssertion{LogQL: lg.LogQL, AssertionCommon: assertion})
 	}
 	for _, m := range def.Expected.Metrics {
+		if !keepForMatrix(m.MatrixCondition, selectedMatrix) {
+			continue
+		}
 		c.Expected.Metrics = append(c.Expected.Metrics, v2case.MetricAssertion{PromQL: m.PromQL, Value: m.Value})
 		if m.MatrixCondition != "" {
 			warnings = append(warnings, fmt.Sprintf("metric %q matrix-condition dropped", m.PromQL))
 		}
 	}
 	for _, p := range def.Expected.Profiles {
+		if !keepForMatrix(p.MatrixCondition, selectedMatrix) {
+			continue
+		}
 		var matches []v2case.MatchEntry
 		if p.Flamebearers.NameEquals != "" {
 			matches = append(matches, v2case.MatchEntry{Name: strPtr(p.Flamebearers.NameEquals)})
@@ -191,6 +223,20 @@ func deriveName(path string) string {
 	return strings.TrimSpace(base)
 }
 
+func keepForMatrix(matrixCondition string, selected *model.Matrix) bool {
+	if matrixCondition == "" {
+		return true
+	}
+	if selected == nil {
+		return true
+	}
+	re, err := regexp.Compile(matrixCondition)
+	if err != nil {
+		return true
+	}
+	return re.MatchString(selected.Name)
+}
+
 func composeFixtureHint(name string, def model.TestCaseDefinition) string {
 	fixtureName := slug(name)
 	var b strings.Builder
@@ -227,6 +273,41 @@ func kubernetesFixtureHint(name string, def model.TestCaseDefinition) string {
 		fmt.Fprintf(&b, "import_images = [%s]\n", quotedList(k.ImportImages))
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+func matrixFixtureHint(name string, m model.Matrix) string {
+	def := model.TestCaseDefinition{
+		DockerCompose: m.DockerCompose,
+		Kubernetes:    m.Kubernetes,
+	}
+	if m.DockerCompose != nil {
+		return composeFixtureHint(name, def)
+	}
+	if m.Kubernetes != nil {
+		return kubernetesFixtureHint(name, def)
+	}
+	return fmt.Sprintf("matrix %q has no fixture override", m.Name)
+}
+
+func matrixExpansionHint(name string, matrix []model.Matrix) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "suggested matrix expansion for %q:\n", name)
+	for _, m := range matrix {
+		fmt.Fprintf(&b, "- %s\n", m.Name)
+		if m.DockerCompose != nil || m.Kubernetes != nil {
+			fixture := indentLines(matrixFixtureHint(fmt.Sprintf("%s [%s]", name, m.Name), m), "  ")
+			fmt.Fprintf(&b, "%s\n", fixture)
+		}
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func indentLines(s, prefix string) string {
+	lines := strings.Split(s, "\n")
+	for i := range lines {
+		lines[i] = prefix + lines[i]
+	}
+	return strings.Join(lines, "\n")
 }
 
 func quotedList(items []string) string {
