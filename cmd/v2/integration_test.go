@@ -17,6 +17,7 @@ import (
 
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/engine"
+	"github.com/grafana/oats/migrate"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
 	"github.com/grafana/oats/testhelpers/remote"
@@ -393,6 +394,94 @@ expected:
 	}
 	if !strings.Contains(buf.String(), "PASS 1/1") {
 		t.Errorf("summary line missing or wrong:\n%s", buf.String())
+	}
+}
+
+func TestIntegration_MigratedLegacyCaseRuns(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake-gcx is a POSIX shell script")
+	}
+
+	legacyPath := filepath.Join(t.TempDir(), "legacy.oats.yaml")
+	writeFile(t, filepath.Dir(legacyPath), filepath.Base(legacyPath), `
+oats-schema-version: 2
+docker-compose:
+  files:
+    - docker-compose.yml
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "gcx-e2e-seed" }'
+      equals: seed-operation
+      attributes:
+        service.name: gcx-e2e-seed
+  logs:
+    - logql: '{service_name="gcx-e2e-seed"}'
+      equals: seed-log-line
+      attributes:
+        service_name: gcx-e2e-seed
+  metrics:
+    - promql: 'seed_counter_total{service_name="gcx-e2e-seed"}'
+      value: ">= 0"
+`)
+	migrated, _, err := migrate.ConvertFile(legacyPath)
+	if err != nil {
+		t.Fatalf("ConvertFile: %v", err)
+	}
+
+	dir := t.TempDir()
+	writeFile(t, dir, "oats.toml", `
+[meta]
+version = 2
+
+[[suite]]
+name    = "migrated"
+cases   = ["cases/*.yaml"]
+fixture = "remote-lgtm"
+
+[fixture.remote-lgtm]
+type     = "remote"
+endpoint = "http://localhost:4318"
+`)
+	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
+
+	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	plans, err := cfg.PlanRun(discovery.Filter{})
+	if err != nil {
+		t.Fatalf("PlanRun: %v", err)
+	}
+	if len(plans) != 1 || len(plans[0].Cases) != 1 {
+		t.Fatalf("expected one plan with one case, got %+v", plans)
+	}
+
+	ep, err := resolveEndpoint(dir, plans[0], "", "localhost", 8080, "http://localhost:4318")
+	if err != nil {
+		t.Fatalf("resolveEndpoint: %v", err)
+	}
+
+	_, here, _, _ := runtime.Caller(0)
+	fakeGCX := filepath.Join(filepath.Dir(here), "testdata", "fake-gcx.sh")
+	exec := &engine.GCX{Binary: fakeGCX, Context: ep.GCXContext}
+
+	var buf bytes.Buffer
+	rep := report.NewTextReporter(&buf, report.VerboseDefault)
+	rep.Emit(report.Event{Type: report.EventRunStart, OatsVersion: "test", SchemaVersion: report.SchemaVersion})
+
+	r := runner.New(exec, rep, ep, runner.Options{
+		Timeout:         500 * time.Millisecond,
+		Interval:        20 * time.Millisecond,
+		SeedSettleDelay: 5 * time.Millisecond,
+	})
+
+	ok := r.RunCase(context.Background(), plans[0].Cases[0])
+	rep.Emit(report.Event{Type: report.EventRunEnd})
+	if !ok {
+		t.Fatalf("migrated case did not pass:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "PASS 1/1") {
+		t.Fatalf("summary line missing or wrong:\n%s", buf.String())
 	}
 }
 
