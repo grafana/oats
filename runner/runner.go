@@ -373,7 +373,7 @@ func (r *Runner) runProfile(ctx context.Context, c *v2case.Case, a *v2case.Profi
 		if len(a.Match) == 0 {
 			return evalCommonText(stdout, a.AssertionCommon)
 		}
-		rows, count, err := extractGenericNamedRows(stdout)
+		rows, count, err := extractProfileRows(stdout)
 		return evalCommonStructured(stdout, a.AssertionCommon, rows, count, err)
 	})
 }
@@ -518,6 +518,9 @@ func extractTraceRows(stdout string) ([]assert.Row, int, error) {
 	if err := json.Unmarshal([]byte(stdout), &root); err != nil {
 		return nil, 0, fmt.Errorf("trace JSON parse: %w", err)
 	}
+	if rows, ok := extractOTLPTraceRows(root); ok {
+		return rows, len(rows), nil
+	}
 	count := traceResultCount(root)
 	rows := collectNamedRows(root)
 	if count == 0 {
@@ -526,10 +529,17 @@ func extractTraceRows(stdout string) ([]assert.Row, int, error) {
 	return rows, count, nil
 }
 
-func extractGenericNamedRows(stdout string) ([]assert.Row, int, error) {
+func extractProfileRows(stdout string) ([]assert.Row, int, error) {
 	var root any
 	if err := json.Unmarshal([]byte(stdout), &root); err != nil {
-		return nil, 0, fmt.Errorf("JSON parse: %w", err)
+		return nil, 0, fmt.Errorf("profile JSON parse: %w", err)
+	}
+	if names := flamebearerNames(root); len(names) > 0 {
+		rows := make([]assert.Row, 0, len(names))
+		for _, name := range names {
+			rows = append(rows, assert.Row{Name: name, Attributes: map[string]string{}})
+		}
+		return rows, len(rows), nil
 	}
 	rows := collectNamedRows(root)
 	return rows, len(rows), nil
@@ -615,4 +625,143 @@ func stringifyMapAny(v any) map[string]string {
 		return map[string]string{}
 	}
 	return stringifyMap(m)
+}
+
+func extractOTLPTraceRows(root any) ([]assert.Row, bool) {
+	top, ok := root.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	resourceSpans, ok := top["resourceSpans"].([]any)
+	if !ok {
+		resourceSpans, ok = top["batches"].([]any)
+	}
+	if !ok {
+		// Some wrappers may nest under "data" first.
+		if data, ok := top["data"].(map[string]any); ok {
+			resourceSpans, ok = data["resourceSpans"].([]any)
+			if !ok {
+				resourceSpans, ok = data["batches"].([]any)
+			}
+		}
+		if !ok {
+			return nil, false
+		}
+	}
+	var rows []assert.Row
+	for _, rsAny := range resourceSpans {
+		rs, ok := rsAny.(map[string]any)
+		if !ok {
+			continue
+		}
+		resourceAttrs := map[string]string{}
+		if resource, ok := rs["resource"].(map[string]any); ok {
+			resourceAttrs = parseOTelAttributeList(resource["attributes"])
+		}
+		scopeSpans, _ := rs["scopeSpans"].([]any)
+		for _, ssAny := range scopeSpans {
+			ss, ok := ssAny.(map[string]any)
+			if !ok {
+				continue
+			}
+			scopeName := ""
+			if scope, ok := ss["scope"].(map[string]any); ok {
+				scopeName = fmt.Sprint(scope["name"])
+			}
+			spans, _ := ss["spans"].([]any)
+			for _, spAny := range spans {
+				sp, ok := spAny.(map[string]any)
+				if !ok {
+					continue
+				}
+				attrs := map[string]string{}
+				for k, v := range resourceAttrs {
+					attrs[k] = v
+				}
+				for k, v := range parseOTelAttributeList(sp["attributes"]) {
+					attrs[k] = v
+				}
+				if scopeName != "" {
+					attrs["otel.scope.name"] = scopeName
+				}
+				if kind, ok := sp["kind"]; ok {
+					attrs["kind"] = fmt.Sprint(kind)
+				}
+				rows = append(rows, assert.Row{
+					Name:       fmt.Sprint(sp["name"]),
+					Attributes: attrs,
+				})
+			}
+		}
+	}
+	if len(rows) == 0 {
+		return nil, false
+	}
+	return rows, true
+}
+
+func parseOTelAttributeList(v any) map[string]string {
+	list, ok := v.([]any)
+	if !ok {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(list))
+	for _, itemAny := range list {
+		item, ok := itemAny.(map[string]any)
+		if !ok {
+			continue
+		}
+		key := fmt.Sprint(item["key"])
+		if key == "" {
+			continue
+		}
+		value, _ := item["value"].(map[string]any)
+		out[key] = parseOTelAnyValue(value)
+	}
+	return out
+}
+
+func parseOTelAnyValue(m map[string]any) string {
+	for _, key := range []string{"stringValue", "intValue", "doubleValue", "boolValue"} {
+		if v, ok := m[key]; ok {
+			return fmt.Sprint(v)
+		}
+	}
+	if arr, ok := m["arrayValue"].(map[string]any); ok {
+		if vals, ok := arr["values"].([]any); ok {
+			parts := make([]string, 0, len(vals))
+			for _, val := range vals {
+				if child, ok := val.(map[string]any); ok {
+					parts = append(parts, parseOTelAnyValue(child))
+				}
+			}
+			return strings.Join(parts, ",")
+		}
+	}
+	return ""
+}
+
+func flamebearerNames(root any) []string {
+	top, ok := root.(map[string]any)
+	if !ok {
+		return nil
+	}
+	flamebearer, ok := top["flamebearer"].(map[string]any)
+	if !ok {
+		if data, ok := top["data"].(map[string]any); ok {
+			flamebearer, _ = data["flamebearer"].(map[string]any)
+		}
+	}
+	if flamebearer == nil {
+		return nil
+	}
+	raw, ok := flamebearer["names"].([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		out = append(out, fmt.Sprint(item))
+	}
+	return out
 }

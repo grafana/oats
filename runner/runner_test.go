@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -269,6 +270,43 @@ func TestApproxRowCount(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("approxRowCount(%q): got %d, want %d", tc.in, got, tc.want)
 		}
+	}
+}
+
+func TestExtractTraceRows_OTLPShape(t *testing.T) {
+	data, err := os.ReadFile("/home/gregor/source/oats-v2/testhelpers/tempo/responses/testdata/trace_by_id.json")
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	rows, count, parseErr := extractTraceRows(string(data))
+	if parseErr != nil {
+		t.Fatalf("extractTraceRows: %v", parseErr)
+	}
+	if count == 0 || len(rows) == 0 {
+		t.Fatalf("expected OTLP trace rows, got count=%d rows=%d", count, len(rows))
+	}
+	found := false
+	for _, row := range rows {
+		if row.Name == "GET /stock" && row.Attributes["http.route"] == "/stock" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected extracted span row for GET /stock with http.route=/stock")
+	}
+}
+
+func TestExtractProfileRows_FlamebearerShape(t *testing.T) {
+	rows, count, err := extractProfileRows(`{"flamebearer":{"names":["main","worker"]}}`)
+	if err != nil {
+		t.Fatalf("extractProfileRows: %v", err)
+	}
+	if count != 2 || len(rows) != 2 {
+		t.Fatalf("expected 2 rows, got count=%d rows=%d", count, len(rows))
+	}
+	if rows[0].Name != "main" || rows[1].Name != "worker" {
+		t.Fatalf("unexpected rows: %+v", rows)
 	}
 }
 
