@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -99,6 +100,11 @@ type Expected struct {
 	Metrics  []MetricAssertion  `yaml:"metrics,omitempty"`
 	Logs     []LogAssertion     `yaml:"logs,omitempty"`
 	Profiles []ProfileAssertion `yaml:"profiles,omitempty"`
+	Custom   []CustomCheck      `yaml:"custom-checks,omitempty"`
+}
+
+type CustomCheck struct {
+	Script string `yaml:"script"`
 }
 
 // AssertionCommon holds the keys every signal-type assertion supports.
@@ -254,8 +260,8 @@ func (c *Case) Validate() error {
 	default:
 		return fmt.Errorf("seed.type: unknown value %q (expected app or inline-otlp)", c.Seed.Type)
 	}
-	if len(c.Expected.Traces)+len(c.Expected.Metrics)+len(c.Expected.Logs)+len(c.Expected.Profiles) == 0 {
-		return fmt.Errorf("expected: at least one signal assertion required (a case with no expectations cannot fail)")
+	if len(c.Expected.Traces)+len(c.Expected.Metrics)+len(c.Expected.Logs)+len(c.Expected.Profiles)+len(c.Expected.Custom) == 0 {
+		return fmt.Errorf("expected: at least one assertion required (signal or custom-check)")
 	}
 	for i, in := range c.Input {
 		if in.Path == "" {
@@ -292,6 +298,11 @@ func (c *Case) Validate() error {
 		}
 		if err := validateAssertionCommon("expected.profiles", i, c.Expected.Profiles[i].AssertionCommon); err != nil {
 			return err
+		}
+	}
+	for i := range c.Expected.Custom {
+		if strings.TrimSpace(c.Expected.Custom[i].Script) == "" {
+			return fmt.Errorf("expected.custom-checks[%d].script: required, non-empty", i)
 		}
 	}
 	return nil

@@ -249,6 +249,28 @@ func TestConvertDefinition_MultiMatrixEmitsExpansionHint(t *testing.T) {
 	}
 }
 
+func TestConvertDefinition_MigratesCustomChecks(t *testing.T) {
+	def := model.TestCaseDefinition{
+		Expected: model.Expected{
+			CustomChecks: []model.CustomCheck{
+				{Script: "./verify.sh"},
+				{Script: "./skip.sh", MatrixCondition: "docker"},
+			},
+		},
+	}
+
+	c, warnings, err := ConvertDefinition(def, "custom checks")
+	if err != nil {
+		fatalf(t, "ConvertDefinition custom checks: %v", err)
+	}
+	if got := len(c.Expected.Custom); got != 2 {
+		fatalf(t, "expected 2 custom checks, got %+v", c.Expected.Custom)
+	}
+	if len(warnings) == 0 || !strings.Contains(strings.Join(warnings, "\n"), "defaulting seed.type to inline-otlp placeholder") {
+		fatalf(t, "expected placeholder warning, got %v", warnings)
+	}
+}
+
 func fatalf(t *testing.T, format string, args ...any) {
 	t.Helper()
 	t.Fatalf(format, args...)

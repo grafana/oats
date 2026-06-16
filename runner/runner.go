@@ -7,12 +7,15 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -221,6 +224,11 @@ func (r *Runner) RunCase(ctx context.Context, c *v2case.Case) bool {
 			ok = false
 		}
 	}
+	for i := range c.Expected.Custom {
+		if !r.runCustomCheck(ctx, c, &c.Expected.Custom[i]) {
+			ok = false
+		}
+	}
 
 	durMs := time.Since(caseStart).Milliseconds()
 	if ok {
@@ -237,6 +245,95 @@ func (r *Runner) RunCase(ctx context.Context, c *v2case.Case) bool {
 		}
 	}
 	return ok
+}
+
+func (r *Runner) runCustomCheck(ctx context.Context, c *v2case.Case, chk *v2case.CustomCheck) bool {
+	dir := "."
+	if c.SourcePath != "" {
+		dir = filepath.Dir(c.SourcePath)
+	}
+	run := func() []assert.Failure {
+		if err := r.driveInputs(c); err != nil {
+			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
+		}
+		deadlineCtx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
+		defer cancel()
+
+		cmd, cleanup, err := customCheckCommand(deadlineCtx, dir, chk.Script)
+		if err != nil {
+			return []assert.Failure{{Rule: "custom-check-setup", Detail: err.Error()}}
+		}
+		defer cleanup()
+
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &out
+		if err := cmd.Run(); err != nil {
+			return []assert.Failure{{Rule: "custom-check", Detail: err.Error() + "\n" + trimOutput(out.String())}}
+		}
+		return nil
+	}
+
+	result := wait.Until[assert.Failure](ctx, wait.Options{Timeout: r.opts.Timeout, Interval: r.caseInterval(c)}, run)
+	if result.OK {
+		return true
+	}
+	for _, f := range result.LastFailures {
+		r.reporter.Emit(report.Event{
+			Type:   report.EventAssertFail,
+			Case:   c.Name,
+			Source: c.SourcePath,
+			Msg:    f.Error(),
+			Cmd:    "custom-check",
+		})
+	}
+	return false
+}
+
+func customCheckCommand(ctx context.Context, dir, script string) (*exec.Cmd, func(), error) {
+	cleanup := func() {}
+	if strings.TrimSpace(script) == "" {
+		return nil, cleanup, fmt.Errorf("empty script")
+	}
+	if looksLikeInlineScript(script) {
+		f, err := os.CreateTemp("", "oats-v2-custom-check-*.sh")
+		if err != nil {
+			return nil, cleanup, err
+		}
+		if _, err := f.WriteString(script); err != nil {
+			_ = f.Close()
+			_ = os.Remove(f.Name())
+			return nil, cleanup, err
+		}
+		if err := f.Close(); err != nil {
+			_ = os.Remove(f.Name())
+			return nil, cleanup, err
+		}
+		if err := os.Chmod(f.Name(), 0o700); err != nil {
+			_ = os.Remove(f.Name())
+			return nil, cleanup, err
+		}
+		cleanup = func() { _ = os.Remove(f.Name()) }
+		cmd := exec.CommandContext(ctx, "sh", f.Name())
+		cmd.Dir = dir
+		return cmd, cleanup, nil
+	}
+	cmd := exec.CommandContext(ctx, script)
+	cmd.Dir = dir
+	return cmd, cleanup, nil
+}
+
+func looksLikeInlineScript(script string) bool {
+	trimmed := strings.TrimSpace(script)
+	return strings.Contains(trimmed, "\n") || strings.HasPrefix(trimmed, "#!")
+}
+
+func trimOutput(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) > 4000 {
+		return s[:4000]
+	}
+	return s
 }
 
 func (r *Runner) seedCase(c *v2case.Case) error {

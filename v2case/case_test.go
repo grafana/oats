@@ -113,6 +113,25 @@ expected:
 	}
 }
 
+func TestParse_CustomChecks(t *testing.T) {
+	src := []byte(`
+oats: 2
+name: custom checks
+seed:
+  type: app
+expected:
+  custom-checks:
+    - script: ./verify.sh
+`)
+	c, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := len(c.Expected.Custom); got != 1 || c.Expected.Custom[0].Script != "./verify.sh" {
+		t.Fatalf("custom checks: %+v", c.Expected.Custom)
+	}
+}
+
 func TestParse_RejectsUnknownFields(t *testing.T) {
 	src := []byte(`
 oats: 2
@@ -177,6 +196,33 @@ func TestValidate_NoExpectations(t *testing.T) {
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "expected:") {
 		t.Errorf("expected 'no expectations' error, got %v", err)
+	}
+}
+
+func TestValidate_CustomCheckOnlyCase(t *testing.T) {
+	c := &Case{
+		OatsVersion: 2,
+		Name:        "x",
+		Seed:        Seed{Type: "app"},
+		Expected:    Expected{Custom: []CustomCheck{{Script: "./verify.sh"}}},
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("expected custom-check-only case to validate, got %v", err)
+	}
+}
+
+func TestValidate_RejectsEmptyCustomCheck(t *testing.T) {
+	_, err := Parse([]byte(`
+oats: 2
+name: bad custom
+seed:
+  type: app
+expected:
+  custom-checks:
+    - script: ""
+`))
+	if err == nil || !strings.Contains(err.Error(), "expected.custom-checks[0].script") {
+		t.Fatalf("expected custom check error, got %v", err)
 	}
 }
 

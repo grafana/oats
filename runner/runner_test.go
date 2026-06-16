@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -300,6 +301,93 @@ expected:
 	}
 	if !strings.Contains(buf.String(), "OTLPHTTP") {
 		t.Errorf("seed-endpoint error not surfaced:\n%s", buf.String())
+	}
+}
+
+func TestRunCase_CustomCheckScriptPath(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "verify.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	c := mustParse(t, `
+oats: 2
+name: custom check path
+seed:
+  type: app
+expected:
+  custom-checks:
+    - script: ./verify.sh
+`)
+	c.SourcePath = filepath.Join(dir, "case.yaml")
+
+	exec := &stubExec{}
+	var buf bytes.Buffer
+	rep := report.NewTextReporter(&buf, report.VerboseDefault)
+	r := New(exec, rep, Endpoint{GCXContext: "test"}, Options{Timeout: 200 * time.Millisecond, SeedSettleDelay: 1})
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+	if !ok {
+		t.Fatalf("expected custom check path case to pass:\n%s", buf.String())
+	}
+}
+
+func TestRunCase_CustomCheckInlineScript(t *testing.T) {
+	c := mustParse(t, `
+oats: 2
+name: custom check inline
+seed:
+  type: app
+expected:
+  custom-checks:
+    - script: |
+        #!/bin/sh
+        exit 0
+`)
+
+	exec := &stubExec{}
+	var buf bytes.Buffer
+	rep := report.NewTextReporter(&buf, report.VerboseDefault)
+	r := New(exec, rep, Endpoint{GCXContext: "test"}, Options{Timeout: 200 * time.Millisecond, SeedSettleDelay: 1})
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+	if !ok {
+		t.Fatalf("expected inline custom check case to pass:\n%s", buf.String())
+	}
+}
+
+func TestRunCase_CustomCheckFailureSurfaced(t *testing.T) {
+	c := mustParse(t, `
+oats: 2
+name: custom check fail
+seed:
+  type: app
+expected:
+  custom-checks:
+    - script: |
+        #!/bin/sh
+        echo bad
+        exit 1
+`)
+
+	exec := &stubExec{}
+	var buf bytes.Buffer
+	rep := report.NewTextReporter(&buf, report.VerboseDefault)
+	r := New(exec, rep, Endpoint{GCXContext: "test"}, Options{Timeout: 200 * time.Millisecond, SeedSettleDelay: 1})
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+	if ok {
+		t.Fatalf("expected inline custom check case to fail")
+	}
+	if !strings.Contains(buf.String(), "custom-check: exit status 1") || !strings.Contains(buf.String(), "bad") {
+		t.Fatalf("expected custom-check failure output, got:\n%s", buf.String())
 	}
 }
 

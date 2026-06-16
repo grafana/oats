@@ -76,9 +76,6 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 	if len(def.Expected.ComposeLogs) > 0 {
 		warnings = append(warnings, "compose-logs assertions are not migrated")
 	}
-	if len(def.Expected.CustomChecks) > 0 {
-		warnings = append(warnings, "custom-checks are not migrated")
-	}
 
 	if def.DockerCompose != nil {
 		c.Seed.Type = "app"
@@ -150,6 +147,15 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 		})
 		if p.MatrixCondition != "" {
 			warnings = append(warnings, fmt.Sprintf("profile %q matrix-condition dropped", p.Query))
+		}
+	}
+	for _, cc := range def.Expected.CustomChecks {
+		if !keepForMatrix(cc.MatrixCondition, selectedMatrix) {
+			continue
+		}
+		c.Expected.Custom = append(c.Expected.Custom, v2case.CustomCheck{Script: cc.Script})
+		if cc.MatrixCondition != "" {
+			warnings = append(warnings, "custom-check matrix-condition dropped after filtering selected matrix")
 		}
 	}
 
