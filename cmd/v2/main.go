@@ -36,6 +36,7 @@ import (
 	"github.com/grafana/oats/cache"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/engine"
+	"github.com/grafana/oats/migrate"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
 )
@@ -49,6 +50,7 @@ func run() int {
 	configPath := flag.String("config", "oats.toml", "path to oats.toml")
 	gcxBin := flag.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
 	listOnly := flag.Bool("list", false, "print the run plan and exit (no execution)")
+	migratePath := flag.String("migrate", "", "convert one legacy OATS yaml file to v2 and print the result to stdout")
 	format := flag.String("format", "text", "output format: text | ndjson")
 	suiteFilterStr := flag.String("suite", "", "comma-separated suite names")
 	tagFilterStr := flag.String("tags", "", "comma-separated tag any-match")
@@ -64,6 +66,19 @@ func run() int {
 	flag.IntVar(&verbose, "v", 0, "verbosity (0-3)")
 
 	flag.Parse()
+
+	if *migratePath != "" {
+		out, warnings, err := migrate.ConvertFile(*migratePath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		for _, w := range warnings {
+			fmt.Fprintln(os.Stderr, "migrate warning:", w)
+		}
+		fmt.Print(string(out))
+		return 0
+	}
 
 	cfg, err := discovery.Load(*configPath)
 	if err != nil {

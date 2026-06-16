@@ -34,6 +34,13 @@ func ReadTestCases(input []string, evaluateIgnoreFile bool) ([]model.TestCase, e
 	return cases, nil
 }
 
+// LoadTestCaseDefinition reads one legacy OATS test case definition file,
+// resolving includes exactly like the v1 runner does. Template files return
+// (nil, nil), matching readTestCaseDefinition's semantics.
+func LoadTestCaseDefinition(path string) (*model.TestCaseDefinition, error) {
+	return readTestCaseDefinition(path, false)
+}
+
 func collectTestCases(base string, evaluateIgnoreFile bool) ([]model.TestCase, error) {
 	var cases []model.TestCase
 

@@ -145,6 +145,19 @@ func (a *AttributeExpectation) UnmarshalYAML(node *yaml.Node) error {
 	}
 }
 
+func (a AttributeExpectation) MarshalYAML() (any, error) {
+	switch {
+	case a.Value != nil && a.Present == nil:
+		return *a.Value, nil
+	case a.Value == nil && a.Present != nil:
+		return map[string]bool{"present": *a.Present}, nil
+	case a.Value == nil && a.Present == nil:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("attribute expectation cannot marshal value and present simultaneously")
+	}
+}
+
 type TraceAssertion struct {
 	TraceQL         string `yaml:"traceql"`
 	AssertionCommon `yaml:",inline"`
