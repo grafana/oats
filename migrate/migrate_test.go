@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/grafana/oats/model"
+	"github.com/grafana/oats/testhelpers/kubernetes"
 )
 
 func TestConvertDefinition_MapsSignalsToMatchSchema(t *testing.T) {
@@ -88,6 +89,52 @@ func TestConvertFile_RendersYAML(t *testing.T) {
 	for _, want := range []string{"oats: 2", "seed:", "input:", "path: /stock", "match:", "match_type: regexp", "db.system: h2", "promql: foo"} {
 		if !strings.Contains(text, want) {
 			fatalf(t, "expected migrated yaml to contain %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestConvertDefinition_KubernetesProducesFixtureHint(t *testing.T) {
+	def := model.TestCaseDefinition{
+		Kubernetes: &kubernetes.Kubernetes{
+			Dir:              "k8s",
+			AppService:       "dice",
+			AppDockerFile:    "Dockerfile",
+			AppDockerContext: "..",
+			AppDockerTag:     "dice:test",
+			AppDockerPort:    8080,
+			ImportImages:     []string{"busybox:latest"},
+		},
+		Expected: model.Expected{
+			Logs: []model.ExpectedLogs{{
+				LogQL: `{service_name="dice"}`,
+				Signal: model.ExpectedSignal{
+					NameEquals: "hello",
+				},
+			}},
+		},
+	}
+
+	c, warnings, err := ConvertDefinition(def, "k8s case")
+	if err != nil {
+		fatalf(t, "ConvertDefinition kubernetes: %v", err)
+	}
+	if c.Seed.Type != "app" {
+		fatalf(t, "expected app seed for kubernetes migration, got %+v", c.Seed)
+	}
+	joined := strings.Join(warnings, "\n")
+	for _, want := range []string{
+		`[fixture.k8s-case]`,
+		`type = "k3d"`,
+		`k8s_dir = "k8s"`,
+		`app_service = "dice"`,
+		`app_docker_file = "Dockerfile"`,
+		`app_docker_context = ".."`,
+		`app_docker_tag = "dice:test"`,
+		`app_port = 8080`,
+		`import_images = ["busybox:latest"]`,
+	} {
+		if !strings.Contains(joined, want) {
+			fatalf(t, "expected kubernetes migration warning to contain %q:\n%s", want, joined)
 		}
 	}
 }

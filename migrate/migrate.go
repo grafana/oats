@@ -43,7 +43,9 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 	}
 
 	if def.Kubernetes != nil {
-		return nil, warnings, fmt.Errorf("kubernetes fixtures are not yet supported by v2 migration")
+		c.Seed.Type = "app"
+		warnings = append(warnings, "legacy kubernetes fixture migrated as an app-backed case; paste the suggested [fixture] block below into oats.toml")
+		warnings = append(warnings, kubernetesFixtureHint(name, def))
 	}
 	if len(def.Matrix) > 0 {
 		warnings = append(warnings, "matrix definitions are not migrated; convert expanded matrix cases manually")
@@ -64,13 +66,11 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 			return nil, warnings, fmt.Errorf("docker-compose present but no files declared")
 		}
 		c.Seed.Compose = def.DockerCompose.Files[0]
-		if len(def.DockerCompose.Files) > 1 {
-			warnings = append(warnings, fmt.Sprintf("multiple docker-compose files collapsed to first entry %q", def.DockerCompose.Files[0]))
+		if len(def.DockerCompose.Files) > 1 || len(def.DockerCompose.Environment) > 0 {
+			warnings = append(warnings, "legacy docker-compose fixture uses suite-level config richer than case-level seed.compose; paste the suggested [fixture] block below into oats.toml")
+			warnings = append(warnings, composeFixtureHint(name, def))
 		}
-		if len(def.DockerCompose.Environment) > 0 {
-			warnings = append(warnings, "docker-compose env overrides are not represented in v2 yet")
-		}
-	} else {
+	} else if def.Kubernetes == nil {
 		warnings = append(warnings, "no docker-compose fixture found; defaulting seed.type to inline-otlp placeholder")
 		c.Seed.Type = "inline-otlp"
 		c.Seed.Traces = []v2case.SeedTrace{{Service: "migrated-service", Spans: []v2case.SeedSpan{{Name: "replace-me"}}}}
@@ -189,6 +189,77 @@ func deriveName(path string) string {
 	base = strings.ReplaceAll(base, "_", " ")
 	base = strings.ReplaceAll(base, "-", " ")
 	return strings.TrimSpace(base)
+}
+
+func composeFixtureHint(name string, def model.TestCaseDefinition) string {
+	fixtureName := slug(name)
+	var b strings.Builder
+	fmt.Fprintf(&b, "suggested oats.toml fixture snippet for %q:\n", name)
+	fmt.Fprintf(&b, "[fixture.%s]\n", fixtureName)
+	fmt.Fprintf(&b, "type = \"compose\"\n")
+	if len(def.DockerCompose.Files) == 1 {
+		fmt.Fprintf(&b, "compose_file = %q\n", def.DockerCompose.Files[0])
+	} else if len(def.DockerCompose.Files) > 1 {
+		fmt.Fprintf(&b, "compose_files = [%s]\n", quotedList(def.DockerCompose.Files))
+	}
+	if len(def.DockerCompose.Environment) > 0 {
+		fmt.Fprintf(&b, "env = [%s]\n", quotedList(def.DockerCompose.Environment))
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func kubernetesFixtureHint(name string, def model.TestCaseDefinition) string {
+	fixtureName := slug(name)
+	k := def.Kubernetes
+	var b strings.Builder
+	fmt.Fprintf(&b, "suggested oats.toml fixture snippet for %q:\n", name)
+	fmt.Fprintf(&b, "[fixture.%s]\n", fixtureName)
+	fmt.Fprintf(&b, "type = \"k3d\"\n")
+	fmt.Fprintf(&b, "k8s_dir = %q\n", k.Dir)
+	fmt.Fprintf(&b, "app_service = %q\n", k.AppService)
+	fmt.Fprintf(&b, "app_docker_file = %q\n", k.AppDockerFile)
+	if k.AppDockerContext != "" {
+		fmt.Fprintf(&b, "app_docker_context = %q\n", k.AppDockerContext)
+	}
+	fmt.Fprintf(&b, "app_docker_tag = %q\n", k.AppDockerTag)
+	fmt.Fprintf(&b, "app_port = %d\n", k.AppDockerPort)
+	if len(k.ImportImages) > 0 {
+		fmt.Fprintf(&b, "import_images = [%s]\n", quotedList(k.ImportImages))
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func quotedList(items []string) string {
+	quoted := make([]string, 0, len(items))
+	for _, item := range items {
+		quoted = append(quoted, fmt.Sprintf("%q", item))
+	}
+	return strings.Join(quoted, ", ")
+}
+
+func slug(s string) string {
+	s = strings.ToLower(s)
+	s = strings.ReplaceAll(s, "_", "-")
+	s = strings.ReplaceAll(s, " ", "-")
+	var b strings.Builder
+	lastDash := false
+	for _, r := range s {
+		keep := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		if keep {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		return "migrated"
+	}
+	return out
 }
 
 func strPtr(s string) *string { return &s }

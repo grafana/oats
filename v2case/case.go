@@ -44,11 +44,11 @@ type Case struct {
 // Seed declares how a case populates the stack before assertions run.
 // Exactly one of the fields beyond Type is meaningful per Type value:
 //
-//	type: app          → Compose is required
+//	type: app          → external suite fixture boots the app; Compose is optional
 //	type: inline-otlp  → Traces/Logs/Metrics describe the payload to push
 type Seed struct {
-	Type    string         `yaml:"type"` // "app" or "inline-otlp"
-	Compose string         `yaml:"compose,omitempty"`
+	Type    string         `yaml:"type"`              // "app" or "inline-otlp"
+	Compose string         `yaml:"compose,omitempty"` // optional legacy shorthand; suite fixture normally owns app boot
 	Traces  []SeedTrace    `yaml:"traces,omitempty"`
 	Logs    []SeedLog      `yaml:"logs,omitempty"`
 	Metrics []SeedMetric   `yaml:"metrics,omitempty"`
@@ -242,9 +242,9 @@ func (c *Case) Validate() error {
 	}
 	switch c.Seed.Type {
 	case "app":
-		if c.Seed.Compose == "" {
-			return fmt.Errorf("seed.compose: required when seed.type = app")
-		}
+		// App-backed cases are normally booted by the suite fixture declared in
+		// oats.toml. seed.compose remains accepted as a legacy/migration
+		// shorthand, but is not required for validation or execution here.
 	case "inline-otlp":
 		if len(c.Seed.Traces)+len(c.Seed.Logs)+len(c.Seed.Metrics) == 0 {
 			return fmt.Errorf("seed: inline-otlp must declare at least one trace, log, or metric")

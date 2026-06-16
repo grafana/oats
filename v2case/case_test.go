@@ -156,11 +156,11 @@ func TestValidate_UnknownSeedType(t *testing.T) {
 	}
 }
 
-func TestValidate_AppSeedNeedsCompose(t *testing.T) {
+func TestValidate_AppSeedAllowsFixtureManagedBoot(t *testing.T) {
 	c := &Case{OatsVersion: 2, Name: "x", Seed: Seed{Type: "app"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
 	err := c.Validate()
-	if err == nil || !strings.Contains(err.Error(), "seed.compose") {
-		t.Errorf("expected compose error, got %v", err)
+	if err != nil {
+		t.Errorf("expected app seed without compose to validate, got %v", err)
 	}
 }
 
