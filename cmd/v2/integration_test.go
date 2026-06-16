@@ -181,6 +181,45 @@ func TestStartFixture_K3DLifecycle(t *testing.T) {
 	}
 }
 
+func TestCloseFixture_EmitsTeardownEvent(t *testing.T) {
+	rep := &recordingReporter{}
+	fix := &fakeSuiteFixture{}
+	plan := discovery.Plan{
+		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Fixture: discovery.FixtureConfig{Type: "compose"},
+	}
+	if err := closeFixture(rep, plan, fix); err != nil {
+		t.Fatalf("closeFixture: %v", err)
+	}
+	if fix.closeCalls != 1 {
+		t.Fatalf("expected Close once, got %d", fix.closeCalls)
+	}
+	if len(rep.events) != 1 || rep.events[0].Type != report.EventFixtureTeardown {
+		t.Fatalf("expected one teardown event, got %+v", rep.events)
+	}
+	if rep.events[0].Fixture != "local" || rep.events[0].Suite != "smoke" || rep.events[0].FixtureType != "compose" {
+		t.Fatalf("unexpected teardown event: %+v", rep.events[0])
+	}
+}
+
+func TestCloseFixture_RemoteDoesNotEmitTeardownEvent(t *testing.T) {
+	rep := &recordingReporter{}
+	fix := &fakeSuiteFixture{}
+	plan := discovery.Plan{
+		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "remote-lgtm"},
+		Fixture: discovery.FixtureConfig{Type: "remote"},
+	}
+	if err := closeFixture(rep, plan, fix); err != nil {
+		t.Fatalf("closeFixture: %v", err)
+	}
+	if fix.closeCalls != 1 {
+		t.Fatalf("expected Close once, got %d", fix.closeCalls)
+	}
+	if len(rep.events) != 0 {
+		t.Fatalf("expected no teardown events for remote fixture, got %+v", rep.events)
+	}
+}
+
 // TestIntegration_FullPipelineWithFakeGCX wires the v2 chain end-to-end:
 // discovery → seed (against an httptest OTLP stub) → engine (against the
 // fake-gcx.sh shell script) → assertions → report. No real gcx, no real
@@ -802,3 +841,13 @@ func equalStrings(got, want []string) bool {
 	}
 	return true
 }
+
+type recordingReporter struct {
+	events []report.Event
+}
+
+func (r *recordingReporter) Emit(e report.Event) {
+	r.events = append(r.events, e)
+}
+
+func (r *recordingReporter) Close() error { return nil }

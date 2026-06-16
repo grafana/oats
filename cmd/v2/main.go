@@ -152,34 +152,17 @@ func run() int {
 	var totalPass, totalFail int
 
 	for _, plan := range plans {
-		fixtureStart := time.Now()
-		if plan.Fixture.Type != "" && plan.Fixture.Type != "remote" {
-			rep.Emit(report.Event{
-				Type:        report.EventFixtureStart,
-				Suite:       plan.Suite.Name,
-				Fixture:     plan.Suite.Fixture,
-				FixtureType: plan.Fixture.Type,
-				Ts:          fixtureStart,
-			})
-		}
+		fixtureStart := emitFixtureStart(rep, plan)
 		fix, err := startFixture(ctx, cfg.SourceDir, plan)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "suite %q: %v\n", plan.Suite.Name, err)
 			return 2
 		}
-		if plan.Fixture.Type != "" && plan.Fixture.Type != "remote" {
-			rep.Emit(report.Event{
-				Type:        report.EventFixtureReady,
-				Suite:       plan.Suite.Name,
-				Fixture:     plan.Suite.Fixture,
-				FixtureType: plan.Fixture.Type,
-				DurationMs:  time.Since(fixtureStart).Milliseconds(),
-			})
-		}
+		emitFixtureReady(rep, plan, fixtureStart)
 		ep, err := resolveEndpoint(cfg.SourceDir, plan, *gcxContextOverride, *appHost, *appPort, *otlpHTTP)
 		if err != nil {
 			if fix != nil {
-				_ = fix.Close()
+				_ = closeFixture(rep, plan, fix)
 			}
 			fmt.Fprintf(os.Stderr, "suite %q: %v\n", plan.Suite.Name, err)
 			return 2
@@ -236,18 +219,10 @@ func run() int {
 			Fail:  suiteFail,
 		})
 		if fix != nil {
-			teardownStart := time.Now()
-			if closeErr := fix.Close(); closeErr != nil {
+			if closeErr := closeFixture(rep, plan, fix); closeErr != nil {
 				fmt.Fprintf(os.Stderr, "suite %q: fixture shutdown: %v\n", plan.Suite.Name, closeErr)
 				return 2
 			}
-			rep.Emit(report.Event{
-				Type:        report.EventFixtureTeardown,
-				Suite:       plan.Suite.Name,
-				Fixture:     plan.Suite.Fixture,
-				FixtureType: plan.Fixture.Type,
-				DurationMs:  time.Since(teardownStart).Milliseconds(),
-			})
 		}
 	}
 
@@ -381,6 +356,49 @@ func startSuiteFixture(fix suiteFixture) error {
 		return fmt.Errorf("fixture does not support startup")
 	}
 	return startable.Up()
+}
+
+func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {
+	start := time.Now()
+	if plan.Fixture.Type != "" && plan.Fixture.Type != "remote" {
+		rep.Emit(report.Event{
+			Type:        report.EventFixtureStart,
+			Suite:       plan.Suite.Name,
+			Fixture:     plan.Suite.Fixture,
+			FixtureType: plan.Fixture.Type,
+			Ts:          start,
+		})
+	}
+	return start
+}
+
+func emitFixtureReady(rep report.Reporter, plan discovery.Plan, start time.Time) {
+	if plan.Fixture.Type != "" && plan.Fixture.Type != "remote" {
+		rep.Emit(report.Event{
+			Type:        report.EventFixtureReady,
+			Suite:       plan.Suite.Name,
+			Fixture:     plan.Suite.Fixture,
+			FixtureType: plan.Fixture.Type,
+			DurationMs:  time.Since(start).Milliseconds(),
+		})
+	}
+}
+
+func closeFixture(rep report.Reporter, plan discovery.Plan, fix suiteFixture) error {
+	start := time.Now()
+	if err := fix.Close(); err != nil {
+		return err
+	}
+	if plan.Fixture.Type != "" && plan.Fixture.Type != "remote" {
+		rep.Emit(report.Event{
+			Type:        report.EventFixtureTeardown,
+			Suite:       plan.Suite.Name,
+			Fixture:     plan.Suite.Fixture,
+			FixtureType: plan.Fixture.Type,
+			DurationMs:  time.Since(start).Milliseconds(),
+		})
+	}
+	return nil
 }
 
 type endpointFixture struct {
