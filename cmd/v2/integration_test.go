@@ -561,6 +561,106 @@ endpoint = "http://localhost:4318"
 	}
 }
 
+func TestIntegration_MigratedSingleMatrixCaseRuns(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake-gcx is a POSIX shell script")
+	}
+
+	legacyPath := filepath.Join(t.TempDir(), "legacy-matrix.oats.yaml")
+	writeFile(t, filepath.Dir(legacyPath), filepath.Base(legacyPath), `
+oats-schema-version: 2
+matrix:
+  - name: docker
+    docker-compose:
+      files:
+        - docker-compose.yml
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "gcx-e2e-seed" }'
+      equals: seed-operation
+      attributes:
+        service.name: gcx-e2e-seed
+      matrix-condition: docker
+    - traceql: '{ resource.service.name = "gcx-e2e-seed" }'
+      equals: should-not-run
+      matrix-condition: k8s
+  logs:
+    - logql: '{service_name="gcx-e2e-seed"}'
+      equals: seed-log-line
+      attributes:
+        service_name: gcx-e2e-seed
+      matrix-condition: docker
+`)
+	migrated, warnings, err := migrate.ConvertFile(legacyPath)
+	if err != nil {
+		t.Fatalf("ConvertFile: %v", err)
+	}
+	if joined := strings.Join(warnings, "\n"); !strings.Contains(joined, `flattened single matrix entry "docker"`) {
+		t.Fatalf("expected flattening warning, got: %v", warnings)
+	}
+
+	dir := t.TempDir()
+	writeFile(t, dir, "oats.toml", `
+[meta]
+version = 2
+
+[[suite]]
+name    = "migrated-matrix"
+cases   = ["cases/*.yaml"]
+fixture = "remote-lgtm"
+
+[fixture.remote-lgtm]
+type     = "remote"
+endpoint = "http://localhost:4318"
+`)
+	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
+
+	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	plans, err := cfg.PlanRun(discovery.Filter{})
+	if err != nil {
+		t.Fatalf("PlanRun: %v", err)
+	}
+	if len(plans) != 1 || len(plans[0].Cases) != 1 {
+		t.Fatalf("expected one plan with one case, got %+v", plans)
+	}
+	if got := plans[0].Cases[0].Name; got != "legacy matrix.oats [docker]" {
+		t.Fatalf("unexpected migrated case name: %q", got)
+	}
+	if got := len(plans[0].Cases[0].Expected.Traces); got != 1 {
+		t.Fatalf("expected k8s-only assertion to be filtered out, got %d traces", got)
+	}
+
+	ep, err := resolveEndpoint(dir, plans[0], "", "localhost", 8080, "http://localhost:4318")
+	if err != nil {
+		t.Fatalf("resolveEndpoint: %v", err)
+	}
+
+	_, here, _, _ := runtime.Caller(0)
+	fakeGCX := filepath.Join(filepath.Dir(here), "testdata", "fake-gcx.sh")
+	exec := &engine.GCX{Binary: fakeGCX, Context: ep.GCXContext}
+	var buf bytes.Buffer
+	rep := report.NewTextReporter(&buf, report.VerboseDefault)
+	rep.Emit(report.Event{Type: report.EventRunStart, OatsVersion: "test", SchemaVersion: report.SchemaVersion})
+
+	r := runner.New(exec, rep, ep, runner.Options{
+		Timeout:         500 * time.Millisecond,
+		Interval:        20 * time.Millisecond,
+		SeedSettleDelay: 5 * time.Millisecond,
+	})
+
+	ok := r.RunCase(context.Background(), plans[0].Cases[0])
+	rep.Emit(report.Event{Type: report.EventRunEnd})
+	if !ok {
+		t.Fatalf("migrated matrix case did not pass:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "PASS 1/1") {
+		t.Fatalf("summary line missing or wrong:\n%s", buf.String())
+	}
+}
+
 func writeFile(t *testing.T, dir, rel, body string) {
 	t.Helper()
 	p := filepath.Join(dir, rel)
