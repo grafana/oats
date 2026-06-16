@@ -220,6 +220,48 @@ func TestCloseFixture_RemoteDoesNotEmitTeardownEvent(t *testing.T) {
 	}
 }
 
+func TestEmitFixtureStartAndReady(t *testing.T) {
+	rep := &recordingReporter{}
+	plan := discovery.Plan{
+		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Fixture: discovery.FixtureConfig{Type: "compose"},
+	}
+	start := emitFixtureStart(rep, plan)
+	if start.IsZero() {
+		t.Fatalf("expected non-zero start time")
+	}
+	if len(rep.events) != 1 || rep.events[0].Type != report.EventFixtureStart {
+		t.Fatalf("expected one fixture.start event, got %+v", rep.events)
+	}
+	if rep.events[0].Fixture != "local" || rep.events[0].Suite != "smoke" || rep.events[0].FixtureType != "compose" {
+		t.Fatalf("unexpected fixture.start event: %+v", rep.events[0])
+	}
+
+	emitFixtureReady(rep, plan, start.Add(-5*time.Millisecond))
+	if len(rep.events) != 2 || rep.events[1].Type != report.EventFixtureReady {
+		t.Fatalf("expected fixture.ready event, got %+v", rep.events)
+	}
+	if rep.events[1].DurationMs <= 0 {
+		t.Fatalf("expected positive ready duration, got %+v", rep.events[1])
+	}
+}
+
+func TestEmitFixtureStartAndReady_NoOpForRemote(t *testing.T) {
+	rep := &recordingReporter{}
+	plan := discovery.Plan{
+		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "remote-lgtm"},
+		Fixture: discovery.FixtureConfig{Type: "remote"},
+	}
+	start := emitFixtureStart(rep, plan)
+	if start.IsZero() {
+		t.Fatalf("expected non-zero start time")
+	}
+	emitFixtureReady(rep, plan, start)
+	if len(rep.events) != 0 {
+		t.Fatalf("expected no events for remote fixture lifecycle helpers, got %+v", rep.events)
+	}
+}
+
 // TestIntegration_FullPipelineWithFakeGCX wires the v2 chain end-to-end:
 // discovery → seed (against an httptest OTLP stub) → engine (against the
 // fake-gcx.sh shell script) → assertions → report. No real gcx, no real
