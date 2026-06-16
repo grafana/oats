@@ -3,15 +3,19 @@ package v2case
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParse_AppSeed(t *testing.T) {
 	src := []byte(`
 oats: 2
 name: rolldice traces have route attribute
+interval: 250ms
 seed:
   type: app
   compose: docker-compose.app.yml
+input:
+  - path: /rolldice?rolls=5
 expected:
   traces:
     - traceql: '{ span.http.route = "/rolldice" }'
@@ -29,6 +33,12 @@ expected:
 	}
 	if c.Seed.Type != "app" || c.Seed.Compose != "docker-compose.app.yml" {
 		t.Errorf("Seed: %+v", c.Seed)
+	}
+	if c.Interval != 250*time.Millisecond {
+		t.Errorf("Interval: got %v", c.Interval)
+	}
+	if len(c.Input) != 1 || c.Input[0].Path != "/rolldice?rolls=5" {
+		t.Errorf("Input: %+v", c.Input)
 	}
 	if len(c.Expected.Traces) != 1 || c.Expected.Traces[0].TraceQL == "" {
 		t.Errorf("Expected.Traces: %+v", c.Expected.Traces)
@@ -167,6 +177,25 @@ func TestValidate_NoExpectations(t *testing.T) {
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "expected:") {
 		t.Errorf("expected 'no expectations' error, got %v", err)
+	}
+}
+
+func TestValidate_RejectsInputWithoutPath(t *testing.T) {
+	_, err := Parse([]byte(`
+oats: 2
+name: bad input
+seed:
+  type: app
+  compose: x.yml
+input:
+  - method: POST
+expected:
+  metrics:
+    - promql: up
+      value: ">= 1"
+`))
+	if err == nil || !strings.Contains(err.Error(), "input[0].path") {
+		t.Fatalf("expected input path error, got %v", err)
 	}
 }
 

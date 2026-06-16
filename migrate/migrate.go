@@ -39,6 +39,7 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 	c := &v2case.Case{
 		OatsVersion: v2case.SchemaVersion,
 		Name:        name,
+		Interval:    def.Interval,
 	}
 
 	if def.Kubernetes != nil {
@@ -49,12 +50,6 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 	}
 	if len(def.Include) > 0 {
 		warnings = append(warnings, "include directives were resolved before migration; output is a flattened case")
-	}
-	if len(def.Input) > 0 {
-		warnings = append(warnings, "input requests are not represented in v2 yet; dropped from migrated output")
-	}
-	if def.Interval != 0 {
-		warnings = append(warnings, "interval is not represented in v2 yet; dropped from migrated output")
 	}
 	if len(def.Expected.ComposeLogs) > 0 {
 		warnings = append(warnings, "compose-logs assertions are not migrated")
@@ -79,6 +74,18 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 		warnings = append(warnings, "no docker-compose fixture found; defaulting seed.type to inline-otlp placeholder")
 		c.Seed.Type = "inline-otlp"
 		c.Seed.Traces = []v2case.SeedTrace{{Service: "migrated-service", Spans: []v2case.SeedSpan{{Name: "replace-me"}}}}
+	}
+
+	for _, in := range def.Input {
+		c.Input = append(c.Input, v2case.Input{
+			Scheme:  in.Scheme,
+			Host:    in.Host,
+			Method:  in.Method,
+			Path:    in.Path,
+			Headers: in.Headers,
+			Body:    in.Body,
+			Status:  in.Status,
+		})
 	}
 
 	for _, tr := range def.Expected.Traces {

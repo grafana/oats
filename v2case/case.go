@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -26,12 +27,14 @@ const SchemaVersion = 2
 // Case is one entry point yaml file. Cases are independently runnable;
 // suites group them via oats.toml.
 type Case struct {
-	OatsVersion int      `yaml:"oats"`
-	Name        string   `yaml:"name"`
-	Tags        []string `yaml:"tags,omitempty"`
-	Hermetic    *bool    `yaml:"hermetic,omitempty"` // pointer: distinguish unset vs explicit false
+	OatsVersion int           `yaml:"oats"`
+	Name        string        `yaml:"name"`
+	Tags        []string      `yaml:"tags,omitempty"`
+	Hermetic    *bool         `yaml:"hermetic,omitempty"` // pointer: distinguish unset vs explicit false
+	Interval    time.Duration `yaml:"interval,omitempty"`
 
 	Seed     Seed     `yaml:"seed"`
+	Input    []Input  `yaml:"input,omitempty"`
 	Expected Expected `yaml:"expected"`
 
 	// SourcePath is filled by the loader; not part of the yaml surface.
@@ -74,6 +77,18 @@ type SeedMetric struct {
 	Service string `yaml:"service"`
 	Name    string `yaml:"name"`
 	Value   int64  `yaml:"value"`
+}
+
+// Input drives the application under test so telemetry is emitted before
+// assertions run. It mirrors the legacy OATS HTTP request shape.
+type Input struct {
+	Scheme  string            `yaml:"scheme,omitempty"`
+	Host    string            `yaml:"host,omitempty"`
+	Method  string            `yaml:"method,omitempty"`
+	Path    string            `yaml:"path"`
+	Headers map[string]string `yaml:"headers,omitempty"`
+	Body    string            `yaml:"body,omitempty"`
+	Status  string            `yaml:"status,omitempty"`
 }
 
 // Expected groups per-signal assertion blocks. A case may omit any signal it
@@ -222,6 +237,9 @@ func (c *Case) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("name: required, non-empty")
 	}
+	if c.Interval < 0 {
+		return fmt.Errorf("interval: must be >= 0")
+	}
 	switch c.Seed.Type {
 	case "app":
 		if c.Seed.Compose == "" {
@@ -238,6 +256,11 @@ func (c *Case) Validate() error {
 	}
 	if len(c.Expected.Traces)+len(c.Expected.Metrics)+len(c.Expected.Logs)+len(c.Expected.Profiles) == 0 {
 		return fmt.Errorf("expected: at least one signal assertion required (a case with no expectations cannot fail)")
+	}
+	for i, in := range c.Input {
+		if in.Path == "" {
+			return fmt.Errorf("input[%d].path: required, non-empty", i)
+		}
 	}
 	for i := range c.Expected.Traces {
 		if c.Expected.Traces[i].TraceQL == "" {

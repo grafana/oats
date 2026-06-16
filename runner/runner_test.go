@@ -3,7 +3,11 @@ package runner
 import (
 	"bytes"
 	"context"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -222,6 +226,50 @@ expected:
 	}
 }
 
+func TestRunCase_DrivesInputRequests(t *testing.T) {
+	var hits int
+	app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		if r.Method != http.MethodPost || r.URL.Path != "/rolldice" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer app.Close()
+	host, port := splitHostPort(t, app.Listener.Addr().String())
+
+	exec := &stubExec{stdout: "found span service.name=svc"}
+	r, _ := newRunner(t, exec, Options{Timeout: 100 * time.Millisecond, Interval: 5 * time.Millisecond, SeedSettleDelay: 1})
+	r.endpoint.AppHost = host
+	r.endpoint.AppPort = port
+
+	c := mustParse(t, `
+oats: 2
+name: traces pass with input
+seed:
+  type: app
+  compose: x.yml
+input:
+  - path: /rolldice
+    method: POST
+    status: "201"
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "svc" }'
+      contains: ["svc"]
+`)
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+	if !ok {
+		t.Fatalf("expected case to pass")
+	}
+	if hits == 0 {
+		t.Fatalf("expected at least one input request")
+	}
+}
+
 func TestRunCase_InlineOTLPSeedRequiresEndpoint(t *testing.T) {
 	c := mustParse(t, `
 oats: 2
@@ -324,4 +372,17 @@ func containsSequence(haystack []string, needles ...string) bool {
 		}
 	}
 	return false
+}
+
+func splitHostPort(t *testing.T, addr string) (string, int) {
+	t.Helper()
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatalf("SplitHostPort: %v", err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("Atoi: %v", err)
+	}
+	return host, port
 }

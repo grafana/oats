@@ -49,6 +49,12 @@ func TestConvertDefinition_MapsSignalsToMatchSchema(t *testing.T) {
 	if c.Seed.Type != "app" || c.Seed.Compose != "docker-compose.yml" {
 		fatalf(t, "unexpected seed mapping: %+v", c.Seed)
 	}
+	if c.Interval != 500*time.Millisecond {
+		fatalf(t, "expected interval to carry over, got %v", c.Interval)
+	}
+	if len(c.Input) != 1 || c.Input[0].Path != "/stock" {
+		fatalf(t, "expected input to carry over, got %+v", c.Input)
+	}
 	if len(c.Expected.Traces) != 1 || len(c.Expected.Traces[0].Match) != 2 {
 		fatalf(t, "expected trace strict+regexp split, got %+v", c.Expected.Traces)
 	}
@@ -62,10 +68,10 @@ func TestConvertDefinition_MapsSignalsToMatchSchema(t *testing.T) {
 		fatalf(t, "unexpected profile match mapping: %+v", c.Expected.Profiles[0].Match)
 	}
 	if len(warnings) == 0 {
-		fatalf(t, "expected warnings for dropped input/interval or lossy count")
+		fatalf(t, "expected warnings for lossy count")
 	}
 	joined := strings.Join(warnings, "\n")
-	if !strings.Contains(joined, "input requests are not represented") || !strings.Contains(joined, "count max=3 dropped") {
+	if strings.Contains(joined, "input requests are not represented") || !strings.Contains(joined, "count max=3 dropped") {
 		fatalf(t, "expected warnings not found:\n%s", joined)
 	}
 }
@@ -76,10 +82,10 @@ func TestConvertFile_RendersYAML(t *testing.T) {
 		fatalf(t, "ConvertFile: %v", err)
 	}
 	if len(warnings) == 0 {
-		fatalf(t, "expected at least one warning for flattened include/input migration")
+		fatalf(t, "expected at least one warning for flattened include or fixture migration")
 	}
 	text := string(out)
-	for _, want := range []string{"oats: 2", "seed:", "match:", "match_type: regexp", "db.system: h2", "promql: foo"} {
+	for _, want := range []string{"oats: 2", "seed:", "input:", "path: /stock", "match:", "match_type: regexp", "db.system: h2", "promql: foo"} {
 		if !strings.Contains(text, want) {
 			fatalf(t, "expected migrated yaml to contain %q:\n%s", want, text)
 		}

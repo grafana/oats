@@ -10,7 +10,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +23,7 @@ import (
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/seed"
 	"github.com/grafana/oats/signalcmd"
+	"github.com/grafana/oats/testhelpers/requests"
 	"github.com/grafana/oats/v2case"
 	"github.com/grafana/oats/wait"
 )
@@ -34,6 +38,12 @@ type Endpoint struct {
 	// OTLPHTTP is the base URL for OTLP/HTTP seed POSTs ("http://localhost:4318").
 	// Required when any case uses seed.type = inline-otlp.
 	OTLPHTTP string
+
+	// AppHost/AppPort identify the application under test for `input` request
+	// driving. Individual inputs may override host or scheme, but the port
+	// comes from here.
+	AppHost string
+	AppPort int
 }
 
 // Options configures the polling cadence and per-case deadline. Sensible
@@ -290,6 +300,9 @@ func (r *Runner) pollAssert(
 	cmdStr := signalcmd.Render(args)
 
 	run := func() []assert.Failure {
+		if err := r.driveInputs(c); err != nil {
+			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
+		}
 		res, err := r.exec.Execute(ctx, args...)
 		if err != nil {
 			return []assert.Failure{{Rule: "exec", Detail: err.Error()}}
@@ -302,7 +315,7 @@ func (r *Runner) pollAssert(
 		return evalFn(res.Stdout, res.Stderr, res.ExitCode)
 	}
 
-	opts := wait.Options{Timeout: r.opts.Timeout, Interval: r.opts.Interval}
+	opts := wait.Options{Timeout: r.opts.Timeout, Interval: r.caseInterval(c)}
 	var result wait.Result[assert.Failure]
 	if absent {
 		opts.Timeout = r.opts.AbsentTimeout
@@ -324,6 +337,13 @@ func (r *Runner) pollAssert(
 		})
 	}
 	return false
+}
+
+func (r *Runner) caseInterval(c *v2case.Case) time.Duration {
+	if c.Interval > 0 {
+		return c.Interval
+	}
+	return r.opts.Interval
 }
 
 func (r *Runner) runTrace(ctx context.Context, c *v2case.Case, a *v2case.TraceAssertion) bool {
@@ -485,6 +505,52 @@ func (r *Runner) failCase(c *v2case.Case, msg, cmd string) {
 		Msg:    msg,
 		Cmd:    cmd,
 	})
+}
+
+func (r *Runner) driveInputs(c *v2case.Case) error {
+	for _, in := range c.Input {
+		if err := r.doInput(in); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Runner) doInput(in v2case.Input) error {
+	if in.Path == "" {
+		return nil
+	}
+	host := r.endpoint.AppHost
+	if in.Host != "" {
+		host = in.Host
+	}
+	if host == "" || r.endpoint.AppPort == 0 {
+		return fmt.Errorf("input requires application endpoint; set --app-host/--app-port or provide fixture-derived app endpoint")
+	}
+	scheme := "http"
+	if in.Scheme != "" {
+		scheme = in.Scheme
+	}
+	method := http.MethodGet
+	if in.Method != "" {
+		method = strings.ToUpper(in.Method)
+	}
+	status := 200
+	if in.Status != "" {
+		parsed, err := strconv.Atoi(in.Status)
+		if err != nil {
+			return fmt.Errorf("input status %q is not an integer", in.Status)
+		}
+		status = parsed
+	}
+	headers := map[string]string{}
+	if in.Headers != nil {
+		maps.Copy(headers, in.Headers)
+	} else {
+		headers["Accept"] = "application/json"
+	}
+	url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.endpoint.AppPort, in.Path)
+	return requests.DoHTTPRequest(url, method, headers, in.Body, status)
 }
 
 func extractLogRows(stdout string) ([]assert.Row, int, error) {

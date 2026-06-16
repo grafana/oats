@@ -59,6 +59,8 @@ func run() int {
 	absentTimeout := flag.Duration("absent-timeout", 10*time.Second, "absence-check window")
 	seedSettle := flag.Duration("seed-settle", 2*time.Second, "post-seed wait before first assertion")
 	gcxContextOverride := flag.String("gcx-context", "", "override the gcx --context value (otherwise derived from fixture endpoint)")
+	appHost := flag.String("app-host", "localhost", "application host for driving case input requests")
+	appPort := flag.Int("app-port", 8080, "application port for driving case input requests")
 	noCache := flag.Bool("no-cache", false, "disable the skip-when-unchanged cache for this run")
 	cacheDir := flag.String("cache-dir", defaultCacheDir(), "directory for the skip-when-unchanged cache")
 
@@ -123,7 +125,7 @@ func run() int {
 	var totalPass, totalFail int
 
 	for _, plan := range plans {
-		ep, err := resolveEndpoint(plan, *gcxContextOverride)
+		ep, err := resolveEndpoint(plan, *gcxContextOverride, *appHost, *appPort)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "suite %q: %v\n", plan.Suite.Name, err)
 			return 2
@@ -219,8 +221,8 @@ func verbosityFromInt(n int) report.Verbosity {
 // resolveEndpoint maps a fixture config + an explicit override into the
 // concrete endpoint the runner needs. The v2 branch ships with "remote"
 // support only at this stage; "compose" and "k3d" will land later.
-func resolveEndpoint(plan discovery.Plan, gcxContextOverride string) (runner.Endpoint, error) {
-	ep := runner.Endpoint{}
+func resolveEndpoint(plan discovery.Plan, gcxContextOverride, appHost string, appPort int) (runner.Endpoint, error) {
+	ep := runner.Endpoint{AppHost: appHost, AppPort: appPort}
 	switch plan.Fixture.Type {
 	case "remote":
 		// For a remote fixture, the gcx context is configured externally
