@@ -18,6 +18,37 @@ import (
 	"github.com/grafana/oats/runner"
 )
 
+func TestResolveComposeFile(t *testing.T) {
+	got, err := resolveComposeFile("/tmp/work", discovery.FixtureConfig{Type: "compose", ComposeFile: "stack/compose.yml"})
+	if err != nil {
+		t.Fatalf("resolveComposeFile compose_file: %v", err)
+	}
+	if want := "/tmp/work/stack/compose.yml"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+
+	got, err = resolveComposeFile("/tmp/work", discovery.FixtureConfig{Type: "compose", Template: "lgtm"})
+	if err != nil {
+		t.Fatalf("resolveComposeFile template=lgtm: %v", err)
+	}
+	if want := "/tmp/work/docker-compose.yml"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestResolveEndpoint_ComposeDefaults(t *testing.T) {
+	ep, err := resolveEndpoint("/tmp/work", discovery.Plan{
+		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Fixture: discovery.FixtureConfig{Type: "compose", Template: "lgtm"},
+	}, "", "localhost", 8080, "http://localhost:4318")
+	if err != nil {
+		t.Fatalf("resolveEndpoint: %v", err)
+	}
+	if ep.GCXContext != "local" || ep.AppHost != "localhost" || ep.AppPort != 8080 || ep.OTLPHTTP != "http://localhost:4318" {
+		t.Fatalf("unexpected endpoint: %+v", ep)
+	}
+}
+
 // TestIntegration_FullPipelineWithFakeGCX wires the v2 chain end-to-end:
 // discovery → seed (against an httptest OTLP stub) → engine (against the
 // fake-gcx.sh shell script) → assertions → report. No real gcx, no real

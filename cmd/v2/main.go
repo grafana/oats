@@ -39,6 +39,7 @@ import (
 	"github.com/grafana/oats/migrate"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
+	"github.com/grafana/oats/testhelpers/compose"
 )
 
 func main() {
@@ -61,6 +62,7 @@ func run() int {
 	gcxContextOverride := flag.String("gcx-context", "", "override the gcx --context value (otherwise derived from fixture endpoint)")
 	appHost := flag.String("app-host", "localhost", "application host for driving case input requests")
 	appPort := flag.Int("app-port", 8080, "application port for driving case input requests")
+	otlpHTTP := flag.String("otlp-http", "http://localhost:4318", "OTLP/HTTP base URL for inline-otlp seed mode")
 	noCache := flag.Bool("no-cache", false, "disable the skip-when-unchanged cache for this run")
 	cacheDir := flag.String("cache-dir", defaultCacheDir(), "directory for the skip-when-unchanged cache")
 
@@ -125,8 +127,16 @@ func run() int {
 	var totalPass, totalFail int
 
 	for _, plan := range plans {
-		ep, err := resolveEndpoint(plan, *gcxContextOverride, *appHost, *appPort)
+		fix, err := startFixture(ctx, cfg.SourceDir, plan)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "suite %q: %v\n", plan.Suite.Name, err)
+			return 2
+		}
+		ep, err := resolveEndpoint(cfg.SourceDir, plan, *gcxContextOverride, *appHost, *appPort, *otlpHTTP)
+		if err != nil {
+			if fix != nil {
+				_ = fix.Close()
+			}
 			fmt.Fprintf(os.Stderr, "suite %q: %v\n", plan.Suite.Name, err)
 			return 2
 		}
@@ -181,6 +191,12 @@ func run() int {
 			Pass:  suitePass,
 			Fail:  suiteFail,
 		})
+		if fix != nil {
+			if closeErr := fix.Close(); closeErr != nil {
+				fmt.Fprintf(os.Stderr, "suite %q: fixture shutdown: %v\n", plan.Suite.Name, closeErr)
+				return 2
+			}
+		}
 	}
 
 	rep.Emit(report.Event{
@@ -221,8 +237,8 @@ func verbosityFromInt(n int) report.Verbosity {
 // resolveEndpoint maps a fixture config + an explicit override into the
 // concrete endpoint the runner needs. The v2 branch ships with "remote"
 // support only at this stage; "compose" and "k3d" will land later.
-func resolveEndpoint(plan discovery.Plan, gcxContextOverride, appHost string, appPort int) (runner.Endpoint, error) {
-	ep := runner.Endpoint{AppHost: appHost, AppPort: appPort}
+func resolveEndpoint(sourceDir string, plan discovery.Plan, gcxContextOverride, appHost string, appPort int, otlpHTTP string) (runner.Endpoint, error) {
+	ep := runner.Endpoint{AppHost: appHost, AppPort: appPort, OTLPHTTP: otlpHTTP}
 	switch plan.Fixture.Type {
 	case "remote":
 		// For a remote fixture, the gcx context is configured externally
@@ -230,6 +246,8 @@ func resolveEndpoint(plan discovery.Plan, gcxContextOverride, appHost string, ap
 		// best-effort default; --gcx-context overrides.
 		ep.GCXContext = plan.Suite.Fixture
 		ep.OTLPHTTP = plan.Fixture.Endpoint
+	case "compose":
+		ep.GCXContext = plan.Suite.Fixture
 	case "":
 		// No fixture configured — caller (or --gcx-context) must supply
 		// everything. Useful while plumbing v2 against an external setup.
@@ -243,6 +261,46 @@ func resolveEndpoint(plan discovery.Plan, gcxContextOverride, appHost string, ap
 		return ep, fmt.Errorf("gcx context unresolved; set fixture.<name>.endpoint or pass --gcx-context")
 	}
 	return ep, nil
+}
+
+type suiteFixture interface {
+	Close() error
+}
+
+func startFixture(_ context.Context, sourceDir string, plan discovery.Plan) (suiteFixture, error) {
+	switch plan.Fixture.Type {
+	case "", "remote":
+		return nil, nil
+	case "compose":
+		composeFile, err := resolveComposeFile(sourceDir, plan.Fixture)
+		if err != nil {
+			return nil, err
+		}
+		suite, err := compose.Suite(composeFile)
+		if err != nil {
+			return nil, err
+		}
+		if err := suite.Up(); err != nil {
+			return nil, err
+		}
+		return suite, nil
+	default:
+		return nil, fmt.Errorf("fixture type %q is not yet supported in oats-v2 (k3d arrives in follow-up commits)", plan.Fixture.Type)
+	}
+}
+
+func resolveComposeFile(sourceDir string, fixture discovery.FixtureConfig) (string, error) {
+	if fixture.ComposeFile != "" {
+		return filepath.Join(sourceDir, fixture.ComposeFile), nil
+	}
+	switch fixture.Template {
+	case "lgtm":
+		return filepath.Join(sourceDir, "docker-compose.yml"), nil
+	case "":
+		return "", fmt.Errorf("compose fixture requires compose_file or supported template")
+	default:
+		return "", fmt.Errorf("unsupported compose fixture template %q", fixture.Template)
+	}
 }
 
 func splitCSV(s string) []string {
