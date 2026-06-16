@@ -262,11 +262,15 @@ func TestExampleV2SmokeConfigLoads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PlanRun example config: %v", err)
 	}
-	if len(plans) != 1 || len(plans[0].Cases) != 1 {
-		t.Fatalf("expected one suite/one case, got %+v", plans)
+	if len(plans) != 1 || len(plans[0].Cases) != 3 {
+		t.Fatalf("expected one suite/three cases, got %+v", plans)
 	}
-	if plans[0].Cases[0].Name != "rolldice smoke" {
-		t.Fatalf("unexpected case name: %q", plans[0].Cases[0].Name)
+	got := []string{plans[0].Cases[0].Name, plans[0].Cases[1].Name, plans[0].Cases[2].Name}
+	want := []string{"custom check smoke", "inline seed smoke", "rolldice smoke"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected case order: got %v want %v", got, want)
+		}
 	}
 }
 

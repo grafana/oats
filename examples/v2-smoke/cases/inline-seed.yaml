@@ -1,0 +1,16 @@
+oats: 2
+name: inline seed smoke
+seed:
+  type: inline-otlp
+  traces:
+    - service: gcx-e2e-seed
+      spans:
+        - name: seed-operation
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "gcx-e2e-seed" }'
+      match:
+        - name: seed-operation
+          attributes:
+            service.name: gcx-e2e-seed
+

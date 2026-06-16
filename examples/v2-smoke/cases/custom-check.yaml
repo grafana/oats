@@ -1,0 +1,8 @@
+oats: 2
+name: custom check smoke
+seed:
+  type: app
+expected:
+  custom-checks:
+    - script: ../scripts/verify.sh
+
