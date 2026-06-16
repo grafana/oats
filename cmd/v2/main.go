@@ -152,10 +152,29 @@ func run() int {
 	var totalPass, totalFail int
 
 	for _, plan := range plans {
+		fixtureStart := time.Now()
+		if plan.Fixture.Type != "" && plan.Fixture.Type != "remote" {
+			rep.Emit(report.Event{
+				Type:        report.EventFixtureStart,
+				Suite:       plan.Suite.Name,
+				Fixture:     plan.Suite.Fixture,
+				FixtureType: plan.Fixture.Type,
+				Ts:          fixtureStart,
+			})
+		}
 		fix, err := startFixture(ctx, cfg.SourceDir, plan)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "suite %q: %v\n", plan.Suite.Name, err)
 			return 2
+		}
+		if plan.Fixture.Type != "" && plan.Fixture.Type != "remote" {
+			rep.Emit(report.Event{
+				Type:        report.EventFixtureReady,
+				Suite:       plan.Suite.Name,
+				Fixture:     plan.Suite.Fixture,
+				FixtureType: plan.Fixture.Type,
+				DurationMs:  time.Since(fixtureStart).Milliseconds(),
+			})
 		}
 		ep, err := resolveEndpoint(cfg.SourceDir, plan, *gcxContextOverride, *appHost, *appPort, *otlpHTTP)
 		if err != nil {
@@ -217,10 +236,18 @@ func run() int {
 			Fail:  suiteFail,
 		})
 		if fix != nil {
+			teardownStart := time.Now()
 			if closeErr := fix.Close(); closeErr != nil {
 				fmt.Fprintf(os.Stderr, "suite %q: fixture shutdown: %v\n", plan.Suite.Name, closeErr)
 				return 2
 			}
+			rep.Emit(report.Event{
+				Type:        report.EventFixtureTeardown,
+				Suite:       plan.Suite.Name,
+				Fixture:     plan.Suite.Fixture,
+				FixtureType: plan.Fixture.Type,
+				DurationMs:  time.Since(teardownStart).Milliseconds(),
+			})
 		}
 	}
 

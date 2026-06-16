@@ -99,6 +99,25 @@ func TestTextReporter_VerbosePassPrintsPasses(t *testing.T) {
 	}
 }
 
+func TestTextReporter_VerboseAllPrintsFixtureLifecycle(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseAll)
+	r.Emit(Event{Type: EventFixtureStart, Fixture: "local", DurationMs: 1})
+	r.Emit(Event{Type: EventFixtureReady, Fixture: "local", DurationMs: 12})
+	r.Emit(Event{Type: EventFixtureTeardown, Fixture: "local", DurationMs: 3})
+
+	out := buf.String()
+	for _, want := range []string{
+		"[fixture local] fixture.start",
+		"[fixture local] fixture.ready",
+		"[fixture local] fixture.teardown",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected fixture lifecycle line %q in:\n%s", want, out)
+		}
+	}
+}
+
 func TestNDJSONReporter_EmitsOneJSONObjectPerLine(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewNDJSONReporter(&buf, VerboseDefault)
@@ -129,6 +148,21 @@ func TestNDJSONReporter_FiltersPassByDefault(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), `"case.fail"`) {
 		t.Errorf("fail event missing:\n%s", buf.String())
+	}
+}
+
+func TestNDJSONReporter_EmitsFixtureLifecycleAtVerboseAll(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewNDJSONReporter(&buf, VerboseAll)
+	r.Emit(Event{Type: EventFixtureStart, Fixture: "local"})
+	r.Emit(Event{Type: EventFixtureReady, Fixture: "local"})
+	r.Emit(Event{Type: EventFixtureTeardown, Fixture: "local"})
+
+	out := buf.String()
+	for _, want := range []string{`"fixture.start"`, `"fixture.ready"`, `"fixture.teardown"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %s in NDJSON output:\n%s", want, out)
+		}
 	}
 }
 
