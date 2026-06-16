@@ -274,6 +274,29 @@ func TestExampleV2SmokeConfigLoads(t *testing.T) {
 	}
 }
 
+func TestExampleV2FixturesConfigLoads(t *testing.T) {
+	cfg, err := Load(filepath.Join("..", "examples", "v2-fixtures", "oats.toml"))
+	if err != nil {
+		t.Fatalf("Load fixture example config: %v", err)
+	}
+	plans, err := cfg.PlanRun(Filter{})
+	if err != nil {
+		t.Fatalf("PlanRun fixture example config: %v", err)
+	}
+	if len(plans) != 2 {
+		t.Fatalf("expected two suites, got %+v", plans)
+	}
+	if plans[0].Suite.Name != "compose-app" || plans[0].Fixture.Type != "compose" || len(plans[0].Cases) != 1 {
+		t.Fatalf("unexpected first plan: %+v", plans[0])
+	}
+	if plans[1].Suite.Name != "k3d-app" || plans[1].Fixture.Type != "k3d" || len(plans[1].Cases) != 1 {
+		t.Fatalf("unexpected second plan: %+v", plans[1])
+	}
+	if plans[1].Cases[0].Name != "k3d fixture app smoke" {
+		t.Fatalf("unexpected k3d case name: %q", plans[1].Cases[0].Name)
+	}
+}
+
 func planNames(p []Plan) []string {
 	out := make([]string, len(p))
 	for i := range p {

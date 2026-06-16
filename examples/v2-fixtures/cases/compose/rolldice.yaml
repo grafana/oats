@@ -1,0 +1,18 @@
+oats: 2
+name: compose fixture app smoke
+seed:
+  type: app
+input:
+  - path: /rolldice?rolls=3
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "rolldice" }'
+      match:
+        - match_type: regexp
+          name: '^GET /rolldice.*$'
+  logs:
+    - logql: '{service_name="rolldice"}'
+      match:
+        - match_type: regexp
+          name: '.*roll.*'
+

@@ -16,6 +16,7 @@ bin/oats-v2 --config examples/v2-smoke/oats.toml --list
 Useful v2 entry points:
 - syntax and feature status: [V2.md](V2.md)
 - small runnable examples: [`examples/v2-smoke/`](examples/v2-smoke/)
+- richer fixture examples: [`examples/v2-fixtures/`](examples/v2-fixtures/)
 - best-effort legacy migration: `bin/oats-v2 --migrate path/to/oats.yaml`
 
 OpenTelemetry Acceptance Tests (OATs), or OATs for short, is a test framework for OpenTelemetry.

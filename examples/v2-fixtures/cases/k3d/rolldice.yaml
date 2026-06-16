@@ -1,0 +1,13 @@
+oats: 2
+name: k3d fixture app smoke
+seed:
+  type: app
+input:
+  - path: /rolldice?rolls=2
+expected:
+  metrics:
+    - promql: 'http_server_active_requests{service_name="rolldice"}'
+      value: '>= 0'
+  custom-checks:
+    - script: ../../scripts/verify.sh
+
