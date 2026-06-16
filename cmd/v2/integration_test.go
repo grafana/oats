@@ -478,6 +478,78 @@ expected:
 	}
 }
 
+func TestIntegration_ProfileQueryWithFakeGCX(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake-gcx is a POSIX shell script")
+	}
+
+	dir := t.TempDir()
+	writeFile(t, dir, "oats.toml", `
+[meta]
+version = 2
+
+[[suite]]
+name    = "profiles"
+cases   = ["cases/*.yaml"]
+fixture = "remote-lgtm"
+
+[fixture.remote-lgtm]
+type     = "remote"
+endpoint = "http://localhost:4318"
+`)
+	writeFile(t, dir, "cases/profile.yaml", `oats: 2
+name: profile query end-to-end
+seed:
+  type: app
+expected:
+  profiles:
+    - query: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{}'
+      match:
+        - match_type: regexp
+          name: 'main|worker'
+`)
+
+	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	plans, err := cfg.PlanRun(discovery.Filter{})
+	if err != nil {
+		t.Fatalf("PlanRun: %v", err)
+	}
+	if len(plans) != 1 || len(plans[0].Cases) != 1 {
+		t.Fatalf("expected one plan with one case, got %+v", plans)
+	}
+
+	ep, err := resolveEndpoint(dir, plans[0], "", "localhost", 8080, "http://localhost:4318")
+	if err != nil {
+		t.Fatalf("resolveEndpoint: %v", err)
+	}
+
+	_, here, _, _ := runtime.Caller(0)
+	fakeGCX := filepath.Join(filepath.Dir(here), "testdata", "fake-gcx.sh")
+	exec := &engine.GCX{Binary: fakeGCX, Context: ep.GCXContext}
+
+	var buf bytes.Buffer
+	rep := report.NewTextReporter(&buf, report.VerboseDefault)
+	rep.Emit(report.Event{Type: report.EventRunStart, OatsVersion: "test", SchemaVersion: report.SchemaVersion})
+
+	r := runner.New(exec, rep, ep, runner.Options{
+		Timeout:         500 * time.Millisecond,
+		Interval:        20 * time.Millisecond,
+		SeedSettleDelay: 5 * time.Millisecond,
+	})
+
+	ok := r.RunCase(context.Background(), plans[0].Cases[0])
+	rep.Emit(report.Event{Type: report.EventRunEnd})
+	if !ok {
+		t.Fatalf("profile case did not pass:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "PASS 1/1") {
+		t.Fatalf("summary line missing or wrong:\n%s", buf.String())
+	}
+}
+
 func TestIntegration_MigratedLegacyCaseRuns(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fake-gcx is a POSIX shell script")

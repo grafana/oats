@@ -51,6 +51,11 @@ metrics.query)
 {"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"seed_counter_total","service_name":"gcx-e2e-seed"},"value":[1700000000,"42"]}]}}
 EOF
 	;;
+profiles.query)
+	cat <<'EOF'
+{"flamebearer":{"names":["main","worker"]}}
+EOF
+	;;
 *)
 	echo "fake-gcx: unsupported verb chain: $*" >&2
 	exit 2
