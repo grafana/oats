@@ -237,8 +237,7 @@ func verbosityFromInt(n int) report.Verbosity {
 }
 
 // resolveEndpoint maps a fixture config + an explicit override into the
-// concrete endpoint the runner needs. The v2 branch ships with "remote"
-// support only at this stage; "compose" and "k3d" will land later.
+// concrete endpoint the runner needs.
 func resolveEndpoint(sourceDir string, plan discovery.Plan, gcxContextOverride, appHost string, appPort int, otlpHTTP string) (runner.Endpoint, error) {
 	ep := runner.Endpoint{AppHost: appHost, AppPort: appPort, OTLPHTTP: otlpHTTP}
 	switch plan.Fixture.Type {
@@ -259,7 +258,7 @@ func resolveEndpoint(sourceDir string, plan discovery.Plan, gcxContextOverride, 
 		// No fixture configured — caller (or --gcx-context) must supply
 		// everything. Useful while plumbing v2 against an external setup.
 	default:
-		return ep, fmt.Errorf("fixture type %q is not yet supported in oats-v2 (compose/k3d arrive in follow-up commits)", plan.Fixture.Type)
+		return ep, fmt.Errorf("fixture type %q is not supported in oats-v2", plan.Fixture.Type)
 	}
 	if gcxContextOverride != "" {
 		ep.GCXContext = gcxContextOverride
@@ -312,7 +311,7 @@ func startFixture(_ context.Context, sourceDir string, plan discovery.Plan) (sui
 		}
 		return endpointFixture{ep: ep}, nil
 	default:
-		return nil, fmt.Errorf("fixture type %q is not yet supported in oats-v2 (k3d arrives in follow-up commits)", plan.Fixture.Type)
+		return nil, fmt.Errorf("fixture type %q is not supported in oats-v2", plan.Fixture.Type)
 	}
 }
 

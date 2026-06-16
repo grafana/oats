@@ -24,6 +24,7 @@ type Kubernetes struct {
 
 func NewEndpoint(host string, model *Kubernetes, ports remote.PortsConfig, testName string, dir string) *remote.Endpoint {
 	var killList []*os.Process
+	cluster := clusterName(testName)
 	run := func(cmd *exec.Cmd, background bool) error {
 		slog.Info("running", "command", cmd.String(), "dir", dir)
 		cmd.Stdout = os.Stdout
@@ -48,10 +49,10 @@ func NewEndpoint(host string, model *Kubernetes, ports remote.PortsConfig, testN
 				return err
 			}
 		}
-		return run(exec.Command("k3d", "cluster", "delete", testName), false)
+		return run(exec.Command("k3d", "cluster", "delete", cluster), false)
 	},
 		func(f func(io.ReadCloser, *sync.WaitGroup)) error {
-			panic("not implemented for kubernetes")
+			return fmt.Errorf("compose log reading is not implemented for kubernetes fixtures")
 		},
 	)
 }
@@ -71,10 +72,7 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 		return err
 	}
 
-	cluster := testName
-	if len(cluster) > 32 {
-		cluster = cluster[(len(cluster))-32:]
-	}
+	cluster := clusterName(testName)
 
 	err = run(exec.Command("k3d", "cluster", "list", cluster), false)
 	if err == nil {
@@ -127,4 +125,12 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 		return err
 	}
 	return nil
+}
+
+func clusterName(testName string) string {
+	cluster := testName
+	if len(cluster) > 32 {
+		cluster = cluster[len(cluster)-32:]
+	}
+	return cluster
 }
