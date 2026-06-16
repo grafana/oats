@@ -61,13 +61,27 @@ seed:
 expected:
   traces:
     - traceql: '{ resource.service.name = "gcx-e2e-seed" }'
-      contains: ["gcx-e2e-seed", "seed-operation"]
+      match:
+        - name: seed-operation
+          attributes:
+            service.name: gcx-e2e-seed
+            trace_id:
+              present: true
   logs:
     - logql: '{service_name="gcx-e2e-seed"}'
-      contains: ["seed-log-line"]
+      match:
+        - name: seed-log-line
+          attributes:
+            service_name: gcx-e2e-seed
+            trace_id:
+              present: true
   metrics:
     - promql: 'seed_counter_total{service_name="gcx-e2e-seed"}'
       value: ">= 0"
+      match:
+        - name: seed_counter_total
+          attributes:
+            service_name: gcx-e2e-seed
 `)
 
 	// OTLP stub: accept any POST under /v1/* with 200.
