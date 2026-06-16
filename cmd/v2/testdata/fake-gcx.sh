@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fake-gcx: a tiny stand-in for the gcx CLI used by oats-v2 integration tests.
+# fake-gcx: a tiny stand-in for the gcx CLI used by oats integration tests.
 #
 # It accepts a "--context X" prefix (stripped and ignored), then dispatches on
 # the verb chain. Output is deterministic and matches what the integration

@@ -1,49 +1,48 @@
-# OATS v2
+# Current OATS CLI
 
-This document covers the v2 branch, which replaces the bespoke TraceQL /
+This document covers the current gcx-driven OATS CLI, which replaces the bespoke TraceQL /
 PromQL / LogQL HTTP query infrastructure with the [gcx](https://github.com/grafana/gcx)
-CLI. The v2 binary lives at `cmd/v2/main.go` while the branch is in flight;
-both `oats` and `oats-v2` build from this checkout. See
+CLI. The current CLI entry point lives at `cmd/v2/main.go` while this replaces the legacy path. See
 [grafana/internal-docs#14](https://github.com/grafana/internal-docs/pull/14)
 for the full design.
 
 ## Quick start
 
 ```sh
-# Build the v2 binary
-go build -o bin/oats-v2 ./cmd/v2
+# Build the oats binary
+go build -o bin/oats ./cmd/v2
 
 # Print what would run, do not execute
-bin/oats-v2 --config oats.toml --list
+bin/oats --config oats.toml --list
 
 # Run against an already-running stack
-bin/oats-v2 --config oats.toml --gcx-context my-lgtm
+bin/oats --config oats.toml --gcx-context my-lgtm
 
 # Disable cache for this run
-bin/oats-v2 --config oats.toml --no-cache
+bin/oats --config oats.toml --no-cache
 
 # Verbose output
-bin/oats-v2 -v          # adds per-case PASS lines
-bin/oats-v2 -v=2        # adds the gcx command behind each assertion
-bin/oats-v2 -v=3        # adds fixture lifecycle and full gcx stdout
+bin/oats -v          # adds per-case PASS lines
+bin/oats -v=2        # adds the gcx command behind each assertion
+bin/oats -v=3        # adds fixture lifecycle and full gcx stdout
 
 # Machine-readable
-bin/oats-v2 --format ndjson > events.jsonl
+bin/oats --format ndjson > events.jsonl
 ```
 
-The repo includes a small reference config under `examples/v2-smoke/` showing:
+The repo includes a small reference config under `examples/smoke/` showing:
 - an app-backed case with `input`
 - an inline-OTLP case
 - a `custom-checks` case
 - a profile assertion case
 
-For richer fixture examples, `examples/v2-fixtures/` shows:
+For richer fixture examples, `examples/fixtures/` shows:
 - multi-file compose fixtures with env passthrough
 - k3d fixture config with app build/import fields
 
 ## Current implemented scope
 
-Today the v2 branch already includes:
+Today this branch already includes:
 - gcx-driven traces / logs / metrics / profiles querying
 - collector-style structural `match` assertions with `match_type: strict | regexp`
 - app-backed and inline-OTLP seed modes
@@ -111,7 +110,7 @@ template = "lgtm"              # built-in compose template
 ttl_days = 7                   # default
 ```
 
-## Case yaml shape (v2)
+## Case yaml shape
 
 ```yaml
 oats: 2
@@ -211,34 +210,34 @@ match:
       http.route: "^/roll.*$"
 ```
 
-## What's not in v2 yet
+## What's not here yet
 
 - Parallel cases within a suite.
 - k3d pool warmup / reuse.
 - Full-fidelity `oats migrate` for fixture/input semantics. A best-effort
-  `oats-v2 --migrate <legacy.yaml>` now converts expectation blocks into the
+  `oats --migrate <legacy.yaml>` now converts expectation blocks into the
   collector-style `match` schema and prints warnings for dropped/unsupported
   fields (multi-entry matrix cases still expand manually).
 - Hermeticity static-check (runtime check applies).
 
 ## Migrating from v1
 
-For the v1 → v2 migration story see the OATS v2 implementation plan in
+For the legacy → current migration story see the OATS implementation plan in
 [grafana/internal-docs#14](https://github.com/grafana/internal-docs/pull/14).
 Today a best-effort converter exists:
 
 ```bash
-oats-v2 --migrate path/to/oats.yaml > migrated.yaml
+oats --migrate path/to/oats.yaml > migrated.yaml
 ```
 
 It converts legacy `equals` / `regexp` / `attributes` /
-`attribute-regexp` assertions into v2 `match:` entries and prints warnings
+`attribute-regexp` assertions into `match:` entries and prints warnings
 for fields that still need manual follow-up. For richer legacy fixtures, the
 warnings now include ready-to-paste `oats.toml` fixture snippets for
 multi-file compose/env and kubernetes→k3d mappings. Single-entry legacy
 `matrix:` cases are flattened automatically; multi-entry matrix cases emit
 fixture-expansion hints for manual splitting. The v1 binary (`oats`) and the
-v2 binary (`oats-v2`) still read different file shapes.
+current binary (`oats`) still reads a different file shape than the legacy YAML runner.
 
 ## Verbosity contract
 

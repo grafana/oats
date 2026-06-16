@@ -1,13 +1,12 @@
-// Command oats-v2 is the new OATS binary entry point.
+// Command oats is the OATS binary entry point.
 //
-// While the v2 branch is in flight, this command lives alongside the v1
-// "oats" binary at the repository root. The final v2 commit replaces the
-// root main.go with the contents of this file; until then, both binaries
-// coexist so v1 acceptance tests keep running unmodified.
+// This command currently lives under cmd/v2 while the repository still keeps
+// the legacy root entrypoint around for existing tests. The gcx-driven CLI is
+// intended to replace that legacy path.
 //
 // Usage:
 //
-//	oats-v2 [flags]
+//	oats [flags]
 //
 // Flags (subset):
 //
@@ -76,7 +75,7 @@ func run() int {
 	configPath := flag.String("config", "oats.toml", "path to oats.toml")
 	gcxBin := flag.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
 	listOnly := flag.Bool("list", false, "print the run plan and exit (no execution)")
-	migratePath := flag.String("migrate", "", "convert one legacy OATS yaml file to v2 and print the result to stdout")
+	migratePath := flag.String("migrate", "", "convert one legacy OATS yaml file and print the result to stdout")
 	format := flag.String("format", "text", "output format: text | ndjson")
 	suiteFilterStr := flag.String("suite", "", "comma-separated suite names")
 	tagFilterStr := flag.String("tags", "", "comma-separated tag any-match")
@@ -140,7 +139,7 @@ func run() int {
 
 	rep.Emit(report.Event{
 		Type:          report.EventRunStart,
-		OatsVersion:   "v2-dev",
+		OatsVersion:   "dev",
 		SchemaVersion: report.SchemaVersion,
 		Ts:            time.Now(),
 	})
@@ -192,7 +191,7 @@ func run() int {
 				fixtureBytes, _ := json.Marshal(plan.Fixture) // stable across calls
 				r = r.WithCache(store, runner.CacheContext{
 					GCXVersion:   gcxVersion(*gcxBin),
-					OatsVersion:  "v2-dev",
+					OatsVersion:  "dev",
 					FixtureBytes: fixtureBytes,
 				})
 			}
@@ -281,9 +280,9 @@ func resolveEndpoint(sourceDir string, plan discovery.Plan, gcxContextOverride, 
 		}
 	case "":
 		// No fixture configured — caller (or --gcx-context) must supply
-		// everything. Useful while plumbing v2 against an external setup.
+		// everything. Useful while plumbing the new CLI against an external setup.
 	default:
-		return ep, fmt.Errorf("fixture type %q is not supported in oats-v2", plan.Fixture.Type)
+		return ep, fmt.Errorf("fixture type %q is not supported in oats", plan.Fixture.Type)
 	}
 	if gcxContextOverride != "" {
 		ep.GCXContext = gcxContextOverride
@@ -327,7 +326,7 @@ func startFixture(_ context.Context, sourceDir string, plan discovery.Plan) (sui
 		}
 		return endpointFixture{ep: ep}, nil
 	default:
-		return nil, fmt.Errorf("fixture type %q is not supported in oats-v2", plan.Fixture.Type)
+		return nil, fmt.Errorf("fixture type %q is not supported in oats", plan.Fixture.Type)
 	}
 }
 

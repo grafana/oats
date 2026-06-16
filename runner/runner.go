@@ -296,7 +296,7 @@ func customCheckCommand(ctx context.Context, dir, script string) (*exec.Cmd, fun
 		return nil, cleanup, fmt.Errorf("empty script")
 	}
 	if looksLikeInlineScript(script) {
-		f, err := os.CreateTemp("", "oats-v2-custom-check-*.sh")
+		f, err := os.CreateTemp("", "oats-custom-check-*.sh")
 		if err != nil {
 			return nil, cleanup, err
 		}

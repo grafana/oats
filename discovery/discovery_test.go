@@ -254,7 +254,7 @@ func TestSummary(t *testing.T) {
 }
 
 func TestExampleV2SmokeConfigLoads(t *testing.T) {
-	cfg, err := Load(filepath.Join("..", "examples", "v2-smoke", "oats.toml"))
+	cfg, err := Load(filepath.Join("..", "examples", "smoke", "oats.toml"))
 	if err != nil {
 		t.Fatalf("Load example config: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestExampleV2SmokeConfigLoads(t *testing.T) {
 }
 
 func TestExampleV2FixturesConfigLoads(t *testing.T) {
-	cfg, err := Load(filepath.Join("..", "examples", "v2-fixtures", "oats.toml"))
+	cfg, err := Load(filepath.Join("..", "examples", "fixtures", "oats.toml"))
 	if err != nil {
 		t.Fatalf("Load fixture example config: %v", err)
 	}

@@ -1,25 +1,25 @@
 # OpenTelemetry Acceptance Tests (OATs)
 
 > **Note:** this README primarily documents the legacy `oats` flow and yaml
-> shape. The newer gcx-driven v2 work lives behind `cmd/v2` / `oats-v2`; see
-> [V2.md](V2.md) for the current v2 syntax, fixture model, and migration path.
+> shape. The newer gcx-driven work lives behind `cmd/v2`; see
+> [CURRENT.md](CURRENT.md) for the current syntax, fixture model, and migration path.
 
-## V2 quick pointer
+## Current CLI quick pointer
 
 If you want the newer gcx-driven flow today:
 
 ```sh
-go build -o bin/oats-v2 ./cmd/v2
-bin/oats-v2 --config examples/v2-smoke/oats.toml --list
+go build -o bin/oats ./cmd/v2
+bin/oats --config examples/smoke/oats.toml --list
 ```
 
-Useful v2 entry points:
-- syntax and feature status: [V2.md](V2.md)
-- small runnable examples: [`examples/v2-smoke/`](examples/v2-smoke/)
-- richer fixture examples: [`examples/v2-fixtures/`](examples/v2-fixtures/)
-- best-effort legacy migration: `bin/oats-v2 --migrate path/to/oats.yaml`
+Useful entry points:
+- syntax and feature status: [CURRENT.md](CURRENT.md)
+- small runnable examples: [`examples/smoke/`](examples/smoke/)
+- richer fixture examples: [`examples/fixtures/`](examples/fixtures/)
+- best-effort legacy migration: `bin/oats --migrate path/to/oats.yaml`
 
-Current v2 scope already includes:
+Current scope already includes:
 - traces / logs / metrics / profiles via `gcx`
 - structural `match` assertions
 - inline-OTLP and app-backed cases
