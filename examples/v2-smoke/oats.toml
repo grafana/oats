@@ -1,0 +1,12 @@
+[meta]
+version = 2
+
+[[suite]]
+name = "smoke"
+cases = ["cases/*.yaml"]
+fixture = "local-lgtm"
+tags = ["traces", "logs", "metrics"]
+
+[fixture.local-lgtm]
+type = "remote"
+endpoint = "http://localhost:4318"

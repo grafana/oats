@@ -1,0 +1,21 @@
+oats: 2
+name: rolldice smoke
+input:
+  - path: /rolldice?rolls=5
+seed:
+  type: app
+  compose: docker-compose.app.yml
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "rolldice" }'
+      match:
+        - match_type: regexp
+          name: '^GET /rolldice.*$'
+  metrics:
+    - promql: 'http_server_active_requests{service_name="rolldice"}'
+      value: '>= 0'
+  logs:
+    - logql: '{service_name="rolldice"} |~ `rolling the dice`'
+      match:
+        - match_type: regexp
+          name: '.*rolling the dice.*'

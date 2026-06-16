@@ -1,5 +1,9 @@
 # OpenTelemetry Acceptance Tests (OATs)
 
+> **Note:** this README primarily documents the legacy `oats` flow and yaml
+> shape. The newer gcx-driven v2 work lives behind `cmd/v2` / `oats-v2`; see
+> [V2.md](V2.md) for the current v2 syntax, fixture model, and migration path.
+
 OpenTelemetry Acceptance Tests (OATs), or OATs for short, is a test framework for OpenTelemetry.
 
 - Declarative tests written in YAML

@@ -238,6 +238,23 @@ func TestSummary(t *testing.T) {
 	}
 }
 
+func TestExampleV2SmokeConfigLoads(t *testing.T) {
+	cfg, err := Load(filepath.Join("..", "examples", "v2-smoke", "oats.toml"))
+	if err != nil {
+		t.Fatalf("Load example config: %v", err)
+	}
+	plans, err := cfg.PlanRun(Filter{})
+	if err != nil {
+		t.Fatalf("PlanRun example config: %v", err)
+	}
+	if len(plans) != 1 || len(plans[0].Cases) != 1 {
+		t.Fatalf("expected one suite/one case, got %+v", plans)
+	}
+	if plans[0].Cases[0].Name != "rolldice smoke" {
+		t.Fatalf("unexpected case name: %q", plans[0].Cases[0].Name)
+	}
+}
+
 func planNames(p []Plan) []string {
 	out := make([]string, len(p))
 	for i := range p {
