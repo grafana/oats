@@ -19,6 +19,14 @@ Useful v2 entry points:
 - richer fixture examples: [`examples/v2-fixtures/`](examples/v2-fixtures/)
 - best-effort legacy migration: `bin/oats-v2 --migrate path/to/oats.yaml`
 
+Current v2 scope already includes:
+- traces / logs / metrics / profiles via `gcx`
+- structural `match` assertions
+- inline-OTLP and app-backed cases
+- custom checks
+- remote / compose / k3d fixtures
+- best-effort migration from legacy OATS yaml
+
 OpenTelemetry Acceptance Tests (OATs), or OATs for short, is a test framework for OpenTelemetry.
 
 - Declarative tests written in YAML
