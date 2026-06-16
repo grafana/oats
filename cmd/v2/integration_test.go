@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -296,6 +298,104 @@ expected:
 	}
 }
 
+func TestIntegration_AppSeedWithRemoteFixtureAndInput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake-gcx is a POSIX shell script")
+	}
+
+	var hits int
+	app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		if r.Method != http.MethodPost || r.URL.Path != "/emit" {
+			t.Fatalf("unexpected app request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer app.Close()
+	appHost, appPort := splitHostPort(t, app.Listener.Addr().String())
+
+	dir := t.TempDir()
+	writeFile(t, dir, "oats.toml", `
+[meta]
+version = 2
+
+[[suite]]
+name    = "smoke"
+cases   = ["cases/*.yaml"]
+fixture = "remote-lgtm"
+
+[fixture.remote-lgtm]
+type     = "remote"
+endpoint = "http://localhost:4318"
+`)
+	writeFile(t, dir, "cases/app.yaml", `oats: 2
+name: app seed end-to-end
+seed:
+  type: app
+input:
+  - path: /emit
+    method: POST
+    status: "201"
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "gcx-e2e-seed" }'
+      match:
+        - name: seed-operation
+          attributes:
+            service.name: gcx-e2e-seed
+  logs:
+    - logql: '{service_name="gcx-e2e-seed"}'
+      match:
+        - name: seed-log-line
+          attributes:
+            service_name: gcx-e2e-seed
+`)
+
+	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	plans, err := cfg.PlanRun(discovery.Filter{})
+	if err != nil {
+		t.Fatalf("PlanRun: %v", err)
+	}
+	if len(plans) != 1 || len(plans[0].Cases) != 1 {
+		t.Fatalf("expected one plan with one case, got %+v", plans)
+	}
+
+	ep, err := resolveEndpoint(dir, plans[0], "", appHost, appPort, "http://localhost:4318")
+	if err != nil {
+		t.Fatalf("resolveEndpoint: %v", err)
+	}
+
+	_, here, _, _ := runtime.Caller(0)
+	fakeGCX := filepath.Join(filepath.Dir(here), "testdata", "fake-gcx.sh")
+	exec := &engine.GCX{Binary: fakeGCX, Context: ep.GCXContext}
+
+	var buf bytes.Buffer
+	rep := report.NewTextReporter(&buf, report.VerboseDefault)
+	rep.Emit(report.Event{Type: report.EventRunStart, OatsVersion: "test", SchemaVersion: report.SchemaVersion})
+
+	r := runner.New(exec, rep, ep, runner.Options{
+		Timeout:         500 * time.Millisecond,
+		Interval:        20 * time.Millisecond,
+		SeedSettleDelay: 5 * time.Millisecond,
+	})
+
+	ok := r.RunCase(context.Background(), plans[0].Cases[0])
+	rep.Emit(report.Event{Type: report.EventRunEnd})
+
+	if !ok {
+		t.Fatalf("case did not pass:\n%s", buf.String())
+	}
+	if hits == 0 {
+		t.Fatalf("expected input endpoint to be hit")
+	}
+	if !strings.Contains(buf.String(), "PASS 1/1") {
+		t.Errorf("summary line missing or wrong:\n%s", buf.String())
+	}
+}
+
 func writeFile(t *testing.T, dir, rel, body string) {
 	t.Helper()
 	p := filepath.Join(dir, rel)
@@ -316,6 +416,19 @@ func rewrite(t *testing.T, path, old, new string) {
 	if err := os.WriteFile(path, bytes.ReplaceAll(data, []byte(old), []byte(new)), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func splitHostPort(t *testing.T, addr string) (string, int) {
+	t.Helper()
+	host, portText, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatalf("SplitHostPort(%q): %v", addr, err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatalf("Atoi(%q): %v", portText, err)
+	}
+	return host, port
 }
 
 type fakeSuiteFixture struct {
