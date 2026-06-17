@@ -337,7 +337,11 @@ func resolveCustomCheckPath(dir, script string) string {
 		return script
 	}
 	if strings.ContainsRune(script, os.PathSeparator) {
-		return filepath.Clean(filepath.Join(dir, script))
+		joined := filepath.Clean(filepath.Join(dir, script))
+		if abs, err := filepath.Abs(joined); err == nil {
+			return abs
+		}
+		return joined
 	}
 	return script
 }
@@ -595,6 +599,9 @@ func approxRowCount(stdout string) int {
 // query -o json` output. The schema follows gcx's JSON shape; we only look
 // at the fields we need so additions don't break us.
 func extractMetricRows(stdout string) ([]assert.Row, int, float64, error) {
+	if strings.TrimSpace(stdout) == "" {
+		return nil, 0, 0, fmt.Errorf("metric value parse: empty result")
+	}
 	var generic struct {
 		Data struct {
 			Result []struct {
@@ -690,6 +697,9 @@ func (r *Runner) doInput(in v2case.Input) error {
 }
 
 func extractLogRows(stdout string) ([]assert.Row, int, error) {
+	if strings.TrimSpace(stdout) == "" {
+		return nil, 0, nil
+	}
 	var generic struct {
 		Data struct {
 			Result []struct {
@@ -716,6 +726,9 @@ func extractLogRows(stdout string) ([]assert.Row, int, error) {
 }
 
 func extractTraceRows(stdout string) ([]assert.Row, int, error) {
+	if strings.TrimSpace(stdout) == "" {
+		return nil, 0, nil
+	}
 	var root any
 	if err := json.Unmarshal([]byte(stdout), &root); err != nil {
 		return nil, 0, fmt.Errorf("trace JSON parse: %w", err)
@@ -732,6 +745,9 @@ func extractTraceRows(stdout string) ([]assert.Row, int, error) {
 }
 
 func extractProfileRows(stdout string) ([]assert.Row, int, error) {
+	if strings.TrimSpace(stdout) == "" {
+		return nil, 0, nil
+	}
 	var root any
 	if err := json.Unmarshal([]byte(stdout), &root); err != nil {
 		return nil, 0, fmt.Errorf("profile JSON parse: %w", err)
@@ -841,9 +857,10 @@ func extractOTLPTraceRows(root any) ([]assert.Row, bool) {
 	if !ok {
 		// Some wrappers may nest under "data" first.
 		if data, ok := top["data"].(map[string]any); ok {
-			resourceSpans, ok = data["resourceSpans"].([]any)
-			if !ok {
-				resourceSpans, ok = data["batches"].([]any)
+			if nested, ok := data["resourceSpans"].([]any); ok {
+				resourceSpans = nested
+			} else if nested, ok := data["batches"].([]any); ok {
+				resourceSpans = nested
 			}
 		}
 		if !ok {
