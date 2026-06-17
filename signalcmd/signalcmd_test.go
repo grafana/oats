@@ -18,10 +18,8 @@ func TestTraces(t *testing.T) {
 
 func TestTraces_WithMatchAsksForJSON(t *testing.T) {
 	got := Traces(v2case.TraceAssertion{
-		TraceQL: `{ span.http.route = "/x" }`,
-		AssertionCommon: v2case.AssertionCommon{
-			Match: []v2case.MatchEntry{{Name: strPtr("GET /x")}},
-		},
+		TraceQL:    `{ span.http.route = "/x" }`,
+		MatchSpans: []v2case.MatchEntry{{Name: strPtr("GET /x")}},
 	}, 0)
 	if !contains(got, "-o", "json") {
 		t.Errorf("expected -o json in: %v", got)

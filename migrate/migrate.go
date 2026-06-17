@@ -111,7 +111,7 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 		}
 		assertion, ws := convertSignal(tr.TraceQL, tr.Signal)
 		warnings = append(warnings, ws...)
-		c.Expected.Traces = append(c.Expected.Traces, v2case.TraceAssertion{TraceQL: tr.TraceQL, AssertionCommon: assertion})
+		c.Expected.Traces = append(c.Expected.Traces, v2case.TraceAssertion{TraceQL: tr.TraceQL, MatchSpans: assertion.Match, AssertionCommon: withoutMatch(assertion)})
 	}
 	for _, lg := range def.Expected.Logs {
 		if !keepForMatrix(lg.Signal.MatrixCondition, selectedMatrix) {
@@ -220,6 +220,11 @@ func convertSignal(label string, s model.ExpectedSignal) (v2case.AssertionCommon
 		warnings = append(warnings, fmt.Sprintf("%s has no structural checks after migration", label))
 	}
 	return out, warnings
+}
+
+func withoutMatch(a v2case.AssertionCommon) v2case.AssertionCommon {
+	a.Match = nil
+	return a
 }
 
 func deriveName(path string) string {

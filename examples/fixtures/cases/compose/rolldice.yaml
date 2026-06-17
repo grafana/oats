@@ -7,7 +7,7 @@ input:
 expected:
   traces:
     - traceql: '{ resource.service.name = "rolldice" }'
-      match:
+      match_spans:
         - match_type: regexp
           name: '^GET /rolldice.*$'
   logs:

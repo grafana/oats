@@ -255,7 +255,7 @@ seed:
 expected:
   traces:
     - traceql: '{}'
-      match:
+      match_spans:
         - match_type: glob
           name: x
 `))
@@ -294,7 +294,7 @@ seed:
 expected:
   traces:
     - traceql: '{}'
-      match:
+      match_spans:
         - match_type: regexp
           name: '['
 `))

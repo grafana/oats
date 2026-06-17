@@ -180,7 +180,8 @@ func (a AttributeExpectation) MarshalYAML() (any, error) {
 }
 
 type TraceAssertion struct {
-	TraceQL         string `yaml:"traceql"`
+	TraceQL         string       `yaml:"traceql"`
+	MatchSpans      []MatchEntry `yaml:"match_spans,omitempty"`
 	AssertionCommon `yaml:",inline"`
 }
 
@@ -272,7 +273,7 @@ func (c *Case) Validate() error {
 		if c.Expected.Traces[i].TraceQL == "" {
 			return fmt.Errorf("expected.traces[%d].traceql: required, non-empty", i)
 		}
-		if err := validateAssertionCommon("expected.traces", i, c.Expected.Traces[i].AssertionCommon); err != nil {
+		if err := validateTraceAssertion(i, c.Expected.Traces[i]); err != nil {
 			return err
 		}
 	}
@@ -318,14 +319,28 @@ func (c *Case) IsHermetic() bool {
 	return *c.Hermetic
 }
 
+func validateTraceAssertion(idx int, a TraceAssertion) error {
+	if err := validateMatchEntries(fmt.Sprintf("expected.traces[%d].match_spans", idx), a.MatchSpans); err != nil {
+		return err
+	}
+	return validateAssertionCommon("expected.traces", idx, a.AssertionCommon)
+}
+
 func validateAssertionCommon(path string, idx int, a AssertionCommon) error {
 	for j, p := range a.Regex {
 		if _, err := regexp.Compile(p); err != nil {
 			return fmt.Errorf("%s[%d].regex[%d]: invalid regexp %q: %v", path, idx, j, p, err)
 		}
 	}
-	for j, m := range a.Match {
-		matchPath := fmt.Sprintf("%s[%d].match[%d]", path, idx, j)
+	if err := validateMatchEntries(fmt.Sprintf("%s[%d].match", path, idx), a.Match); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateMatchEntries(path string, entries []MatchEntry) error {
+	for j, m := range entries {
+		matchPath := fmt.Sprintf("%s[%d]", path, j)
 		switch m.EffectiveMatchType() {
 		case MatchTypeStrict, MatchTypeRegexp:
 		default:

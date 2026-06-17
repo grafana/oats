@@ -44,7 +44,7 @@ For richer fixture examples, `examples/fixtures/` shows:
 
 Today this branch already includes:
 - gcx-driven traces / logs / metrics / profiles querying
-- collector-style structural `match` assertions with `match_type: strict | regexp`
+- collector-style structural assertions (`match_spans` for traces, `match` elsewhere) with `match_type: strict | regexp`
 - app-backed and inline-OTLP seed modes
 - input-driving HTTP requests
 - custom checks
@@ -125,7 +125,7 @@ input:
 expected:
   traces:
     - traceql: '{ span.http.route = "/rolldice" }'
-      match:
+      match_spans:
         - name: "GET /rolldice"
   metrics:
     - promql: 'dice_lib_rolls_counter_total{service_name="dice-server"}'
@@ -163,7 +163,7 @@ seed:
 expected:
   traces:
     - traceql: '{ resource.service.name = "gcx-e2e-seed" }'
-      match:
+      match_spans:
         - name: seed-operation
           attributes:
             service.name: gcx-e2e-seed
@@ -179,7 +179,8 @@ Per signal under `expected.<signal>[]`:
 | `contains` | Substrings that must appear in gcx stdout. |
 | `not_contains` | Substrings that must not appear. |
 | `regex` | Patterns that must match. |
-| `match` | Structural assertions using collector-style `match_type: strict | regexp`. |
+| `match_spans` | Trace-only structural assertions over returned spans using collector-style `match_type: strict | regexp`. |
+| `match` | Structural assertions for logs / metrics / profiles using collector-style `match_type: strict | regexp`. |
 | `value` | Metrics only — numeric comparison (`>= 0`, `== 42`). |
 | `count` | Comparison against the number of result rows. |
 | `absent` | If true, the query must return zero rows. |
@@ -195,7 +196,7 @@ assertion poll, mirroring OATS v1's “drive the app until telemetry appears”
 behavior. For remote fixtures, point those requests at a running app with
 `--app-host` and `--app-port` (defaults: `localhost:8080`).
 
-`match` entries default to `match_type: strict`. OATS also supports the
+`match_spans` (for traces) and `match` (for logs / metrics / profiles) default to `match_type: strict`. OATS also supports the
 small convenience extension `present: true` for attribute existence checks:
 
 ```yaml
@@ -231,7 +232,7 @@ oats --migrate path/to/oats.yaml > migrated.yaml
 ```
 
 It converts legacy `equals` / `regexp` / `attributes` /
-`attribute-regexp` assertions into `match:` entries and prints warnings
+`attribute-regexp` assertions into structural matcher entries (`match_spans:` for traces, `match:` elsewhere) and prints warnings
 for fields that still need manual follow-up. For richer legacy fixtures, the
 warnings now include ready-to-paste `oats.toml` fixture snippets for
 multi-file compose/env and kubernetes→k3d mappings. Single-entry legacy

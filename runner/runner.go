@@ -460,11 +460,11 @@ func (r *Runner) caseInterval(c *v2case.Case) time.Duration {
 func (r *Runner) runTrace(ctx context.Context, c *v2case.Case, a *v2case.TraceAssertion) bool {
 	args := signalcmd.Traces(*a, r.opts.Timeout)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
-		if len(a.Match) == 0 {
+		if len(a.MatchSpans) == 0 {
 			return evalCommonText(stdout, a.AssertionCommon)
 		}
 		rows, count, err := extractTraceRows(stdout)
-		return evalCommonStructured(stdout, a.AssertionCommon, rows, count, err)
+		return evalTraceStructured(stdout, *a, rows, count, err)
 	})
 }
 
@@ -521,6 +521,31 @@ func evalCommonText(stdout string, c v2case.AssertionCommon) []assert.Failure {
 	}
 	if c.Absent {
 		fails = append(fails, assert.Absent(approxRowCount(stdout))...)
+	}
+	return fails
+}
+
+func evalTraceStructured(stdout string, a v2case.TraceAssertion, rows []assert.Row, count int, parseErr error) []assert.Failure {
+	var fails []assert.Failure
+	fails = append(fails, assert.Contains(stdout, a.Contains)...)
+	fails = append(fails, assert.NotContains(stdout, a.NotContains)...)
+	fails = append(fails, assert.Regex(stdout, a.Regex)...)
+	if parseErr != nil {
+		fails = append(fails, assert.Failure{Rule: "match_spans", Detail: parseErr.Error()})
+		return fails
+	}
+	if len(a.MatchSpans) > 0 {
+		spanFails := assert.MatchRows(rows, a.MatchSpans)
+		for i := range spanFails {
+			spanFails[i].Rule = "match_spans"
+		}
+		fails = append(fails, spanFails...)
+	}
+	if a.Count != "" {
+		fails = append(fails, assert.Count(count, a.Count)...)
+	}
+	if a.Absent {
+		fails = append(fails, assert.Absent(count)...)
 	}
 	return fails
 }

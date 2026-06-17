@@ -305,7 +305,7 @@ seed:
 expected:
   traces:
     - traceql: '{ resource.service.name = "gcx-e2e-seed" }'
-      match:
+      match_spans:
         - name: seed-operation
           attributes:
             service.name: gcx-e2e-seed
@@ -421,7 +421,7 @@ input:
 expected:
   traces:
     - traceql: '{ resource.service.name = "gcx-e2e-seed" }'
-      match:
+      match_spans:
         - name: seed-operation
           attributes:
             service.name: gcx-e2e-seed

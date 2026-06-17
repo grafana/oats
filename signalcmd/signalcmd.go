@@ -30,7 +30,7 @@ func Traces(a v2case.TraceAssertion, since time.Duration) []string {
 		"traces", "search",
 		"--since", since.String(),
 	}
-	if len(a.Match) > 0 {
+	if len(a.MatchSpans) > 0 {
 		args = append(args, "-o", "json")
 	}
 	args = append(args, a.TraceQL)
