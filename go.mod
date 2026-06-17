@@ -3,7 +3,7 @@ module github.com/grafana/oats
 go 1.25.0
 
 require (
-	github.com/onsi/gomega v1.41.0
+	github.com/onsi/gomega v1.42.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/collector/pdata v1.60.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0
