@@ -67,8 +67,17 @@ func TestMetrics_WithValueAsksForJSON(t *testing.T) {
 
 func TestProfiles(t *testing.T) {
 	got := Profiles(v2case.ProfileAssertion{Query: "process_cpu:cpu:nanoseconds:cpu:nanoseconds{}"}, 0)
-	if got[0] != "profiles" || got[1] != "query" {
-		t.Errorf("wrong verb chain: %v", got)
+	want := []string{"profiles", "query", "--since", "10m0s", "--profile-type", "process_cpu:cpu:nanoseconds:cpu:nanoseconds", "{}"}
+	if !equal(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+func TestProfiles_QueryWithoutSelectorDefaultsToEmptySelector(t *testing.T) {
+	got := Profiles(v2case.ProfileAssertion{Query: "process_cpu:cpu:nanoseconds:cpu:nanoseconds"}, 0)
+	want := []string{"profiles", "query", "--since", "10m0s", "--profile-type", "process_cpu:cpu:nanoseconds:cpu:nanoseconds", "{}"}
+	if !equal(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
 

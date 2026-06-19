@@ -11,6 +11,7 @@
 package signalcmd
 
 import (
+	"strings"
 	"time"
 
 	"github.com/grafana/oats/v2case"
@@ -77,6 +78,7 @@ func Profiles(a v2case.ProfileAssertion, since time.Duration) []string {
 	if since <= 0 {
 		since = DefaultSince
 	}
+	profileType, expr := splitProfileQuery(a.Query)
 	args := []string{
 		"profiles", "query",
 		"--since", since.String(),
@@ -84,8 +86,30 @@ func Profiles(a v2case.ProfileAssertion, since time.Duration) []string {
 	if len(a.Match) > 0 {
 		args = append(args, "-o", "json")
 	}
-	args = append(args, a.Query)
+	if profileType != "" {
+		args = append(args, "--profile-type", profileType)
+	}
+	args = append(args, expr)
 	return args
+}
+
+func splitProfileQuery(query string) (profileType string, expr string) {
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return "", "{}"
+	}
+	if i := strings.Index(q, "{"); i >= 0 {
+		profileType = strings.TrimSpace(q[:i])
+		expr = strings.TrimSpace(q[i:])
+		if expr == "" {
+			expr = "{}"
+		}
+		return profileType, expr
+	}
+	if strings.Contains(q, ":") {
+		return q, "{}"
+	}
+	return "", q
 }
 
 // Render is a convenience used by the report layer to show the gcx
