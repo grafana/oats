@@ -69,7 +69,7 @@ discovery → seed → engine → assert → report
 
 | Package    | Responsibility |
 |------------|---------------|
-| `discovery` | Parse `oats.toml`, expand case globs, apply filters, and derive
+| `discovery` | Parse `oats.toml`, expand case globs, apply filters, and derive |
 |            | case-local fixtures when a suite omits one. |
 | `v2case`    | Parse and validate one case yaml file. |
 | `seed`      | Push inline-OTLP payloads at an OTLP/HTTP endpoint. |
@@ -78,7 +78,7 @@ discovery → seed → engine → assert → report
 | `assert`    | The expectation vocabulary: `contains`, `not_contains`, `regex`, `value`, `count`, `absent`. |
 | `wait`      | `Until` / `While` polling primitives (replaces gomega.Eventually). |
 | `report`    | Compact-text and NDJSON renderers driven by an Event stream. |
-| `cache`     | Skip-when-unchanged store keyed by
+| `cache`     | Skip-when-unchanged store keyed by |
 |            | `(case yaml + fixture + gcx version + oats version)`. |
 | `runner`    | Orchestrates a suite: seed → poll-and-assert → report, with optional cache. |
 | `cmd/v2`    | The new binary entry point. |
@@ -211,8 +211,9 @@ assertion poll, mirroring OATS v1's “drive the app until telemetry appears”
 behavior. For remote fixtures, point those requests at a running app with
 `--app-host` and `--app-port` (defaults: `localhost:8080`).
 
-`match_spans` (for traces) and `match` (for logs / metrics / profiles) default to `match_type: strict`. OATS also supports the
-small convenience extension `present: true` for attribute existence checks:
+`match_spans` (for traces) and `match` (for logs / metrics / profiles)
+default to `match_type: strict`. OATS also supports the small convenience
+extension `present: true` for attribute existence checks:
 
 ```yaml
 match:
@@ -247,8 +248,9 @@ oats --migrate path/to/oats.yaml > migrated.yaml
 ```
 
 It converts legacy `equals` / `regexp` / `attributes` /
-`attribute-regexp` assertions into structural matcher entries (`match_spans:` for traces, `match:` elsewhere) and prints warnings
-for fields that still need manual follow-up. For richer legacy fixtures, the
+`attribute-regexp` assertions into structural matcher entries
+(`match_spans:` for traces, `match:` elsewhere) and prints warnings for
+fields that still need manual follow-up. For richer legacy fixtures, the
 warnings now include ready-to-paste `oats.toml` fixture snippets for
 multi-file compose/env and kubernetes→k3d mappings. Single-entry legacy
 `matrix:` cases are flattened automatically; multi-entry matrix cases emit
