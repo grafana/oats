@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/grafana/oats/testhelpers/remote"
 )
@@ -128,9 +130,34 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 }
 
 func clusterName(testName string) string {
-	cluster := testName
+	var b strings.Builder
+	lastDash := false
+	for _, r := range strings.ToLower(testName) {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
+			b.WriteRune(r)
+			lastDash = false
+		case r == '-' || r == '_' || unicode.IsSpace(r):
+			if !lastDash && b.Len() > 0 {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		default:
+			if !lastDash && b.Len() > 0 {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	cluster := strings.Trim(b.String(), "-")
+	if cluster == "" {
+		cluster = "oats"
+	}
 	if len(cluster) > 32 {
-		cluster = cluster[len(cluster)-32:]
+		cluster = strings.Trim(cluster[len(cluster)-32:], "-")
+		if cluster == "" {
+			cluster = "oats"
+		}
 	}
 	return cluster
 }

@@ -20,6 +20,15 @@ func TestClusterName_TruncatesFromEnd(t *testing.T) {
 	}
 }
 
+func TestClusterName_NormalizesRFC1123(t *testing.T) {
+	if got := clusterName("logging k8s probe"); got != "logging-k8s-probe" {
+		t.Fatalf("clusterName() = %q, want %q", got, "logging-k8s-probe")
+	}
+	if got := clusterName("!!!"); got != "oats" {
+		t.Fatalf("clusterName() fallback = %q, want %q", got, "oats")
+	}
+}
+
 func TestStart_DefaultDockerContextAndCommandSequence(t *testing.T) {
 	model := &Kubernetes{
 		Dir:           "k8s",
