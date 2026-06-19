@@ -494,6 +494,7 @@ func localGrafanaEnv(plan discovery.Plan) []string {
 	return []string{
 		"GRAFANA_SERVER=" + grafanaURL(),
 		"GRAFANA_TOKEN=" + token,
+		"GRAFANA_ORG_ID=1",
 	}
 }
 

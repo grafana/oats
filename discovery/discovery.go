@@ -25,6 +25,7 @@ import (
 // the toml decoder rather than a silent miss.
 type RootConfig struct {
 	Meta    Meta                     `toml:"meta"`
+	Cases   []string                 `toml:"cases"`
 	Suites  []SuiteConfig            `toml:"suite"`
 	Fixture map[string]FixtureConfig `toml:"fixture"`
 	Cache   CacheConfig              `toml:"cache,omitempty"`
@@ -96,8 +97,18 @@ func (c *RootConfig) Validate() error {
 	if c.Meta.Version != SupportedVersion {
 		return fmt.Errorf("meta.version: expected %d, got %d", SupportedVersion, c.Meta.Version)
 	}
-	if len(c.Suites) == 0 {
-		return fmt.Errorf("at least one [[suite]] required")
+	if len(c.Cases) > 0 && len(c.Suites) > 0 {
+		return fmt.Errorf("use top-level cases or [[suite]], not both")
+	}
+	if len(c.Cases) == 0 && len(c.Suites) == 0 {
+		return fmt.Errorf("at least one top-level case or [[suite]] required")
+	}
+	if len(c.Cases) > 0 {
+		for i, path := range c.Cases {
+			if strings.TrimSpace(path) == "" {
+				return fmt.Errorf("cases[%d]: path is required and non-empty", i)
+			}
+		}
 	}
 	for i, s := range c.Suites {
 		if len(s.Cases) == 0 {
@@ -152,6 +163,17 @@ type Plan struct {
 	Cases            []*v2case.Case
 }
 
+func (c *RootConfig) effectiveSuites() []SuiteConfig {
+	if len(c.Suites) > 0 {
+		return c.Suites
+	}
+	suites := make([]SuiteConfig, 0, len(c.Cases))
+	for _, path := range c.Cases {
+		suites = append(suites, SuiteConfig{Cases: []string{path}})
+	}
+	return suites
+}
+
 // PlanRun expands globs and applies the filter against the loaded config.
 // Returns plans in oats.toml order; cases within a plan are sorted by
 // SourcePath for stable test ordering.
@@ -182,7 +204,7 @@ func (c *RootConfig) PlanRun(f Filter) ([]Plan, error) {
 	}
 
 	var plans []Plan
-	for _, suite := range c.Suites {
+	for _, suite := range c.effectiveSuites() {
 		cases, err := c.loadSuiteCases(suite)
 		if err != nil {
 			return nil, fmt.Errorf("suite %q: %w", suiteLabel(suite), err)
@@ -275,6 +297,9 @@ func materializeSuite(s SuiteConfig, cases []*v2case.Case) SuiteConfig {
 
 func deriveSuiteName(s SuiteConfig, cases []*v2case.Case) string {
 	if len(cases) == 1 {
+		if strings.TrimSpace(cases[0].Name) != "" {
+			return cases[0].Name
+		}
 		if base := dirLabel(filepath.Dir(cases[0].SourcePath)); base != "" {
 			return base
 		}

@@ -304,3 +304,45 @@ func planNames(p []Plan) []string {
 	}
 	return out
 }
+
+func TestLoadTopLevelCases(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "oats.toml", `
+cases = ["cases/a.yaml", "cases/b.yaml"]
+
+[meta]
+version = 2
+`)
+	writeFile(t, dir, "cases/a.yaml", `
+oats: 2
+name: a
+seed: { type: app }
+expected:
+  traces:
+    - traceql: "{}"
+      absent: true
+`)
+	writeFile(t, dir, "cases/b.yaml", `
+oats: 2
+name: b
+seed: { type: app }
+expected:
+  traces:
+    - traceql: "{}"
+      absent: true
+`)
+	cfg, err := Load(filepath.Join(dir, "oats.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plans, err := cfg.PlanRun(Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plans) != 2 {
+		t.Fatalf("expected 2 plans, got %d", len(plans))
+	}
+	if plans[0].Suite.Name != "a" || plans[1].Suite.Name != "b" {
+		t.Fatalf("unexpected suite names: %q, %q", plans[0].Suite.Name, plans[1].Suite.Name)
+	}
+}
