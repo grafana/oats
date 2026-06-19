@@ -180,7 +180,7 @@ func run() int {
 			CaseCount:   len(plan.Cases),
 		})
 
-		gcxExec := &engine.GCX{Binary: *gcxBin, Context: ep.GCXContext, Env: ep.GCXEnv}
+		gcxExec := &engine.GCX{Binary: *gcxBin, Context: ep.GCXContext, Config: ep.GCXConfig, Env: ep.GCXEnv}
 		r := runner.New(gcxExec, rep, ep, runner.Options{
 			Timeout:         *timeout,
 			Interval:        *interval,
@@ -283,9 +283,15 @@ func resolveEndpoint(plan discovery.Plan, gcxContextOverride, appHost string, ap
 		)
 	case "compose":
 		ep.GCXEnv = append(ep.GCXEnv, localGrafanaEnv(plan)...)
+		if cfg, err := writeLocalGCXConfig(plan.FixtureSourceDir); err == nil {
+			ep.GCXConfig = cfg
+		}
 		ep.CustomCheckEnv = append(ep.CustomCheckEnv, composeCheckEnv(plan, ep)...)
 	case "k3d":
 		ep.GCXEnv = append(ep.GCXEnv, localGrafanaEnv(plan)...)
+		if cfg, err := writeLocalGCXConfig(plan.FixtureSourceDir); err == nil {
+			ep.GCXConfig = cfg
+		}
 		if plan.Fixture.AppPort > 0 {
 			ep.AppPort = plan.Fixture.AppPort
 		}
@@ -302,7 +308,7 @@ func resolveEndpoint(plan discovery.Plan, gcxContextOverride, appHost string, ap
 	if gcxContextOverride != "" {
 		ep.GCXContext = gcxContextOverride
 	}
-	if ep.GCXContext == "" && len(ep.GCXEnv) == 0 {
+	if ep.GCXContext == "" && ep.GCXConfig == "" && len(ep.GCXEnv) == 0 {
 		return ep, fmt.Errorf("gcx context unresolved; set fixture.<name>.endpoint or pass --gcx-context")
 	}
 	return ep, nil
@@ -487,15 +493,44 @@ func grafanaURL() string   { return "http://localhost:3000" }
 func pyroscopeURL() string { return "http://localhost:4040" }
 
 func localGrafanaEnv(plan discovery.Plan) []string {
-	token, err := waitForGrafanaToken(plan)
+	return nil
+}
+
+func writeLocalGCXConfig(_ string) (string, error) {
+	cfg := `current-context: local
+contexts:
+  local:
+    grafana:
+      server: http://localhost:3000
+      user: admin
+      password: admin
+      org-id: 1
+      auth-method: basic
+    datasources:
+      prometheus: prometheus
+      loki: loki
+      tempo: tempo
+      pyroscope: pyroscope
+`
+	f, err := os.CreateTemp("", "oats-gcx-*.yaml")
 	if err != nil {
-		return nil
+		return "", err
 	}
-	return []string{
-		"GRAFANA_SERVER=" + grafanaURL(),
-		"GRAFANA_TOKEN=" + token,
-		"GRAFANA_ORG_ID=1",
+	path := f.Name()
+	if _, err := f.WriteString(cfg); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return "", err
 	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	return path, nil
 }
 
 func composeCheckEnv(plan discovery.Plan, ep runner.Endpoint) []string {

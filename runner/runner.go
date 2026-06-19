@@ -35,8 +35,13 @@ import (
 // purpose: the v2 runner only needs to know where gcx points and where to
 // seed OTLP. Everything else lives in the gcx config context.
 type Endpoint struct {
-	// GCXContext is the value passed to gcx --context. Required.
+	// GCXContext is the value passed to gcx --context when using a named gcx
+	// context. Local LGTM fixtures may leave this empty and instead provide
+	// GCXConfig.
 	GCXContext string
+
+	// GCXConfig is an optional gcx config file path for local fixtures.
+	GCXConfig string
 
 	// OTLPHTTP is the base URL for OTLP/HTTP seed POSTs ("http://localhost:4318").
 	// Required when any case uses seed.type = inline-otlp.

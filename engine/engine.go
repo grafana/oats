@@ -49,6 +49,11 @@ type GCX struct {
 	// can drive multiple Grafana endpoints.
 	Context string
 
+	// Config is an optional path passed via --config before every invocation.
+	// OATS uses this for local LGTM fixtures so gcx can query local datasources
+	// without consumer-managed wrapper scripts or ambient config state.
+	Config string
+
 	// Env supplements os.Environ() for the child process. Use to pass HOME /
 	// XDG_CONFIG_HOME for config isolation.
 	Env []string
@@ -68,7 +73,10 @@ func (g *GCX) Execute(ctx context.Context, args ...string) (*Result, error) {
 
 	full := args
 	if g.Context != "" {
-		full = append([]string{"--context", g.Context}, args...)
+		full = append([]string{"--context", g.Context}, full...)
+	}
+	if g.Config != "" {
+		full = append([]string{"--config", g.Config}, full...)
 	}
 
 	if g.Timeout > 0 {
