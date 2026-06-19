@@ -28,11 +28,12 @@ const SchemaVersion = 2
 // Case is one entry point yaml file. Cases are independently runnable;
 // suites group them via oats.toml.
 type Case struct {
-	OatsVersion int           `yaml:"oats"`
-	Name        string        `yaml:"name"`
-	Tags        []string      `yaml:"tags,omitempty"`
-	Hermetic    *bool         `yaml:"hermetic,omitempty"` // pointer: distinguish unset vs explicit false
-	Interval    time.Duration `yaml:"interval,omitempty"`
+	OatsVersion int            `yaml:"oats"`
+	Name        string         `yaml:"name"`
+	Tags        []string       `yaml:"tags,omitempty"`
+	Hermetic    *bool          `yaml:"hermetic,omitempty"` // pointer: distinguish unset vs explicit false
+	Interval    time.Duration  `yaml:"interval,omitempty"`
+	Fixture     *FixtureConfig `yaml:"fixture,omitempty"`
 
 	Seed     Seed     `yaml:"seed"`
 	Input    []Input  `yaml:"input,omitempty"`
@@ -54,6 +55,23 @@ type Seed struct {
 	Logs    []SeedLog      `yaml:"logs,omitempty"`
 	Metrics []SeedMetric   `yaml:"metrics,omitempty"`
 	Vars    map[string]any `yaml:"vars,omitempty"`
+}
+
+type FixtureConfig struct {
+	Type             string   `yaml:"type,omitempty"`
+	Template         string   `yaml:"template,omitempty"`
+	ComposeFile      string   `yaml:"compose_file,omitempty"`
+	ComposeFiles     []string `yaml:"compose_files,omitempty"`
+	Env              []string `yaml:"env,omitempty"`
+	K8sDir           string   `yaml:"k8s_dir,omitempty"`
+	AppService       string   `yaml:"app_service,omitempty"`
+	AppDockerFile    string   `yaml:"app_docker_file,omitempty"`
+	AppDockerContext string   `yaml:"app_docker_context,omitempty"`
+	AppDockerTag     string   `yaml:"app_docker_tag,omitempty"`
+	AppPort          int      `yaml:"app_port,omitempty"`
+	ImportImages     []string `yaml:"import_images,omitempty"`
+	PoolSize         int      `yaml:"pool_size,omitempty"`
+	Endpoint         string   `yaml:"endpoint,omitempty"`
 }
 
 type SeedTrace struct {
@@ -247,6 +265,11 @@ func (c *Case) Validate() error {
 	if c.Interval < 0 {
 		return fmt.Errorf("interval: must be >= 0")
 	}
+	if c.Fixture != nil {
+		if err := c.Fixture.Validate("fixture"); err != nil {
+			return err
+		}
+	}
 	switch c.Seed.Type {
 	case "app":
 		// App-backed cases are normally booted by the suite fixture declared in
@@ -305,6 +328,31 @@ func (c *Case) Validate() error {
 		if strings.TrimSpace(c.Expected.Custom[i].Script) == "" {
 			return fmt.Errorf("expected.custom-checks[%d].script: required, non-empty", i)
 		}
+	}
+	return nil
+}
+
+func (f FixtureConfig) Validate(path string) error {
+	switch f.Type {
+	case "compose":
+		if f.Template == "" && f.ComposeFile == "" && len(f.ComposeFiles) == 0 {
+			return fmt.Errorf("%s: type=compose requires template, compose_file, or compose_files", path)
+		}
+		if f.ComposeFile != "" && len(f.ComposeFiles) > 0 {
+			return fmt.Errorf("%s: use compose_file or compose_files, not both", path)
+		}
+	case "k3d":
+		if f.K8sDir == "" || f.AppService == "" || f.AppDockerFile == "" || f.AppDockerTag == "" || f.AppPort == 0 {
+			return fmt.Errorf("%s: type=k3d requires k8s_dir, app_service, app_docker_file, app_docker_tag, and app_port", path)
+		}
+	case "remote":
+		if f.Endpoint == "" {
+			return fmt.Errorf("%s: type=remote requires endpoint", path)
+		}
+	case "":
+		return fmt.Errorf("%s.type: required (compose | k3d | remote)", path)
+	default:
+		return fmt.Errorf("%s.type: unknown value %q (expected compose, k3d, or remote)", path, f.Type)
 	}
 	return nil
 }

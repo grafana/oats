@@ -47,9 +47,13 @@ var (
 	newComposeSuite = func(files []string, env []string) (suiteFixture, error) {
 		return compose.SuiteFiles(files, env)
 	}
-	newKubernetesEndpoint = func(sourceDir string, plan discovery.Plan) *remote.Endpoint {
+	newKubernetesEndpoint = func(plan discovery.Plan) *remote.Endpoint {
+		sourceDir := plan.FixtureSourceDir
+		if sourceDir == "" {
+			sourceDir = "."
+		}
 		model := &kubernetes.Kubernetes{
-			Dir:              filepath.Join(sourceDir, plan.Fixture.K8sDir),
+			Dir:              plan.Fixture.K8sDir,
 			AppService:       plan.Fixture.AppService,
 			AppDockerFile:    plan.Fixture.AppDockerFile,
 			AppDockerContext: plan.Fixture.AppDockerContext,
@@ -64,6 +68,7 @@ var (
 			PyroscopeHttpPort:  4040,
 		}, plan.Suite.Name, sourceDir)
 	}
+	waitForGrafanaToken = waitForGrafanaTokenImpl
 )
 
 func main() {
@@ -152,13 +157,13 @@ func run() int {
 
 	for _, plan := range plans {
 		fixtureStart := emitFixtureStart(rep, plan)
-		fix, err := startFixture(ctx, cfg.SourceDir, plan)
+		fix, err := startFixture(ctx, plan)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "suite %q: %v\n", plan.Suite.Name, err)
 			return 2
 		}
 		emitFixtureReady(rep, plan, fixtureStart)
-		ep, err := resolveEndpoint(cfg.SourceDir, plan, *gcxContextOverride, *appHost, *appPort, *otlpHTTP)
+		ep, err := resolveEndpoint(plan, *gcxContextOverride, *appHost, *appPort, *otlpHTTP)
 		if err != nil {
 			if fix != nil {
 				_ = closeFixture(rep, plan, fix)
@@ -175,7 +180,7 @@ func run() int {
 			CaseCount:   len(plan.Cases),
 		})
 
-		gcxExec := &engine.GCX{Binary: *gcxBin, Context: ep.GCXContext}
+		gcxExec := &engine.GCX{Binary: *gcxBin, Context: ep.GCXContext, Env: ep.GCXEnv}
 		r := runner.New(gcxExec, rep, ep, runner.Options{
 			Timeout:         *timeout,
 			Interval:        *interval,
@@ -262,7 +267,7 @@ func verbosityFromInt(n int) report.Verbosity {
 
 // resolveEndpoint maps a fixture config + an explicit override into the
 // concrete endpoint the runner needs.
-func resolveEndpoint(sourceDir string, plan discovery.Plan, gcxContextOverride, appHost string, appPort int, otlpHTTP string) (runner.Endpoint, error) {
+func resolveEndpoint(plan discovery.Plan, gcxContextOverride, appHost string, appPort int, otlpHTTP string) (runner.Endpoint, error) {
 	ep := runner.Endpoint{AppHost: appHost, AppPort: appPort, OTLPHTTP: otlpHTTP}
 	switch plan.Fixture.Type {
 	case "remote":
@@ -271,23 +276,33 @@ func resolveEndpoint(sourceDir string, plan discovery.Plan, gcxContextOverride, 
 		// best-effort default; --gcx-context overrides.
 		ep.GCXContext = plan.Suite.Fixture
 		ep.OTLPHTTP = plan.Fixture.Endpoint
+		ep.CustomCheckEnv = append(ep.CustomCheckEnv,
+			"OATS_FIXTURE_TYPE=remote",
+			"OATS_GRAFANA_URL="+grafanaURL(),
+			"OATS_APP_URL="+fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
+		)
 	case "compose":
-		ep.GCXContext = plan.Suite.Fixture
+		ep.GCXEnv = append(ep.GCXEnv, localGrafanaEnv(plan)...)
+		ep.CustomCheckEnv = append(ep.CustomCheckEnv, composeCheckEnv(plan, ep)...)
 	case "k3d":
-		ep.GCXContext = plan.Suite.Fixture
+		ep.GCXEnv = append(ep.GCXEnv, localGrafanaEnv(plan)...)
 		if plan.Fixture.AppPort > 0 {
 			ep.AppPort = plan.Fixture.AppPort
 		}
+		ep.CustomCheckEnv = append(ep.CustomCheckEnv, k3dCheckEnv(ep)...)
 	case "":
 		// No fixture configured — caller (or --gcx-context) must supply
 		// everything. Useful while plumbing the new CLI against an external setup.
+		ep.CustomCheckEnv = append(ep.CustomCheckEnv,
+			"OATS_APP_URL="+fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
+		)
 	default:
 		return ep, fmt.Errorf("fixture type %q is not supported in oats", plan.Fixture.Type)
 	}
 	if gcxContextOverride != "" {
 		ep.GCXContext = gcxContextOverride
 	}
-	if ep.GCXContext == "" {
+	if ep.GCXContext == "" && len(ep.GCXEnv) == 0 {
 		return ep, fmt.Errorf("gcx context unresolved; set fixture.<name>.endpoint or pass --gcx-context")
 	}
 	return ep, nil
@@ -302,25 +317,31 @@ type startableSuiteFixture interface {
 	Up() error
 }
 
-func startFixture(_ context.Context, sourceDir string, plan discovery.Plan) (suiteFixture, error) {
+func startFixture(_ context.Context, plan discovery.Plan) (suiteFixture, error) {
 	switch plan.Fixture.Type {
 	case "", "remote":
 		return nil, nil
 	case "compose":
-		composeFiles, err := resolveComposeFiles(sourceDir, plan.Fixture)
+		composeFiles, cleanup, err := resolveComposeFiles(plan.FixtureSourceDir, plan.Fixture)
 		if err != nil {
 			return nil, err
 		}
 		suite, err := newComposeSuite(composeFiles, plan.Fixture.Env)
 		if err != nil {
+			if cleanup != nil {
+				_ = cleanup()
+			}
 			return nil, err
 		}
 		if err := startSuiteFixture(suite); err != nil {
+			if cleanup != nil {
+				_ = cleanup()
+			}
 			return nil, err
 		}
-		return suite, nil
+		return composeFixture{suite: suite, cleanup: cleanup}, nil
 	case "k3d":
-		ep := newKubernetesEndpoint(sourceDir, plan)
+		ep := newKubernetesEndpoint(plan)
 		if err := ep.Start(context.Background()); err != nil {
 			return nil, err
 		}
@@ -330,8 +351,19 @@ func startFixture(_ context.Context, sourceDir string, plan discovery.Plan) (sui
 	}
 }
 
-func resolveComposeFiles(sourceDir string, fixture discovery.FixtureConfig) ([]string, error) {
+func resolveComposeFiles(sourceDir string, fixture discovery.FixtureConfig) ([]string, func() error, error) {
 	var files []string
+	var cleanup func() error
+	if fixture.Template == "lgtm" {
+		f, err := writeBuiltinLGTMCompose(sourceDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		files = append(files, f)
+		cleanup = func() error { return os.Remove(f) }
+	} else if fixture.Template != "" {
+		return nil, nil, fmt.Errorf("unsupported compose fixture template %q", fixture.Template)
+	}
 	switch {
 	case fixture.ComposeFile != "":
 		files = append(files, filepath.Join(sourceDir, fixture.ComposeFile))
@@ -339,14 +371,10 @@ func resolveComposeFiles(sourceDir string, fixture discovery.FixtureConfig) ([]s
 		for _, file := range fixture.ComposeFiles {
 			files = append(files, filepath.Join(sourceDir, file))
 		}
-	case fixture.Template == "lgtm":
-		files = append(files, filepath.Join(sourceDir, "docker-compose.yml"))
 	case fixture.Template == "":
-		return nil, fmt.Errorf("compose fixture requires compose_file, compose_files, or supported template")
-	default:
-		return nil, fmt.Errorf("unsupported compose fixture template %q", fixture.Template)
+		return nil, nil, fmt.Errorf("compose fixture requires compose_file, compose_files, or supported template")
 	}
-	return files, nil
+	return files, cleanup, nil
 }
 
 func startSuiteFixture(fix suiteFixture) error {
@@ -406,6 +434,152 @@ type endpointFixture struct {
 
 func (e endpointFixture) Close() error {
 	return e.ep.Stop(context.Background())
+}
+
+type composeFixture struct {
+	suite   suiteFixture
+	cleanup func() error
+}
+
+func (c composeFixture) Close() error {
+	err := c.suite.Close()
+	if c.cleanup != nil {
+		if cleanupErr := c.cleanup(); cleanupErr != nil && err == nil {
+			err = cleanupErr
+		}
+	}
+	return err
+}
+
+func writeBuiltinLGTMCompose(sourceDir string) (string, error) {
+	path := filepath.Join(sourceDir, ".oats.lgtm.compose.yml")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+	const body = `services:
+  lgtm:
+    image: ${LGTM_IMAGE:-docker.io/grafana/otel-lgtm:latest}
+    ports:
+      - "3000:3000"
+      - "4317:4317"
+      - "4318:4318"
+      - "3200:3200"
+      - "4040:4040"
+      - "9090:9090"
+`
+	if _, err := f.WriteString(body); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	return path, nil
+}
+
+func grafanaURL() string   { return "http://localhost:3000" }
+func pyroscopeURL() string { return "http://localhost:4040" }
+
+func localGrafanaEnv(plan discovery.Plan) []string {
+	token, err := waitForGrafanaToken(plan)
+	if err != nil {
+		return nil
+	}
+	return []string{
+		"GRAFANA_SERVER=" + grafanaURL(),
+		"GRAFANA_TOKEN=" + token,
+	}
+}
+
+func composeCheckEnv(plan discovery.Plan, ep runner.Endpoint) []string {
+	files, _, err := resolveComposeFiles(plan.FixtureSourceDir, plan.Fixture)
+	if err != nil {
+		return []string{"OATS_FIXTURE_TYPE=compose"}
+	}
+	return []string{
+		"OATS_FIXTURE_TYPE=compose",
+		"COMPOSE_FILE=" + strings.Join(files, string(os.PathListSeparator)),
+		"OATS_COMPOSE_FILE_ARGS=" + composeFileArgs(files),
+		"OATS_APP_URL=" + fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
+		"OATS_GRAFANA_URL=" + grafanaURL(),
+		"OATS_PYROSCOPE_URL=" + pyroscopeURL(),
+	}
+}
+
+func composeFileArgs(files []string) string {
+	var parts []string
+	for _, f := range files {
+		parts = append(parts, "-f", shellQuote(f))
+	}
+	return strings.Join(parts, " ")
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+func k3dCheckEnv(ep runner.Endpoint) []string {
+	return []string{
+		"OATS_FIXTURE_TYPE=k3d",
+		"OATS_APP_URL=" + fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
+		"OATS_GRAFANA_URL=" + grafanaURL(),
+		"OATS_PYROSCOPE_URL=" + pyroscopeURL(),
+	}
+}
+
+func waitForGrafanaTokenImpl(plan discovery.Plan) (string, error) {
+	deadline := time.Now().Add(3 * time.Minute)
+	for time.Now().Before(deadline) {
+		var token string
+		var err error
+		switch plan.Fixture.Type {
+		case "compose":
+			token, err = readComposeGrafanaToken(plan)
+		case "k3d":
+			token, err = readK3DGrafanaToken()
+		default:
+			return "", nil
+		}
+		if err == nil && strings.TrimSpace(token) != "" {
+			return strings.TrimSpace(token), nil
+		}
+		time.Sleep(time.Second)
+	}
+	return "", fmt.Errorf("timed out waiting for Grafana service-account token")
+}
+
+func readComposeGrafanaToken(plan discovery.Plan) (string, error) {
+	files, _, err := resolveComposeFiles(plan.FixtureSourceDir, plan.Fixture)
+	if err != nil {
+		return "", err
+	}
+	args := []string{"compose"}
+	for _, f := range files {
+		args = append(args, "-f", f)
+	}
+	args = append(args, "exec", "-T", "lgtm", "sh", "-c", "cat /tmp/grafana-sa-token 2>/dev/null || true")
+	cmd := exec.Command("docker", args...)
+	cmd.Env = append(cmd.Environ(), plan.Fixture.Env...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+func readK3DGrafanaToken() (string, error) {
+	cmd := exec.Command("kubectl", "exec", "deploy/lgtm", "--", "sh", "-c", "cat /tmp/grafana-sa-token 2>/dev/null || true")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
 
 func splitCSV(s string) []string {

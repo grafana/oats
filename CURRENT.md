@@ -9,8 +9,8 @@ for the full design.
 ## Quick start
 
 ```sh
-# Build the oats binary
-go build -o bin/oats ./cmd/v2
+# Build oats plus the gcx binary it shells out to
+./scripts/build-local-tools.sh
 
 # Print what would run, do not execute
 bin/oats --config oats.toml --list
@@ -66,7 +66,7 @@ discovery → seed → engine → assert → report
 
 | Package    | Responsibility |
 |------------|---------------|
-| `discovery` | Parse `oats.toml`, expand case globs, apply filters. |
+| `discovery` | Parse `oats.toml`, expand case globs, apply filters, and derive case-local fixtures when a suite omits one. |
 | `v2case`    | Parse and validate one case yaml file. |
 | `seed`      | Push inline-OTLP payloads at an OTLP/HTTP endpoint. |
 | `engine`    | Execute a gcx command, capture stdout/stderr/exit. |
@@ -78,6 +78,14 @@ discovery → seed → engine → assert → report
 | `runner`    | Orchestrates a suite: seed → poll-and-assert → report, with optional cache. |
 | `cmd/v2`    | The new binary entry point. |
 
+## Consumer-shape notes
+
+For simple consumer repos, keep `oats.toml` thin: a suite usually only needs `cases = ["..."]`.
+Case-local `fixture:` blocks now cover the common one-case-per-suite path. Shared root-level `[fixture.*]` blocks are still useful when many suites intentionally reuse the same fixture or when one case is run against multiple fixtures.
+
+Local LGTM compose boot plus Grafana auth bootstrap are now owned by OATS itself:
+consumer repos should not need their own shared `docker-compose.lgtm.yml` or a custom `gcx-wrapper.sh` just to talk to a local LGTM stack.
+
 ## `oats.toml` shape
 
 ```toml
@@ -85,26 +93,18 @@ discovery → seed → engine → assert → report
 version = 2
 
 [[suite]]
-name    = "lgtm-examples"
-cases   = ["examples/*/oats.yaml"]
-fixture = "lgtm-shared"
-tags    = ["traces", "metrics", "logs"]
+cases = ["examples/nodejs/oats.yaml"]
 
-[fixture.lgtm-shared]
-type     = "compose"           # compose | k3d | remote
-template = "lgtm"              # built-in compose template
-# compose_file = "./my-compose.yml"  # alternative to template
-# compose_files = ["./base.yml", "./override.yml"]  # multi-file compose
-# env = ["FOO=bar"]            # extra env for compose config/up
-# k8s_dir = "./k8s"            # k3d only
-# app_service = "dice"         # k3d only
-# app_docker_file = "Dockerfile"
-# app_docker_context = "."
-# app_docker_tag = "dice:test"
-# app_port = 8080
-# import_images = ["grafana/docker-otel-lgtm:latest"]
-# pool_size = 4                # reserved for future k3d pooling
-# endpoint = "http://..."      # remote only
+# Optional when many suites share one fixture:
+# [[suite]]
+# name    = "lgtm-examples"
+# cases   = ["examples/*/oats.yaml"]
+# fixture = "lgtm-shared"
+# tags    = ["traces", "metrics", "logs"]
+#
+# [fixture.lgtm-shared]
+# type     = "compose"
+# template = "lgtm"
 
 [cache]
 ttl_days = 7                   # default
@@ -115,6 +115,11 @@ ttl_days = 7                   # default
 ```yaml
 oats: 2
 name: rolldice traces have route attribute
+
+fixture:
+  type: compose
+  template: lgtm
+  compose_file: docker-compose.oats.yml
 
 seed:
   type: app

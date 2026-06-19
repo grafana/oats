@@ -9,7 +9,7 @@
 If you want the newer gcx-driven flow today:
 
 ```sh
-go build -o bin/oats ./cmd/v2
+./scripts/build-local-tools.sh
 bin/oats --config examples/smoke/oats.toml --list
 ```
 
@@ -20,6 +20,7 @@ Useful entry points:
 - best-effort legacy migration: `bin/oats --migrate path/to/oats.yaml`
 
 Current scope already includes:
+- built-in local-LGTM fixture/bootstrap owned by OATS (consumer repos do not need a shared `docker-compose.lgtm.yml` or `gcx` wrapper)
 - traces / logs / metrics / profiles via `gcx`
 - structural `match` assertions
 - inline-OTLP and app-backed cases

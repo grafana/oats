@@ -24,53 +24,71 @@ import (
 )
 
 func TestResolveComposeFiles(t *testing.T) {
-	got, err := resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", ComposeFile: "stack/compose.yml"})
+	got, cleanup, err := resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", ComposeFile: "stack/compose.yml"})
 	if err != nil {
 		t.Fatalf("resolveComposeFiles compose_file: %v", err)
+	}
+	if cleanup != nil {
+		t.Fatalf("unexpected cleanup for compose_file fixture")
 	}
 	if want := []string{"/tmp/work/stack/compose.yml"}; len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("got %q want %q", got, want)
 	}
 
-	got, err = resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", ComposeFiles: []string{"a.yml", "b.yml"}})
+	got, cleanup, err = resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", ComposeFiles: []string{"a.yml", "b.yml"}})
 	if err != nil {
 		t.Fatalf("resolveComposeFiles compose_files: %v", err)
+	}
+	if cleanup != nil {
+		t.Fatalf("unexpected cleanup for compose_files fixture")
 	}
 	if len(got) != 2 || got[0] != "/tmp/work/a.yml" || got[1] != "/tmp/work/b.yml" {
 		t.Fatalf("unexpected compose_files resolution: %v", got)
 	}
 
-	got, err = resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", Template: "lgtm"})
+	got, cleanup, err = resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", Template: "lgtm"})
 	if err != nil {
 		t.Fatalf("resolveComposeFiles template=lgtm: %v", err)
 	}
-	if want := []string{"/tmp/work/docker-compose.yml"}; len(got) != 1 || got[0] != want[0] {
-		t.Fatalf("got %q want %q", got, want)
+	if cleanup == nil {
+		t.Fatalf("expected cleanup for template=lgtm fixture")
+	}
+	defer func() { _ = cleanup() }()
+	if len(got) != 1 || !strings.HasSuffix(got[0], ".oats.lgtm.compose.yml") {
+		t.Fatalf("unexpected template=lgtm resolution: %v", got)
 	}
 }
 
 func TestResolveEndpoint_ComposeDefaults(t *testing.T) {
-	ep, err := resolveEndpoint("/tmp/work", discovery.Plan{
+	oldToken := waitForGrafanaToken
+	waitForGrafanaToken = func(plan discovery.Plan) (string, error) { return "tok", nil }
+	defer func() { waitForGrafanaToken = oldToken }()
+
+	ep, err := resolveEndpoint(discovery.Plan{
 		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
 		Fixture: discovery.FixtureConfig{Type: "compose", Template: "lgtm"},
 	}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
-	if ep.GCXContext != "local" || ep.AppHost != "localhost" || ep.AppPort != 8080 || ep.OTLPHTTP != "http://localhost:4318" {
+	if ep.GCXContext != "" || ep.AppHost != "localhost" || ep.AppPort != 8080 || ep.OTLPHTTP != "http://localhost:4318" {
 		t.Fatalf("unexpected endpoint: %+v", ep)
 	}
 }
 
 func TestResolveEndpoint_K3DUsesFixtureAppPort(t *testing.T) {
-	ep, err := resolveEndpoint("/tmp/work", discovery.Plan{
+	oldToken := waitForGrafanaToken
+	waitForGrafanaToken = func(plan discovery.Plan) (string, error) { return "tok", nil }
+	defer func() { waitForGrafanaToken = oldToken }()
+
+	ep, err := resolveEndpoint(discovery.Plan{
 		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "cluster"},
 		Fixture: discovery.FixtureConfig{Type: "k3d", AppPort: 18080},
 	}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
-	if ep.GCXContext != "cluster" || ep.AppPort != 18080 {
+	if ep.GCXContext != "" || ep.AppPort != 18080 {
 		t.Fatalf("unexpected endpoint: %+v", ep)
 	}
 }
@@ -87,13 +105,14 @@ func TestStartFixture_ComposeLifecycle(t *testing.T) {
 		return fake, nil
 	}
 
-	fix, err := startFixture(context.Background(), "/tmp/work", discovery.Plan{
+	fix, err := startFixture(context.Background(), discovery.Plan{
 		Suite: discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
 		Fixture: discovery.FixtureConfig{
 			Type:         "compose",
 			ComposeFiles: []string{"a.yml", "b.yml"},
 			Env:          []string{"FOO=bar"},
 		},
+		FixtureSourceDir: "/tmp/work",
 	})
 	if err != nil {
 		t.Fatalf("startFixture compose: %v", err)
@@ -123,9 +142,10 @@ func TestStartFixture_ComposeStartFailure(t *testing.T) {
 		return &fakeSuiteFixture{upErr: fmt.Errorf("boom")}, nil
 	}
 
-	_, err := startFixture(context.Background(), "/tmp/work", discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
-		Fixture: discovery.FixtureConfig{Type: "compose", ComposeFile: "compose.yml"},
+	_, err := startFixture(context.Background(), discovery.Plan{
+		Suite:            discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Fixture:          discovery.FixtureConfig{Type: "compose", ComposeFile: "compose.yml"},
+		FixtureSourceDir: "/tmp/work",
 	})
 	if err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("expected compose startup error, got %v", err)
@@ -136,11 +156,9 @@ func TestStartFixture_K3DLifecycle(t *testing.T) {
 	oldFactory := newKubernetesEndpoint
 	defer func() { newKubernetesEndpoint = oldFactory }()
 
-	var capturedSource string
 	var capturedPlan discovery.Plan
 	var starts, stops int
-	newKubernetesEndpoint = func(sourceDir string, plan discovery.Plan) *remote.Endpoint {
-		capturedSource = sourceDir
+	newKubernetesEndpoint = func(plan discovery.Plan) *remote.Endpoint {
 		capturedPlan = plan
 		return remote.NewEndpoint("localhost", remote.PortsConfig{}, func(ctx context.Context) error {
 			starts++
@@ -151,7 +169,7 @@ func TestStartFixture_K3DLifecycle(t *testing.T) {
 		}, nil)
 	}
 
-	fix, err := startFixture(context.Background(), "/tmp/work", discovery.Plan{
+	fix, err := startFixture(context.Background(), discovery.Plan{
 		Suite: discovery.SuiteConfig{Name: "cluster-smoke", Fixture: "cluster"},
 		Fixture: discovery.FixtureConfig{
 			Type:             "k3d",
@@ -163,6 +181,7 @@ func TestStartFixture_K3DLifecycle(t *testing.T) {
 			AppPort:          18080,
 			ImportImages:     []string{"busybox:latest"},
 		},
+		FixtureSourceDir: "/tmp/work",
 	})
 	if err != nil {
 		t.Fatalf("startFixture k3d: %v", err)
@@ -170,8 +189,8 @@ func TestStartFixture_K3DLifecycle(t *testing.T) {
 	if starts != 1 {
 		t.Fatalf("expected one endpoint start, got %d", starts)
 	}
-	if capturedSource != "/tmp/work" || capturedPlan.Suite.Name != "cluster-smoke" || capturedPlan.Fixture.AppPort != 18080 {
-		t.Fatalf("unexpected endpoint factory args: source=%q plan=%+v", capturedSource, capturedPlan)
+	if capturedPlan.FixtureSourceDir != "/tmp/work" || capturedPlan.Suite.Name != "cluster-smoke" || capturedPlan.Fixture.AppPort != 18080 {
+		t.Fatalf("unexpected endpoint factory args: plan=%+v", capturedPlan)
 	}
 	if err := fix.Close(); err != nil {
 		t.Fatalf("fixture close: %v", err)
@@ -445,7 +464,7 @@ expected:
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(dir, plans[0], "", appHost, appPort, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], "", appHost, appPort, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -521,7 +540,7 @@ expected:
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(dir, plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -600,7 +619,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(dir, plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -688,7 +707,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(dir, plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -767,7 +786,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(dir, plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -845,7 +864,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(dir, plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -943,7 +962,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("expected k8s-only assertion to be filtered out, got %d traces", got)
 	}
 
-	ep, err := resolveEndpoint(dir, plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}

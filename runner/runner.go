@@ -47,6 +47,16 @@ type Endpoint struct {
 	// comes from here.
 	AppHost string
 	AppPort int
+
+	// GCXEnv supplements the gcx subprocess environment for every assertion.
+	// OATS uses this for local LGTM fixtures so consumer repos do not need a
+	// custom gcx wrapper script just to inject Grafana auth.
+	GCXEnv []string
+
+	// CustomCheckEnv is appended to each custom-check subprocess environment.
+	// It carries fixture-specific helpers like COMPOSE_FILE and stable local
+	// endpoint URLs.
+	CustomCheckEnv []string
 }
 
 // Options configures the polling cadence and per-case deadline. Sensible
@@ -259,7 +269,7 @@ func (r *Runner) runCustomCheck(ctx context.Context, c *v2case.Case, chk *v2case
 		deadlineCtx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
 		defer cancel()
 
-		cmd, cleanup, err := customCheckCommand(deadlineCtx, dir, chk.Script)
+		cmd, cleanup, err := customCheckCommand(deadlineCtx, dir, chk.Script, r.endpoint.CustomCheckEnv)
 		if err != nil {
 			return []assert.Failure{{Rule: "custom-check-setup", Detail: err.Error()}}
 		}
@@ -290,7 +300,7 @@ func (r *Runner) runCustomCheck(ctx context.Context, c *v2case.Case, chk *v2case
 	return false
 }
 
-func customCheckCommand(ctx context.Context, dir, script string) (*exec.Cmd, func(), error) {
+func customCheckCommand(ctx context.Context, dir, script string, extraEnv []string) (*exec.Cmd, func(), error) {
 	cleanup := func() {}
 	if strings.TrimSpace(script) == "" {
 		return nil, cleanup, fmt.Errorf("empty script")
@@ -316,10 +326,12 @@ func customCheckCommand(ctx context.Context, dir, script string) (*exec.Cmd, fun
 		cleanup = func() { _ = os.Remove(f.Name()) }
 		cmd := exec.CommandContext(ctx, "sh", f.Name())
 		cmd.Dir = dir
+		cmd.Env = append(cmd.Environ(), extraEnv...)
 		return cmd, cleanup, nil
 	}
 	cmd := exec.CommandContext(ctx, resolveCustomCheckPath(dir, script))
 	cmd.Dir = dir
+	cmd.Env = append(cmd.Environ(), extraEnv...)
 	return cmd, cleanup, nil
 }
 
