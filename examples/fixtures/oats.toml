@@ -27,4 +27,3 @@ app_docker_context = "."
 app_docker_tag = "rolldice:test"
 app_port = 18080
 import_images = ["grafana/otel-lgtm:latest"]
-

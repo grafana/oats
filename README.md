@@ -14,13 +14,17 @@ bin/oats --config examples/smoke/oats.toml --list
 ```
 
 Useful entry points:
+
 - syntax and feature status: [CURRENT.md](CURRENT.md)
 - small runnable examples: [`examples/smoke/`](examples/smoke/)
 - richer fixture examples: [`examples/fixtures/`](examples/fixtures/)
 - best-effort legacy migration: `bin/oats --migrate path/to/oats.yaml`
 
 Current scope already includes:
-- built-in local-LGTM fixture/bootstrap owned by OATS (consumer repos do not need a shared `docker-compose.lgtm.yml` or `gcx` wrapper)
+
+- built-in local-LGTM fixture/bootstrap owned by OATS
+  (consumer repos do not need a shared `docker-compose.lgtm.yml` or `gcx`
+  wrapper)
 - traces / logs / metrics / profiles via `gcx`
 - structural `match` assertions
 - inline-OTLP and app-backed cases

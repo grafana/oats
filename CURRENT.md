@@ -31,18 +31,21 @@ bin/oats --format ndjson > events.jsonl
 ```
 
 The repo includes a small reference config under `examples/smoke/` showing:
+
 - an app-backed case with `input`
 - an inline-OTLP case
 - a `custom-checks` case
 - a profile assertion case
 
 For richer fixture examples, `examples/fixtures/` shows:
+
 - multi-file compose fixtures with env passthrough
 - k3d fixture config with app build/import fields
 
 ## Current implemented scope
 
 Today this branch already includes:
+
 - gcx-driven traces / logs / metrics / profiles querying
 - collector-style structural assertions (`match_spans` for traces, `match` elsewhere) with `match_type: strict | regexp`
 - app-backed and inline-OTLP seed modes
@@ -66,7 +69,8 @@ discovery → seed → engine → assert → report
 
 | Package    | Responsibility |
 |------------|---------------|
-| `discovery` | Parse `oats.toml`, expand case globs, apply filters, and derive case-local fixtures when a suite omits one. |
+| `discovery` | Parse `oats.toml`, expand case globs, apply filters, and derive
+|            | case-local fixtures when a suite omits one. |
 | `v2case`    | Parse and validate one case yaml file. |
 | `seed`      | Push inline-OTLP payloads at an OTLP/HTTP endpoint. |
 | `engine`    | Execute a gcx command, capture stdout/stderr/exit. |
@@ -74,17 +78,23 @@ discovery → seed → engine → assert → report
 | `assert`    | The expectation vocabulary: `contains`, `not_contains`, `regex`, `value`, `count`, `absent`. |
 | `wait`      | `Until` / `While` polling primitives (replaces gomega.Eventually). |
 | `report`    | Compact-text and NDJSON renderers driven by an Event stream. |
-| `cache`     | Skip-when-unchanged store keyed by `(case yaml + fixture + gcx version + oats version)`. |
+| `cache`     | Skip-when-unchanged store keyed by
+|            | `(case yaml + fixture + gcx version + oats version)`. |
 | `runner`    | Orchestrates a suite: seed → poll-and-assert → report, with optional cache. |
 | `cmd/v2`    | The new binary entry point. |
 
 ## Consumer-shape notes
 
-For simple consumer repos, keep `oats.toml` thin: a suite usually only needs `cases = ["..."]`.
-Case-local `fixture:` blocks now cover the common one-case-per-suite path. Shared root-level `[fixture.*]` blocks are still useful when many suites intentionally reuse the same fixture or when one case is run against multiple fixtures.
+For simple consumer repos, keep `oats.toml` thin: a suite usually only needs
+`cases = ["..."]`. Case-local `fixture:` blocks now cover the common
+one-case-per-suite path. Shared root-level `[fixture.*]` blocks are still useful
+when many suites intentionally reuse the same fixture or when one case is run
+against multiple fixtures.
 
-Local LGTM compose boot plus Grafana auth bootstrap are now owned by OATS itself:
-consumer repos should not need their own shared `docker-compose.lgtm.yml` or a custom `gcx-wrapper.sh` just to talk to a local LGTM stack.
+Local LGTM compose boot plus Grafana auth bootstrap are now owned by OATS
+itself: consumer repos should not need their own shared
+`docker-compose.lgtm.yml` or a custom `gcx-wrapper.sh` just to talk to a local
+LGTM stack.
 
 ## `oats.toml` shape
 
