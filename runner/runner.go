@@ -604,12 +604,36 @@ func approxRowCount(stdout string) int {
 			continue
 		}
 		// Skip lines that look like table-headers / dividers in gcx text mode.
-		if strings.HasPrefix(t, "─") || strings.HasPrefix(t, "═") || strings.HasPrefix(t, "+") {
+		if strings.HasPrefix(t, "─") || strings.HasPrefix(t, "═") || strings.HasPrefix(t, "+") || looksLikeGCXHeader(t) {
 			continue
 		}
 		n++
 	}
 	return n
+}
+
+func looksLikeGCXHeader(line string) bool {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return false
+	}
+	for _, f := range fields {
+		hasLetter := false
+		for _, r := range f {
+			switch {
+			case r >= 'A' && r <= 'Z':
+				hasLetter = true
+			case r >= '0' && r <= '9':
+			case r == '_' || r == '.' || r == '/':
+			default:
+				return false
+			}
+		}
+		if !hasLetter {
+			return false
+		}
+	}
+	return true
 }
 
 // extractMetricValue parses the first numeric data point out of `gcx metrics

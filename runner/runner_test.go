@@ -419,6 +419,9 @@ func TestApproxRowCount(t *testing.T) {
 		{"a\nb\nc", 3},
 		{"a\n\nb", 2},
 		{"─\na\n═\n+\nb", 2},
+		{"TRACE_ID  SERVICE  NAME  DURATION  START", 0},
+		{"TIME  STREAM  MESSAGE", 0},
+		{"TRACE_ID  SERVICE  NAME  DURATION  START\nabc svc GET /x 1ms now", 1},
 	}
 	for _, tc := range cases {
 		got := approxRowCount(tc.in)
