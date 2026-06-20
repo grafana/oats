@@ -1,7 +1,7 @@
 [tools]
 go = "1.26.4"
 goreleaser = "2.16.0"
-node = "24.16.0"
+node = "24.17.0"
 
 # Linters
 actionlint = "1.7.10"
