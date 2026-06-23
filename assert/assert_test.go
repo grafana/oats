@@ -99,7 +99,6 @@ func TestAbsent(t *testing.T) {
 }
 
 func TestMatchRows(t *testing.T) {
-	present := true
 	rows := []Row{
 		{
 			Name: "seed-operation",
@@ -113,9 +112,9 @@ func TestMatchRows(t *testing.T) {
 	got := MatchRows(rows, []v2case.MatchEntry{
 		{
 			Name: strPtr("seed-operation"),
-			Attributes: map[string]v2case.AttributeExpectation{
-				"service.name": {Value: strPtr("gcx-e2e-seed")},
-				"trace_id":     {Present: &present},
+			Attributes: v2case.AttributeMatchers{
+				{Key: "service.name", Value: strPtr("gcx-e2e-seed")},
+				{Key: "trace_id"},
 			},
 		},
 	})
@@ -125,11 +124,9 @@ func TestMatchRows(t *testing.T) {
 
 	got = MatchRows(rows, []v2case.MatchEntry{
 		{
-			MatchType: v2case.MatchTypeRegexp,
-			Name:      strPtr("^seed-.*$"),
-			Attributes: map[string]v2case.AttributeExpectation{
-				"trace_id": {Value: strPtr("^abc")},
-			},
+			MatchType:  v2case.MatchTypeRegexp,
+			Name:       strPtr("^seed-.*$"),
+			Attributes: v2case.AttributeMatchers{{Key: "trace_id", Value: strPtr("^abc")}},
 		},
 	})
 	if len(got) != 0 {
@@ -138,9 +135,7 @@ func TestMatchRows(t *testing.T) {
 
 	got = MatchRows(rows, []v2case.MatchEntry{
 		{
-			Attributes: map[string]v2case.AttributeExpectation{
-				"missing": {Present: &present},
-			},
+			Attributes: v2case.AttributeMatchers{{Key: "missing"}},
 		},
 	})
 	if len(got) != 1 || got[0].Rule != "match" {

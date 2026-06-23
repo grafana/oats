@@ -162,15 +162,15 @@ func rowMatches(row Row, entry v2case.MatchEntry) bool {
 			return false
 		}
 	}
-	for key, expected := range entry.Attributes {
-		actual, ok := row.Attributes[key]
-		if expected.Present != nil {
+	for _, expected := range entry.Attributes {
+		actual, ok := row.Attributes[expected.Key]
+		if expected.Value == nil {
 			if !ok {
 				return false
 			}
 			continue
 		}
-		if !ok || expected.Value == nil {
+		if !ok {
 			return false
 		}
 		if !matchesValue(actual, *expected.Value, matchType) {
@@ -201,12 +201,12 @@ func describeMatch(entry v2case.MatchEntry) string {
 	if entry.Name != nil {
 		parts = append(parts, fmt.Sprintf("name=%q", *entry.Name))
 	}
-	for key, expected := range entry.Attributes {
-		switch {
-		case expected.Present != nil:
-			parts = append(parts, fmt.Sprintf("attribute %s present", key))
-		case expected.Value != nil:
-			parts = append(parts, fmt.Sprintf("attribute %s=%q", key, *expected.Value))
+	for _, expected := range entry.Attributes {
+		switch expected.Value {
+		case nil:
+			parts = append(parts, fmt.Sprintf("attribute %s present", expected.Key))
+		default:
+			parts = append(parts, fmt.Sprintf("attribute %s=%q", expected.Key, *expected.Value))
 		}
 	}
 	if len(parts) == 0 {

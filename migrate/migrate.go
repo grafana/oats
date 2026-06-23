@@ -190,26 +190,25 @@ func convertSignal(label string, s model.ExpectedSignal) (v2case.AssertionCommon
 		warnings = append(warnings, fmt.Sprintf("%s matrix-condition dropped", label))
 	}
 	if s.NameEquals != "" || len(s.Attributes) > 0 {
-		entry := v2case.MatchEntry{Attributes: map[string]v2case.AttributeExpectation{}}
+		entry := v2case.MatchEntry{}
 		if s.NameEquals != "" {
 			entry.Name = strPtr(s.NameEquals)
 		}
 		for k, v := range s.Attributes {
-			entry.Attributes[k] = v2case.AttributeExpectation{Value: strPtr(v)}
+			entry.Attributes = append(entry.Attributes, v2case.AttributeMatcher{Key: k, Value: strPtr(v)})
 		}
 		out.Match = append(out.Match, entry)
 	}
 	if s.NameRegexp != "" || len(s.AttributeRegexp) > 0 {
-		entry := v2case.MatchEntry{MatchType: v2case.MatchTypeRegexp, Attributes: map[string]v2case.AttributeExpectation{}}
+		entry := v2case.MatchEntry{MatchType: v2case.MatchTypeRegexp}
 		if s.NameRegexp != "" {
 			entry.Name = strPtr(s.NameRegexp)
 		}
 		for k, v := range s.AttributeRegexp {
 			if v == ".*" {
-				present := true
-				entry.Attributes[k] = v2case.AttributeExpectation{Present: &present}
+				entry.Attributes = append(entry.Attributes, v2case.AttributeMatcher{Key: k})
 			} else {
-				entry.Attributes[k] = v2case.AttributeExpectation{Value: strPtr(v)}
+				entry.Attributes = append(entry.Attributes, v2case.AttributeMatcher{Key: k, Value: strPtr(v)})
 			}
 		}
 		if entry.Name != nil || len(entry.Attributes) > 0 {

@@ -114,11 +114,12 @@ type Input struct {
 // does not care about; an empty Expected makes the case a no-op (rejected at
 // validation).
 type Expected struct {
-	Traces   []TraceAssertion   `yaml:"traces,omitempty"`
-	Metrics  []MetricAssertion  `yaml:"metrics,omitempty"`
-	Logs     []LogAssertion     `yaml:"logs,omitempty"`
-	Profiles []ProfileAssertion `yaml:"profiles,omitempty"`
-	Custom   []CustomCheck      `yaml:"custom-checks,omitempty"`
+	Traces      []TraceAssertion   `yaml:"traces,omitempty"`
+	Metrics     []MetricAssertion  `yaml:"metrics,omitempty"`
+	Logs        []LogAssertion     `yaml:"logs,omitempty"`
+	Profiles    []ProfileAssertion `yaml:"profiles,omitempty"`
+	ComposeLogs []string           `yaml:"compose-logs,omitempty"`
+	Custom      []CustomCheck      `yaml:"custom-checks,omitempty"`
 }
 
 type CustomCheck struct {
@@ -129,9 +130,9 @@ type CustomCheck struct {
 // Embedded into each concrete assertion struct so a case author can mix and
 // match contains / regex / count / absent on any signal.
 type AssertionCommon struct {
-	Contains    []string     `yaml:"contains,omitempty"`
-	NotContains []string     `yaml:"not_contains,omitempty"`
-	Regex       []string     `yaml:"regex,omitempty"`
+	Contains    StringList   `yaml:"contains,omitempty"`
+	NotContains StringList   `yaml:"not_contains,omitempty"`
+	Regex       StringList   `yaml:"regex,omitempty"`
 	Match       []MatchEntry `yaml:"match,omitempty"`
 	Count       string       `yaml:"count,omitempty"` // ">= 1", "== 0", ...
 	Absent      bool         `yaml:"absent,omitempty"`
@@ -145,9 +146,9 @@ const (
 )
 
 type MatchEntry struct {
-	MatchType  MatchType                       `yaml:"match_type,omitempty"`
-	Name       *string                         `yaml:"name,omitempty"`
-	Attributes map[string]AttributeExpectation `yaml:"attributes,omitempty"`
+	MatchType  MatchType         `yaml:"match_type,omitempty"`
+	Name       *string           `yaml:"name,omitempty"`
+	Attributes AttributeMatchers `yaml:"attributes,omitempty"`
 }
 
 func (m MatchEntry) EffectiveMatchType() MatchType {
@@ -157,44 +158,113 @@ func (m MatchEntry) EffectiveMatchType() MatchType {
 	return m.MatchType
 }
 
-type AttributeExpectation struct {
-	Value   *string
-	Present *bool
-}
+type StringList []string
 
-func (a *AttributeExpectation) UnmarshalYAML(node *yaml.Node) error {
+func (s *StringList) UnmarshalYAML(node *yaml.Node) error {
 	switch node.Kind {
-	case yaml.ScalarNode:
-		v := node.Value
-		a.Value = &v
-		a.Present = nil
+	case 0:
+		*s = nil
 		return nil
-	case yaml.MappingNode:
-		var aux struct {
-			Present *bool `yaml:"present"`
-		}
-		if err := node.Decode(&aux); err != nil {
+	case yaml.ScalarNode:
+		var v string
+		if err := node.Decode(&v); err != nil {
 			return err
 		}
-		a.Value = nil
-		a.Present = aux.Present
+		*s = []string{v}
+		return nil
+	case yaml.SequenceNode:
+		var v []string
+		if err := node.Decode(&v); err != nil {
+			return err
+		}
+		*s = v
 		return nil
 	default:
-		return fmt.Errorf("expected scalar string or mapping {present: true}")
+		return fmt.Errorf("expected string or list of strings")
 	}
 }
 
-func (a AttributeExpectation) MarshalYAML() (any, error) {
-	switch {
-	case a.Value != nil && a.Present == nil:
-		return *a.Value, nil
-	case a.Value == nil && a.Present != nil:
-		return map[string]bool{"present": *a.Present}, nil
-	case a.Value == nil && a.Present == nil:
+func (s StringList) MarshalYAML() (any, error) {
+	switch len(s) {
+	case 0:
 		return nil, nil
+	case 1:
+		return s[0], nil
 	default:
-		return nil, fmt.Errorf("attribute expectation cannot marshal value and present simultaneously")
+		return []string(s), nil
 	}
+}
+
+type AttributeMatcher struct {
+	Key   string
+	Value *string
+}
+
+type AttributeMatchers []AttributeMatcher
+
+func (a *AttributeMatchers) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.SequenceNode:
+		type attrDoc struct {
+			Key   string  `yaml:"key"`
+			Value *string `yaml:"value,omitempty"`
+		}
+		var docs []attrDoc
+		if err := node.Decode(&docs); err != nil {
+			return err
+		}
+		out := make([]AttributeMatcher, 0, len(docs))
+		for _, doc := range docs {
+			out = append(out, AttributeMatcher(doc))
+		}
+		*a = out
+		return nil
+	case yaml.MappingNode:
+		// Backward-compatible input: attributes: {key: value} or
+		// attributes: {key: {present: true}}.
+		out := make([]AttributeMatcher, 0, len(node.Content)/2)
+		for i := 0; i < len(node.Content); i += 2 {
+			keyNode, valueNode := node.Content[i], node.Content[i+1]
+			attr := AttributeMatcher{Key: keyNode.Value}
+			switch valueNode.Kind {
+			case yaml.ScalarNode:
+				v := valueNode.Value
+				attr.Value = &v
+			case yaml.MappingNode:
+				var aux struct {
+					Present *bool `yaml:"present"`
+				}
+				if err := valueNode.Decode(&aux); err != nil {
+					return err
+				}
+				if aux.Present == nil || !*aux.Present {
+					return fmt.Errorf("expected scalar value or {present: true}")
+				}
+			default:
+				return fmt.Errorf("expected scalar value or {present: true}")
+			}
+			out = append(out, attr)
+		}
+		*a = out
+		return nil
+	default:
+		return fmt.Errorf("expected list of {key, value?} or legacy mapping")
+	}
+}
+
+func (a AttributeMatchers) MarshalYAML() (any, error) {
+	if len(a) == 0 {
+		return nil, nil
+	}
+	type attrDoc struct {
+		Key   string  `yaml:"key"`
+		Value *string `yaml:"value,omitempty"`
+	}
+	out := make([]attrDoc, 0, len(a))
+	for _, attr := range a {
+		out = append(out, attrDoc(attr))
+	}
+	return out, nil
 }
 
 type TraceAssertion struct {
@@ -402,20 +472,19 @@ func validateMatchEntries(path string, entries []MatchEntry) error {
 				return fmt.Errorf("%s.name: invalid regexp %q: %v", matchPath, *m.Name, err)
 			}
 		}
-		for key, attr := range m.Attributes {
-			attrPath := fmt.Sprintf("%s.attributes[%q]", matchPath, key)
-			if attr.Value != nil && attr.Present != nil {
-				return fmt.Errorf("%s: expected either scalar value or {present: true}, not both", attrPath)
+		seenKeys := map[string]struct{}{}
+		for i, attr := range m.Attributes {
+			attrPath := fmt.Sprintf("%s.attributes[%d]", matchPath, i)
+			if strings.TrimSpace(attr.Key) == "" {
+				return fmt.Errorf("%s.key: required", attrPath)
 			}
-			if attr.Value == nil && attr.Present == nil {
-				return fmt.Errorf("%s: expected scalar value or {present: true}", attrPath)
+			if _, ok := seenKeys[attr.Key]; ok {
+				return fmt.Errorf("%s.key: duplicate key %q", attrPath, attr.Key)
 			}
-			if attr.Present != nil && !*attr.Present {
-				return fmt.Errorf("%s.present: only true is allowed", attrPath)
-			}
+			seenKeys[attr.Key] = struct{}{}
 			if m.EffectiveMatchType() == MatchTypeRegexp && attr.Value != nil {
 				if _, err := regexp.Compile(*attr.Value); err != nil {
-					return fmt.Errorf("%s: invalid regexp %q: %v", attrPath, *attr.Value, err)
+					return fmt.Errorf("%s.value: invalid regexp %q: %v", attrPath, *attr.Value, err)
 				}
 			}
 		}

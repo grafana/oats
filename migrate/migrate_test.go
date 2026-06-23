@@ -62,8 +62,8 @@ func TestConvertDefinition_MapsSignalsToMatchSchema(t *testing.T) {
 	if len(c.Expected.Traces) != 1 || len(c.Expected.Traces[0].MatchSpans) != 2 {
 		fatalf(t, "expected trace strict+regexp split, got %+v", c.Expected.Traces)
 	}
-	if got := c.Expected.Traces[0].MatchSpans[1].Attributes["trace_id"].Present; got == nil || !*got {
-		fatalf(t, "expected trace_id .* to map to present:true")
+	if got := c.Expected.Traces[0].MatchSpans[1].Attributes[0]; got.Key != "trace_id" || got.Value != nil {
+		fatalf(t, "expected trace_id .* to map to presence, got %+v", got)
 	}
 	if c.Expected.Logs[0].Count != ">= 1" {
 		fatalf(t, "expected lossy count min mapping, got %q", c.Expected.Logs[0].Count)
@@ -89,7 +89,7 @@ func TestConvertFile_RendersYAML(t *testing.T) {
 		fatalf(t, "expected at least one warning for flattened include or fixture migration")
 	}
 	text := string(out)
-	for _, want := range []string{"oats: 2", "seed:", "input:", "path: /stock", "match_spans:", "match_type: regexp", "db.system: h2", "promql: foo"} {
+	for _, want := range []string{"oats: 2", "seed:", "input:", "path: /stock", "match_spans:", "match_type: regexp", "key: db.system", "value: h2", "promql: foo"} {
 		if !strings.Contains(text, want) {
 			fatalf(t, "expected migrated yaml to contain %q:\n%s", want, text)
 		}

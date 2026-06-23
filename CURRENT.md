@@ -147,13 +147,15 @@ expected:
       value: '>= 0'
       match:
         - attributes:
-            service_name: dice-server
+            - key: service_name
+              value: dice-server
   logs:
     - logql: '{service_name="dice-server"} |~ `Received request`'
       match:
         - name: "Received request to roll dice"
           attributes:
-            service_name: dice-server
+            - key: service_name
+              value: dice-server
   custom-checks:
     - script: ./verify.sh
 ```
@@ -181,7 +183,8 @@ expected:
       match_spans:
         - name: seed-operation
           attributes:
-            service.name: gcx-e2e-seed
+            - key: service.name
+              value: gcx-e2e-seed
 ```
 
 ### Assertion keys
@@ -191,9 +194,9 @@ Per signal under `expected.<signal>[]`:
 | Key | Meaning |
 |-----|---------|
 | `traceql` / `promql` / `logql` / `query` | The query string. |
-| `contains` | Substrings that must appear in gcx stdout. |
-| `not_contains` | Substrings that must not appear. |
-| `regex` | Patterns that must match. |
+| `contains` | Substrings that must appear in gcx stdout. Accepts a string or list of strings. |
+| `not_contains` | Substrings that must not appear. Accepts a string or list of strings. |
+| `regex` | Patterns that must match. Accepts a string or list of strings. |
 | `match_spans` | Trace-only structural assertions over returned spans using collector-style `match_type: strict | regexp`. |
 | `match` | Structural assertions for logs / metrics / profiles using collector-style `match_type: strict | regexp`. |
 | `value` | Metrics only — numeric comparison (`>= 0`, `== 42`). |
@@ -212,19 +215,22 @@ behavior. For remote fixtures, point those requests at a running app with
 `--app-host` and `--app-port` (defaults: `localhost:8080`).
 
 `match_spans` (for traces) and `match` (for logs / metrics / profiles)
-default to `match_type: strict`. OATS also supports the small convenience
-extension `present: true` for attribute existence checks:
+default to `match_type: strict`. Attributes follow collector-style
+`[{ key, value? }]` entries; omitting `value` means “the key must be present”.
+Text assertions keep list semantics internally, but author-facing YAML may use
+either a scalar string or a list of strings.
 
 ```yaml
 match:
   - name: seed-operation
     attributes:
-      service.name: gcx-e2e-seed
-      trace_id:
-        present: true
+      - key: service.name
+        value: gcx-e2e-seed
+      - key: trace_id
   - match_type: regexp
     attributes:
-      http.route: "^/roll.*$"
+      - key: http.route
+        value: "^/roll.*$"
 ```
 
 ## What's not here yet

@@ -88,12 +88,13 @@ expected:
       match:
         - name: "seed-log-line"
           attributes:
-            service_name: svc
-            trace_id:
-              present: true
+            - key: service_name
+              value: svc
+            - key: trace_id
         - match_type: regexp
           attributes:
-            level: "info|warn"
+            - key: level
+              value: "info|warn"
 `)
 	c, err := Parse(src)
 	if err != nil {
@@ -105,11 +106,72 @@ expected:
 	if c.Expected.Logs[0].Match[0].EffectiveMatchType() != MatchTypeStrict {
 		t.Fatalf("default match_type should be strict")
 	}
-	if c.Expected.Logs[0].Match[0].Attributes["trace_id"].Present == nil {
-		t.Fatalf("trace_id.present should be set")
+	if got := c.Expected.Logs[0].Match[0].Attributes[1]; got.Key != "trace_id" || got.Value != nil {
+		t.Fatalf("trace_id presence should be encoded as key-only entry, got %+v", got)
 	}
 	if c.Expected.Logs[0].Match[1].EffectiveMatchType() != MatchTypeRegexp {
 		t.Fatalf("second entry should be regexp")
+	}
+}
+
+func TestParse_StringListScalarOrList(t *testing.T) {
+	src := []byte(`
+oats: 2
+name: text assertions
+seed:
+  type: app
+expected:
+  logs:
+    - logql: '{service_name="svc"}'
+      contains: hello
+      not_contains:
+        - panic
+      regex: 'warn|error'
+`)
+	c, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	log := c.Expected.Logs[0]
+	if got := []string(log.Contains); len(got) != 1 || got[0] != "hello" {
+		t.Fatalf("contains scalar not normalized correctly: %#v", got)
+	}
+	if got := []string(log.NotContains); len(got) != 1 || got[0] != "panic" {
+		t.Fatalf("not_contains list parse failed: %#v", got)
+	}
+	if got := []string(log.Regex); len(got) != 1 || got[0] != "warn|error" {
+		t.Fatalf("regex scalar not normalized correctly: %#v", got)
+	}
+}
+
+func TestParse_LegacyAttributeMapStillAccepted(t *testing.T) {
+	src := []byte(`
+oats: 2
+name: legacy attrs
+seed:
+  type: app
+expected:
+  traces:
+    - traceql: '{}'
+      match_spans:
+        - attributes:
+            service.name: svc
+            trace_id:
+              present: true
+`)
+	c, err := Parse(src)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	attrs := c.Expected.Traces[0].MatchSpans[0].Attributes
+	if len(attrs) != 2 {
+		t.Fatalf("expected 2 attrs, got %+v", attrs)
+	}
+	if attrs[0].Key != "service.name" || attrs[0].Value == nil || *attrs[0].Value != "svc" {
+		t.Fatalf("unexpected first attr: %+v", attrs[0])
+	}
+	if attrs[1].Key != "trace_id" || attrs[1].Value != nil {
+		t.Fatalf("unexpected presence attr: %+v", attrs[1])
 	}
 }
 
@@ -276,11 +338,13 @@ expected:
     - logql: '{job="x"}'
       match:
         - attributes:
-            trace_id:
-              present: false
+            - key: trace_id
+              value: foo
+            - key: trace_id
+              value: bar
 `))
-	if err == nil || !strings.Contains(err.Error(), "only true is allowed") {
-		t.Fatalf("expected present error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "duplicate key") {
+		t.Fatalf("expected duplicate key error, got %v", err)
 	}
 }
 

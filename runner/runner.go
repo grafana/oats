@@ -239,6 +239,11 @@ func (r *Runner) RunCase(ctx context.Context, c *v2case.Case) bool {
 			ok = false
 		}
 	}
+	for _, msg := range c.Expected.ComposeLogs {
+		if !r.runComposeLogCheck(ctx, c, msg) {
+			ok = false
+		}
+	}
 	for i := range c.Expected.Custom {
 		if !r.runCustomCheck(ctx, c, &c.Expected.Custom[i]) {
 			ok = false
@@ -260,6 +265,37 @@ func (r *Runner) RunCase(ctx context.Context, c *v2case.Case) bool {
 		}
 	}
 	return ok
+}
+
+func (r *Runner) runComposeLogCheck(ctx context.Context, c *v2case.Case, msg string) bool {
+	run := func() []assert.Failure {
+		if err := r.driveInputs(c); err != nil {
+			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
+		}
+		ok, err := searchComposeLogs(ctx, r.endpoint.CustomCheckEnv, msg)
+		if err != nil {
+			return []assert.Failure{{Rule: "compose-logs", Detail: err.Error()}}
+		}
+		if !ok {
+			return []assert.Failure{{Rule: "compose-logs", Detail: fmt.Sprintf("missing %q", msg)}}
+		}
+		return nil
+	}
+
+	result := wait.Until[assert.Failure](ctx, wait.Options{Timeout: r.opts.Timeout, Interval: r.caseInterval(c)}, run)
+	if result.OK {
+		return true
+	}
+	for _, f := range result.LastFailures {
+		r.reporter.Emit(report.Event{
+			Type:   report.EventAssertFail,
+			Case:   c.Name,
+			Source: c.SourcePath,
+			Msg:    f.Error(),
+			Cmd:    "compose-logs",
+		})
+	}
+	return false
 }
 
 func (r *Runner) runCustomCheck(ctx context.Context, c *v2case.Case, chk *v2case.CustomCheck) bool {
@@ -338,6 +374,31 @@ func customCheckCommand(ctx context.Context, dir, script string, extraEnv []stri
 	cmd.Dir = dir
 	cmd.Env = append(cmd.Environ(), extraEnv...)
 	return cmd, cleanup, nil
+}
+
+func searchComposeLogs(ctx context.Context, extraEnv []string, needle string) (bool, error) {
+	if envValue(extraEnv, "OATS_FIXTURE_TYPE") != "compose" {
+		return false, fmt.Errorf("compose-logs requires a compose fixture")
+	}
+	cmd := exec.CommandContext(ctx, "docker", "compose", "logs", "--no-color")
+	cmd.Env = append(cmd.Environ(), extraEnv...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		return false, fmt.Errorf("docker compose logs: %w\n%s", err, trimOutput(out.String()))
+	}
+	return strings.Contains(out.String(), needle), nil
+}
+
+func envValue(env []string, key string) string {
+	prefix := key + "="
+	for _, kv := range env {
+		if strings.HasPrefix(kv, prefix) {
+			return strings.TrimPrefix(kv, prefix)
+		}
+	}
+	return ""
 }
 
 func looksLikeInlineScript(script string) bool {
@@ -479,14 +540,92 @@ func (r *Runner) caseInterval(c *v2case.Case) time.Duration {
 }
 
 func (r *Runner) runTrace(ctx context.Context, c *v2case.Case, a *v2case.TraceAssertion) bool {
+	if len(a.MatchSpans) > 0 {
+		return r.runTraceStructured(ctx, c, a)
+	}
 	args := signalcmd.Traces(*a, r.opts.Timeout)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
-		if len(a.MatchSpans) == 0 {
-			return evalCommonText(stdout, a.AssertionCommon)
-		}
-		rows, count, err := extractTraceRows(stdout)
-		return evalTraceStructured(stdout, *a, rows, count, err)
+		return evalCommonText(stdout, a.AssertionCommon)
 	})
+}
+
+func (r *Runner) runTraceStructured(ctx context.Context, c *v2case.Case, a *v2case.TraceAssertion) bool {
+	run := func() []assert.Failure {
+		if err := r.driveInputs(c); err != nil {
+			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
+		}
+		searchArgs := signalcmd.Traces(*a, r.opts.Timeout)
+		searchCmd := signalcmd.Render(searchArgs)
+		searchRes, err := r.exec.Execute(ctx, searchArgs...)
+		if err != nil {
+			return []assert.Failure{{Rule: "exec", Detail: err.Error()}}
+		}
+		r.reporter.Emit(report.Event{Type: report.EventGCXExec, Case: c.Name, Cmd: searchCmd})
+		if searchRes.ExitCode != 0 {
+			detail := strings.TrimSpace(searchRes.Stderr)
+			if detail == "" {
+				detail = fmt.Sprintf("gcx exit code %d", searchRes.ExitCode)
+			}
+			return []assert.Failure{{Rule: "exec", Detail: detail}}
+		}
+		rows, count, err := r.fetchTraceRows(ctx, c, searchRes.Stdout)
+		return evalTraceStructured(searchRes.Stdout, *a, rows, count, err)
+	}
+
+	result := wait.Until[assert.Failure](ctx, wait.Options{Timeout: r.opts.Timeout, Interval: r.caseInterval(c)}, run)
+	if result.OK {
+		return true
+	}
+	cmdStr := signalcmd.Render(signalcmd.Traces(*a, r.opts.Timeout))
+	for _, f := range result.LastFailures {
+		r.reporter.Emit(report.Event{
+			Type:   report.EventAssertFail,
+			Case:   c.Name,
+			Source: c.SourcePath,
+			Msg:    f.Error(),
+			Cmd:    cmdStr,
+		})
+	}
+	return false
+}
+
+func (r *Runner) fetchTraceRows(ctx context.Context, c *v2case.Case, searchStdout string) ([]assert.Row, int, error) {
+	traceIDs, count, err := extractTraceIDs(searchStdout)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(traceIDs) == 0 {
+		rows, parsedCount, err := extractTraceRows(searchStdout)
+		if err != nil {
+			return nil, count, err
+		}
+		if count == 0 {
+			count = parsedCount
+		}
+		return rows, count, nil
+	}
+	var rows []assert.Row
+	for _, traceID := range traceIDs {
+		args := signalcmd.TraceGet(traceID, r.opts.Timeout)
+		res, err := r.exec.Execute(ctx, args...)
+		if err != nil {
+			return nil, count, fmt.Errorf("trace %s fetch: %w", traceID, err)
+		}
+		r.reporter.Emit(report.Event{Type: report.EventGCXExec, Case: c.Name, Cmd: signalcmd.Render(args)})
+		if res.ExitCode != 0 {
+			detail := strings.TrimSpace(res.Stderr)
+			if detail == "" {
+				detail = fmt.Sprintf("gcx exit code %d", res.ExitCode)
+			}
+			return nil, count, fmt.Errorf("trace %s fetch: %s", traceID, detail)
+		}
+		traceRows, _, err := extractTraceRows(res.Stdout)
+		if err != nil {
+			return nil, count, err
+		}
+		rows = append(rows, traceRows...)
+	}
+	return rows, count, nil
 }
 
 func (r *Runner) runLog(ctx context.Context, c *v2case.Case, a *v2case.LogAssertion) bool {
@@ -785,6 +924,27 @@ func extractTraceRows(stdout string) ([]assert.Row, int, error) {
 	return rows, count, nil
 }
 
+func extractTraceIDs(stdout string) ([]string, int, error) {
+	if strings.TrimSpace(stdout) == "" {
+		return nil, 0, nil
+	}
+	var payload struct {
+		Traces []struct {
+			TraceID string `json:"traceID"`
+		} `json:"traces"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		return nil, 0, fmt.Errorf("trace JSON parse: %w", err)
+	}
+	ids := make([]string, 0, len(payload.Traces))
+	for _, tr := range payload.Traces {
+		if tr.TraceID != "" {
+			ids = append(ids, tr.TraceID)
+		}
+	}
+	return ids, len(payload.Traces), nil
+}
+
 func extractProfileRows(stdout string) ([]assert.Row, int, error) {
 	if strings.TrimSpace(stdout) == "" {
 		return nil, 0, nil
@@ -794,6 +954,13 @@ func extractProfileRows(stdout string) ([]assert.Row, int, error) {
 		return nil, 0, fmt.Errorf("profile JSON parse: %w", err)
 	}
 	if names := flamebearerNames(root); len(names) > 0 {
+		rows := make([]assert.Row, 0, len(names))
+		for _, name := range names {
+			rows = append(rows, assert.Row{Name: name, Attributes: map[string]string{}})
+		}
+		return rows, len(rows), nil
+	}
+	if names := flamegraphNames(root); len(names) > 0 {
 		rows := make([]assert.Row, 0, len(names))
 		for _, name := range names {
 			rows = append(rows, assert.Row{Name: name, Attributes: map[string]string{}})
@@ -891,6 +1058,9 @@ func extractOTLPTraceRows(root any) ([]assert.Row, bool) {
 	if !ok {
 		return nil, false
 	}
+	if trace, ok := top["trace"].(map[string]any); ok {
+		top = trace
+	}
 	resourceSpans, ok := top["resourceSpans"].([]any)
 	if !ok {
 		resourceSpans, ok = top["batches"].([]any)
@@ -943,6 +1113,7 @@ func extractOTLPTraceRows(root any) ([]assert.Row, bool) {
 				}
 				if scopeName != "" {
 					attrs["otel.scope.name"] = scopeName
+					attrs["otel.library.name"] = scopeName
 				}
 				if kind, ok := sp["kind"]; ok {
 					attrs["kind"] = fmt.Sprint(kind)
@@ -1022,6 +1193,35 @@ func flamebearerNames(root any) []string {
 	out := make([]string, 0, len(raw))
 	for _, item := range raw {
 		out = append(out, fmt.Sprint(item))
+	}
+	return out
+}
+
+func flamegraphNames(root any) []string {
+	top, ok := root.(map[string]any)
+	if !ok {
+		return nil
+	}
+	flamegraph, ok := top["flamegraph"].(map[string]any)
+	if !ok {
+		if data, ok := top["data"].(map[string]any); ok {
+			flamegraph, _ = data["flamegraph"].(map[string]any)
+		}
+	}
+	if flamegraph == nil {
+		return nil
+	}
+	raw, ok := flamegraph["names"].([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		s := fmt.Sprint(item)
+		if s == "" {
+			continue
+		}
+		out = append(out, s)
 	}
 	return out
 }

@@ -38,6 +38,19 @@ func Traces(a v2case.TraceAssertion, since time.Duration) []string {
 	return args
 }
 
+// TraceGet builds the gcx args to retrieve one trace by ID as OTLP-shaped JSON.
+func TraceGet(traceID string, since time.Duration) []string {
+	if since <= 0 {
+		since = DefaultSince
+	}
+	return []string{
+		"traces", "get",
+		"--since", since.String(),
+		"-o", "json",
+		traceID,
+	}
+}
+
 // Logs builds the gcx args for a LogAssertion.
 func Logs(a v2case.LogAssertion, since time.Duration) []string {
 	if since <= 0 {
