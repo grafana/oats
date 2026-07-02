@@ -3,7 +3,7 @@
 This document covers the current gcx-driven OATS CLI, which replaces the bespoke TraceQL /
 PromQL / LogQL HTTP query infrastructure with the [gcx](https://github.com/grafana/gcx)
 CLI. The current CLI entry point lives at `cmd/v2/main.go` while this replaces the legacy path. See
-[grafana/internal-docs#14](https://github.com/grafana/internal-docs/pull/14)
+the internal design doc (grafana/internal-docs#14)
 for the full design.
 
 ## Quick start
@@ -246,7 +246,7 @@ match:
 ## Migrating from v1
 
 For the legacy → current migration story see the OATS implementation plan in
-[grafana/internal-docs#14](https://github.com/grafana/internal-docs/pull/14).
+the internal design doc (grafana/internal-docs#14).
 Today a best-effort converter exists:
 
 ```bash
