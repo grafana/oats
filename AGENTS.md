@@ -19,7 +19,7 @@ validate traces (TraceQL), logs (LogQL), metrics (PromQL), and profiles
 # Build
 mise run build
 
-# Run unit tests
+# Run non-e2e tests
 mise run test
 
 # Run e2e tests

@@ -79,6 +79,8 @@
         "golangci-lint",
         "goreleaser",
         "hadolint",
+        "k3d",
+        "kubectl",
         "lychee",
         "node",
         "npm:renovate",
