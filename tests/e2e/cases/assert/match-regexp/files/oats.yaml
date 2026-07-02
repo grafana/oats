@@ -1,0 +1,19 @@
+oats: 2
+name: match-regexp
+fixture:
+  type: remote
+  endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  logs:
+    - service: {{CASE_NAME}}
+      body: seed-log-line
+expected:
+  logs:
+    - logql: '{service_name="{{CASE_NAME}}"}'
+      match:
+        - match_type: regexp
+          name: seed-.*
+          attributes:
+            - key: service_name
+              value: '{{CASE_NAME}}'

@@ -3,7 +3,7 @@ package assert
 import (
 	"testing"
 
-	"github.com/grafana/oats/v2case"
+	"github.com/grafana/oats/casefile"
 )
 
 func TestContains(t *testing.T) {
@@ -109,10 +109,10 @@ func TestMatchRows(t *testing.T) {
 		},
 	}
 
-	got := MatchRows(rows, []v2case.MatchEntry{
+	got := MatchRows(rows, []casefile.MatchEntry{
 		{
 			Name: strPtr("seed-operation"),
-			Attributes: v2case.AttributeMatchers{
+			Attributes: casefile.AttributeMatchers{
 				{Key: "service.name", Value: strPtr("gcx-e2e-seed")},
 				{Key: "trace_id"},
 			},
@@ -122,20 +122,20 @@ func TestMatchRows(t *testing.T) {
 		t.Fatalf("expected match to pass, got %v", got)
 	}
 
-	got = MatchRows(rows, []v2case.MatchEntry{
+	got = MatchRows(rows, []casefile.MatchEntry{
 		{
-			MatchType:  v2case.MatchTypeRegexp,
+			MatchType:  casefile.MatchTypeRegexp,
 			Name:       strPtr("^seed-.*$"),
-			Attributes: v2case.AttributeMatchers{{Key: "trace_id", Value: strPtr("^abc")}},
+			Attributes: casefile.AttributeMatchers{{Key: "trace_id", Value: strPtr("^abc")}},
 		},
 	})
 	if len(got) != 0 {
 		t.Fatalf("expected regexp match to pass, got %v", got)
 	}
 
-	got = MatchRows(rows, []v2case.MatchEntry{
+	got = MatchRows(rows, []casefile.MatchEntry{
 		{
-			Attributes: v2case.AttributeMatchers{{Key: "missing"}},
+			Attributes: casefile.AttributeMatchers{{Key: "missing"}},
 		},
 	})
 	if len(got) != 1 || got[0].Rule != "match" {

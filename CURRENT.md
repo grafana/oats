@@ -2,7 +2,7 @@
 
 This document covers the current gcx-driven OATS CLI, which replaces the bespoke TraceQL /
 PromQL / LogQL HTTP query infrastructure with the [gcx](https://github.com/grafana/gcx)
-CLI. The current CLI entry point lives at `cmd/v2/main.go` while this replaces the legacy path. See
+CLI. The current `oats` binary runs the gcx-driven implementation. See
 the internal design doc (grafana/internal-docs#14)
 for the full design.
 
@@ -71,17 +71,17 @@ discovery → seed → engine → assert → report
 |------------|---------------|
 | `discovery` | Parse `oats.toml`, expand case globs, apply filters, and derive |
 |            | case-local fixtures when a suite omits one. |
-| `v2case`    | Parse and validate one case yaml file. |
+| `casefile`  | Parse and validate one current-format case yaml file. |
 | `seed`      | Push inline-OTLP payloads at an OTLP/HTTP endpoint. |
 | `engine`    | Execute a gcx command, capture stdout/stderr/exit. |
-| `signalcmd` | Translate a `v2case` assertion into gcx args. |
+| `signalcmd` | Translate a `casefile` assertion into gcx args. |
 | `assert`    | The expectation vocabulary: `contains`, `not_contains`, `regex`, `value`, `count`, `absent`. |
 | `wait`      | `Until` / `While` polling primitives (replaces gomega.Eventually). |
 | `report`    | Compact-text and NDJSON renderers driven by an Event stream. |
 | `cache`     | Skip-when-unchanged store keyed by |
 |            | `(case yaml + fixture + gcx version + oats version)`. |
 | `runner`    | Orchestrates a suite: seed → poll-and-assert → report, with optional cache. |
-| `cmd/v2`    | The new binary entry point. |
+| `internal/cli` | The gcx-driven CLI implementation package used by the root `oats` binary. |
 
 ## Consumer-shape notes
 

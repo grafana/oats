@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/oats/v2case"
+	"github.com/grafana/oats/casefile"
 )
 
 // Failure carries enough context to render a compact "FAIL <case>  <source>"
@@ -133,7 +133,7 @@ func Absent(actual int) []Failure {
 // MatchRows checks that each collector-style match entry is satisfied by at
 // least one row. Each entry is independent: one entry may match one row and
 // the next entry a different row.
-func MatchRows(rows []Row, entries []v2case.MatchEntry) []Failure {
+func MatchRows(rows []Row, entries []casefile.MatchEntry) []Failure {
 	var fails []Failure
 	for _, entry := range entries {
 		if !anyRowMatches(rows, entry) {
@@ -146,7 +146,7 @@ func MatchRows(rows []Row, entries []v2case.MatchEntry) []Failure {
 	return fails
 }
 
-func anyRowMatches(rows []Row, entry v2case.MatchEntry) bool {
+func anyRowMatches(rows []Row, entry casefile.MatchEntry) bool {
 	for _, row := range rows {
 		if rowMatches(row, entry) {
 			return true
@@ -155,7 +155,7 @@ func anyRowMatches(rows []Row, entry v2case.MatchEntry) bool {
 	return false
 }
 
-func rowMatches(row Row, entry v2case.MatchEntry) bool {
+func rowMatches(row Row, entry casefile.MatchEntry) bool {
 	matchType := entry.EffectiveMatchType()
 	if entry.Name != nil {
 		if !matchesValue(row.Name, *entry.Name, matchType) {
@@ -180,9 +180,9 @@ func rowMatches(row Row, entry v2case.MatchEntry) bool {
 	return true
 }
 
-func matchesValue(actual, expected string, matchType v2case.MatchType) bool {
+func matchesValue(actual, expected string, matchType casefile.MatchType) bool {
 	switch matchType {
-	case v2case.MatchTypeRegexp:
+	case casefile.MatchTypeRegexp:
 		re, err := regexp.Compile(expected)
 		if err != nil {
 			return false
@@ -193,7 +193,7 @@ func matchesValue(actual, expected string, matchType v2case.MatchType) bool {
 	}
 }
 
-func describeMatch(entry v2case.MatchEntry) string {
+func describeMatch(entry casefile.MatchEntry) string {
 	var parts []string
 	if entry.MatchType != "" {
 		parts = append(parts, fmt.Sprintf("match_type=%s", entry.MatchType))

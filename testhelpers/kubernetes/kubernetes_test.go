@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/grafana/oats/testhelpers/remote"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClusterName_TruncatesFromEnd(t *testing.T) {
@@ -70,7 +71,7 @@ func TestStart_DefaultDockerContextAndCommandSequence(t *testing.T) {
 		"fg: k3d image import -c smoke-suite dice:test",
 		"fg: k3d image import -c smoke-suite busybox:latest",
 		"fg: kubectl apply -f k8s",
-		"fg: kubectl wait --timeout=5m --for=condition=ready pod -l app=lgtm",
+		"fg: kubectl wait --timeout=5m --for=condition=available deployment/lgtm",
 		"bg: kubectl port-forward service/dice 18080:8080",
 		"bg: kubectl port-forward service/lgtm 13100:3100",
 		"bg: kubectl port-forward service/lgtm 19090:9090",
@@ -80,4 +81,40 @@ func TestStart_DefaultDockerContextAndCommandSequence(t *testing.T) {
 	if !reflect.DeepEqual(calls, want) {
 		t.Fatalf("unexpected command sequence:\n got: %#v\nwant: %#v", calls, want)
 	}
+}
+
+func TestStartWaitsForLgtmDeploymentAvailability(t *testing.T) {
+	t.Parallel()
+
+	model := &Kubernetes{
+		Dir:              "k8s",
+		AppService:       "dice",
+		AppDockerFile:    "Dockerfile",
+		AppDockerContext: ".",
+		AppDockerTag:     "dice:1.1-SNAPSHOT",
+		AppDockerPort:    8080,
+	}
+	ports := remote.PortsConfig{
+		LokiHttpPort:       3100,
+		PrometheusHTTPPort: 9090,
+		TempoHTTPPort:      3200,
+		PyroscopeHttpPort:  4040,
+	}
+
+	var commands [][]string
+	run := func(cmd *exec.Cmd, background bool) error {
+		commands = append(commands, append([]string(nil), cmd.Args...))
+		return nil
+	}
+
+	err := start(model, ports, "run-oats", run)
+	require.NoError(t, err)
+
+	require.Contains(t, commands, []string{
+		"kubectl",
+		"wait",
+		"--timeout=5m",
+		"--for=condition=available",
+		"deployment/lgtm",
+	})
 }

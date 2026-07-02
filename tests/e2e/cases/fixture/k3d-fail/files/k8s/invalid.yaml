@@ -1,0 +1,3 @@
+this is not valid kubernetes yaml:
+  - because
+    - it: breaks

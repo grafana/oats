@@ -1,4 +1,4 @@
-// Package runner orchestrates one v2 case end-to-end: seed → poll-and-assert
+// Package runner orchestrates one case end-to-end: seed → poll-and-assert
 // → report. It is intentionally agnostic about fixtures — the caller hands
 // in already-resolved endpoints, so this layer ships before the
 // fixture-lifecycle layer exists.
@@ -22,12 +22,12 @@ import (
 
 	"github.com/grafana/oats/assert"
 	"github.com/grafana/oats/cache"
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/seed"
 	"github.com/grafana/oats/signalcmd"
 	"github.com/grafana/oats/testhelpers/requests"
-	"github.com/grafana/oats/v2case"
 	"github.com/grafana/oats/wait"
 )
 
@@ -118,7 +118,7 @@ type Runner struct {
 }
 
 // CacheContext describes the per-run inputs that must contribute to the
-// cache key. They are passed in by the caller (typically cmd/v2) rather
+// cache key. They are passed in by the caller (typically the CLI package) rather
 // than discovered by the Runner because they are global to the whole run:
 // the gcx version doesn't change between cases, and a fresh "gcx --version"
 // per case is wasted work.
@@ -153,7 +153,7 @@ func (r *Runner) WithCache(store *cache.Store, ctx CacheContext) *Runner {
 	return r
 }
 
-func (r *Runner) cacheKey(c *v2case.Case) cache.Key {
+func (r *Runner) cacheKey(c *casefile.Case) cache.Key {
 	yamlBytes, _ := os.ReadFile(c.SourcePath) // best-effort; nil on error
 	return cache.Key{
 		CaseYAML:     yamlBytes,
@@ -173,7 +173,7 @@ func (r *Runner) cacheKey(c *v2case.Case) cache.Key {
 // case.skip and returns true without running the case at all. A miss
 // runs the case as usual; passes are recorded, failures evict any stale
 // entry so a regression is never masked.
-func (r *Runner) RunCase(ctx context.Context, c *v2case.Case) bool {
+func (r *Runner) RunCase(ctx context.Context, c *casefile.Case) bool {
 	caseStart := time.Now()
 	r.reporter.Emit(report.Event{
 		Type:   report.EventCaseStart,
@@ -267,7 +267,7 @@ func (r *Runner) RunCase(ctx context.Context, c *v2case.Case) bool {
 	return ok
 }
 
-func (r *Runner) runComposeLogCheck(ctx context.Context, c *v2case.Case, msg string) bool {
+func (r *Runner) runComposeLogCheck(ctx context.Context, c *casefile.Case, msg string) bool {
 	run := func() []assert.Failure {
 		if err := r.driveInputs(c); err != nil {
 			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
@@ -298,7 +298,7 @@ func (r *Runner) runComposeLogCheck(ctx context.Context, c *v2case.Case, msg str
 	return false
 }
 
-func (r *Runner) runCustomCheck(ctx context.Context, c *v2case.Case, chk *v2case.CustomCheck) bool {
+func (r *Runner) runCustomCheck(ctx context.Context, c *casefile.Case, chk *casefile.CustomCheck) bool {
 	dir := "."
 	if c.SourcePath != "" {
 		dir = filepath.Dir(c.SourcePath)
@@ -432,7 +432,7 @@ func trimOutput(s string) string {
 	return s
 }
 
-func (r *Runner) seedCase(c *v2case.Case) error {
+func (r *Runner) seedCase(c *casefile.Case) error {
 	switch c.Seed.Type {
 	case "app":
 		// External fixture is responsible for booting the app. Runner
@@ -447,7 +447,7 @@ func (r *Runner) seedCase(c *v2case.Case) error {
 	return fmt.Errorf("unknown seed type %q", c.Seed.Type)
 }
 
-func toSeedPayload(s v2case.Seed) seed.Payload {
+func toSeedPayload(s casefile.Seed) seed.Payload {
 	p := seed.Payload{}
 	for _, t := range s.Traces {
 		for _, sp := range t.Spans {
@@ -485,7 +485,7 @@ func toSeedPayload(s v2case.Seed) seed.Payload {
 // wait.Until / wait.While accordingly.
 func (r *Runner) pollAssert(
 	ctx context.Context,
-	c *v2case.Case,
+	c *casefile.Case,
 	args []string,
 	absent bool,
 	evalFn func(stdout, stderr string, exit int) []assert.Failure,
@@ -532,14 +532,14 @@ func (r *Runner) pollAssert(
 	return false
 }
 
-func (r *Runner) caseInterval(c *v2case.Case) time.Duration {
+func (r *Runner) caseInterval(c *casefile.Case) time.Duration {
 	if c.Interval > 0 {
 		return c.Interval
 	}
 	return r.opts.Interval
 }
 
-func (r *Runner) runTrace(ctx context.Context, c *v2case.Case, a *v2case.TraceAssertion) bool {
+func (r *Runner) runTrace(ctx context.Context, c *casefile.Case, a *casefile.TraceAssertion) bool {
 	if len(a.MatchSpans) > 0 {
 		return r.runTraceStructured(ctx, c, a)
 	}
@@ -549,7 +549,7 @@ func (r *Runner) runTrace(ctx context.Context, c *v2case.Case, a *v2case.TraceAs
 	})
 }
 
-func (r *Runner) runTraceStructured(ctx context.Context, c *v2case.Case, a *v2case.TraceAssertion) bool {
+func (r *Runner) runTraceStructured(ctx context.Context, c *casefile.Case, a *casefile.TraceAssertion) bool {
 	run := func() []assert.Failure {
 		if err := r.driveInputs(c); err != nil {
 			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
@@ -589,7 +589,7 @@ func (r *Runner) runTraceStructured(ctx context.Context, c *v2case.Case, a *v2ca
 	return false
 }
 
-func (r *Runner) fetchTraceRows(ctx context.Context, c *v2case.Case, searchStdout string) ([]assert.Row, int, error) {
+func (r *Runner) fetchTraceRows(ctx context.Context, c *casefile.Case, searchStdout string) ([]assert.Row, int, error) {
 	traceIDs, count, err := extractTraceIDs(searchStdout)
 	if err != nil {
 		return nil, 0, err
@@ -628,7 +628,7 @@ func (r *Runner) fetchTraceRows(ctx context.Context, c *v2case.Case, searchStdou
 	return rows, count, nil
 }
 
-func (r *Runner) runLog(ctx context.Context, c *v2case.Case, a *v2case.LogAssertion) bool {
+func (r *Runner) runLog(ctx context.Context, c *casefile.Case, a *casefile.LogAssertion) bool {
 	args := signalcmd.Logs(*a, r.opts.Timeout)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
 		if len(a.Match) == 0 {
@@ -639,7 +639,7 @@ func (r *Runner) runLog(ctx context.Context, c *v2case.Case, a *v2case.LogAssert
 	})
 }
 
-func (r *Runner) runMetric(ctx context.Context, c *v2case.Case, a *v2case.MetricAssertion) bool {
+func (r *Runner) runMetric(ctx context.Context, c *casefile.Case, a *casefile.MetricAssertion) bool {
 	args := signalcmd.Metrics(*a, r.opts.Timeout)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
 		if a.Value == "" && len(a.Match) == 0 {
@@ -658,7 +658,7 @@ func (r *Runner) runMetric(ctx context.Context, c *v2case.Case, a *v2case.Metric
 	})
 }
 
-func (r *Runner) runProfile(ctx context.Context, c *v2case.Case, a *v2case.ProfileAssertion) bool {
+func (r *Runner) runProfile(ctx context.Context, c *casefile.Case, a *casefile.ProfileAssertion) bool {
 	args := signalcmd.Profiles(*a, r.opts.Timeout)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
 		if len(a.Match) == 0 {
@@ -671,7 +671,7 @@ func (r *Runner) runProfile(ctx context.Context, c *v2case.Case, a *v2case.Profi
 
 // evalCommonText runs the assertions that every signal type shares when gcx
 // output is plain text rather than JSON.
-func evalCommonText(stdout string, c v2case.AssertionCommon) []assert.Failure {
+func evalCommonText(stdout string, c casefile.AssertionCommon) []assert.Failure {
 	var fails []assert.Failure
 	fails = append(fails, assert.Contains(stdout, c.Contains)...)
 	fails = append(fails, assert.NotContains(stdout, c.NotContains)...)
@@ -685,7 +685,7 @@ func evalCommonText(stdout string, c v2case.AssertionCommon) []assert.Failure {
 	return fails
 }
 
-func evalTraceStructured(stdout string, a v2case.TraceAssertion, rows []assert.Row, count int, parseErr error) []assert.Failure {
+func evalTraceStructured(stdout string, a casefile.TraceAssertion, rows []assert.Row, count int, parseErr error) []assert.Failure {
 	var fails []assert.Failure
 	fails = append(fails, assert.Contains(stdout, a.Contains)...)
 	fails = append(fails, assert.NotContains(stdout, a.NotContains)...)
@@ -710,7 +710,7 @@ func evalTraceStructured(stdout string, a v2case.TraceAssertion, rows []assert.R
 	return fails
 }
 
-func evalCommonStructured(stdout string, c v2case.AssertionCommon, rows []assert.Row, count int, parseErr error) []assert.Failure {
+func evalCommonStructured(stdout string, c casefile.AssertionCommon, rows []assert.Row, count int, parseErr error) []assert.Failure {
 	var fails []assert.Failure
 	fails = append(fails, assert.Contains(stdout, c.Contains)...)
 	fails = append(fails, assert.NotContains(stdout, c.NotContains)...)
@@ -740,6 +740,12 @@ func approxRowCount(stdout string) int {
 	for _, line := range strings.Split(stdout, "\n") {
 		t := strings.TrimSpace(line)
 		if t == "" {
+			continue
+		}
+		if strings.HasPrefix(t, "hint: use --json") {
+			continue
+		}
+		if t == "No data" {
 			continue
 		}
 		// Skip lines that look like table-headers / dividers in gcx text mode.
@@ -820,7 +826,7 @@ func extractMetricRows(stdout string) ([]assert.Row, int, float64, error) {
 	return rows, len(generic.Data.Result), f, nil
 }
 
-func (r *Runner) failCase(c *v2case.Case, msg, cmd string) {
+func (r *Runner) failCase(c *casefile.Case, msg, cmd string) {
 	r.reporter.Emit(report.Event{
 		Type:   report.EventAssertFail,
 		Case:   c.Name,
@@ -830,7 +836,7 @@ func (r *Runner) failCase(c *v2case.Case, msg, cmd string) {
 	})
 }
 
-func (r *Runner) driveInputs(c *v2case.Case) error {
+func (r *Runner) driveInputs(c *casefile.Case) error {
 	for _, in := range c.Input {
 		if err := r.doInput(in); err != nil {
 			return err
@@ -839,7 +845,7 @@ func (r *Runner) driveInputs(c *v2case.Case) error {
 	return nil
 }
 
-func (r *Runner) doInput(in v2case.Input) error {
+func (r *Runner) doInput(in casefile.Input) error {
 	if in.Path == "" {
 		return nil
 	}
@@ -1011,7 +1017,7 @@ func collectNamedRows(v any) []assert.Row {
 
 func maybeRow(m map[string]any) (assert.Row, bool) {
 	row := assert.Row{Attributes: map[string]string{}}
-	for _, key := range []string{"name", "spanName", "span_name", "body"} {
+	for _, key := range []string{"name", "spanName", "span_name", "body", "rootTraceName"} {
 		if v, ok := m[key]; ok {
 			row.Name = fmt.Sprint(v)
 			break
@@ -1030,6 +1036,12 @@ func maybeRow(m map[string]any) (assert.Row, bool) {
 				row.Attributes[k] = v
 			}
 		}
+	}
+	if v, ok := m["rootServiceName"]; ok {
+		row.Attributes["service.name"] = fmt.Sprint(v)
+	}
+	if v, ok := m["traceID"]; ok {
+		row.Attributes["trace_id"] = fmt.Sprint(v)
 	}
 	if row.Name == "" && len(row.Attributes) == 0 {
 		return assert.Row{}, false

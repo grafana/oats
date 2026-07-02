@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/oats/v2case"
+	"github.com/grafana/oats/casefile"
 )
 
 func TestTraces(t *testing.T) {
-	got := Traces(v2case.TraceAssertion{TraceQL: `{ span.http.route = "/x" }`}, 0)
+	got := Traces(casefile.TraceAssertion{TraceQL: `{ span.http.route = "/x" }`}, 0)
 	want := []string{"traces", "search", "--since", "10m0s", `{ span.http.route = "/x" }`}
 	if !equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
@@ -17,9 +17,9 @@ func TestTraces(t *testing.T) {
 }
 
 func TestTraces_WithMatchAsksForJSON(t *testing.T) {
-	got := Traces(v2case.TraceAssertion{
+	got := Traces(casefile.TraceAssertion{
 		TraceQL:    `{ span.http.route = "/x" }`,
-		MatchSpans: []v2case.MatchEntry{{Name: strPtr("GET /x")}},
+		MatchSpans: []casefile.MatchEntry{{Name: strPtr("GET /x")}},
 	}, 0)
 	if !contains(got, "-o", "json") {
 		t.Errorf("expected -o json in: %v", got)
@@ -27,7 +27,7 @@ func TestTraces_WithMatchAsksForJSON(t *testing.T) {
 }
 
 func TestLogs(t *testing.T) {
-	got := Logs(v2case.LogAssertion{LogQL: `{service_name="x"}`}, 5*time.Minute)
+	got := Logs(casefile.LogAssertion{LogQL: `{service_name="x"}`}, 5*time.Minute)
 	want := []string{"logs", "query", "--since", "5m0s", `{service_name="x"}`}
 	if !equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
@@ -35,10 +35,10 @@ func TestLogs(t *testing.T) {
 }
 
 func TestLogs_WithMatchAsksForJSON(t *testing.T) {
-	got := Logs(v2case.LogAssertion{
+	got := Logs(casefile.LogAssertion{
 		LogQL: `{service_name="x"}`,
-		AssertionCommon: v2case.AssertionCommon{
-			Match: []v2case.MatchEntry{{Name: strPtr("line")}},
+		AssertionCommon: casefile.AssertionCommon{
+			Match: []casefile.MatchEntry{{Name: strPtr("line")}},
 		},
 	}, 5*time.Minute)
 	if !contains(got, "-o", "json") {
@@ -47,7 +47,7 @@ func TestLogs_WithMatchAsksForJSON(t *testing.T) {
 }
 
 func TestMetrics_PromQLOnly(t *testing.T) {
-	got := Metrics(v2case.MetricAssertion{PromQL: "up"}, time.Minute)
+	got := Metrics(casefile.MetricAssertion{PromQL: "up"}, time.Minute)
 	want := []string{"metrics", "query", "--since", "1m0s", "up"}
 	if !equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
@@ -55,7 +55,7 @@ func TestMetrics_PromQLOnly(t *testing.T) {
 }
 
 func TestMetrics_WithValueAsksForJSON(t *testing.T) {
-	got := Metrics(v2case.MetricAssertion{PromQL: "rate(x[1m])", Value: ">= 0"}, time.Minute)
+	got := Metrics(casefile.MetricAssertion{PromQL: "rate(x[1m])", Value: ">= 0"}, time.Minute)
 	// JSON output flag must appear before the positional PromQL.
 	if !contains(got, "-o", "json") {
 		t.Errorf("expected -o json in: %v", got)
@@ -66,7 +66,7 @@ func TestMetrics_WithValueAsksForJSON(t *testing.T) {
 }
 
 func TestProfiles(t *testing.T) {
-	got := Profiles(v2case.ProfileAssertion{Query: "process_cpu:cpu:nanoseconds:cpu:nanoseconds{}"}, 0)
+	got := Profiles(casefile.ProfileAssertion{Query: "process_cpu:cpu:nanoseconds:cpu:nanoseconds{}"}, 0)
 	want := []string{"profiles", "query", "--since", "10m0s", "--profile-type", "process_cpu:cpu:nanoseconds:cpu:nanoseconds", "{}"}
 	if !equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
@@ -74,7 +74,7 @@ func TestProfiles(t *testing.T) {
 }
 
 func TestProfiles_QueryWithoutSelectorDefaultsToEmptySelector(t *testing.T) {
-	got := Profiles(v2case.ProfileAssertion{Query: "process_cpu:cpu:nanoseconds:cpu:nanoseconds"}, 0)
+	got := Profiles(casefile.ProfileAssertion{Query: "process_cpu:cpu:nanoseconds:cpu:nanoseconds"}, 0)
 	want := []string{"profiles", "query", "--since", "10m0s", "--profile-type", "process_cpu:cpu:nanoseconds:cpu:nanoseconds", "{}"}
 	if !equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
@@ -82,10 +82,10 @@ func TestProfiles_QueryWithoutSelectorDefaultsToEmptySelector(t *testing.T) {
 }
 
 func TestProfiles_WithMatchAsksForJSON(t *testing.T) {
-	got := Profiles(v2case.ProfileAssertion{
+	got := Profiles(casefile.ProfileAssertion{
 		Query: "process_cpu:cpu:nanoseconds:cpu:nanoseconds{}",
-		AssertionCommon: v2case.AssertionCommon{
-			Match: []v2case.MatchEntry{{Name: strPtr("main")}},
+		AssertionCommon: casefile.AssertionCommon{
+			Match: []casefile.MatchEntry{{Name: strPtr("main")}},
 		},
 	}, 0)
 	if !contains(got, "-o", "json") {

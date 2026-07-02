@@ -1,0 +1,18 @@
+oats: 2
+name: match-fail
+fixture:
+  type: remote
+  endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  logs:
+    - service: {{CASE_NAME}}
+      body: seed-log-line
+expected:
+  logs:
+    - logql: '{service_name="{{CASE_NAME}}"}'
+      match:
+        - name: seed-log-line
+          attributes:
+            - key: service_name
+              value: other-service

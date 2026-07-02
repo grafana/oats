@@ -101,7 +101,16 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 	if err != nil {
 		return err
 	}
-	err = run(exec.Command("kubectl", "wait", "--timeout=5m", "--for=condition=ready", "pod", "-l", "app=lgtm"), false)
+	err = run(
+		exec.Command(
+			"kubectl",
+			"wait",
+			"--timeout=5m",
+			"--for=condition=available",
+			"deployment/lgtm",
+		),
+		false,
+	)
 	if err != nil {
 		return err
 	}

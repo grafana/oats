@@ -9,7 +9,7 @@ mkdir -p "$bin_dir"
 # fetch/build OATS itself.
 : "${GCX_VERSION:=v0.4.0}"
 
-GOWORK=off go -C "$root" build -buildvcs=false -o "$bin_dir/oats" ./cmd/v2
+GOWORK=off go -C "$root" build -buildvcs=false -o "$bin_dir/oats" .
 GOBIN="$bin_dir" GOWORK=off go install "github.com/grafana/gcx/cmd/gcx@${GCX_VERSION}"
 
 printf 'built %s/oats and %s/gcx\n' "$bin_dir" "$bin_dir"

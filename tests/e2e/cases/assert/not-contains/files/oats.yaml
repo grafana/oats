@@ -1,0 +1,14 @@
+oats: 2
+name: not-contains
+fixture:
+  type: remote
+  endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  logs:
+    - service: {{CASE_NAME}}
+      body: seed-log-line
+expected:
+  logs:
+    - logql: '{service_name="{{CASE_NAME}}"}'
+      not_contains: definitely-not-present

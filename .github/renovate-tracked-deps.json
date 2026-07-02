@@ -16,11 +16,6 @@
         "mise"
       ]
     },
-    ".github/workflows/integration_test.yml": {
-      "regex": [
-        "mise"
-      ]
-    },
     ".github/workflows/lint.yml": {
       "regex": [
         "mise"

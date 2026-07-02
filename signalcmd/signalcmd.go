@@ -1,4 +1,4 @@
-// Package signalcmd translates a single v2case assertion into the gcx
+// Package signalcmd translates a single case assertion into the gcx
 // command line that will execute the corresponding query.
 //
 // One function per signal type. Each returns []string suitable for handing
@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/oats/v2case"
+	"github.com/grafana/oats/casefile"
 )
 
 // Defaults applied when a case does not pin its own values.
@@ -23,7 +23,7 @@ const (
 )
 
 // Traces builds the gcx args for a TraceAssertion.
-func Traces(a v2case.TraceAssertion, since time.Duration) []string {
+func Traces(a casefile.TraceAssertion, since time.Duration) []string {
 	if since <= 0 {
 		since = DefaultSince
 	}
@@ -52,7 +52,7 @@ func TraceGet(traceID string, since time.Duration) []string {
 }
 
 // Logs builds the gcx args for a LogAssertion.
-func Logs(a v2case.LogAssertion, since time.Duration) []string {
+func Logs(a casefile.LogAssertion, since time.Duration) []string {
 	if since <= 0 {
 		since = DefaultSince
 	}
@@ -71,7 +71,7 @@ func Logs(a v2case.LogAssertion, since time.Duration) []string {
 // declares a numeric `value` comparison we ask gcx for JSON so the runner
 // can parse the actual value out; otherwise the default agent text format
 // is enough for substring matching.
-func Metrics(a v2case.MetricAssertion, since time.Duration) []string {
+func Metrics(a casefile.MetricAssertion, since time.Duration) []string {
 	if since <= 0 {
 		since = DefaultSince
 	}
@@ -87,7 +87,7 @@ func Metrics(a v2case.MetricAssertion, since time.Duration) []string {
 }
 
 // Profiles builds the gcx args for a ProfileAssertion.
-func Profiles(a v2case.ProfileAssertion, since time.Duration) []string {
+func Profiles(a casefile.ProfileAssertion, since time.Duration) []string {
 	if since <= 0 {
 		since = DefaultSince
 	}

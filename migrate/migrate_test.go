@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/model"
 	"github.com/grafana/oats/testhelpers/kubernetes"
-	"github.com/grafana/oats/v2case"
 )
 
 func TestConvertDefinition_MapsSignalsToMatchSchema(t *testing.T) {
@@ -114,7 +114,7 @@ func TestConvertFile_MatrixSampleIsParseable(t *testing.T) {
 			fatalf(t, "expected matrix warning to contain %q:\n%s", want, joined)
 		}
 	}
-	c, err := v2case.Parse(out)
+	c, err := casefile.Parse(out)
 	if err != nil {
 		fatalf(t, "migrated matrix yaml should parse as v2: %v\n%s", err, string(out))
 	}
@@ -151,7 +151,7 @@ expected:
 	if len(warnings) != 0 {
 		fatalf(t, "expected no warnings for straightforward custom checks, got %v", warnings)
 	}
-	c, err := v2case.Parse(out)
+	c, err := casefile.Parse(out)
 	if err != nil {
 		fatalf(t, "migrated custom-check yaml should parse as v2: %v\n%s", err, string(out))
 	}

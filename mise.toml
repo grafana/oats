@@ -34,14 +34,13 @@ run = "flint run --fix"
 description = "Run tests"
 run = "go test $(go list ./...)"
 
-[tasks.integration-test]
-description = "Run integration tests"
-env.INTEGRATION_TESTS = "true"
-run = "go test github.com/grafana/oats/tests"
+[tasks.e2e-test]
+description = "Run acceptance case suite"
+run = "go test ./tests/e2e -run TestCases"
 
 [tasks.build]
 description = "Build the project"
-run = "go build"
+run = "go build -buildvcs=false ."
 
 [tasks.check]
 description = "Run all checks"

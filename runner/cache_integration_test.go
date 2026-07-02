@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/grafana/oats/cache"
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/report"
-	"github.com/grafana/oats/v2case"
 )
 
-func cachedRunnerCase(t *testing.T) (*v2case.Case, []byte) {
+func cachedRunnerCase(t *testing.T) (*casefile.Case, []byte) {
 	t.Helper()
 	src := []byte(`oats: 2
 name: cached
@@ -26,12 +26,12 @@ expected:
     - traceql: '{}'
       contains: ["svc"]
 `)
-	// v2case.Load requires SourcePath, so persist to a temp file.
+	// casefile.Load requires SourcePath, so persist to a temp file.
 	tmp := filepath.Join(t.TempDir(), "case.yaml")
 	if err := os.WriteFile(tmp, src, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c, err := v2case.Load(tmp)
+	c, err := casefile.Load(tmp)
 	if err != nil {
 		t.Fatal(err)
 	}

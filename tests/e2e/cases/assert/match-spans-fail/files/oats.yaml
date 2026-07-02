@@ -1,0 +1,16 @@
+oats: 2
+name: match-spans-fail
+fixture:
+  type: remote
+  endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  traces:
+    - service: {{CASE_NAME}}
+      spans:
+        - name: seed-operation
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "{{CASE_NAME}}" }'
+      match_spans:
+        - name: wrong-operation

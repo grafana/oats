@@ -1,0 +1,6 @@
+name: inline-otlp
+tags: [seed, inline-otlp, traces, logs, metrics]
+
+expect:
+  stdout_contains:
+    - PASS 1/1

@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/report"
-	"github.com/grafana/oats/v2case"
 )
 
 // stubExec is a deterministic Executor that returns the configured output
@@ -49,9 +49,9 @@ func newRunner(t *testing.T, exec engine.Executor, opts Options) (*Runner, *byte
 	return New(exec, rep, Endpoint{GCXContext: "test"}, opts), &buf
 }
 
-func mustParse(t *testing.T, src string) *v2case.Case {
+func mustParse(t *testing.T, src string) *casefile.Case {
 	t.Helper()
-	c, err := v2case.Parse([]byte(src))
+	c, err := casefile.Parse([]byte(src))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -388,6 +388,131 @@ expected:
 	}
 	if !strings.Contains(buf.String(), "custom-check: exit status 1") || !strings.Contains(buf.String(), "bad") {
 		t.Fatalf("expected custom-check failure output, got:\n%s", buf.String())
+	}
+}
+
+func TestRunCase_ComposeLogsPass(t *testing.T) {
+	dir := t.TempDir()
+	binDir := filepath.Join(dir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	docker := filepath.Join(binDir, "docker")
+	if err := os.WriteFile(docker, []byte("#!/bin/sh\necho 'service boot complete'\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	c := mustParse(t, `
+oats: 2
+name: compose logs pass
+seed:
+  type: app
+expected:
+  logs:
+    - logql: '{service_name="gcx-e2e-seed"}'
+      contains: seed-log-line
+  compose-logs:
+    - service boot complete
+`)
+
+	exec := &stubExec{stdout: "seed-log-line"}
+	var buf bytes.Buffer
+	rep := report.NewTextReporter(&buf, report.VerboseDefault)
+	r := New(exec, rep, Endpoint{
+		GCXContext: "test",
+		CustomCheckEnv: []string{
+			"OATS_FIXTURE_TYPE=compose",
+			"PATH=" + binDir + string(os.PathListSeparator) + os.Getenv("PATH"),
+		},
+	}, Options{Timeout: 200 * time.Millisecond, SeedSettleDelay: 1})
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+	if !ok {
+		t.Fatalf("expected compose-logs case to pass:\n%s", buf.String())
+	}
+}
+
+func TestRunCase_ComposeLogsMissingSurfaced(t *testing.T) {
+	dir := t.TempDir()
+	binDir := filepath.Join(dir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	docker := filepath.Join(binDir, "docker")
+	if err := os.WriteFile(docker, []byte("#!/bin/sh\necho 'different output'\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	c := mustParse(t, `
+oats: 2
+name: compose logs missing
+seed:
+  type: app
+expected:
+  logs:
+    - logql: '{service_name="gcx-e2e-seed"}'
+      contains: seed-log-line
+  compose-logs:
+    - expected line
+`)
+
+	exec := &stubExec{stdout: "seed-log-line"}
+	var buf bytes.Buffer
+	rep := report.NewTextReporter(&buf, report.VerboseDefault)
+	r := New(exec, rep, Endpoint{
+		GCXContext: "test",
+		CustomCheckEnv: []string{
+			"OATS_FIXTURE_TYPE=compose",
+			"PATH=" + binDir + string(os.PathListSeparator) + os.Getenv("PATH"),
+		},
+	}, Options{Timeout: 200 * time.Millisecond, Interval: 20 * time.Millisecond, SeedSettleDelay: 1})
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+	if ok {
+		t.Fatalf("expected compose-logs case to fail")
+	}
+	if !strings.Contains(buf.String(), `compose-logs: missing "expected line"`) {
+		t.Fatalf("expected compose-logs failure output, got:\n%s", buf.String())
+	}
+}
+
+func TestRunCase_ComposeLogsRequireComposeFixture(t *testing.T) {
+	c := mustParse(t, `
+oats: 2
+name: compose logs wrong fixture
+seed:
+  type: app
+expected:
+  logs:
+    - logql: '{service_name="gcx-e2e-seed"}'
+      contains: seed-log-line
+  compose-logs:
+    - expected line
+`)
+
+	exec := &stubExec{stdout: "seed-log-line"}
+	var buf bytes.Buffer
+	rep := report.NewTextReporter(&buf, report.VerboseDefault)
+	r := New(exec, rep, Endpoint{GCXContext: "test", CustomCheckEnv: []string{"OATS_FIXTURE_TYPE=remote"}}, Options{
+		Timeout:         200 * time.Millisecond,
+		Interval:        20 * time.Millisecond,
+		SeedSettleDelay: 1,
+	})
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+	if ok {
+		t.Fatalf("expected compose-logs case to fail")
+	}
+	if !strings.Contains(buf.String(), "compose-logs requires a compose fixture") {
+		t.Fatalf("expected compose fixture error, got:\n%s", buf.String())
 	}
 }
 

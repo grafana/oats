@@ -5,6 +5,24 @@ The changelog is available in the [releases section](https://github.com/grafana/
 This file only contains upgrade notes for breaking changes that require you to
 modify your existing YAML test files.
 
+## Unreleased / next major
+
+⚠️ Breaking Changes — legacy root runner removed
+
+The root `oats` binary now runs the gcx-driven current CLI only.
+
+That means upgrades now require migrating to the current:
+
+- `oats.toml` suite/discovery file
+- current case yaml shape documented in [CURRENT.md](CURRENT.md)
+
+The legacy “pass one or more old yaml files directly to `oats`” runner has been
+removed. For one-off help migrating old cases, use:
+
+```sh
+oats --migrate path/to/legacy.yaml
+```
+
 ## 0.6.0
 
 ⚠️ Breaking Changes - Migration Required: File Version Tag

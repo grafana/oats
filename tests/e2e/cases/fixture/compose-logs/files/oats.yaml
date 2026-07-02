@@ -1,0 +1,17 @@
+oats: 2
+name: compose-logs
+fixture:
+  type: compose
+  template: lgtm
+  compose_file: docker-compose.oats.yml
+seed:
+  type: inline-otlp
+  logs:
+    - service: {{CASE_NAME}}
+      body: seed-log-line
+expected:
+  logs:
+    - logql: '{service_name="{{CASE_NAME}}"}'
+      contains: seed-log-line
+  compose-logs:
+    - app started ok

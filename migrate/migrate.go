@@ -6,14 +6,14 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/model"
-	"github.com/grafana/oats/v2case"
 	legacyyaml "github.com/grafana/oats/yaml"
 	goyaml "go.yaml.in/yaml/v3"
 )
 
-// ConvertFile reads one legacy OATS yaml file and returns a best-effort v2
-// case yaml plus any warnings about dropped or lossy fields.
+// ConvertFile reads one legacy OATS yaml file and returns a best-effort
+// current-format case yaml plus any warnings about dropped or lossy fields.
 func ConvertFile(path string) ([]byte, []string, error) {
 	def, err := legacyyaml.LoadTestCaseDefinition(path)
 	if err != nil {
@@ -34,11 +34,11 @@ func ConvertFile(path string) ([]byte, []string, error) {
 }
 
 // ConvertDefinition maps a legacy v1/v1.5-style OATS definition into the
-// current v2 case shape. Unsupported fields are dropped with warnings.
-func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case, []string, error) {
+// current case yaml shape. Unsupported fields are dropped with warnings.
+func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Case, []string, error) {
 	var warnings []string
-	c := &v2case.Case{
-		OatsVersion: v2case.SchemaVersion,
+	c := &casefile.Case{
+		OatsVersion: casefile.SchemaVersion,
 		Name:        name,
 		Interval:    def.Interval,
 	}
@@ -90,11 +90,11 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 	} else if def.Kubernetes == nil && selectedMatrix == nil {
 		warnings = append(warnings, "no docker-compose fixture found; defaulting seed.type to inline-otlp placeholder")
 		c.Seed.Type = "inline-otlp"
-		c.Seed.Traces = []v2case.SeedTrace{{Service: "migrated-service", Spans: []v2case.SeedSpan{{Name: "replace-me"}}}}
+		c.Seed.Traces = []casefile.SeedTrace{{Service: "migrated-service", Spans: []casefile.SeedSpan{{Name: "replace-me"}}}}
 	}
 
 	for _, in := range def.Input {
-		c.Input = append(c.Input, v2case.Input{
+		c.Input = append(c.Input, casefile.Input{
 			Scheme:  in.Scheme,
 			Host:    in.Host,
 			Method:  in.Method,
@@ -111,7 +111,7 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 		}
 		assertion, ws := convertSignal(tr.TraceQL, tr.Signal)
 		warnings = append(warnings, ws...)
-		c.Expected.Traces = append(c.Expected.Traces, v2case.TraceAssertion{TraceQL: tr.TraceQL, MatchSpans: assertion.Match, AssertionCommon: withoutMatch(assertion)})
+		c.Expected.Traces = append(c.Expected.Traces, casefile.TraceAssertion{TraceQL: tr.TraceQL, MatchSpans: assertion.Match, AssertionCommon: withoutMatch(assertion)})
 	}
 	for _, lg := range def.Expected.Logs {
 		if !keepForMatrix(lg.Signal.MatrixCondition, selectedMatrix) {
@@ -119,13 +119,13 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 		}
 		assertion, ws := convertSignal(lg.LogQL, lg.Signal)
 		warnings = append(warnings, ws...)
-		c.Expected.Logs = append(c.Expected.Logs, v2case.LogAssertion{LogQL: lg.LogQL, AssertionCommon: assertion})
+		c.Expected.Logs = append(c.Expected.Logs, casefile.LogAssertion{LogQL: lg.LogQL, AssertionCommon: assertion})
 	}
 	for _, m := range def.Expected.Metrics {
 		if !keepForMatrix(m.MatrixCondition, selectedMatrix) {
 			continue
 		}
-		c.Expected.Metrics = append(c.Expected.Metrics, v2case.MetricAssertion{PromQL: m.PromQL, Value: m.Value})
+		c.Expected.Metrics = append(c.Expected.Metrics, casefile.MetricAssertion{PromQL: m.PromQL, Value: m.Value})
 		if m.MatrixCondition != "" {
 			warnings = append(warnings, fmt.Sprintf("metric %q matrix-condition dropped", m.PromQL))
 		}
@@ -134,16 +134,16 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 		if !keepForMatrix(p.MatrixCondition, selectedMatrix) {
 			continue
 		}
-		var matches []v2case.MatchEntry
+		var matches []casefile.MatchEntry
 		if p.Flamebearers.NameEquals != "" {
-			matches = append(matches, v2case.MatchEntry{Name: strPtr(p.Flamebearers.NameEquals)})
+			matches = append(matches, casefile.MatchEntry{Name: strPtr(p.Flamebearers.NameEquals)})
 		}
 		if p.Flamebearers.NameRegexp != "" {
-			matches = append(matches, v2case.MatchEntry{MatchType: v2case.MatchTypeRegexp, Name: strPtr(p.Flamebearers.NameRegexp)})
+			matches = append(matches, casefile.MatchEntry{MatchType: casefile.MatchTypeRegexp, Name: strPtr(p.Flamebearers.NameRegexp)})
 		}
-		c.Expected.Profiles = append(c.Expected.Profiles, v2case.ProfileAssertion{
+		c.Expected.Profiles = append(c.Expected.Profiles, casefile.ProfileAssertion{
 			Query:           p.Query,
-			AssertionCommon: v2case.AssertionCommon{Match: matches},
+			AssertionCommon: casefile.AssertionCommon{Match: matches},
 		})
 		if p.MatrixCondition != "" {
 			warnings = append(warnings, fmt.Sprintf("profile %q matrix-condition dropped", p.Query))
@@ -153,28 +153,28 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*v2case.Case,
 		if !keepForMatrix(cc.MatrixCondition, selectedMatrix) {
 			continue
 		}
-		c.Expected.Custom = append(c.Expected.Custom, v2case.CustomCheck{Script: cc.Script})
+		c.Expected.Custom = append(c.Expected.Custom, casefile.CustomCheck{Script: cc.Script})
 		if cc.MatrixCondition != "" {
 			warnings = append(warnings, "custom-check matrix-condition dropped after filtering selected matrix")
 		}
 	}
 
 	if err := c.Validate(); err != nil {
-		return nil, warnings, fmt.Errorf("migrated v2 case failed validation: %w", err)
+		return nil, warnings, fmt.Errorf("migrated case failed validation: %w", err)
 	}
 	return c, warnings, nil
 }
 
-func convertSignal(label string, s model.ExpectedSignal) (v2case.AssertionCommon, []string) {
+func convertSignal(label string, s model.ExpectedSignal) (casefile.AssertionCommon, []string) {
 	var warnings []string
-	out := v2case.AssertionCommon{}
+	out := casefile.AssertionCommon{}
 	if s.Count != nil {
 		switch {
 		case s.Count.Min == 0 && s.Count.Max == 0:
 			out.Absent = true
 		case s.Count.Max > 0 && s.Count.Min > 0 && s.Count.Max != s.Count.Min:
 			out.Count = fmt.Sprintf(">= %d", s.Count.Min)
-			warnings = append(warnings, fmt.Sprintf("%s count max=%d dropped; v2 scalar count keeps only min bound", label, s.Count.Max))
+			warnings = append(warnings, fmt.Sprintf("%s count max=%d dropped; scalar count keeps only min bound", label, s.Count.Max))
 		case s.Count.Max > 0 && s.Count.Min == s.Count.Max:
 			out.Count = fmt.Sprintf("== %d", s.Count.Min)
 		case s.Count.Min > 0:
@@ -184,31 +184,31 @@ func convertSignal(label string, s model.ExpectedSignal) (v2case.AssertionCommon
 		}
 	}
 	if s.NoExtraAttributes {
-		warnings = append(warnings, fmt.Sprintf("%s no-extra-attributes is not supported in v2 and was dropped", label))
+		warnings = append(warnings, fmt.Sprintf("%s no-extra-attributes is not supported in the current schema and was dropped", label))
 	}
 	if s.MatrixCondition != "" {
 		warnings = append(warnings, fmt.Sprintf("%s matrix-condition dropped", label))
 	}
 	if s.NameEquals != "" || len(s.Attributes) > 0 {
-		entry := v2case.MatchEntry{}
+		entry := casefile.MatchEntry{}
 		if s.NameEquals != "" {
 			entry.Name = strPtr(s.NameEquals)
 		}
 		for k, v := range s.Attributes {
-			entry.Attributes = append(entry.Attributes, v2case.AttributeMatcher{Key: k, Value: strPtr(v)})
+			entry.Attributes = append(entry.Attributes, casefile.AttributeMatcher{Key: k, Value: strPtr(v)})
 		}
 		out.Match = append(out.Match, entry)
 	}
 	if s.NameRegexp != "" || len(s.AttributeRegexp) > 0 {
-		entry := v2case.MatchEntry{MatchType: v2case.MatchTypeRegexp}
+		entry := casefile.MatchEntry{MatchType: casefile.MatchTypeRegexp}
 		if s.NameRegexp != "" {
 			entry.Name = strPtr(s.NameRegexp)
 		}
 		for k, v := range s.AttributeRegexp {
 			if v == ".*" {
-				entry.Attributes = append(entry.Attributes, v2case.AttributeMatcher{Key: k})
+				entry.Attributes = append(entry.Attributes, casefile.AttributeMatcher{Key: k})
 			} else {
-				entry.Attributes = append(entry.Attributes, v2case.AttributeMatcher{Key: k, Value: strPtr(v)})
+				entry.Attributes = append(entry.Attributes, casefile.AttributeMatcher{Key: k, Value: strPtr(v)})
 			}
 		}
 		if entry.Name != nil || len(entry.Attributes) > 0 {
@@ -221,7 +221,7 @@ func convertSignal(label string, s model.ExpectedSignal) (v2case.AssertionCommon
 	return out, warnings
 }
 
-func withoutMatch(a v2case.AssertionCommon) v2case.AssertionCommon {
+func withoutMatch(a casefile.AssertionCommon) casefile.AssertionCommon {
 	a.Match = nil
 	return a
 }

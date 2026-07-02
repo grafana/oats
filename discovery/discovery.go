@@ -2,7 +2,7 @@
 // concrete run plan.
 //
 // In OATS v1, the runner walked the file system for any yaml carrying
-// "oats-schema-version" and ran whatever it found. v2 declares the plan up
+// "oats-schema-version" and ran whatever it found. the current format declares the plan up
 // front: oats.toml lists suites, each suite lists cases (path globs) and the
 // fixture they share. "oats list" prints the plan before "oats run" executes
 // it.
@@ -17,7 +17,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/grafana/oats/v2case"
+	"github.com/grafana/oats/casefile"
 )
 
 // RootConfig is the parsed oats.toml file. Field names mirror the TOML keys
@@ -160,7 +160,7 @@ type Plan struct {
 	Suite            SuiteConfig
 	Fixture          FixtureConfig
 	FixtureSourceDir string
-	Cases            []*v2case.Case
+	Cases            []*casefile.Case
 }
 
 func (c *RootConfig) effectiveSuites() []SuiteConfig {
@@ -231,9 +231,9 @@ func (c *RootConfig) PlanRun(f Filter) ([]Plan, error) {
 	return plans, nil
 }
 
-func (c *RootConfig) loadSuiteCases(suite SuiteConfig) ([]*v2case.Case, error) {
+func (c *RootConfig) loadSuiteCases(suite SuiteConfig) ([]*casefile.Case, error) {
 	seen := make(map[string]struct{}) // dedupe overlapping globs
-	var cases []*v2case.Case
+	var cases []*casefile.Case
 	for _, pattern := range suite.Cases {
 		abs := filepath.Join(c.SourceDir, pattern)
 		matches, err := filepath.Glob(abs)
@@ -248,7 +248,7 @@ func (c *RootConfig) loadSuiteCases(suite SuiteConfig) ([]*v2case.Case, error) {
 				continue
 			}
 			seen[m] = struct{}{}
-			tc, loadErr := v2case.Load(m)
+			tc, loadErr := casefile.Load(m)
 			if loadErr != nil {
 				return nil, loadErr
 			}
@@ -275,7 +275,7 @@ func suiteLabel(s SuiteConfig) string {
 	return fmt.Sprintf("suite[%d cases]", len(s.Cases))
 }
 
-func materializeSuite(s SuiteConfig, cases []*v2case.Case) SuiteConfig {
+func materializeSuite(s SuiteConfig, cases []*casefile.Case) SuiteConfig {
 	if s.Name == "" {
 		s.Name = deriveSuiteName(s, cases)
 	}
@@ -295,7 +295,7 @@ func materializeSuite(s SuiteConfig, cases []*v2case.Case) SuiteConfig {
 	return s
 }
 
-func deriveSuiteName(s SuiteConfig, cases []*v2case.Case) string {
+func deriveSuiteName(s SuiteConfig, cases []*casefile.Case) string {
 	if len(cases) == 1 {
 		if strings.TrimSpace(cases[0].Name) != "" {
 			return cases[0].Name
@@ -328,7 +328,7 @@ func dirLabel(dir string) string {
 	return base
 }
 
-func (c *RootConfig) resolveSuiteFixture(suite SuiteConfig, cases []*v2case.Case) (FixtureConfig, string, error) {
+func (c *RootConfig) resolveSuiteFixture(suite SuiteConfig, cases []*casefile.Case) (FixtureConfig, string, error) {
 	if suite.Fixture != "" {
 		return c.Fixture[suite.Fixture], c.SourceDir, nil
 	}
@@ -357,7 +357,7 @@ func (c *RootConfig) resolveSuiteFixture(suite SuiteConfig, cases []*v2case.Case
 	return fixture, sourceDir, nil
 }
 
-func fixtureConfigFromCase(f v2case.FixtureConfig) FixtureConfig {
+func fixtureConfigFromCase(f casefile.FixtureConfig) FixtureConfig {
 	return FixtureConfig{
 		Type:             f.Type,
 		Template:         f.Template,

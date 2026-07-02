@@ -1,0 +1,13 @@
+oats: 2
+name: custom-check
+fixture:
+  type: remote
+  endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  logs:
+    - service: {{CASE_NAME}}
+      body: custom-check-line
+expected:
+  custom-checks:
+    - script: ./verify.sh
