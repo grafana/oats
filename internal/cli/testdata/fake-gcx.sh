@@ -11,7 +11,7 @@ set -euo pipefail
 # would produce via signalcmd.
 while [[ $# -gt 0 ]]; do
 	case "${1:-}" in
-	--context|--config)
+	--context | --config)
 		shift 2
 		;;
 	*)

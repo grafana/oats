@@ -7,5 +7,5 @@ execution:
 expect:
   exit_code: 2
   stderr_contains:
-    - "error parsing k8s/invalid.yaml"
+    - 'error when creating "k8s/invalid.yaml"'
     - 'suite "k3d-fail": exit status 1'

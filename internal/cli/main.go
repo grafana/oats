@@ -70,11 +70,6 @@ var (
 	waitForGrafanaToken = waitForGrafanaTokenImpl
 )
 
-func main() {
-	code := Run()
-	os.Exit(code)
-}
-
 func Main() {
 	os.Exit(Run())
 }

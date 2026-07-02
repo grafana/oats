@@ -1,3 +1,6 @@
-this is not valid kubernetes yaml:
-  - because
-    - it: breaks
+apiVersion: v1
+kind: Pod
+metadata:
+  name: invalid
+spec:
+  containers: definitely-not-a-list
