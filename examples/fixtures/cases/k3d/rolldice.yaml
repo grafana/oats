@@ -10,4 +10,3 @@ expected:
       value: '>= 0'
   custom-checks:
     - script: ../../scripts/verify.sh
-

@@ -5,4 +5,3 @@ seed:
 expected:
   custom-checks:
     - script: ../scripts/verify.sh
-

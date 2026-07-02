@@ -15,4 +15,3 @@ expected:
       match:
         - match_type: regexp
           name: '.*roll.*'
-

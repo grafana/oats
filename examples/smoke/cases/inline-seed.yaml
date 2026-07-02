@@ -13,4 +13,3 @@ expected:
         - name: seed-operation
           attributes:
             service.name: gcx-e2e-seed
-
