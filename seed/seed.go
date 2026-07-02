@@ -20,8 +20,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
+
+var defaultHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
 // Payload describes one inline-otlp seed declaration as it arrives from a
 // case yaml. All three signal slices are optional; emitting only the ones
@@ -70,7 +73,7 @@ func (s *Sender) httpClient() *http.Client {
 	if s.Client != nil {
 		return s.Client
 	}
-	return http.DefaultClient
+	return defaultHTTPClient
 }
 
 // Send pushes all signals declared in p. Returns the first error encountered,
@@ -128,7 +131,7 @@ func (s *Sender) sendTrace(t Trace, now time.Time) error {
       }]
     }]
   }]
-}`, t.Service, randHex(16), randHex(8), t.Span.Name, kind, start, end)
+}`, t.Service, mustRandHex(16), mustRandHex(8), t.Span.Name, kind, start, end)
 	return s.post("/v1/traces", body)
 }
 
@@ -201,10 +204,20 @@ func (s *Sender) post(path, body string) error {
 	return nil
 }
 
-func randHex(nBytes int) string {
+func randHex(nBytes int) (string, error) {
 	buf := make([]byte, nBytes)
 	if _, err := rand.Read(buf); err != nil {
-		panic(err)
+		return "", err
 	}
-	return hex.EncodeToString(buf)
+	return hex.EncodeToString(buf), nil
+}
+
+func mustRandHex(nBytes int) string {
+	s, err := randHex(nBytes)
+	if err != nil {
+		// Extremely rare; fall back to a stable all-zero ID rather than panic so
+		// the run fails, if at all, through normal backend/query behavior.
+		return strings.Repeat("0", nBytes*2)
+	}
+	return s
 }

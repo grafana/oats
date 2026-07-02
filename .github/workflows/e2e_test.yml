@@ -6,8 +6,18 @@ on: [pull_request]
 permissions: {}
 
 jobs:
-  test-core-and-compose:
+  test-e2e:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: core
+            filter: "assert/,custom/,seed/"
+          - name: compose-and-remote
+            filter: "fixture/compose,fixture/remote"
+          - name: k3d
+            filter: "fixture/k3d"
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -17,23 +27,7 @@ jobs:
         with:
           version: v2026.6.14
           sha256: 96ae1ef7b00a6ebbbec23ba1016d6e722f5e904966272f621d15326429e90d53
-      - name: Run core e2e tests
+      - name: Run ${{ matrix.name }} e2e tests
         env:
-          OATS_E2E_FILTER: "assert/,custom/,seed/,fixture/compose,fixture/remote"
-        run: mise run e2e-test
-
-  test-k3d:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check out
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-        with:
-          persist-credentials: false
-      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
-        with:
-          version: v2026.6.14
-          sha256: 96ae1ef7b00a6ebbbec23ba1016d6e722f5e904966272f621d15326429e90d53
-      - name: Run k3d e2e tests
-        env:
-          OATS_E2E_FILTER: "fixture/k3d"
+          OATS_E2E_FILTER: ${{ matrix.filter }}
         run: mise run e2e-test

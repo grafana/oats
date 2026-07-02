@@ -93,9 +93,6 @@ func (o Options) withDefaults() Options {
 	if o.AbsentTimeout <= 0 {
 		o.AbsentTimeout = 10 * time.Second
 	}
-	if o.SeedSettleDelay < 0 {
-		o.SeedSettleDelay = 2 * time.Second
-	}
 	if o.SeedSettleDelay == 0 {
 		o.SeedSettleDelay = 2 * time.Second
 	}
@@ -365,7 +362,7 @@ func customCheckCommand(ctx context.Context, dir, script string, extraEnv []stri
 			return nil, cleanup, err
 		}
 		cleanup = func() { _ = os.Remove(f.Name()) }
-		cmd := exec.CommandContext(ctx, "sh", f.Name())
+		cmd := exec.CommandContext(ctx, f.Name())
 		cmd.Dir = dir
 		cmd.Env = append(cmd.Environ(), extraEnv...)
 		return cmd, cleanup, nil
@@ -442,16 +439,27 @@ func (r *Runner) seedCase(c *casefile.Case) error {
 		if r.seeder.OTLPEndpoint == "" {
 			return fmt.Errorf("inline-otlp seed requires Endpoint.OTLPHTTP")
 		}
-		return r.seeder.Send(toSeedPayload(c.Seed))
+		payload, err := toSeedPayload(c.Seed)
+		if err != nil {
+			return err
+		}
+		return r.seeder.Send(payload)
 	}
 	return fmt.Errorf("unknown seed type %q", c.Seed.Type)
 }
 
-func toSeedPayload(s casefile.Seed) seed.Payload {
+func toSeedPayload(s casefile.Seed) (seed.Payload, error) {
 	p := seed.Payload{}
 	for _, t := range s.Traces {
 		for _, sp := range t.Spans {
-			dur, _ := time.ParseDuration(sp.Duration)
+			dur := time.Duration(0)
+			if sp.Duration != "" {
+				parsed, err := time.ParseDuration(sp.Duration)
+				if err != nil {
+					return seed.Payload{}, fmt.Errorf("seed trace span %q: invalid duration %q: %w", sp.Name, sp.Duration, err)
+				}
+				dur = parsed
+			}
 			p.Traces = append(p.Traces, seed.Trace{
 				Service: t.Service,
 				Span: seed.SpanFields{
@@ -477,7 +485,7 @@ func toSeedPayload(s casefile.Seed) seed.Payload {
 			Value:   m.Value,
 		})
 	}
-	return p
+	return p, nil
 }
 
 // pollAssert handles the polling loop common to all signal types. The
@@ -505,6 +513,13 @@ func (r *Runner) pollAssert(
 			Case: c.Name,
 			Cmd:  cmdStr,
 		})
+		if res.ExitCode != 0 {
+			detail := trimOutput(strings.TrimSpace(res.Stderr))
+			if detail == "" {
+				detail = fmt.Sprintf("gcx exit code %d", res.ExitCode)
+			}
+			return []assert.Failure{{Rule: "exec", Detail: detail}}
+		}
 		return evalFn(res.Stdout, res.Stderr, res.ExitCode)
 	}
 

@@ -63,7 +63,7 @@ func Until[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 		if len(last) == 0 {
 			return Result[F]{OK: true, Iterations: iter, Elapsed: time.Since(start), LastFailures: nil}
 		}
-		if time.Now().After(deadline) {
+		if !time.Now().Before(deadline) {
 			return Result[F]{OK: false, Iterations: iter, Elapsed: time.Since(start), LastFailures: last}
 		}
 		if ctx.Err() != nil {
@@ -97,12 +97,12 @@ func While[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 			return Result[F]{OK: true, Iterations: iter, Elapsed: time.Since(start), LastFailures: nil}
 		}
 		if ctx.Err() != nil {
-			return Result[F]{OK: true, Iterations: iter, Elapsed: time.Since(start), LastFailures: nil}
+			return Result[F]{OK: false, Iterations: iter, Elapsed: time.Since(start), LastFailures: nil}
 		}
 		select {
 		case <-time.After(opts.Interval):
 		case <-ctx.Done():
-			return Result[F]{OK: true, Iterations: iter, Elapsed: time.Since(start), LastFailures: nil}
+			return Result[F]{OK: false, Iterations: iter, Elapsed: time.Since(start), LastFailures: nil}
 		}
 	}
 }

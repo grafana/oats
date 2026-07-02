@@ -80,7 +80,7 @@ func (c *Compose) Remove() error {
 func (c *Compose) runDocker(cc command) error {
 	var cmdArgs []string
 	if cc.compose {
-		cmdArgs = c.DefaultArgs
+		cmdArgs = append([]string(nil), c.DefaultArgs...)
 	}
 	cmdArgs = append(cmdArgs, cc.args...)
 	cmd := exec.Command(c.Command, cmdArgs...)
@@ -114,6 +114,7 @@ func (c *Compose) runDocker(cc command) error {
 		if err != nil {
 			return fmt.Errorf("failed to start docker command: %w", err)
 		}
+		go func() { _ = cmd.Wait() }()
 	} else {
 		slog.Info("Running", "command", cmd.String(), "dir", strings.Join(c.Paths, ","))
 		cmd.Stdout = os.Stdout

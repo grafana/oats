@@ -321,7 +321,7 @@ type startableSuiteFixture interface {
 	Up() error
 }
 
-func startFixture(_ context.Context, plan discovery.Plan) (suiteFixture, error) {
+func startFixture(ctx context.Context, plan discovery.Plan) (suiteFixture, error) {
 	switch plan.Fixture.Type {
 	case "", "remote":
 		return nil, nil
@@ -346,7 +346,7 @@ func startFixture(_ context.Context, plan discovery.Plan) (suiteFixture, error) 
 		return composeFixture{suite: suite, cleanup: cleanup}, nil
 	case "k3d":
 		ep := newKubernetesEndpoint(plan)
-		if err := ep.Start(context.Background()); err != nil {
+		if err := ep.Start(ctx); err != nil {
 			return nil, err
 		}
 		return endpointFixture{ep: ep}, nil
@@ -635,7 +635,9 @@ func splitCSV(s string) []string {
 // output, or "" if gcx is unreachable. The version contributes to the
 // cache key so an upgrade to gcx invalidates all green records.
 func gcxVersion(bin string) string {
-	out, err := exec.Command(bin, "--version").Output()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, bin, "--version").Output()
 	if err != nil {
 		return ""
 	}

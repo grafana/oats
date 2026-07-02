@@ -115,11 +115,19 @@ func (r *TextReporter) emitGHAAnnotation(e Event) {
 	if msg == "" {
 		msg = "OATS assertion failed"
 	}
+	msg = ghaEscape(msg)
 	if line > 0 {
 		r.write("::error file=%s,line=%d::%s\n", file, line, msg)
 	} else {
 		r.write("::error file=%s::%s\n", file, msg)
 	}
+}
+
+func ghaEscape(s string) string {
+	s = strings.ReplaceAll(s, "%", "%25")
+	s = strings.ReplaceAll(s, "\r", "%0D")
+	s = strings.ReplaceAll(s, "\n", "%0A")
+	return s
 }
 
 func (r *TextReporter) flushRunEnd(e Event) {
