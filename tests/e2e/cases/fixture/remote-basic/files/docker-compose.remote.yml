@@ -2,5 +2,5 @@ services:
   lgtm:
     image: docker.io/grafana/otel-lgtm:latest
     ports:
-      - "3001:3000"
-      - "4319:4318"
+      - "127.0.0.1::3000"
+      - "127.0.0.1::4318"

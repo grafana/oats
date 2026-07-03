@@ -123,7 +123,7 @@ ttl_days = 7                   # default
 ## Case yaml shape
 
 ```yaml
-oats: 2
+oats-schema-version: 3
 name: rolldice traces have route attribute
 
 fixture:
@@ -167,7 +167,7 @@ but the runner does not require it when a fixture already provides the app.
 Inline-OTLP seed (no example app required):
 
 ```yaml
-oats: 2
+oats-schema-version: 3
 name: gcx returns seeded trace
 
 seed:

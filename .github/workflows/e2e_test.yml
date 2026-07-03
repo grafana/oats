@@ -12,12 +12,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: core
-            filter: "assert/,custom/,seed/"
-          - name: compose-and-remote
-            filter: "fixture/compose,fixture/remote"
-          - name: k3d
-            filter: "fixture/k3d"
+          - name: assert-a
+            filter: "assert/absent,assert/contains,assert/count"
+          - name: assert-b
+            filter: "assert/match,assert/not-contains,assert/regex"
+          - name: custom-and-seed
+            filter: "custom/,seed/"
+          - name: compose
+            filter: "fixture/compose"
+          - name: remote
+            filter: "fixture/remote"
+          - name: k3d-fail
+            filter: "fixture/k3d-fail"
+          - name: k3d-smoke
+            filter: "fixture/k3d-smoke"
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7

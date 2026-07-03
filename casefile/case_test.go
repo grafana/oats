@@ -8,7 +8,7 @@ import (
 
 func TestParse_AppSeed(t *testing.T) {
 	src := []byte(`
-oats: 2
+oats-schema-version: 3
 name: rolldice traces have route attribute
 interval: 250ms
 seed:
@@ -50,7 +50,7 @@ expected:
 
 func TestParse_InlineOTLPSeed(t *testing.T) {
 	src := []byte(`
-oats: 2
+oats-schema-version: 3
 name: gcx returns seeded trace
 seed:
   type: inline-otlp
@@ -77,7 +77,7 @@ expected:
 
 func TestParse_MatchAssertions(t *testing.T) {
 	src := []byte(`
-oats: 2
+oats-schema-version: 3
 name: structured match
 seed:
   type: app
@@ -116,7 +116,7 @@ expected:
 
 func TestParse_StringListScalarOrList(t *testing.T) {
 	src := []byte(`
-oats: 2
+oats-schema-version: 3
 name: text assertions
 seed:
   type: app
@@ -146,7 +146,7 @@ expected:
 
 func TestParse_LegacyAttributeMapStillAccepted(t *testing.T) {
 	src := []byte(`
-oats: 2
+oats-schema-version: 3
 name: legacy attrs
 seed:
   type: app
@@ -177,7 +177,7 @@ expected:
 
 func TestParse_CustomChecks(t *testing.T) {
 	src := []byte(`
-oats: 2
+oats-schema-version: 3
 name: custom checks
 seed:
   type: app
@@ -196,7 +196,7 @@ expected:
 
 func TestParse_RejectsUnknownFields(t *testing.T) {
 	src := []byte(`
-oats: 2
+oats-schema-version: 3
 name: typo
 seed:
   type: app
@@ -216,13 +216,13 @@ expected:
 func TestValidate_MissingOats(t *testing.T) {
 	c := &Case{Name: "x", Seed: Seed{Type: "app", Compose: "y"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
 	err := c.Validate()
-	if err == nil || !strings.Contains(err.Error(), "oats:") {
+	if err == nil || !strings.Contains(err.Error(), "oats-schema-version") {
 		t.Errorf("expected oats version error, got %v", err)
 	}
 }
 
 func TestValidate_MissingName(t *testing.T) {
-	c := &Case{OatsVersion: 2, Seed: Seed{Type: "app", Compose: "y"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
+	c := &Case{OatsSchemaVersion: 3, Seed: Seed{Type: "app", Compose: "y"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "name:") {
 		t.Errorf("expected name error, got %v", err)
@@ -230,7 +230,7 @@ func TestValidate_MissingName(t *testing.T) {
 }
 
 func TestValidate_UnknownSeedType(t *testing.T) {
-	c := &Case{OatsVersion: 2, Name: "x", Seed: Seed{Type: "weird"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
+	c := &Case{OatsSchemaVersion: 3, Name: "x", Seed: Seed{Type: "weird"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "seed.type") {
 		t.Errorf("expected seed type error, got %v", err)
@@ -238,7 +238,7 @@ func TestValidate_UnknownSeedType(t *testing.T) {
 }
 
 func TestValidate_AppSeedAllowsFixtureManagedBoot(t *testing.T) {
-	c := &Case{OatsVersion: 2, Name: "x", Seed: Seed{Type: "app"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
+	c := &Case{OatsSchemaVersion: 3, Name: "x", Seed: Seed{Type: "app"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
 	err := c.Validate()
 	if err != nil {
 		t.Errorf("expected app seed without compose to validate, got %v", err)
@@ -246,7 +246,7 @@ func TestValidate_AppSeedAllowsFixtureManagedBoot(t *testing.T) {
 }
 
 func TestValidate_InlineOTLPNeedsPayload(t *testing.T) {
-	c := &Case{OatsVersion: 2, Name: "x", Seed: Seed{Type: "inline-otlp"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
+	c := &Case{OatsSchemaVersion: 3, Name: "x", Seed: Seed{Type: "inline-otlp"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "at least one trace") {
 		t.Errorf("expected payload error, got %v", err)
@@ -254,7 +254,7 @@ func TestValidate_InlineOTLPNeedsPayload(t *testing.T) {
 }
 
 func TestValidate_NoExpectations(t *testing.T) {
-	c := &Case{OatsVersion: 2, Name: "x", Seed: Seed{Type: "app", Compose: "y"}}
+	c := &Case{OatsSchemaVersion: 3, Name: "x", Seed: Seed{Type: "app", Compose: "y"}}
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), "expected:") {
 		t.Errorf("expected 'no expectations' error, got %v", err)
@@ -263,10 +263,10 @@ func TestValidate_NoExpectations(t *testing.T) {
 
 func TestValidate_CustomCheckOnlyCase(t *testing.T) {
 	c := &Case{
-		OatsVersion: 2,
-		Name:        "x",
-		Seed:        Seed{Type: "app"},
-		Expected:    Expected{Custom: []CustomCheck{{Script: "./verify.sh"}}},
+		OatsSchemaVersion: 3,
+		Name:              "x",
+		Seed:              Seed{Type: "app"},
+		Expected:          Expected{Custom: []CustomCheck{{Script: "./verify.sh"}}},
 	}
 	if err := c.Validate(); err != nil {
 		t.Fatalf("expected custom-check-only case to validate, got %v", err)
@@ -275,7 +275,7 @@ func TestValidate_CustomCheckOnlyCase(t *testing.T) {
 
 func TestValidate_RejectsEmptyCustomCheck(t *testing.T) {
 	_, err := Parse([]byte(`
-oats: 2
+oats-schema-version: 3
 name: bad custom
 seed:
   type: app
@@ -290,7 +290,7 @@ expected:
 
 func TestValidate_RejectsInputWithoutPath(t *testing.T) {
 	_, err := Parse([]byte(`
-oats: 2
+oats-schema-version: 3
 name: bad input
 seed:
   type: app
@@ -309,7 +309,7 @@ expected:
 
 func TestValidate_RejectsUnknownMatchType(t *testing.T) {
 	_, err := Parse([]byte(`
-oats: 2
+oats-schema-version: 3
 name: bad match type
 seed:
   type: app
@@ -328,7 +328,7 @@ expected:
 
 func TestValidate_RejectsPresentFalse(t *testing.T) {
 	_, err := Parse([]byte(`
-oats: 2
+oats-schema-version: 3
 name: bad present
 seed:
   type: app
@@ -350,7 +350,7 @@ expected:
 
 func TestValidate_RejectsInvalidMatchRegexp(t *testing.T) {
 	_, err := Parse([]byte(`
-oats: 2
+oats-schema-version: 3
 name: bad regexp
 seed:
   type: app

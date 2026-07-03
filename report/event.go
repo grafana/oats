@@ -81,9 +81,9 @@ type Reporter interface {
 	Close() error
 }
 
-// Verbosity controls how much detail TextReporter renders. NDJSON is
-// unaffected — it emits everything except gcx.exec events, which are only
-// included at VerboseAll because they can be very large.
+// Verbosity controls how much detail the renderers emit. TextReporter uses
+// it for pass/cmd/lifecycle chatter; NDJSON applies the same gates to
+// case.pass, gcx.exec, and fixture lifecycle events.
 type Verbosity int
 
 const (

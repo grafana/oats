@@ -90,7 +90,7 @@ func TestConvertFile_RendersYAML(t *testing.T) {
 		fatalf(t, "expected at least one warning for flattened include or fixture migration")
 	}
 	text := string(out)
-	for _, want := range []string{"oats: 2", "seed:", "input:", "path: /stock", "match_spans:", "match_type: regexp", "key: db.system", "value: h2", "promql: foo"} {
+	for _, want := range []string{"oats-schema-version: 3", "seed:", "input:", "path: /stock", "match_spans:", "match_type: regexp", "key: db.system", "value: h2", "promql: foo"} {
 		if !strings.Contains(text, want) {
 			fatalf(t, "expected migrated yaml to contain %q:\n%s", want, text)
 		}

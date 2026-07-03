@@ -18,7 +18,7 @@ func writeFile(t *testing.T, dir, rel, body string) {
 	}
 }
 
-const validCaseYAML = `oats: 2
+const validCaseYAML = `oats-schema-version: 3
 name: %s
 seed:
   type: app
@@ -314,7 +314,7 @@ cases = ["cases/a.yaml", "cases/b.yaml"]
 version = 2
 `)
 	writeFile(t, dir, "cases/a.yaml", `
-oats: 2
+oats-schema-version: 3
 name: a
 seed: { type: app }
 expected:
@@ -323,7 +323,7 @@ expected:
       absent: true
 `)
 	writeFile(t, dir, "cases/b.yaml", `
-oats: 2
+oats-schema-version: 3
 name: b
 seed: { type: app }
 expected:

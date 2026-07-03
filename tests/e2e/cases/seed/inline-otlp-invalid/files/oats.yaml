@@ -1,4 +1,4 @@
-oats: 2
+oats-schema-version: 3
 name: inline-otlp-invalid
 seed:
   type: inline-otlp

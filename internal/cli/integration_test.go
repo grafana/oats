@@ -350,7 +350,7 @@ fixture = "remote-lgtm"
 type     = "remote"
 endpoint = "REPLACED_AT_RUNTIME"
 `)
-	writeFile(t, dir, "cases/inline.yaml", `oats: 2
+	writeFile(t, dir, "cases/inline.yaml", `oats-schema-version: 3
 name: inline seed end-to-end
 seed:
   type: inline-otlp
@@ -473,7 +473,7 @@ fixture = "remote-lgtm"
 type     = "remote"
 endpoint = "http://localhost:4318"
 `)
-	writeFile(t, dir, "cases/app.yaml", `oats: 2
+	writeFile(t, dir, "cases/app.yaml", `oats-schema-version: 3
 name: app seed end-to-end
 seed:
   type: app
@@ -560,7 +560,7 @@ fixture = "remote-lgtm"
 type     = "remote"
 endpoint = "http://localhost:4318"
 `)
-	writeFile(t, dir, "cases/profile.yaml", `oats: 2
+	writeFile(t, dir, "cases/profile.yaml", `oats-schema-version: 3
 name: profile query end-to-end
 seed:
   type: app

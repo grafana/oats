@@ -57,6 +57,7 @@ type sharedEnv struct {
 	TempDir        string
 	ComposeFile    string
 	Project        string
+	GrafanaURL     string
 	RemoteOTLPHTTP string
 	GCX            string
 	GCXConfig      string
@@ -170,12 +171,8 @@ func setupSharedEnv(env *sharedEnv) error {
   lgtm:
     image: docker.io/grafana/otel-lgtm:latest
     ports:
-      - "3000:3000"
-      - "4317:4317"
-      - "4318:4318"
-      - "3200:3200"
-      - "4040:4040"
-      - "9090:9090"
+      - "127.0.0.1::3000"
+      - "127.0.0.1::4318"
 `
 	if err := os.WriteFile(env.ComposeFile, []byte(composeBody), 0o644); err != nil {
 		return err
@@ -191,35 +188,95 @@ func setupSharedEnv(env *sharedEnv) error {
 	env.OATS = filepath.Join(binDir, "oats")
 	env.GCX = filepath.Join(binDir, "gcx")
 	env.GCXConfig = filepath.Join(tmp, "gcx.yaml")
-	const gcxConfig = `current-context: local
-contexts:
-  local:
-    grafana:
-      server: http://localhost:3000
-      user: admin
-      password: admin
-      org-id: 1
-      auth-method: basic
-    datasources:
-      prometheus: prometheus
-      loki: loki
-      tempo: tempo
-      pyroscope: pyroscope
-`
-	if err := os.WriteFile(env.GCXConfig, []byte(gcxConfig), 0o600); err != nil {
-		return err
-	}
 	up := exec.Command("docker", "compose", "-p", env.Project, "-f", env.ComposeFile, "up", "-d")
 	up.Stdout = os.Stdout
 	up.Stderr = os.Stderr
 	if err := up.Run(); err != nil {
 		return fmt.Errorf("start shared lgtm: %w", err)
 	}
-	env.RemoteOTLPHTTP = "http://localhost:4318"
-	if err := waitForHTTP("http://localhost:3000/api/health", 2*time.Minute); err != nil {
+	grafanaPort, err := dockerComposePort(env.Project, env.ComposeFile, "lgtm", "3000")
+	if err != nil {
+		return err
+	}
+	otlpPort, err := dockerComposePort(env.Project, env.ComposeFile, "lgtm", "4318")
+	if err != nil {
+		return err
+	}
+	env.GrafanaURL = "http://127.0.0.1:" + grafanaPort
+	env.RemoteOTLPHTTP = "http://127.0.0.1:" + otlpPort
+	if err := writeGCXConfig(env.GCXConfig, env.GrafanaURL); err != nil {
+		return err
+	}
+	if err := waitForHTTP(env.GrafanaURL+"/api/health", 2*time.Minute); err != nil {
 		return err
 	}
 	return nil
+}
+
+func writeGCXConfig(path, grafanaURL string) error {
+	cfg := map[string]any{
+		"current-context": "local",
+		"contexts": map[string]any{
+			"local": map[string]any{
+				"grafana": map[string]any{
+					"server":      grafanaURL,
+					"user":        "admin",
+					"password":    "admin",
+					"org-id":      1,
+					"auth-method": "basic",
+				},
+				"datasources": map[string]any{
+					"prometheus": "prometheus",
+					"loki":       "loki",
+					"tempo":      "tempo",
+					"pyroscope":  "pyroscope",
+				},
+			},
+		},
+	}
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o600)
+}
+
+func dockerComposePort(project, composeFile, service, containerPort string) (string, error) {
+	cmd := exec.Command("docker", "compose", "-p", project, "-f", composeFile, "port", service, containerPort)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("docker compose port %s %s: %w\n%s", service, containerPort, err, stderr.String())
+	}
+	out := strings.TrimSpace(stdout.String())
+	if out == "" {
+		return "", fmt.Errorf("docker compose port %s %s: empty output", service, containerPort)
+	}
+	host, port, err := splitHostPort(out)
+	if err != nil {
+		return "", fmt.Errorf("docker compose port %s %s: %w", service, containerPort, err)
+	}
+	if host == "" {
+		return "", fmt.Errorf("docker compose port %s %s: missing host in %q", service, containerPort, out)
+	}
+	return port, nil
+}
+
+func splitHostPort(addr string) (string, string, error) {
+	addr = strings.TrimSpace(addr)
+	if strings.HasPrefix(addr, "[") {
+		end := strings.Index(addr, "]")
+		if end < 0 || end+2 > len(addr) || addr[end+1] != ':' {
+			return "", "", fmt.Errorf("invalid address %q", addr)
+		}
+		return addr[1:end], addr[end+2:], nil
+	}
+	idx := strings.LastIndex(addr, ":")
+	if idx < 0 {
+		return "", "", fmt.Errorf("invalid address %q", addr)
+	}
+	return addr[:idx], addr[idx+1:], nil
 }
 
 func teardownSharedEnv(env *sharedEnv) error {

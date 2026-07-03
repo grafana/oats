@@ -151,7 +151,15 @@ func (r *Runner) WithCache(store *cache.Store, ctx CacheContext) *Runner {
 }
 
 func (r *Runner) cacheKey(c *casefile.Case) cache.Key {
-	yamlBytes, _ := os.ReadFile(c.SourcePath) // best-effort; nil on error
+	var yamlBytes []byte
+	if c.SourcePath != "" {
+		if data, err := os.ReadFile(c.SourcePath); err == nil {
+			yamlBytes = data
+		}
+	}
+	if len(yamlBytes) == 0 {
+		yamlBytes = []byte(fmt.Sprintf("case:%s\nsource:%s\n", c.Name, c.SourcePath))
+	}
 	return cache.Key{
 		CaseYAML:     yamlBytes,
 		FixtureBytes: r.cacheCtx.FixtureBytes,
@@ -504,7 +512,9 @@ func (r *Runner) pollAssert(
 		if err := r.driveInputs(c); err != nil {
 			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
 		}
-		res, err := r.exec.Execute(ctx, args...)
+		execCtx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
+		defer cancel()
+		res, err := r.exec.Execute(execCtx, args...)
 		if err != nil {
 			return []assert.Failure{{Rule: "exec", Detail: err.Error()}}
 		}
@@ -535,6 +545,16 @@ func (r *Runner) pollAssert(
 	if result.OK {
 		return true
 	}
+	if len(result.LastFailures) == 0 {
+		r.reporter.Emit(report.Event{
+			Type:   report.EventAssertFail,
+			Case:   c.Name,
+			Source: c.SourcePath,
+			Msg:    "assertion polling stopped before any failure details were captured",
+			Cmd:    cmdStr,
+		})
+		return false
+	}
 	for _, f := range result.LastFailures {
 		r.reporter.Emit(report.Event{
 			Type:   report.EventAssertFail,
@@ -558,7 +578,7 @@ func (r *Runner) runTrace(ctx context.Context, c *casefile.Case, a *casefile.Tra
 	if len(a.MatchSpans) > 0 {
 		return r.runTraceStructured(ctx, c, a)
 	}
-	args := signalcmd.Traces(*a, r.opts.Timeout)
+	args := signalcmd.Traces(*a, 0)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
 		return evalCommonText(stdout, a.AssertionCommon)
 	})
@@ -569,9 +589,11 @@ func (r *Runner) runTraceStructured(ctx context.Context, c *casefile.Case, a *ca
 		if err := r.driveInputs(c); err != nil {
 			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
 		}
-		searchArgs := signalcmd.Traces(*a, r.opts.Timeout)
+		searchArgs := signalcmd.Traces(*a, 0)
 		searchCmd := signalcmd.Render(searchArgs)
-		searchRes, err := r.exec.Execute(ctx, searchArgs...)
+		execCtx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
+		defer cancel()
+		searchRes, err := r.exec.Execute(execCtx, searchArgs...)
 		if err != nil {
 			return []assert.Failure{{Rule: "exec", Detail: err.Error()}}
 		}
@@ -591,7 +613,7 @@ func (r *Runner) runTraceStructured(ctx context.Context, c *casefile.Case, a *ca
 	if result.OK {
 		return true
 	}
-	cmdStr := signalcmd.Render(signalcmd.Traces(*a, r.opts.Timeout))
+	cmdStr := signalcmd.Render(signalcmd.Traces(*a, 0))
 	for _, f := range result.LastFailures {
 		r.reporter.Emit(report.Event{
 			Type:   report.EventAssertFail,
@@ -621,8 +643,10 @@ func (r *Runner) fetchTraceRows(ctx context.Context, c *casefile.Case, searchStd
 	}
 	var rows []assert.Row
 	for _, traceID := range traceIDs {
-		args := signalcmd.TraceGet(traceID, r.opts.Timeout)
-		res, err := r.exec.Execute(ctx, args...)
+		args := signalcmd.TraceGet(traceID, 0)
+		execCtx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
+		res, err := r.exec.Execute(execCtx, args...)
+		cancel()
 		if err != nil {
 			return nil, count, fmt.Errorf("trace %s fetch: %w", traceID, err)
 		}
@@ -644,7 +668,7 @@ func (r *Runner) fetchTraceRows(ctx context.Context, c *casefile.Case, searchStd
 }
 
 func (r *Runner) runLog(ctx context.Context, c *casefile.Case, a *casefile.LogAssertion) bool {
-	args := signalcmd.Logs(*a, r.opts.Timeout)
+	args := signalcmd.Logs(*a, 0)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
 		if len(a.Match) == 0 {
 			return evalCommonText(stdout, a.AssertionCommon)
@@ -655,7 +679,7 @@ func (r *Runner) runLog(ctx context.Context, c *casefile.Case, a *casefile.LogAs
 }
 
 func (r *Runner) runMetric(ctx context.Context, c *casefile.Case, a *casefile.MetricAssertion) bool {
-	args := signalcmd.Metrics(*a, r.opts.Timeout)
+	args := signalcmd.Metrics(*a, 0)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
 		if a.Value == "" && len(a.Match) == 0 {
 			return evalCommonText(stdout, a.AssertionCommon)
@@ -674,7 +698,7 @@ func (r *Runner) runMetric(ctx context.Context, c *casefile.Case, a *casefile.Me
 }
 
 func (r *Runner) runProfile(ctx context.Context, c *casefile.Case, a *casefile.ProfileAssertion) bool {
-	args := signalcmd.Profiles(*a, r.opts.Timeout)
+	args := signalcmd.Profiles(*a, 0)
 	return r.pollAssert(ctx, c, args, a.Absent, func(stdout, _ string, _ int) []assert.Failure {
 		if len(a.Match) == 0 {
 			return evalCommonText(stdout, a.AssertionCommon)

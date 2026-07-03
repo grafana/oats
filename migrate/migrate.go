@@ -38,9 +38,9 @@ func ConvertFile(path string) ([]byte, []string, error) {
 func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Case, []string, error) {
 	var warnings []string
 	c := &casefile.Case{
-		OatsVersion: casefile.SchemaVersion,
-		Name:        name,
-		Interval:    def.Interval,
+		OatsSchemaVersion: casefile.SchemaVersion,
+		Name:              name,
+		Interval:          def.Interval,
 	}
 	selectedMatrix := (*model.Matrix)(nil)
 

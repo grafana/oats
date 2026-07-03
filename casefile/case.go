@@ -21,19 +21,20 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// SchemaVersion is the value of the top-level `oats:` field that this loader
-// understands. Cases with any other value are rejected at parse time.
-const SchemaVersion = 2
+// SchemaVersion is the value of the top-level `oats-schema-version` field
+// that this loader understands. Cases with any other value are rejected at
+// parse time.
+const SchemaVersion = 3
 
 // Case is one entry point yaml file. Cases are independently runnable;
 // suites group them via oats.toml.
 type Case struct {
-	OatsVersion int            `yaml:"oats"`
-	Name        string         `yaml:"name"`
-	Tags        []string       `yaml:"tags,omitempty"`
-	Hermetic    *bool          `yaml:"hermetic,omitempty"` // pointer: distinguish unset vs explicit false
-	Interval    time.Duration  `yaml:"interval,omitempty"`
-	Fixture     *FixtureConfig `yaml:"fixture,omitempty"`
+	OatsSchemaVersion int            `yaml:"oats-schema-version"`
+	Name              string         `yaml:"name"`
+	Tags              []string       `yaml:"tags,omitempty"`
+	Hermetic          *bool          `yaml:"hermetic,omitempty"` // pointer: distinguish unset vs explicit false
+	Interval          time.Duration  `yaml:"interval,omitempty"`
+	Fixture           *FixtureConfig `yaml:"fixture,omitempty"`
 
 	Seed     Seed     `yaml:"seed"`
 	Input    []Input  `yaml:"input,omitempty"`
@@ -325,9 +326,9 @@ func Parse(data []byte) (*Case, error) {
 // Called automatically by Parse; exported for tests that construct Cases
 // programmatically.
 func (c *Case) Validate() error {
-	if c.OatsVersion != SchemaVersion {
-		return fmt.Errorf("oats: expected %d, got %d (this binary parses v%d only)",
-			SchemaVersion, c.OatsVersion, SchemaVersion)
+	if c.OatsSchemaVersion != SchemaVersion {
+		return fmt.Errorf("unsupported oats-schema-version '%d' required version is '%d'",
+			c.OatsSchemaVersion, SchemaVersion)
 	}
 	if c.Name == "" {
 		return fmt.Errorf("name: required, non-empty")
@@ -348,6 +349,16 @@ func (c *Case) Validate() error {
 	case "inline-otlp":
 		if len(c.Seed.Traces)+len(c.Seed.Logs)+len(c.Seed.Metrics) == 0 {
 			return fmt.Errorf("seed: inline-otlp must declare at least one trace, log, or metric")
+		}
+		for i, tr := range c.Seed.Traces {
+			for j, sp := range tr.Spans {
+				if sp.Duration == "" {
+					continue
+				}
+				if _, err := time.ParseDuration(sp.Duration); err != nil {
+					return fmt.Errorf("seed.traces[%d].spans[%d].duration: invalid duration %q: %v", i, j, sp.Duration, err)
+				}
+			}
 		}
 	case "":
 		return fmt.Errorf("seed.type: required (app | inline-otlp)")

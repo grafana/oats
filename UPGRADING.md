@@ -32,14 +32,14 @@ All test files must now include an `oats-schema-version` tag.
 
 Full release notes: <https://github.com/grafana/oats/releases/tag/v0.6.0>
 
-### Add `oats-schema-version: 2` to all test files
+### Add `oats-schema-version: 3` to all test files
 
 All OATS test files must now include the `oats-schema-version` field at the
 top level. The current version is `2`.
 
 ```yaml
 # ✅ Required in all test files
-oats-schema-version: 2
+oats-schema-version: 3
 
 docker-compose:
   files:
@@ -70,7 +70,7 @@ points must now use the `oats-template: true` flag:
 
 ```yaml
 # Template file (e.g., oats-base.yaml)
-oats-schema-version: 2
+oats-schema-version: 3
 oats-template: true
 
 docker-compose:
@@ -97,7 +97,7 @@ and want to avoid parsing all of them.
 
 ### Migration Steps
 
-1. Add `oats-schema-version: 2` to all your test files
+1. Add `oats-schema-version: 3` to all your test files
 2. Add `oats-template: true` to any template files (files that are included but
    not entry points)
 3. (Optional) Consider passing specific file paths instead of directories for

@@ -98,7 +98,7 @@ func (c *Compose) runDocker(cc command) error {
 		}
 		wg.Wait()
 	} else if cc.background {
-		slog.Info("Running", "command", cmd.String(), "dir", strings.Join(c.Paths, ","))
+		slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
 		stdout, _ := cmd.StdoutPipe()
 		cmd.Stderr = cmd.Stdout
 		go func() {
@@ -116,7 +116,7 @@ func (c *Compose) runDocker(cc command) error {
 		}
 		go func() { _ = cmd.Wait() }()
 	} else {
-		slog.Info("Running", "command", cmd.String(), "dir", strings.Join(c.Paths, ","))
+		slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		err := cmd.Run()
