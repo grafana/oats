@@ -74,6 +74,8 @@ func TestStart_DefaultDockerContextAndCommandSequence(t *testing.T) {
 		"fg: kubectl wait --timeout=5m --for=condition=available deployment/lgtm",
 		"bg: kubectl port-forward service/dice 18080:8080",
 		"bg: kubectl port-forward service/lgtm 13100:3100",
+		"bg: kubectl port-forward service/lgtm 3000:3000",
+		"bg: kubectl port-forward service/lgtm 4318:4318",
 		"bg: kubectl port-forward service/lgtm 19090:9090",
 		"bg: kubectl port-forward service/lgtm 13200:3200",
 		"bg: kubectl port-forward service/lgtm 14040:4040",

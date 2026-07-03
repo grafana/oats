@@ -123,6 +123,14 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 	if err != nil {
 		return err
 	}
+	err = portForward(3000, 3000)
+	if err != nil {
+		return err
+	}
+	err = portForward(4318, 4318)
+	if err != nil {
+		return err
+	}
 	err = portForward(ports.PrometheusHTTPPort, 9090)
 	if err != nil {
 		return err
