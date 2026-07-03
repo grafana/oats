@@ -5,8 +5,8 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 bin_dir="${1:-$root/bin}"
 mkdir -p "$bin_dir"
 
-# Keep the gcx bootstrap logic owned by OATS so consumer repos only need to
-# fetch/build OATS itself.
+# Local smoke/e2e runs need both binaries. Consumer repos should still only
+# install `oats`; OATS owns the gcx bootstrap for fixture-backed runs.
 : "${GCX_VERSION:=v0.4.0}"
 
 GOWORK=off go -C "$root" build -buildvcs=false -o "$bin_dir/oats" .

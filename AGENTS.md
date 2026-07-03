@@ -59,7 +59,7 @@ EditorConfig rules live in `.editorconfig`.
 
 ### Test Case Schema
 
-Current user-facing syntax is documented in `CURRENT.md`. Legacy yaml parsing
+Current user-facing syntax is documented in `README.md`. Legacy yaml parsing
 still exists in-package for migration support, but the repo's CLI surface is
 the current `oats.toml` + case-yaml flow.
 

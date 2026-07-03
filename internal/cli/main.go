@@ -13,7 +13,7 @@
 //	--gcx          Path to gcx binary (default "gcx" on PATH)
 //	--list         Print the run plan and exit (no execution)
 //	--format       Output format: "text" (default) or "ndjson"
-//	-v / -vv / -vvv  Progressive verbosity (passes / commands / lifecycle)
+//	-v / -v=2 / -v=3  Progressive verbosity (passes / commands / lifecycle)
 //	--suite        Comma-separated suite names to include
 //	--tags         Comma-separated tag any-match filter
 package cli
@@ -44,6 +44,10 @@ import (
 )
 
 var (
+	// Version is the oats CLI version. Release builds can override this with
+	// -ldflags "-X github.com/grafana/oats/internal/cli.Version=vX.Y.Z".
+	Version = "dev"
+
 	newComposeSuite = func(files []string, env []string) (suiteFixture, error) {
 		return compose.SuiteFiles(files, env)
 	}
@@ -76,9 +80,15 @@ func Main() {
 }
 
 func Run() int {
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Println(Version)
+		return 0
+	}
+
 	configPath := flag.String("config", "oats.toml", "path to oats.toml")
 	gcxBin := flag.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
 	listOnly := flag.Bool("list", false, "print the run plan and exit (no execution)")
+	versionOnly := flag.Bool("version", false, "print the oats version and exit")
 	migratePath := flag.String("migrate", "", "convert one legacy OATS yaml file and print the result to stdout")
 	format := flag.String("format", "text", "output format: text | ndjson")
 	suiteFilterStr := flag.String("suite", "", "comma-separated suite names")
@@ -98,6 +108,11 @@ func Run() int {
 	flag.IntVar(&verbose, "v", 0, "verbosity (0-3)")
 
 	flag.Parse()
+
+	if *versionOnly {
+		fmt.Println(Version)
+		return 0
+	}
 
 	if *migratePath != "" {
 		out, warnings, err := migrate.ConvertFile(*migratePath)
@@ -143,7 +158,7 @@ func Run() int {
 
 	rep.Emit(report.Event{
 		Type:          report.EventRunStart,
-		OatsVersion:   "dev",
+		OatsVersion:   Version,
 		SchemaVersion: report.SchemaVersion,
 		Ts:            time.Now(),
 	})
@@ -202,7 +217,7 @@ func Run() int {
 				fixtureBytes, _ := json.Marshal(plan.Fixture) // stable across calls
 				r = r.WithCache(store, runner.CacheContext{
 					GCXVersion:   gcxVersion(*gcxBin),
-					OatsVersion:  "dev",
+					OatsVersion:  Version,
 					FixtureBytes: fixtureBytes,
 				})
 			}

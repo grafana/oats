@@ -2,9 +2,8 @@
 
 OATs is a declarative acceptance-test framework for OpenTelemetry.
 
-The current `oats` binary is the gcx-driven CLI. The legacy root runner has
-been removed; existing users must migrate to the current `oats.toml` +
-case-yaml flow when upgrading.
+The `oats` binary is the gcx-driven CLI. Legacy direct-yaml invocation has been
+removed; upgrades now use the current `oats.toml` + case-yaml flow.
 
 ## Install
 
@@ -15,17 +14,25 @@ go install github.com/grafana/oats@latest
 ## Quick start
 
 ```sh
+# Build local dev binaries (oats + gcx) into ./bin
 ./scripts/build-local-tools.sh
+
+# Print the CLI version
+bin/oats version
+bin/oats -version
+
+# Print what would run
 bin/oats --config examples/smoke/oats.toml --list
+
+# Run
 bin/oats --config examples/smoke/oats.toml
 ```
 
-## Key docs
+## Layout
 
-- current syntax and feature status: [CURRENT.md](CURRENT.md)
-- migration guidance: [UPGRADING.md](UPGRADING.md)
-- small runnable examples: [`examples/smoke/`](examples/smoke/)
-- richer fixture examples: [`examples/fixtures/`](examples/fixtures/)
+- `examples/smoke/` — small runnable examples
+- `examples/fixtures/` — richer compose / k3d fixture examples
+- `UPGRADING.md` — migration notes for older repos
 
 ## Current scope
 
@@ -39,3 +46,80 @@ bin/oats --config examples/smoke/oats.toml
   ```sh
   oats --migrate path/to/legacy.yaml
   ```
+
+## CLI
+
+```sh
+oats --config oats.toml --list
+oats --config oats.toml --suite smoke
+oats --config oats.toml --tags traces,logs
+oats --config oats.toml --gcx-context my-lgtm
+oats --config oats.toml --no-cache
+oats --format ndjson
+oats -v
+oats -v=2
+oats -v=3
+```
+
+Key flags:
+
+- `--config`
+- `--suite`
+- `--tags`
+- `--timeout`
+- `--interval`
+- `--absent-timeout`
+- `--gcx`
+- `--gcx-context`
+- `--version`
+
+## Config shape
+
+```toml
+[meta]
+version = 2
+
+[[suite]]
+cases = ["examples/smoke/cases/*.yaml"]
+
+[cache]
+ttl_days = 7
+```
+
+Case yaml:
+
+```yaml
+oats-schema-version: 3
+name: rolldice traces have route attribute
+
+fixture:
+  type: compose
+  template: lgtm
+  compose_file: docker-compose.oats.yml
+
+seed:
+  type: app
+input:
+  - path: /rolldice?rolls=5
+
+expected:
+  traces:
+    - traceql: '{ span.http.route = "/rolldice" }'
+      match_spans:
+        - name: "GET /rolldice"
+  metrics:
+    - promql: 'dice_lib_rolls_counter_total{service_name="dice-server"}'
+      value: '>= 0'
+  logs:
+    - logql: '{service_name="dice-server"}'
+      contains: Received request
+  custom-checks:
+    - script: ./verify.sh
+```
+
+## Notes
+
+- Cases currently run sequentially inside `oats`; there is no parallel case
+  execution yet.
+- Case-local `fixture:` blocks cover the common one-case-per-suite shape.
+- OATS owns local LGTM bootstrapping and gcx bootstrap for fixture-backed runs.

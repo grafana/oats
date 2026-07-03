@@ -14,7 +14,7 @@ The root `oats` binary now runs the gcx-driven current CLI only.
 That means upgrades now require migrating to the current:
 
 - `oats.toml` suite/discovery file
-- current case yaml shape documented in [CURRENT.md](CURRENT.md)
+- current case yaml shape documented in [README.md](README.md)
 
 The legacy “pass one or more old yaml files directly to `oats`” runner has been
 removed. For one-off help migrating old cases, use:
@@ -35,7 +35,7 @@ Full release notes: <https://github.com/grafana/oats/releases/tag/v0.6.0>
 ### Add `oats-schema-version: 3` to all test files
 
 All OATS test files must now include the `oats-schema-version` field at the
-top level. The current version is `2`.
+top level. The current version is `3`.
 
 ```yaml
 # ✅ Required in all test files
