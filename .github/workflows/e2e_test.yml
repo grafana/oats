@@ -13,7 +13,7 @@ jobs:
       matrix:
         include:
           - name: non-k3d
-            filter: "assert/,custom/,seed/,fixture/compose,fixture/parallel-compose,fixture/remote"
+            filter: ""
           - name: k3d-fail
             filter: "fixture/k3d-fail"
           - name: k3d-smoke
