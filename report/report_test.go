@@ -87,6 +87,29 @@ func TestTextReporter_GHAAnnotationsWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestTextReporter_GHAAnnotationsWithoutSource(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "true")
+
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventRunStart})
+	r.Emit(Event{
+		Type: EventAssertFail,
+		Case: "x",
+		Msg:  "oops",
+	})
+	r.Emit(Event{Type: EventCaseFail, Case: "x"})
+	r.Emit(Event{Type: EventRunEnd})
+
+	out := buf.String()
+	if !strings.Contains(out, "::error::oops") {
+		t.Fatalf("expected source-free gha annotation:\n%s", out)
+	}
+	if strings.Contains(out, "::error file=") {
+		t.Fatalf("did not expect empty file annotation:\n%s", out)
+	}
+}
+
 func TestTextReporter_VerbosePassPrintsPasses(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewTextReporter(&buf, VerbosePasses)

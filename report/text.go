@@ -48,6 +48,7 @@ func NewTextReporter(w io.Writer, v Verbosity) *TextReporter {
 func (r *TextReporter) Emit(e Event) {
 	switch e.Type {
 	case EventRunStart:
+		r.resetRunState()
 		r.runStart = nonZeroOrNow(e.Ts)
 	case EventRunEnd:
 		r.flushRunEnd(e)
@@ -78,6 +79,14 @@ func (r *TextReporter) Emit(e Event) {
 
 func (r *TextReporter) Close() error { return nil }
 
+func (r *TextReporter) resetRunState() {
+	r.pass = 0
+	r.fail = 0
+	r.skip = 0
+	r.failBlocks = nil
+	r.knownErrAt = make(map[string]struct{})
+}
+
 func (r *TextReporter) recordFailure(e Event) {
 	var b strings.Builder
 	src := e.Source
@@ -102,6 +111,21 @@ func (r *TextReporter) recordFailure(e Event) {
 }
 
 func (r *TextReporter) emitGHAAnnotation(e Event) {
+	if e.Source == "" {
+		const key = "(unknown source):0"
+		if _, dup := r.knownErrAt[key]; dup {
+			return
+		}
+		r.knownErrAt[key] = struct{}{}
+
+		msg := e.Msg
+		if msg == "" {
+			msg = "OATS assertion failed"
+		}
+		r.write("::error::%s\n", ghaEscape(msg))
+		return
+	}
+
 	file, line := splitSource(e.Source)
 	// Suppress duplicate annotations for the same source position so a case
 	// with N substring failures does not flood the PR diff.

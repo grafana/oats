@@ -90,20 +90,29 @@ func (c *Compose) runDocker(cc command) error {
 	cmd := exec.Command(c.Command, cmdArgs...)
 	cmd.Env = c.Env
 	if cc.logConsumer != nil {
-		stdout, _ := cmd.StdoutPipe()
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return fmt.Errorf("failed to open docker stdout pipe: %w", err)
+		}
 		cmd.Stderr = cmd.Stdout
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go cc.logConsumer(stdout, &wg)
 
-		err := cmd.Start()
+		err = cmd.Start()
 		if err != nil {
 			return fmt.Errorf("failed to start docker command: %w", err)
 		}
 		wg.Wait()
+		if err := cmd.Wait(); err != nil {
+			return fmt.Errorf("failed to run docker command: %w", err)
+		}
 	} else if cc.background {
 		slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
-		stdout, _ := cmd.StdoutPipe()
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return fmt.Errorf("failed to open docker stdout pipe: %w", err)
+		}
 		cmd.Stderr = cmd.Stdout
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -117,7 +126,7 @@ func (c *Compose) runDocker(cc command) error {
 			}
 		}()
 
-		err := cmd.Start()
+		err = cmd.Start()
 		if err != nil {
 			return fmt.Errorf("failed to start docker command: %w", err)
 		}
