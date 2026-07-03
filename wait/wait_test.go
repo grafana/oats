@@ -47,9 +47,9 @@ func TestUntil_FailsAtDeadline(t *testing.T) {
 	}
 }
 
-func TestUntil_RunsAtLeastOnceEvenWithZeroTimeout(t *testing.T) {
-	// Zero timeout gets the default — we just want to verify the asserter
-	// is invoked, not that no poll happens. The contract is "at least once."
+func TestUntil_RunsAtLeastOnceEvenWithTightDeadline(t *testing.T) {
+	// A tight deadline should still invoke the asserter at least once. The
+	// contract is "at least once," not "zero polls under short timeouts."
 	called := false
 	r := Until[string](context.Background(), Options{Timeout: 5 * time.Millisecond}, func() []string {
 		called = true
