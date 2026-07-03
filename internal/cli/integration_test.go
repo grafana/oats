@@ -172,8 +172,10 @@ func TestStartFixture_K3DLifecycle(t *testing.T) {
 
 	var capturedPlan discovery.Plan
 	var starts, stops int
-	newKubernetesEndpoint = func(plan discovery.Plan) *remote.Endpoint {
+	var capturedPorts remote.PortsConfig
+	newKubernetesEndpoint = func(plan discovery.Plan, ports remote.PortsConfig) *remote.Endpoint {
 		capturedPlan = plan
+		capturedPorts = ports
 		return remote.NewEndpoint("localhost", remote.PortsConfig{}, func(ctx context.Context) error {
 			starts++
 			return nil
@@ -206,6 +208,9 @@ func TestStartFixture_K3DLifecycle(t *testing.T) {
 	if capturedPlan.FixtureSourceDir != "/tmp/work" || capturedPlan.Suite.Name != "cluster-smoke" || capturedPlan.Fixture.AppPort != 18080 {
 		t.Fatalf("unexpected endpoint factory args: plan=%+v", capturedPlan)
 	}
+	if capturedPorts.GrafanaHTTPPort == 0 || capturedPorts.OTLPHTTPPort == 0 || capturedPorts.LokiHttpPort == 0 || capturedPorts.PrometheusHTTPPort == 0 || capturedPorts.TempoHTTPPort == 0 || capturedPorts.PyroscopeHttpPort == 0 {
+		t.Fatalf("expected allocated k3d ports, got %+v", capturedPorts)
+	}
 	if err := fix.Close(); err != nil {
 		t.Fatalf("fixture close: %v", err)
 	}
@@ -218,7 +223,7 @@ func TestStartFixture_K3DStartFailure(t *testing.T) {
 	oldFactory := newKubernetesEndpoint
 	defer func() { newKubernetesEndpoint = oldFactory }()
 
-	newKubernetesEndpoint = func(plan discovery.Plan) *remote.Endpoint {
+	newKubernetesEndpoint = func(plan discovery.Plan, ports remote.PortsConfig) *remote.Endpoint {
 		return remote.NewEndpoint("localhost", remote.PortsConfig{}, func(ctx context.Context) error {
 			return fmt.Errorf("cluster boom")
 		}, func(ctx context.Context) error {
@@ -241,6 +246,24 @@ func TestStartFixture_K3DStartFailure(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "cluster boom") {
 		t.Fatalf("expected k3d startup error, got %v", err)
+	}
+}
+
+func TestK3DCheckEnv_UsesConfiguredPorts(t *testing.T) {
+	got := k3dCheckEnv(runner.Endpoint{AppHost: "localhost", AppPort: 18080}, remote.PortsConfig{
+		GrafanaHTTPPort:   13000,
+		OTLPHTTPPort:      14318,
+		PyroscopeHttpPort: 14040,
+	})
+	for _, want := range []string{
+		"OATS_APP_URL=http://localhost:18080",
+		"OATS_GRAFANA_URL=http://localhost:13000",
+		"OATS_OTLP_HTTP=http://localhost:14318",
+		"OATS_PYROSCOPE_URL=http://localhost:14040",
+	} {
+		if !containsString(got, want) {
+			t.Fatalf("k3dCheckEnv missing %q in %v", want, got)
+		}
 	}
 }
 
@@ -1190,6 +1213,15 @@ func equalStrings(got, want []string) bool {
 		}
 	}
 	return true
+}
+
+func containsString(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
 }
 
 type recordingReporter struct {

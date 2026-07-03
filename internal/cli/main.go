@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -53,7 +54,7 @@ var (
 	newComposeSuite = func(files []string, env []string) (suiteFixture, error) {
 		return compose.SuiteFiles(files, env)
 	}
-	newKubernetesEndpoint = func(plan discovery.Plan) *remote.Endpoint {
+	newKubernetesEndpoint = func(plan discovery.Plan, ports remote.PortsConfig) *remote.Endpoint {
 		sourceDir := plan.FixtureSourceDir
 		if sourceDir == "" {
 			sourceDir = "."
@@ -67,12 +68,7 @@ var (
 			AppDockerPort:    plan.Fixture.AppPort,
 			ImportImages:     plan.Fixture.ImportImages,
 		}
-		return kubernetes.NewEndpoint("localhost", model, remote.PortsConfig{
-			PrometheusHTTPPort: 9090,
-			LokiHttpPort:       3100,
-			TempoHTTPPort:      3200,
-			PyroscopeHttpPort:  4040,
-		}, plan.Suite.Name, sourceDir)
+		return kubernetes.NewEndpoint("localhost", model, ports, plan.Suite.Name, sourceDir)
 	}
 	waitForGrafanaToken = waitForGrafanaTokenImpl
 	lookupComposePort   = dockerComposePort
@@ -558,17 +554,21 @@ func startFixture(ctx context.Context, plan discovery.Plan) (suiteFixture, fixtu
 		rt.ParallelSafe, rt.ParallelDisabled = planSupportsParallel(plan)
 		return composeFixture{suite: suite, cleanup: cleanup}, rt, nil
 	case "k3d":
-		ep := newKubernetesEndpoint(plan)
+		ports, err := allocateK3DPorts()
+		if err != nil {
+			return nil, fixtureRuntime{}, err
+		}
+		ep := newKubernetesEndpoint(plan, ports)
 		if err := ep.Start(ctx); err != nil {
 			return nil, fixtureRuntime{}, err
 		}
 		rt := fixtureRuntime{
-			GrafanaURL:       "http://localhost:3000",
-			OTLPHTTP:         "http://localhost:4318",
-			PyroscopeURL:     "http://localhost:4040",
-			CustomCheckEnv:   k3dCheckEnv(runner.Endpoint{AppHost: "localhost", AppPort: plan.Fixture.AppPort}),
+			GrafanaURL:       fmt.Sprintf("http://localhost:%d", ports.GrafanaHTTPPort),
+			OTLPHTTP:         fmt.Sprintf("http://localhost:%d", ports.OTLPHTTPPort),
+			PyroscopeURL:     fmt.Sprintf("http://localhost:%d", ports.PyroscopeHttpPort),
+			CustomCheckEnv:   k3dCheckEnv(runner.Endpoint{AppHost: "localhost", AppPort: plan.Fixture.AppPort}, ports),
 			ParallelSafe:     false,
-			ParallelDisabled: "k3d fixtures currently use shared localhost port-forwards",
+			ParallelDisabled: "k3d fixtures currently use shared clusters and kubectl port-forwards",
 		}
 		if cfg, cfgErr := writeLocalGCXConfig(rt.GrafanaURL); cfgErr == nil {
 			rt.GCXConfig = cfg
@@ -778,13 +778,13 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-func k3dCheckEnv(ep runner.Endpoint) []string {
+func k3dCheckEnv(ep runner.Endpoint, ports remote.PortsConfig) []string {
 	return []string{
 		"OATS_FIXTURE_TYPE=k3d",
 		"OATS_APP_URL=" + fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
-		"OATS_GRAFANA_URL=http://localhost:3000",
-		"OATS_OTLP_HTTP=http://localhost:4318",
-		"OATS_PYROSCOPE_URL=http://localhost:4040",
+		"OATS_GRAFANA_URL=" + fmt.Sprintf("http://localhost:%d", ports.GrafanaHTTPPort),
+		"OATS_OTLP_HTTP=" + fmt.Sprintf("http://localhost:%d", ports.OTLPHTTPPort),
+		"OATS_PYROSCOPE_URL=" + fmt.Sprintf("http://localhost:%d", ports.PyroscopeHttpPort),
 	}
 }
 
@@ -848,6 +848,54 @@ func planSupportsParallel(plan discovery.Plan) (bool, string) {
 	default:
 		return false, "fixture type is not parallel-safe"
 	}
+}
+
+func allocateK3DPorts() (remote.PortsConfig, error) {
+	grafanaPort, err := findFreePort()
+	if err != nil {
+		return remote.PortsConfig{}, err
+	}
+	otlpHTTPPort, err := findFreePort()
+	if err != nil {
+		return remote.PortsConfig{}, err
+	}
+	lokiPort, err := findFreePort()
+	if err != nil {
+		return remote.PortsConfig{}, err
+	}
+	promPort, err := findFreePort()
+	if err != nil {
+		return remote.PortsConfig{}, err
+	}
+	tempoPort, err := findFreePort()
+	if err != nil {
+		return remote.PortsConfig{}, err
+	}
+	pyroscopePort, err := findFreePort()
+	if err != nil {
+		return remote.PortsConfig{}, err
+	}
+	return remote.PortsConfig{
+		GrafanaHTTPPort:    grafanaPort,
+		OTLPHTTPPort:       otlpHTTPPort,
+		LokiHttpPort:       lokiPort,
+		PrometheusHTTPPort: promPort,
+		TempoHTTPPort:      tempoPort,
+		PyroscopeHttpPort:  pyroscopePort,
+	}, nil
+}
+
+func findFreePort() (int, error) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = ln.Close() }()
+	addr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		return 0, fmt.Errorf("unexpected listener address %T", ln.Addr())
+	}
+	return addr.Port, nil
 }
 
 func composeProjectName(plan discovery.Plan) string {

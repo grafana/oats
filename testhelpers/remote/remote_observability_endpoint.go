@@ -21,6 +21,8 @@ import (
 type PortsConfig struct {
 	TracesGRPCPort     int
 	TracesHTTPPort     int
+	GrafanaHTTPPort    int
+	OTLPHTTPPort       int
 	TempoHTTPPort      int
 	MimirHTTPPort      int
 	PrometheusHTTPPort int
