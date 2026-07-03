@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-python3 - <<'PY'
-import os, urllib.request
-urllib.request.urlopen(os.environ['OATS_GRAFANA_URL'] + '/api/health').read()
-PY
+grafana_url="$(awk '/server:/ {print $2; exit}' "${GCX_CONFIG:?}")"
+curl -fsS "${grafana_url}/api/health" >/dev/null
 echo "custom check ok"

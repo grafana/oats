@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -64,7 +65,11 @@ type sharedEnv struct {
 	OATS           string
 }
 
-var shared sharedEnv
+var (
+	shared     sharedEnv
+	sharedOnce sync.Once
+	sharedErr  error
+)
 
 func TestMain(m *testing.M) {
 	root, err := findRepoRoot()
@@ -74,7 +79,7 @@ func TestMain(m *testing.M) {
 	}
 	shared.RepoRoot = root
 	if runtime.GOOS != "windows" {
-		if err := setupSharedEnv(&shared); err != nil {
+		if err := prepareLocalTools(&shared); err != nil {
 			fmt.Fprintf(os.Stderr, "e2e setup failed: %v\n", err)
 			_ = teardownSharedEnv(&shared)
 			os.Exit(1)
@@ -160,13 +165,11 @@ func setupSharedEnv(env *sharedEnv) error {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return err
 	}
-	tmp, err := os.MkdirTemp("", "oats-e2e-")
-	if err != nil {
+	if err := prepareLocalTools(env); err != nil {
 		return err
 	}
-	env.TempDir = tmp
 	env.Project = fmt.Sprintf("oatse2e%d", os.Getpid())
-	env.ComposeFile = filepath.Join(tmp, "docker-compose.yml")
+	env.ComposeFile = filepath.Join(env.TempDir, "docker-compose.yml")
 	const composeBody = `services:
   lgtm:
     image: docker.io/grafana/otel-lgtm:latest
@@ -177,17 +180,6 @@ func setupSharedEnv(env *sharedEnv) error {
 	if err := os.WriteFile(env.ComposeFile, []byte(composeBody), 0o644); err != nil {
 		return err
 	}
-	binDir := filepath.Join(tmp, "bin")
-	build := exec.Command("bash", "-lc", fmt.Sprintf("./scripts/build-local-tools.sh %q", binDir))
-	build.Dir = env.RepoRoot
-	build.Stdout = os.Stdout
-	build.Stderr = os.Stderr
-	if err := build.Run(); err != nil {
-		return fmt.Errorf("build local tools: %w", err)
-	}
-	env.OATS = filepath.Join(binDir, "oats")
-	env.GCX = filepath.Join(binDir, "gcx")
-	env.GCXConfig = filepath.Join(tmp, "gcx.yaml")
 	up := exec.Command("docker", "compose", "-p", env.Project, "-f", env.ComposeFile, "up", "-d")
 	up.Stdout = os.Stdout
 	up.Stderr = os.Stderr
@@ -210,7 +202,69 @@ func setupSharedEnv(env *sharedEnv) error {
 	if err := waitForHTTP(env.GrafanaURL+"/api/health", 2*time.Minute); err != nil {
 		return err
 	}
+	if err := waitForHTTP(env.RemoteOTLPHTTP, 2*time.Minute); err != nil {
+		return err
+	}
 	return nil
+}
+
+func prepareLocalTools(env *sharedEnv) error {
+	if env.TempDir != "" && env.OATS != "" && env.GCX != "" && env.GCXConfig != "" {
+		return nil
+	}
+	tmp, err := os.MkdirTemp("", "oats-e2e-")
+	if err != nil {
+		return err
+	}
+	env.TempDir = tmp
+	binDir := filepath.Join(tmp, "bin")
+	build := exec.Command("bash", "-lc", fmt.Sprintf("./scripts/build-local-tools.sh %q", binDir))
+	build.Dir = env.RepoRoot
+	build.Stdout = os.Stdout
+	build.Stderr = os.Stderr
+	if err := build.Run(); err != nil {
+		return fmt.Errorf("build local tools: %w", err)
+	}
+	env.OATS = filepath.Join(binDir, "oats")
+	env.GCX = filepath.Join(binDir, "gcx")
+	env.GCXConfig = filepath.Join(tmp, "gcx.yaml")
+	return nil
+}
+
+func ensureSharedEnv(t *testing.T) {
+	t.Helper()
+	sharedOnce.Do(func() {
+		sharedErr = setupSharedEnv(&shared)
+	})
+	if sharedErr != nil {
+		t.Fatalf("e2e setup failed: %v", sharedErr)
+	}
+}
+
+func caseNeedsSharedEnv(t *testing.T, dir string) bool {
+	t.Helper()
+	matches := false
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), "{{REMOTE_OTLP_HTTP}}") {
+			matches = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, filepath.SkipAll) {
+		t.Fatalf("scan %s: %v", dir, err)
+	}
+	return matches
 }
 
 func writeGCXConfig(path, grafanaURL string) error {
@@ -366,6 +420,9 @@ func runCase(t *testing.T, root, dir string) {
 	t.Helper()
 
 	spec := loadCaseFile(t, filepath.Join(dir, "test.yaml"))
+	if caseNeedsSharedEnv(t, dir) {
+		ensureSharedEnv(t)
+	}
 	tmp := t.TempDir()
 	filesDir := filepath.Join(tmp, "files")
 	if err := os.MkdirAll(filesDir, 0o755); err != nil {

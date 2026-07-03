@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -157,6 +158,13 @@ func Run() int {
 		fixtureStart := emitFixtureStart(rep, plan)
 		fix, err := startFixture(ctx, plan)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "suite %q: %v\n", plan.Suite.Name, err)
+			return 2
+		}
+		if err := waitForFixtureReady(plan); err != nil {
+			if fix != nil {
+				_ = closeFixture(rep, plan, fix)
+			}
 			fmt.Fprintf(os.Stderr, "suite %q: %v\n", plan.Suite.Name, err)
 			return 2
 		}
@@ -586,6 +594,34 @@ func waitForGrafanaTokenImpl(plan discovery.Plan) (string, error) {
 		time.Sleep(time.Second)
 	}
 	return "", fmt.Errorf("timed out waiting for Grafana service-account token")
+}
+
+func waitForFixtureReady(plan discovery.Plan) error {
+	switch plan.Fixture.Type {
+	case "compose", "k3d":
+		if err := waitForHTTP(grafanaURL()+"/api/health", 2*time.Minute); err != nil {
+			return fmt.Errorf("wait for grafana: %w", err)
+		}
+		if err := waitForHTTP("http://localhost:4318", 2*time.Minute); err != nil {
+			return fmt.Errorf("wait for otlp-http: %w", err)
+		}
+	}
+	return nil
+}
+
+func waitForHTTP(url string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(url) //nolint:gosec
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+				return nil
+			}
+		}
+		time.Sleep(2 * time.Second)
+	}
+	return fmt.Errorf("timed out waiting for %s", url)
 }
 
 func readComposeGrafanaToken(plan discovery.Plan) (string, error) {
