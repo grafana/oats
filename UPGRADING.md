@@ -97,7 +97,7 @@ and want to avoid parsing all of them.
 
 ### Migration Steps
 
-1. Add `oats-schema-version: 3` to all your test files
+1. Add `oats-schema-version: 2` to all your test files
 2. Add `oats-template: true` to any template files (files that are included but
    not entry points)
 3. (Optional) Consider passing specific file paths instead of directories for

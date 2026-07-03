@@ -22,6 +22,7 @@ jobs:
           version: v2026.6.14
           sha256: 96ae1ef7b00a6ebbbec23ba1016d6e722f5e904966272f621d15326429e90d53
       - name: Run ${{ matrix.shard }} e2e tests
+        # OATS_E2E_FILTER is not part of the matrix to avoid that it shows up in the gh action (too long)
         run: |
           case "${{ matrix.shard }}" in
             non-k3d)

@@ -55,6 +55,9 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Cas
 			c.Name = fmt.Sprintf("%s [%s]", name, selectedMatrix.Name)
 			warnings = append(warnings, fmt.Sprintf("flattened single matrix entry %q into the migrated case", selectedMatrix.Name))
 			if selectedMatrix.DockerCompose != nil {
+				if len(selectedMatrix.DockerCompose.Files) == 0 {
+					return nil, warnings, fmt.Errorf("matrix docker-compose present but no files declared")
+				}
 				c.Seed.Type = "app"
 				c.Seed.Compose = selectedMatrix.DockerCompose.Files[0]
 				warnings = append(warnings, "single matrix docker-compose fixture selected; paste the suggested [fixture] block below into oats.toml")
