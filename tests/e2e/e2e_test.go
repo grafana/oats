@@ -583,14 +583,17 @@ func copyFiles(t *testing.T, srcDir, dstDir string, ph placeholders) {
 
 func markExecutables(t *testing.T, filesDir string) {
 	t.Helper()
-	for _, rel := range []string{"verify.sh", "setup.sh"} {
-		path := filepath.Join(filesDir, rel)
-		if _, err := os.Stat(path); err == nil {
+	_ = filepath.WalkDir(filesDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d == nil || d.IsDir() {
+			return err
+		}
+		if strings.HasSuffix(d.Name(), ".sh") {
 			if chmodErr := os.Chmod(path, 0o755); chmodErr != nil {
 				t.Fatalf("chmod %s: %v", path, chmodErr)
 			}
 		}
-	}
+		return nil
+	})
 	binDir := filepath.Join(filesDir, "bin")
 	_ = filepath.WalkDir(binDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d == nil || d.IsDir() {

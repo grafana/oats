@@ -1,0 +1,15 @@
+oats-schema-version: 3
+name: alpha
+seed:
+  type: inline-otlp
+  logs:
+    - service: alpha
+      body: alpha-line
+expected:
+  logs:
+    - logql: '{service_name="alpha"}'
+      contains: alpha-line
+  compose-logs:
+    - app started ok
+  custom-checks:
+    - script: ./verify-alpha.sh

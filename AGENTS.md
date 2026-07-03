@@ -74,7 +74,7 @@ oats --config oats.toml --timeout 1m
 ```
 
 Key flags: `--config`, `--suite`, `--tags`, `--timeout`, `--interval`,
-`--absent-timeout`, `--gcx`, `--gcx-context`
+`--absent-timeout`, `--parallel`, `--gcx`, `--gcx-context`, `--version`
 
 ## Code Conventions
 

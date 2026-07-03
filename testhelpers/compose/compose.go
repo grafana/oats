@@ -23,6 +23,8 @@ type Compose struct {
 	Env         []string
 }
 
+var dockerPruneMu sync.Mutex
+
 func defaultEnv() []string {
 	return os.Environ()
 }
@@ -53,7 +55,9 @@ func SuiteFiles(composeFiles []string, env []string) (*Compose, error) {
 
 func (c *Compose) Up() error {
 	// networks accumulate over time and can cause issues with the tests
+	dockerPruneMu.Lock()
 	err := c.runDocker(newCommand("network", "prune", "-f", "--filter", "until=5m").withCompose(false))
+	dockerPruneMu.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to prune docker networks: %w", err)
 	}
@@ -101,7 +105,10 @@ func (c *Compose) runDocker(cc command) error {
 		slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
 		stdout, _ := cmd.StdoutPipe()
 		cmd.Stderr = cmd.Stdout
+		wg := sync.WaitGroup{}
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			reader := bufio.NewReader(stdout)
 			line, err := reader.ReadString('\n')
 			for err == nil {
@@ -114,7 +121,11 @@ func (c *Compose) runDocker(cc command) error {
 		if err != nil {
 			return fmt.Errorf("failed to start docker command: %w", err)
 		}
-		go func() { _ = cmd.Wait() }()
+		err = cmd.Wait()
+		wg.Wait()
+		if err != nil {
+			return fmt.Errorf("failed to run docker command: %w", err)
+		}
 	} else {
 		slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
 		cmd.Stdout = os.Stdout

@@ -69,6 +69,7 @@ Key flags:
 - `--timeout`
 - `--interval`
 - `--absent-timeout`
+- `--parallel`
 - `--gcx`
 - `--gcx-context`
 - `--version`
@@ -119,7 +120,9 @@ expected:
 
 ## Notes
 
-- Cases currently run sequentially inside `oats`; there is no parallel case
-  execution yet.
+- Cases inside one suite still run sequentially.
+- Suites can run in parallel with `--parallel N` when fixture isolation allows
+  it. Today that mainly means remote suites and compose suites where OATS owns
+  the LGTM ports (`template = "lgtm"`).
 - Case-local `fixture:` blocks cover the common one-case-per-suite shape.
 - OATS owns local LGTM bootstrapping and gcx bootstrap for fixture-backed runs.

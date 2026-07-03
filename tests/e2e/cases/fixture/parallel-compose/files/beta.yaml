@@ -1,0 +1,15 @@
+oats-schema-version: 3
+name: beta
+seed:
+  type: inline-otlp
+  logs:
+    - service: beta
+      body: beta-line
+expected:
+  logs:
+    - logql: '{service_name="beta"}'
+      contains: beta-line
+  compose-logs:
+    - app started ok
+  custom-checks:
+    - script: ./verify-beta.sh

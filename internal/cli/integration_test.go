@@ -54,7 +54,7 @@ func TestResolveComposeFiles(t *testing.T) {
 		t.Fatalf("expected cleanup for template=lgtm fixture")
 	}
 	defer func() { _ = cleanup() }()
-	if len(got) != 1 || !strings.HasSuffix(got[0], ".oats.lgtm.compose.yml") {
+	if len(got) != 1 || !strings.Contains(filepath.Base(got[0]), ".oats.lgtm.") || !strings.HasSuffix(got[0], ".compose.yml") {
 		t.Fatalf("unexpected template=lgtm resolution: %v", got)
 	}
 }
@@ -67,11 +67,11 @@ func TestResolveEndpoint_ComposeDefaults(t *testing.T) {
 	ep, err := resolveEndpoint(discovery.Plan{
 		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
 		Fixture: discovery.FixtureConfig{Type: "compose", Template: "lgtm"},
-	}, "", "localhost", 8080, "http://localhost:4318")
+	}, fixtureRuntime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318"}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
-	if ep.GCXContext != "" || ep.AppHost != "localhost" || ep.AppPort != 8080 || ep.OTLPHTTP != "http://localhost:4318" {
+	if ep.GCXContext != "" || ep.GCXConfig != "/tmp/gcx.yaml" || ep.AppHost != "localhost" || ep.AppPort != 8080 || ep.OTLPHTTP != "http://127.0.0.1:4318" {
 		t.Fatalf("unexpected endpoint: %+v", ep)
 	}
 }
@@ -84,7 +84,7 @@ func TestResolveEndpoint_K3DUsesFixtureAppPort(t *testing.T) {
 	ep, err := resolveEndpoint(discovery.Plan{
 		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "cluster"},
 		Fixture: discovery.FixtureConfig{Type: "k3d", AppPort: 18080},
-	}, "", "localhost", 8080, "http://localhost:4318")
+	}, fixtureRuntime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318"}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -95,7 +95,9 @@ func TestResolveEndpoint_K3DUsesFixtureAppPort(t *testing.T) {
 
 func TestStartFixture_ComposeLifecycle(t *testing.T) {
 	oldFactory := newComposeSuite
+	oldLookup := lookupComposePort
 	defer func() { newComposeSuite = oldFactory }()
+	defer func() { lookupComposePort = oldLookup }()
 
 	var gotFiles, gotEnv []string
 	fake := &fakeSuiteFixture{}
@@ -104,8 +106,20 @@ func TestStartFixture_ComposeLifecycle(t *testing.T) {
 		gotEnv = append([]string(nil), env...)
 		return fake, nil
 	}
+	lookupComposePort = func(files []string, env []string, service, containerPort string) (string, error) {
+		switch containerPort {
+		case "3000":
+			return "43000", nil
+		case "4318":
+			return "44318", nil
+		case "4040":
+			return "44040", nil
+		default:
+			return "", fmt.Errorf("unexpected port %s", containerPort)
+		}
+	}
 
-	fix, err := startFixture(context.Background(), discovery.Plan{
+	fix, _, err := startFixture(context.Background(), discovery.Plan{
 		Suite: discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
 		Fixture: discovery.FixtureConfig{
 			Type:         "compose",
@@ -123,8 +137,8 @@ func TestStartFixture_ComposeLifecycle(t *testing.T) {
 	if want := []string{"/tmp/work/a.yml", "/tmp/work/b.yml"}; !equalStrings(gotFiles, want) {
 		t.Fatalf("compose files: got %v want %v", gotFiles, want)
 	}
-	if want := []string{"FOO=bar"}; !equalStrings(gotEnv, want) {
-		t.Fatalf("compose env: got %v want %v", gotEnv, want)
+	if len(gotEnv) != 2 || gotEnv[0] != "FOO=bar" || !strings.HasPrefix(gotEnv[1], "COMPOSE_PROJECT_NAME=oats-smoke-") {
+		t.Fatalf("compose env: got %v", gotEnv)
 	}
 	if err := fix.Close(); err != nil {
 		t.Fatalf("fixture close: %v", err)
@@ -142,7 +156,7 @@ func TestStartFixture_ComposeStartFailure(t *testing.T) {
 		return &fakeSuiteFixture{upErr: fmt.Errorf("boom")}, nil
 	}
 
-	_, err := startFixture(context.Background(), discovery.Plan{
+	_, _, err := startFixture(context.Background(), discovery.Plan{
 		Suite:            discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
 		Fixture:          discovery.FixtureConfig{Type: "compose", ComposeFile: "compose.yml"},
 		FixtureSourceDir: "/tmp/work",
@@ -169,7 +183,7 @@ func TestStartFixture_K3DLifecycle(t *testing.T) {
 		}, nil)
 	}
 
-	fix, err := startFixture(context.Background(), discovery.Plan{
+	fix, _, err := startFixture(context.Background(), discovery.Plan{
 		Suite: discovery.SuiteConfig{Name: "cluster-smoke", Fixture: "cluster"},
 		Fixture: discovery.FixtureConfig{
 			Type:             "k3d",
@@ -212,7 +226,7 @@ func TestStartFixture_K3DStartFailure(t *testing.T) {
 		}, nil)
 	}
 
-	_, err := startFixture(context.Background(), discovery.Plan{
+	_, _, err := startFixture(context.Background(), discovery.Plan{
 		Suite: discovery.SuiteConfig{Name: "cluster-smoke", Fixture: "cluster"},
 		Fixture: discovery.FixtureConfig{
 			Type:             "k3d",
@@ -241,6 +255,86 @@ func TestResolveComposeFiles_MissingConfig(t *testing.T) {
 	_, _, err := resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose"})
 	if err == nil || !strings.Contains(err.Error(), "compose fixture requires compose_file, compose_files, or supported template") {
 		t.Fatalf("expected missing compose config error, got %v", err)
+	}
+}
+
+func TestComposeFilePublishesFixedHostPorts(t *testing.T) {
+	dir := t.TempDir()
+	fixed := filepath.Join(dir, "fixed.yml")
+	random := filepath.Join(dir, "random.yml")
+	writeFile(t, dir, "fixed.yml", `services:
+  app:
+    image: alpine
+    ports:
+      - "8080:8080"
+`)
+	writeFile(t, dir, "random.yml", `services:
+  app:
+    image: alpine
+    ports:
+      - "8080"
+`)
+	got, err := composeFilePublishesFixedHostPorts(fixed)
+	if err != nil {
+		t.Fatalf("composeFilePublishesFixedHostPorts fixed: %v", err)
+	}
+	if !got {
+		t.Fatalf("expected fixed host port detection for %s", fixed)
+	}
+	got, err = composeFilePublishesFixedHostPorts(random)
+	if err != nil {
+		t.Fatalf("composeFilePublishesFixedHostPorts random: %v", err)
+	}
+	if got {
+		t.Fatalf("did not expect fixed host port detection for %s", random)
+	}
+}
+
+func TestPlanSupportsParallel_ComposeTemplateLGTM(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "oats.toml", `
+[meta]
+version = 2
+
+[[suite]]
+name = "parallel-safe"
+cases = ["cases/*.yaml"]
+fixture = "stack"
+
+[fixture.stack]
+type = "compose"
+template = "lgtm"
+compose_file = "docker-compose.oats.yml"
+`)
+	writeFile(t, dir, "docker-compose.oats.yml", `services:
+  app:
+    image: alpine
+    command: ["sh", "-c", "sleep 1"]
+`)
+	writeFile(t, dir, "cases/a.yaml", `oats-schema-version: 3
+name: a
+seed:
+  type: inline-otlp
+  logs:
+    - service: a
+      body: line
+expected:
+  logs:
+    - logql: '{service_name="a"}'
+      contains: line
+`)
+
+	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	plans, err := cfg.PlanRun(discovery.Filter{})
+	if err != nil {
+		t.Fatalf("PlanRun: %v", err)
+	}
+	safe, reason := planSupportsParallel(plans[0])
+	if !safe {
+		t.Fatalf("expected plan to be parallel-safe, got false: %s", reason)
 	}
 }
 
@@ -508,7 +602,7 @@ expected:
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], "", appHost, appPort, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], fixtureRuntime{}, "", appHost, appPort, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -584,7 +678,7 @@ expected:
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], fixtureRuntime{}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -663,7 +757,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], fixtureRuntime{}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -751,7 +845,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], fixtureRuntime{}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -830,7 +924,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], fixtureRuntime{}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -908,7 +1002,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], fixtureRuntime{}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -1006,7 +1100,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("expected k8s-only assertion to be filtered out, got %d traces", got)
 	}
 
-	ep, err := resolveEndpoint(plans[0], "", "localhost", 8080, "http://localhost:4318")
+	ep, err := resolveEndpoint(plans[0], fixtureRuntime{}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}

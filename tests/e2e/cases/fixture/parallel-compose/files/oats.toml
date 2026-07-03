@@ -1,0 +1,17 @@
+[meta]
+version = 2
+
+[[suite]]
+name = "alpha"
+cases = ["alpha.yaml"]
+fixture = "shared"
+
+[[suite]]
+name = "beta"
+cases = ["beta.yaml"]
+fixture = "shared"
+
+[fixture.shared]
+type = "compose"
+template = "lgtm"
+compose_file = "docker-compose.oats.yml"

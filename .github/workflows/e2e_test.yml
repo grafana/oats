@@ -12,16 +12,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: assert-a
-            filter: "assert/absent,assert/contains,assert/count"
-          - name: assert-b
-            filter: "assert/match,assert/not-contains,assert/regex"
-          - name: custom-and-seed
-            filter: "custom/,seed/"
-          - name: compose
-            filter: "fixture/compose"
-          - name: remote
-            filter: "fixture/remote"
+          - name: non-k3d
+            filter: "assert/,custom/,seed/,fixture/compose,fixture/parallel-compose,fixture/remote"
           - name: k3d-fail
             filter: "fixture/k3d-fail"
           - name: k3d-smoke
