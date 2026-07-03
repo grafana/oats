@@ -26,10 +26,10 @@ jobs:
         run: |
           case "${{ matrix.shard }}" in
             core)
-              export OATS_E2E_FILTER="assert/,custom/,seed/"
+              export OATS_E2E_FILTER="-fixture/"
               ;;
             fixtures)
-              export OATS_E2E_FILTER="fixture/compose,fixture/parallel-compose,fixture/remote"
+              export OATS_E2E_FILTER="fixture/,-fixture/k3d-fail,-fixture/k3d-smoke"
               ;;
             k3d-fail)
               export OATS_E2E_FILTER="fixture/k3d-fail"
