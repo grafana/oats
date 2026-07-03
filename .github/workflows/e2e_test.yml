@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [non-k3d, k3d-fail, k3d-smoke]
+        shard: [core, fixtures, k3d-fail, k3d-smoke]
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -25,8 +25,11 @@ jobs:
         # OATS_E2E_FILTER is not part of the matrix to avoid that it shows up in the gh action (too long)
         run: |
           case "${{ matrix.shard }}" in
-            non-k3d)
-              export OATS_E2E_FILTER="-fixture/k3d-fail,-fixture/k3d-smoke"
+            core)
+              export OATS_E2E_FILTER="assert/,custom/,seed/"
+              ;;
+            fixtures)
+              export OATS_E2E_FILTER="fixture/compose,fixture/parallel-compose,fixture/remote"
               ;;
             k3d-fail)
               export OATS_E2E_FILTER="fixture/k3d-fail"
