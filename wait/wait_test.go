@@ -36,6 +36,7 @@ func TestUntil_SucceedsAfterSeveralTries(t *testing.T) {
 }
 
 func TestUntil_FailsAtDeadline(t *testing.T) {
+	start := time.Now()
 	r := Until[string](context.Background(), Options{Timeout: 30 * time.Millisecond, Interval: 5 * time.Millisecond}, func() []string {
 		return []string{"never passes"}
 	})
@@ -44,6 +45,9 @@ func TestUntil_FailsAtDeadline(t *testing.T) {
 	}
 	if len(r.LastFailures) == 0 {
 		t.Errorf("LastFailures should carry the last asserter output")
+	}
+	if elapsed := time.Since(start); elapsed > 60*time.Millisecond {
+		t.Fatalf("Until overshot timeout too far: %s", elapsed)
 	}
 }
 
@@ -64,6 +68,7 @@ func TestUntil_RunsAtLeastOnceEvenWithTightDeadline(t *testing.T) {
 }
 
 func TestWhile_HoldsForEntireWindow(t *testing.T) {
+	start := time.Now()
 	r := While[string](context.Background(), Options{Timeout: 30 * time.Millisecond, Interval: 5 * time.Millisecond}, func() []string {
 		return nil // never fails
 	})
@@ -72,6 +77,9 @@ func TestWhile_HoldsForEntireWindow(t *testing.T) {
 	}
 	if r.Iterations < 2 {
 		t.Errorf("expected multiple polls in 30ms with 5ms interval, got %d", r.Iterations)
+	}
+	if elapsed := time.Since(start); elapsed > 60*time.Millisecond {
+		t.Fatalf("While overshot timeout too far: %s", elapsed)
 	}
 }
 

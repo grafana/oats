@@ -2,10 +2,10 @@
 // concrete run plan.
 //
 // In OATS v1, the runner walked the file system for any yaml carrying
-// "oats-schema-version" and ran whatever it found. the current format declares the plan up
-// front: oats.toml lists suites, each suite lists cases (path globs) and the
-// fixture they share. "oats list" prints the plan before "oats run" executes
-// it.
+// "oats-schema-version" and ran whatever it found. The current format
+// declares the plan up front: oats.toml lists suites, each suite lists cases
+// (path globs) and the fixture they share. "oats list" prints the plan
+// before "oats run" executes it.
 package discovery
 
 import (

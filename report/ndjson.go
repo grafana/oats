@@ -40,7 +40,7 @@ func (r *NDJSONReporter) shouldEmit(e Event) bool {
 	case EventCasePass:
 		return r.v >= VerbosePasses
 	case EventGCXExec:
-		return r.v >= VerboseAll
+		return r.v >= VerboseCmd
 	case EventFixtureStart, EventFixtureReady, EventFixtureTeardown:
 		return r.v >= VerboseAll
 	}

@@ -54,6 +54,8 @@ func Until[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 	opts = withDefaults(opts)
 	start := time.Now()
 	deadline := start.Add(opts.Timeout)
+	var timer *time.Timer
+	defer stopTimer(timer)
 
 	var last []F
 	iter := 0
@@ -69,9 +71,7 @@ func Until[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 		if ctx.Err() != nil {
 			return Result[F]{OK: false, Iterations: iter, Elapsed: time.Since(start), LastFailures: last}
 		}
-		select {
-		case <-time.After(opts.Interval):
-		case <-ctx.Done():
+		if !waitForNextPoll(ctx, &timer, sleepInterval(opts.Interval, deadline)) {
 			return Result[F]{OK: false, Iterations: iter, Elapsed: time.Since(start), LastFailures: last}
 		}
 	}
@@ -85,6 +85,8 @@ func While[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 	opts = withDefaults(opts)
 	start := time.Now()
 	deadline := start.Add(opts.Timeout)
+	var timer *time.Timer
+	defer stopTimer(timer)
 
 	iter := 0
 	for {
@@ -99,9 +101,7 @@ func While[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 		if ctx.Err() != nil {
 			return Result[F]{OK: false, Iterations: iter, Elapsed: time.Since(start), LastFailures: nil}
 		}
-		select {
-		case <-time.After(opts.Interval):
-		case <-ctx.Done():
+		if !waitForNextPoll(ctx, &timer, sleepInterval(opts.Interval, deadline)) {
 			return Result[F]{OK: false, Iterations: iter, Elapsed: time.Since(start), LastFailures: nil}
 		}
 	}
@@ -115,4 +115,56 @@ func withDefaults(o Options) Options {
 		o.Interval = DefaultInterval
 	}
 	return o
+}
+
+func sleepInterval(interval time.Duration, deadline time.Time) time.Duration {
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return 0
+	}
+	if remaining < interval {
+		return remaining
+	}
+	return interval
+}
+
+func waitForNextPoll(ctx context.Context, timer **time.Timer, d time.Duration) bool {
+	if d <= 0 {
+		return true
+	}
+	if *timer == nil {
+		*timer = time.NewTimer(d)
+	} else {
+		if !(*timer).Stop() {
+			select {
+			case <-(*timer).C:
+			default:
+			}
+		}
+		(*timer).Reset(d)
+	}
+	select {
+	case <-(*timer).C:
+		return true
+	case <-ctx.Done():
+		if !(*timer).Stop() {
+			select {
+			case <-(*timer).C:
+			default:
+			}
+		}
+		return false
+	}
+}
+
+func stopTimer(timer *time.Timer) {
+	if timer == nil {
+		return
+	}
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
 }

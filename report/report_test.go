@@ -166,6 +166,15 @@ func TestNDJSONReporter_EmitsFixtureLifecycleAtVerboseAll(t *testing.T) {
 	}
 }
 
+func TestNDJSONReporter_EmitsGCXExecAtVerboseCmd(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewNDJSONReporter(&buf, VerboseCmd)
+	r.Emit(Event{Type: EventGCXExec, Cmd: "gcx logs --query x"})
+	if !strings.Contains(buf.String(), `"gcx.exec"`) {
+		t.Fatalf("expected gcx.exec in NDJSON output:\n%s", buf.String())
+	}
+}
+
 func TestSplitSource(t *testing.T) {
 	cases := []struct {
 		in       string
