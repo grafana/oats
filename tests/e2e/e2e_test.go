@@ -408,12 +408,55 @@ func splitFilter(raw string) []string {
 }
 
 func matchesAnyFilter(path string, filters []string) bool {
+	if len(filters) == 0 {
+		return true
+	}
+	matchedInclude := false
+	haveInclude := false
 	for _, f := range filters {
+		if strings.HasPrefix(f, "-") {
+			if strings.Contains(path, strings.TrimPrefix(f, "-")) {
+				return false
+			}
+			continue
+		}
+		haveInclude = true
 		if strings.Contains(path, f) {
-			return true
+			matchedInclude = true
 		}
 	}
-	return false
+	if haveInclude {
+		return matchedInclude
+	}
+	return true
+}
+
+func TestMatchesAnyFilter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		path    string
+		filters []string
+		want    bool
+	}{
+		{name: "no filters matches all", path: "fixture/compose-logs", want: true},
+		{name: "positive include match", path: "fixture/compose-logs", filters: []string{"fixture/compose"}, want: true},
+		{name: "positive include miss", path: "fixture/k3d-smoke", filters: []string{"fixture/compose"}, want: false},
+		{name: "exclude only keeps other cases", path: "fixture/compose-logs", filters: []string{"-fixture/k3d"}, want: true},
+		{name: "exclude only drops match", path: "fixture/k3d-smoke", filters: []string{"-fixture/k3d"}, want: false},
+		{name: "include plus exclude prefers exclude", path: "fixture/k3d-smoke", filters: []string{"fixture/", "-fixture/k3d"}, want: false},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := matchesAnyFilter(tc.path, tc.filters); got != tc.want {
+				t.Fatalf("matchesAnyFilter(%q, %v) = %v, want %v", tc.path, tc.filters, got, tc.want)
+			}
+		})
+	}
 }
 
 func runCase(t *testing.T, root, dir string) {
