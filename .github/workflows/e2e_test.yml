@@ -11,13 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: non-k3d
-            filter: "-fixture/k3d-fail,-fixture/k3d-smoke"
-          - name: k3d-fail
-            filter: "fixture/k3d-fail"
-          - name: k3d-smoke
-            filter: "fixture/k3d-smoke"
+        shard: [non-k3d, k3d-fail, k3d-smoke]
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -27,7 +21,21 @@ jobs:
         with:
           version: v2026.6.14
           sha256: 96ae1ef7b00a6ebbbec23ba1016d6e722f5e904966272f621d15326429e90d53
-      - name: Run ${{ matrix.name }} e2e tests
-        env:
-          OATS_E2E_FILTER: ${{ matrix.filter }}
-        run: mise run e2e-test
+      - name: Run ${{ matrix.shard }} e2e tests
+        run: |
+          case "${{ matrix.shard }}" in
+            non-k3d)
+              export OATS_E2E_FILTER="-fixture/k3d-fail,-fixture/k3d-smoke"
+              ;;
+            k3d-fail)
+              export OATS_E2E_FILTER="fixture/k3d-fail"
+              ;;
+            k3d-smoke)
+              export OATS_E2E_FILTER="fixture/k3d-smoke"
+              ;;
+            *)
+              echo "unknown e2e shard: ${{ matrix.shard }}" >&2
+              exit 1
+              ;;
+          esac
+          mise run e2e-test
