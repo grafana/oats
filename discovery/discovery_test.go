@@ -119,6 +119,30 @@ tags = ["logs"]
 	}
 }
 
+func TestSummary_TopLevelCases(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "oats.toml", `
+cases = ["cases/*.yaml"]
+
+[meta]
+version = 2
+`)
+	writeFile(t, dir, "cases/a.yaml", strings.Replace(validCaseYAML, "%s", "case-a", 1))
+
+	cfg, err := Load(filepath.Join(dir, "oats.toml"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	got := cfg.Summary()
+	if !strings.Contains(got, `suite=cases`) {
+		t.Fatalf("Summary missing synthesized suite label: %q", got)
+	}
+	if !strings.Contains(got, `cases=[cases/*.yaml]`) {
+		t.Fatalf("Summary missing cases glob: %q", got)
+	}
+}
+
 func TestPlanRun_FilterBySuiteName(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats.toml", `

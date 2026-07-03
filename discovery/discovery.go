@@ -380,7 +380,7 @@ func fixtureConfigFromCase(f casefile.FixtureConfig) FixtureConfig {
 // not load any cases — useful for a dry-run before deciding to expand globs.
 func (c *RootConfig) Summary() string {
 	var out string
-	for _, s := range c.Suites {
+	for _, s := range c.effectiveSuites() {
 		label := s.Name
 		if label == "" {
 			label = suiteLabel(s)
