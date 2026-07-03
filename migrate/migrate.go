@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/grafana/oats/casefile"
@@ -197,7 +198,8 @@ func convertSignal(label string, s model.ExpectedSignal) (casefile.AssertionComm
 		if s.NameEquals != "" {
 			entry.Name = strPtr(s.NameEquals)
 		}
-		for k, v := range s.Attributes {
+		for _, k := range sortedMapKeys(s.Attributes) {
+			v := s.Attributes[k]
 			entry.Attributes = append(entry.Attributes, casefile.AttributeMatcher{Key: k, Value: strPtr(v)})
 		}
 		out.Match = append(out.Match, entry)
@@ -207,7 +209,8 @@ func convertSignal(label string, s model.ExpectedSignal) (casefile.AssertionComm
 		if s.NameRegexp != "" {
 			entry.Name = strPtr(s.NameRegexp)
 		}
-		for k, v := range s.AttributeRegexp {
+		for _, k := range sortedMapKeys(s.AttributeRegexp) {
+			v := s.AttributeRegexp[k]
 			if v == ".*" {
 				entry.Attributes = append(entry.Attributes, casefile.AttributeMatcher{Key: k})
 			} else {
@@ -222,6 +225,15 @@ func convertSignal(label string, s model.ExpectedSignal) (casefile.AssertionComm
 		warnings = append(warnings, fmt.Sprintf("%s has no structural checks after migration", label))
 	}
 	return out, warnings
+}
+
+func sortedMapKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func withoutMatch(a casefile.AssertionCommon) casefile.AssertionCommon {

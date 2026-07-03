@@ -22,8 +22,8 @@ func TestConvertDefinition_MapsSignalsToMatchSchema(t *testing.T) {
 				TraceQL: `{ name = "GET /stock" }`,
 				Signal: model.ExpectedSignal{
 					NameEquals:      "GET /stock",
-					Attributes:      map[string]string{"db.system": "h2"},
-					AttributeRegexp: map[string]string{"trace_id": ".*"},
+					Attributes:      map[string]string{"service.name": "shop", "db.system": "h2"},
+					AttributeRegexp: map[string]string{"trace_id": ".*", "span.kind": "server"},
 				},
 			}},
 			Logs: []model.ExpectedLogs{{
@@ -62,7 +62,13 @@ func TestConvertDefinition_MapsSignalsToMatchSchema(t *testing.T) {
 	if len(c.Expected.Traces) != 1 || len(c.Expected.Traces[0].MatchSpans) != 2 {
 		fatalf(t, "expected trace strict+regexp split, got %+v", c.Expected.Traces)
 	}
-	if got := c.Expected.Traces[0].MatchSpans[1].Attributes[0]; got.Key != "trace_id" || got.Value != nil {
+	if got := c.Expected.Traces[0].MatchSpans[0].Attributes; len(got) != 2 || got[0].Key != "db.system" || got[1].Key != "service.name" {
+		fatalf(t, "expected strict attributes sorted, got %+v", got)
+	}
+	if got := c.Expected.Traces[0].MatchSpans[1].Attributes[0]; got.Key != "span.kind" || got.Value == nil || *got.Value != "server" {
+		fatalf(t, "expected regexp attributes sorted, got %+v", c.Expected.Traces[0].MatchSpans[1].Attributes)
+	}
+	if got := c.Expected.Traces[0].MatchSpans[1].Attributes[1]; got.Key != "trace_id" || got.Value != nil {
 		fatalf(t, "expected trace_id .* to map to presence, got %+v", got)
 	}
 	if c.Expected.Logs[0].Count != ">= 1" {
@@ -77,6 +83,19 @@ func TestConvertDefinition_MapsSignalsToMatchSchema(t *testing.T) {
 	joined := strings.Join(warnings, "\n")
 	if strings.Contains(joined, "input requests are not represented") || !strings.Contains(joined, "count max=3 dropped") {
 		fatalf(t, "expected warnings not found:\n%s", joined)
+	}
+}
+
+func TestConvertDefinition_SingleMatrixComposeRequiresFile(t *testing.T) {
+	def := model.TestCaseDefinition{
+		Matrix: []model.Matrix{{
+			Name:          "docker",
+			DockerCompose: &model.DockerCompose{},
+		}},
+	}
+	_, _, err := ConvertDefinition(def, "matrix no files")
+	if err == nil || !strings.Contains(err.Error(), "matrix docker-compose present but no files declared") {
+		fatalf(t, "expected helpful matrix file error, got %v", err)
 	}
 }
 

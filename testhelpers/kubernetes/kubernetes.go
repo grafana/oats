@@ -123,11 +123,11 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 	if err != nil {
 		return err
 	}
-	err = portForward(ports.GrafanaHTTPPort, 3000)
+	err = portForward(ports.EffectiveGrafanaHTTPPort(), 3000)
 	if err != nil {
 		return err
 	}
-	err = portForward(ports.OTLPHTTPPort, 4318)
+	err = portForward(ports.EffectiveOTLPHTTPPort(), 4318)
 	if err != nil {
 		return err
 	}

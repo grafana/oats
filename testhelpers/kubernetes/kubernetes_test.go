@@ -124,3 +124,51 @@ func TestStartWaitsForLgtmDeploymentAvailability(t *testing.T) {
 		"deployment/lgtm",
 	})
 }
+
+func TestStart_FallsBackToLegacyGrafanaAndOTLPPorts(t *testing.T) {
+	t.Parallel()
+
+	model := &Kubernetes{
+		Dir:              "k8s",
+		AppService:       "dice",
+		AppDockerFile:    "Dockerfile",
+		AppDockerContext: ".",
+		AppDockerTag:     "dice:test",
+		AppDockerPort:    18080,
+	}
+	ports := remote.PortsConfig{
+		LokiHttpPort:       3100,
+		PrometheusHTTPPort: 9090,
+		TempoHTTPPort:      3200,
+		PyroscopeHttpPort:  4040,
+	}
+
+	var calls []string
+	run := func(cmd *exec.Cmd, background bool) error {
+		mode := "fg"
+		if background {
+			mode = "bg"
+		}
+		calls = append(calls, mode+": "+strings.Join(cmd.Args, " "))
+		return nil
+	}
+
+	if err := start(model, ports, "legacy-ports", run); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if !contains(calls, "bg: kubectl port-forward service/lgtm 3000:3000") {
+		t.Fatalf("expected Grafana legacy fallback port-forward, got %#v", calls)
+	}
+	if !contains(calls, "bg: kubectl port-forward service/lgtm 4318:4318") {
+		t.Fatalf("expected OTLP legacy fallback port-forward, got %#v", calls)
+	}
+}
+
+func contains(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
+}
