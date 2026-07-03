@@ -15,6 +15,14 @@ spec:
       containers:
         - name: lgtm
           image: docker.io/grafana/otel-lgtm:latest
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 2
+            periodSeconds: 2
+            timeoutSeconds: 1
+            failureThreshold: 30
 ---
 apiVersion: v1
 kind: Service
