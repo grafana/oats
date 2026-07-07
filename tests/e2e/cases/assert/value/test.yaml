@@ -3,10 +3,12 @@ tags: [assert, value, metrics]
 
 run:
   args:
+    # OTLP metric → Prometheus landing latency is 15-35s in otel-lgtm, so allow
+    # a generous ceiling; wait.Until returns as soon as the value appears.
     - --timeout
-    - 30s
+    - 60s
     - --interval
-    - 1s
+    - 2s
 
 expect:
   stdout_contains:

@@ -1,0 +1,16 @@
+oats-schema-version: 3
+name: profile
+fixture:
+  type: remote
+  endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: app
+expected:
+  profiles:
+    # otel-lgtm's Pyroscope self-profiles under service_name="pyroscope", so a
+    # CPU flamegraph is always present without seeding (oats cannot seed
+    # profiles). This exercises the oats -> gcx -> Pyroscope query + flamebearer
+    # assertion path. runtime.mcall is a Go scheduler frame present in every
+    # Go CPU profile.
+    - query: 'process_cpu:samples:count:cpu:nanoseconds{service_name="pyroscope"}'
+      contains: runtime.mcall

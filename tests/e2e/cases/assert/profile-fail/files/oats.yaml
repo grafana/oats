@@ -1,0 +1,13 @@
+oats-schema-version: 3
+name: profile-fail
+fixture:
+  type: remote
+  endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: app
+expected:
+  profiles:
+    # This frame is never present in Pyroscope's self-profile, so the case must
+    # fail — exercising the profiles assertion failure path.
+    - query: 'process_cpu:samples:count:cpu:nanoseconds{service_name="pyroscope"}'
+      contains: this_frame_does_not_exist_oats_xyz
