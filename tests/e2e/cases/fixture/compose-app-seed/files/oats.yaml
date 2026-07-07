@@ -1,0 +1,14 @@
+oats-schema-version: 3
+name: compose-app-seed
+fixture:
+  type: compose
+  template: lgtm
+  compose_file: docker-compose.oats.yml
+seed:
+  type: app
+expected:
+  traces:
+    # telemetrygen emits a root span named "lets-go" under service oats-app-e2e.
+    - traceql: '{ resource.service.name = "oats-app-e2e" }'
+      match_spans:
+        - name: lets-go
