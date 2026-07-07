@@ -1,0 +1,11 @@
+[meta]
+version = 2
+
+[[suite]]
+name = "cache-clear"
+cases = ["case.yaml"]
+fixture = "remote-lgtm"
+
+[fixture.remote-lgtm]
+type = "remote"
+endpoint = "{{REMOTE_OTLP_HTTP}}"

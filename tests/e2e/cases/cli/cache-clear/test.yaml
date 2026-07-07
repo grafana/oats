@@ -1,0 +1,21 @@
+name: cache-clear
+tags: [cli, cache]
+
+# Populate the cache with one green run, then `oats cache clear` it. The run
+# after the clear must re-execute the case instead of skipping it: no SKIP line
+# appears anywhere (the sibling cache-skip case proves a rerun WOULD skip
+# without the clear).
+run:
+  shell: |
+    set -e
+    {{OATS}} --config files/oats.toml --gcx {{GCX}} --gcx-context local --cache-dir "$PWD/cache" --timeout 30s --interval 2s -v
+    {{OATS}} cache clear --cache-dir "$PWD/cache"
+    echo "=== rerun after clear ==="
+    {{OATS}} --config files/oats.toml --gcx {{GCX}} --gcx-context local --cache-dir "$PWD/cache" --timeout 30s --interval 2s -v
+
+expect:
+  stdout_contains:
+    - "cache cleared:"
+    - "PASS"
+  stdout_not_contains:
+    - "SKIP"

@@ -1,0 +1,11 @@
+oats-schema-version: 3
+name: cache-clear-case
+seed:
+  type: inline-otlp
+  logs:
+    - service: cache-clear-case
+      body: cache-clear-seed-line
+expected:
+  logs:
+    - logql: '{service_name="cache-clear-case"}'
+      contains: cache-clear-seed-line
