@@ -32,7 +32,6 @@ type Case struct {
 	OatsSchemaVersion int            `yaml:"oats-schema-version"`
 	Name              string         `yaml:"name"`
 	Tags              []string       `yaml:"tags,omitempty"`
-	Hermetic          *bool          `yaml:"hermetic,omitempty"` // pointer: distinguish unset vs explicit false
 	Interval          time.Duration  `yaml:"interval,omitempty"`
 	Fixture           *FixtureConfig `yaml:"fixture,omitempty"`
 
@@ -436,16 +435,6 @@ func (f FixtureConfig) Validate(path string) error {
 		return fmt.Errorf("%s.type: unknown value %q (expected compose, k3d, or remote)", path, f.Type)
 	}
 	return nil
-}
-
-// IsHermetic reports whether this case promises not to interfere with siblings
-// sharing the same fixture. Default is true; cases opt out by setting
-// `hermetic: false`.
-func (c *Case) IsHermetic() bool {
-	if c.Hermetic == nil {
-		return true
-	}
-	return *c.Hermetic
 }
 
 func validateTraceAssertion(idx int, a TraceAssertion) error {

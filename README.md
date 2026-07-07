@@ -19,10 +19,9 @@ go install github.com/grafana/oats@latest
 
 # Print the CLI version
 bin/oats version
-bin/oats -version
 
 # Print what would run
-bin/oats --config examples/smoke/oats.toml --list
+bin/oats list --config examples/smoke/oats.toml
 
 # Run
 bin/oats --config examples/smoke/oats.toml
@@ -44,22 +43,32 @@ bin/oats --config examples/smoke/oats.toml
 - best-effort migration from legacy OATS yaml via:
 
   ```sh
-  oats --migrate path/to/legacy.yaml
+  oats migrate path/to/legacy.yaml
   ```
 
 ## CLI
 
+Commands:
+
 ```sh
-oats --config oats.toml --list
+oats [flags]                     # run the suites (implicit; same as `oats run`)
+oats run [flags]                 # run the suites
+oats list --config oats.toml     # print the run plan and exit
+oats migrate legacy.yaml         # convert one legacy yaml to the v3 shape
+oats cache clear                 # delete all cached results
+oats version                     # print the version
+```
+
+Run flags (on `oats` / `oats run`):
+
+```sh
 oats --config oats.toml --suite smoke
 oats --config oats.toml --tags traces,logs
 oats --config oats.toml --gcx-context my-lgtm
 oats --config oats.toml --no-cache
 oats --config oats.toml --fail-fast
-oats --format ndjson
-oats -v=1
-oats -v=2
-oats -v=3
+oats --config oats.toml --format ndjson
+oats -v    # -v / -vv / -vvv increase verbosity
 ```
 
 Key flags:
@@ -74,7 +83,7 @@ Key flags:
 - `--fail-fast` — stop scheduling further cases after the first case failure
 - `--gcx`
 - `--gcx-context`
-- `--version`
+- `-v` / `-vv` / `-vvv` — verbosity
 
 ## Config shape
 

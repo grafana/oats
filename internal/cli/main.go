@@ -5,24 +5,27 @@
 //
 // Usage:
 //
-//	oats [flags]
+//	oats [flags]          run the suites (implicit; same as `oats run`)
+//	oats run [flags]      run the suites
+//	oats list             print the run plan and exit
+//	oats migrate <file>   convert one legacy yaml to the v3 shape
+//	oats cache clear      delete all cached results
+//	oats version          print the version
 //
-// Flags (subset):
+// Run flags (subset):
 //
 //	--config       Path to oats.toml (default ./oats.toml)
 //	--gcx          Path to gcx binary (default "gcx" on PATH)
-//	--list         Print the run plan and exit (no execution)
 //	--format       Output format: "text" (default) or "ndjson"
-//	-v=1 / -v=2 / -v=3  Progressive verbosity (passes / commands / lifecycle)
 //	--suite        Comma-separated suite names to include
 //	--tags         Comma-separated tag any-match filter
 //	--fail-fast    Stop scheduling further cases after the first failure
+//	-v / -vv / -vvv  Progressive verbosity (passes / commands / lifecycle)
 package cli
 
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -35,6 +38,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/grafana/oats/cache"
 	"github.com/grafana/oats/discovery"
@@ -97,83 +103,210 @@ func Main() {
 	os.Exit(Run())
 }
 
+// Run builds the cobra command tree and executes it. The exit code is
+// threaded through *exit so a run with failing cases returns 1 without cobra
+// treating it as a usage error.
 func Run() int {
-	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Println(Version)
-		return 0
+	var exit int
+	root := newRootCmd(&exit)
+	if err := root.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		if exit == 0 {
+			exit = 2
+		}
 	}
+	return exit
+}
 
-	configPath := flag.String("config", "oats.toml", "path to oats.toml")
-	gcxBin := flag.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
-	listOnly := flag.Bool("list", false, "print the run plan and exit (no execution)")
-	versionOnly := flag.Bool("version", false, "print the oats version and exit")
-	migratePath := flag.String("migrate", "", "convert one legacy OATS yaml file and print the result to stdout")
-	format := flag.String("format", "text", "output format: text | ndjson")
-	suiteFilterStr := flag.String("suite", "", "comma-separated suite names")
-	tagFilterStr := flag.String("tags", "", "comma-separated tag any-match")
-	timeout := flag.Duration("timeout", 30*time.Second, "per-assertion timeout")
-	interval := flag.Duration("interval", 500*time.Millisecond, "polling interval")
-	absentTimeout := flag.Duration("absent-timeout", 10*time.Second, "absence-check window")
-	seedSettle := flag.Duration("seed-settle", 2*time.Second, "post-seed wait before first assertion")
-	gcxContextOverride := flag.String("gcx-context", "", "override the gcx --context value (otherwise derived from fixture endpoint)")
-	appHost := flag.String("app-host", "localhost", "application host for driving case input requests")
-	appPort := flag.Int("app-port", 8080, "application port for driving case input requests")
-	otlpHTTP := flag.String("otlp-http", "http://localhost:4318", "OTLP/HTTP base URL for inline-otlp seed mode")
-	parallel := flag.Int("parallel", 1, "number of suites to run in parallel when fixture isolation allows it")
-	failFast := flag.Bool("fail-fast", false, "stop scheduling further cases after the first case failure")
-	noCache := flag.Bool("no-cache", false, "disable the skip-when-unchanged cache for this run")
-	cacheDir := flag.String("cache-dir", defaultCacheDir(), "directory for the skip-when-unchanged cache")
-
+func newRootCmd(exit *int) *cobra.Command {
 	var verbose int
-	flag.IntVar(&verbose, "v", 0, "verbosity (0-3)")
-
-	flag.Parse()
-
-	if *versionOnly {
-		fmt.Println(Version)
-		return 0
+	root := &cobra.Command{
+		Use:           "oats",
+		Short:         "OpenTelemetry Acceptance Tests — the gcx-driven runner",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		// Bare `oats [flags]` is an implicit `run` for backward compatibility.
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runAction(cmd, verbose, exit)
+		},
 	}
+	root.PersistentFlags().CountVarP(&verbose, "verbose", "v", "increase verbosity (-v, -vv, -vvv)")
+	addRunFlags(root.Flags())
 
-	if *migratePath != "" {
-		out, warnings, err := migrate.ConvertFile(*migratePath)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return 2
-		}
-		for _, w := range warnings {
-			fmt.Fprintln(os.Stderr, "migrate warning:", w)
-		}
-		fmt.Print(string(out))
-		return 0
+	root.AddCommand(
+		newRunCmd(&verbose, exit),
+		newListCmd(),
+		newMigrateCmd(),
+		newCacheCmd(),
+		newVersionCmd(),
+	)
+	return root
+}
+
+// addRunFlags registers the flags shared by the implicit-run root and the
+// explicit `run` subcommand.
+func addRunFlags(fs *pflag.FlagSet) {
+	fs.String("config", "oats.toml", "path to oats.toml")
+	fs.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
+	fs.String("format", "text", "output format: text | ndjson")
+	fs.String("suite", "", "comma-separated suite names")
+	fs.String("tags", "", "comma-separated tag any-match")
+	fs.Duration("timeout", 30*time.Second, "per-assertion timeout")
+	fs.Duration("interval", 500*time.Millisecond, "polling interval")
+	fs.Duration("absent-timeout", 10*time.Second, "absence-check window")
+	fs.Duration("seed-settle", 2*time.Second, "post-seed wait before first assertion")
+	fs.String("gcx-context", "", "override the gcx --context value (otherwise derived from fixture endpoint)")
+	fs.String("app-host", "localhost", "application host for driving case input requests")
+	fs.Int("app-port", 8080, "application port for driving case input requests")
+	fs.String("otlp-http", "http://localhost:4318", "OTLP/HTTP base URL for inline-otlp seed mode")
+	fs.Int("parallel", 1, "number of suites to run in parallel when fixture isolation allows it")
+	fs.Bool("fail-fast", false, "stop scheduling further cases after the first case failure")
+	fs.Bool("no-cache", false, "disable the skip-when-unchanged cache for this run")
+	fs.String("cache-dir", defaultCacheDir(), "directory for the skip-when-unchanged cache")
+
+	// Deprecated flag aliases, superseded by the `list` and `migrate`
+	// subcommands. Hidden but still honored so existing invocations keep working.
+	fs.Bool("list", false, "deprecated: use `oats list`")
+	fs.String("migrate", "", "deprecated: use `oats migrate <file>`")
+	_ = fs.MarkHidden("list")
+	_ = fs.MarkHidden("migrate")
+}
+
+func newRunCmd(verbose, exit *int) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "run",
+		Short:         "Run the suites in oats.toml (default when no subcommand is given)",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runAction(cmd, *verbose, exit)
+		},
 	}
+	addRunFlags(cmd.Flags())
+	return cmd
+}
 
-	cfg, err := discovery.Load(*configPath)
+func newListCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "list",
+		Short:         "Print the run plan and exit (no execution)",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return listAction(cmd)
+		},
+	}
+	cmd.Flags().String("config", "oats.toml", "path to oats.toml")
+	return cmd
+}
+
+func newMigrateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "migrate <legacy-yaml>",
+		Short:         "Convert one legacy OATS yaml file and print the result to stdout",
+		Args:          cobra.ExactArgs(1),
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return migrateAction(args[0])
+		},
+	}
+	return cmd
+}
+
+func newCacheCmd() *cobra.Command {
+	cacheCmd := &cobra.Command{
+		Use:   "cache",
+		Short: "Manage the skip-when-unchanged cache",
+	}
+	clear := &cobra.Command{
+		Use:           "clear",
+		Short:         "Delete all cached results",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			dir, _ := cmd.Flags().GetString("cache-dir")
+			store, err := cache.New(dir, 0, nil)
+			if err != nil {
+				return err
+			}
+			if err := store.Clear(); err != nil {
+				return err
+			}
+			fmt.Println("cache cleared:", dir)
+			return nil
+		},
+	}
+	clear.Flags().String("cache-dir", defaultCacheDir(), "cache directory to clear")
+	cacheCmd.AddCommand(clear)
+	return cacheCmd
+}
+
+func newVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print the oats version and exit",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			fmt.Println(Version)
+			return nil
+		},
+	}
+}
+
+func listAction(cmd *cobra.Command) error {
+	configPath, _ := cmd.Flags().GetString("config")
+	cfg, err := discovery.Load(configPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 2
+		return err
+	}
+	fmt.Print(cfg.Summary())
+	return nil
+}
+
+func migrateAction(path string) error {
+	out, warnings, err := migrate.ConvertFile(path)
+	if err != nil {
+		return err
+	}
+	for _, w := range warnings {
+		fmt.Fprintln(os.Stderr, "migrate warning:", w)
+	}
+	fmt.Print(string(out))
+	return nil
+}
+
+// runAction is the shared implementation behind the implicit-run root and the
+// explicit `run` subcommand.
+func runAction(cmd *cobra.Command, verbose int, exit *int) error {
+	fs := cmd.Flags()
+
+	// Honor the deprecated --list / --migrate flags.
+	if list, _ := fs.GetBool("list"); list {
+		return listAction(cmd)
+	}
+	if migratePath, _ := fs.GetString("migrate"); migratePath != "" {
+		return migrateAction(migratePath)
+	}
+
+	configPath, _ := fs.GetString("config")
+	cfg, err := discovery.Load(configPath)
+	if err != nil {
+		return err
 	}
 
 	filter := discovery.Filter{
-		Suites: splitCSV(*suiteFilterStr),
-		Tags:   splitCSV(*tagFilterStr),
+		Suites: splitCSV(flagStr(fs, "suite")),
+		Tags:   splitCSV(flagStr(fs, "tags")),
 	}
-
-	if *listOnly {
-		fmt.Print(cfg.Summary())
-		return 0
-	}
-
 	plans, err := cfg.PlanRun(filter)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 2
+		return err
 	}
 	if len(plans) == 0 {
-		fmt.Fprintln(os.Stderr, "no suites matched the filter")
-		return 2
+		return fmt.Errorf("no suites matched the filter")
 	}
 
-	rep := newReporter(os.Stdout, *format, verbosityFromInt(verbose))
+	rep := newReporter(os.Stdout, flagStr(fs, "format"), verbosityFromInt(verbose))
 	defer func() { _ = rep.Close() }()
 	rep = &lockedReporter{inner: rep}
 
@@ -189,24 +322,23 @@ func Run() int {
 
 	runStart := time.Now()
 	opts := runOptions{
-		gcxBin:             *gcxBin,
-		gcxContextOverride: *gcxContextOverride,
-		appHost:            *appHost,
-		appPort:            *appPort,
-		otlpHTTP:           *otlpHTTP,
-		timeout:            *timeout,
-		interval:           *interval,
-		absentTimeout:      *absentTimeout,
-		seedSettle:         *seedSettle,
-		noCache:            *noCache,
-		cacheDir:           *cacheDir,
+		gcxBin:             flagStr(fs, "gcx"),
+		gcxContextOverride: flagStr(fs, "gcx-context"),
+		appHost:            flagStr(fs, "app-host"),
+		appPort:            flagInt(fs, "app-port"),
+		otlpHTTP:           flagStr(fs, "otlp-http"),
+		timeout:            flagDur(fs, "timeout"),
+		interval:           flagDur(fs, "interval"),
+		absentTimeout:      flagDur(fs, "absent-timeout"),
+		seedSettle:         flagDur(fs, "seed-settle"),
+		noCache:            flagBool(fs, "no-cache"),
+		cacheDir:           flagStr(fs, "cache-dir"),
 		cacheTTLDays:       cfg.Cache.TTLDays,
-		failFast:           *failFast,
+		failFast:           flagBool(fs, "fail-fast"),
 	}
-	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, *parallel)
+	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, flagInt(fs, "parallel"))
 	if runErr != nil {
-		fmt.Fprintln(os.Stderr, runErr)
-		return 2
+		return runErr
 	}
 
 	rep.Emit(report.Event{
@@ -217,9 +349,17 @@ func Run() int {
 	})
 
 	if totalFail > 0 || ctx.Err() != nil {
-		return 1
+		*exit = 1
 	}
-	return 0
+	return nil
+}
+
+func flagStr(fs *pflag.FlagSet, name string) string { v, _ := fs.GetString(name); return v }
+func flagInt(fs *pflag.FlagSet, name string) int    { v, _ := fs.GetInt(name); return v }
+func flagBool(fs *pflag.FlagSet, name string) bool  { v, _ := fs.GetBool(name); return v }
+func flagDur(fs *pflag.FlagSet, name string) (d time.Duration) {
+	d, _ = fs.GetDuration(name)
+	return d
 }
 
 func newReporter(w *os.File, format string, v report.Verbosity) report.Reporter {

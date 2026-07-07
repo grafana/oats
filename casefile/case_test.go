@@ -366,15 +366,3 @@ expected:
 		t.Fatalf("expected regexp error, got %v", err)
 	}
 }
-
-func TestIsHermetic(t *testing.T) {
-	c := &Case{}
-	if !c.IsHermetic() {
-		t.Error("default should be hermetic")
-	}
-	f := false
-	c.Hermetic = &f
-	if c.IsHermetic() {
-		t.Error("explicit false should override")
-	}
-}

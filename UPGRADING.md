@@ -20,7 +20,7 @@ The legacy “pass one or more old yaml files directly to `oats`” runner has b
 removed. For one-off help migrating old cases, use:
 
 ```sh
-oats --migrate path/to/legacy.yaml
+oats migrate path/to/legacy.yaml
 ```
 
 ### Case schema: `oats-schema-version: 2` → `3`
@@ -89,14 +89,78 @@ vocabulary keyed off `query`:
 ```
 
 **`compose-logs`.** Still supported natively for `compose` fixtures
-(`expected.compose-logs: [ ... ]`). `--migrate` does **not** convert it (it
+(`expected.compose-logs: [ ... ]`). `oats migrate` does **not** convert it (it
 emits a warning); either keep it as-is on a compose fixture, or replace it with
 a `custom-checks` script that queries the backend directly — see the
 [custom checks](README.md#custom-checks) contract.
 
-**`matrix`.** Not migrated automatically. `--migrate` flattens a single-entry
+**`matrix`.** Not migrated automatically. `oats migrate` flattens a single-entry
 matrix and otherwise emits a hint; multi-entry matrices must be split into
 separate cases by hand.
+
+### Worked example: a full legacy case → v3
+
+A legacy (schema-version 2) case plus its `docker-compose`:
+
+```yaml
+# oats.yaml (v2)
+oats-schema-version: 2
+docker-compose:
+  files:
+    - ./docker-compose.yaml
+input:
+  - path: /rolldice
+expected:
+  traces:
+    - traceql: '{}'
+      spans:
+        - name: "GET /rolldice"
+          attributes:
+            http.request.method: "GET"
+  logs:
+    - logql: '{service_name="rolldice"}'
+      contains: ["rolling the dice"]
+```
+
+Run `oats migrate ./oats.yaml`. Split the result into an `oats.toml` and a v3
+case (the migrator prints both the case yaml and a suggested `[fixture]` block):
+
+```toml
+# oats.toml
+[meta]
+version = 2
+
+[[suite]]
+name    = "rolldice"
+cases   = ["cases/*.yaml"]
+fixture = "compose-lgtm"
+
+[fixture.compose-lgtm]
+type         = "compose"
+compose_file = "docker-compose.yaml"
+```
+
+```yaml
+# cases/rolldice.yaml (v3)
+oats-schema-version: 3
+name: rolldice
+seed:
+  type: app
+input:
+  - path: /rolldice
+expected:
+  traces:
+    - traceql: '{}'
+      match_spans:
+        - match_type: strict
+          name: "GET /rolldice"
+          attributes:
+            - key: http.request.method
+              value: "GET"
+  logs:
+    - logql: '{service_name="rolldice"}'
+      contains: "rolling the dice"
+```
 
 See [README.md](README.md) for the full version-3 assertion reference.
 
