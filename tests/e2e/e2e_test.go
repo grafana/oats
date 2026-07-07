@@ -79,11 +79,13 @@ func TestMain(m *testing.M) {
 	}
 	shared.RepoRoot = root
 	if runtime.GOOS != "windows" {
+		start := time.Now()
 		if err := prepareLocalTools(&shared); err != nil {
 			fmt.Fprintf(os.Stderr, "e2e setup failed: %v\n", err)
 			_ = teardownSharedEnv(&shared)
 			os.Exit(1)
 		}
+		fmt.Fprintf(os.Stderr, "e2e timing: prepareLocalTools finished in %s\n", time.Since(start).Round(time.Millisecond))
 	}
 	code := m.Run()
 	if runtime.GOOS != "windows" {
@@ -162,6 +164,8 @@ func TestCases(t *testing.T) {
 }
 
 func setupSharedEnv(env *sharedEnv) error {
+	start := time.Now()
+	fmt.Fprintln(os.Stderr, "e2e timing: setting up shared remote LGTM env")
 	if _, err := exec.LookPath("docker"); err != nil {
 		return err
 	}
@@ -183,9 +187,11 @@ func setupSharedEnv(env *sharedEnv) error {
 	up := exec.Command("docker", "compose", "-p", env.Project, "-f", env.ComposeFile, "up", "-d")
 	up.Stdout = os.Stdout
 	up.Stderr = os.Stderr
+	upStart := time.Now()
 	if err := up.Run(); err != nil {
 		return fmt.Errorf("start shared lgtm: %w", err)
 	}
+	fmt.Fprintf(os.Stderr, "e2e timing: docker compose up for shared LGTM finished in %s\n", time.Since(upStart).Round(time.Millisecond))
 	grafanaPort, err := dockerComposePort(env.Project, env.ComposeFile, "lgtm", "3000")
 	if err != nil {
 		return err
@@ -199,12 +205,15 @@ func setupSharedEnv(env *sharedEnv) error {
 	if err := writeGCXConfig(env.GCXConfig, env.GrafanaURL); err != nil {
 		return err
 	}
+	waitStart := time.Now()
 	if err := waitForHTTP(env.GrafanaURL+"/api/health", 2*time.Minute); err != nil {
 		return err
 	}
 	if err := waitForHTTP(env.RemoteOTLPHTTP, 2*time.Minute); err != nil {
 		return err
 	}
+	fmt.Fprintf(os.Stderr, "e2e timing: shared LGTM health checks finished in %s\n", time.Since(waitStart).Round(time.Millisecond))
+	fmt.Fprintf(os.Stderr, "e2e timing: shared remote LGTM env ready in %s\n", time.Since(start).Round(time.Millisecond))
 	return nil
 }
 
@@ -218,6 +227,8 @@ func prepareLocalTools(env *sharedEnv) error {
 	}
 	env.TempDir = tmp
 	binDir := filepath.Join(tmp, "bin")
+	start := time.Now()
+	fmt.Fprintf(os.Stderr, "e2e timing: building local tools into %s\n", binDir)
 	build := exec.Command("bash", "-lc", fmt.Sprintf("./scripts/build-local-tools.sh %q", binDir))
 	build.Dir = env.RepoRoot
 	build.Stdout = os.Stdout
@@ -225,6 +236,7 @@ func prepareLocalTools(env *sharedEnv) error {
 	if err := build.Run(); err != nil {
 		return fmt.Errorf("build local tools: %w", err)
 	}
+	fmt.Fprintf(os.Stderr, "e2e timing: build-local-tools finished in %s\n", time.Since(start).Round(time.Millisecond))
 	env.OATS = filepath.Join(binDir, "oats")
 	env.GCX = filepath.Join(binDir, "gcx")
 	env.GCXConfig = filepath.Join(tmp, "gcx.yaml")

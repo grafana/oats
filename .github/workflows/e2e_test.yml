@@ -24,6 +24,7 @@ jobs:
       - name: Run ${{ matrix.shard }} e2e tests
         # OATS_E2E_FILTER is not part of the matrix to avoid that it shows up in the gh action (too long)
         run: |
+          start_ts="$(date +%s)"
           case "${{ matrix.shard }}" in
             core)
               export OATS_E2E_FILTER="-fixture/"
@@ -45,4 +46,7 @@ jobs:
               exit 1
               ;;
           esac
+          echo "e2e timing: shard=${{ matrix.shard }} filter=${OATS_E2E_FILTER}"
           mise run e2e-test
+          end_ts="$(date +%s)"
+          echo "e2e timing: shard=${{ matrix.shard }} total=$((end_ts-start_ts))s"
