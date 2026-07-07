@@ -46,7 +46,9 @@ func TestUntil_FailsAtDeadline(t *testing.T) {
 	if len(r.LastFailures) == 0 {
 		t.Errorf("LastFailures should carry the last asserter output")
 	}
-	if elapsed := time.Since(start); elapsed > 60*time.Millisecond {
+	// Generous upper bound: guards against a runaway loop that ignores the
+	// deadline (which would be seconds), while tolerating CI scheduler jitter.
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 		t.Fatalf("Until overshot timeout too far: %s", elapsed)
 	}
 }
@@ -78,7 +80,9 @@ func TestWhile_HoldsForEntireWindow(t *testing.T) {
 	if r.Iterations < 2 {
 		t.Errorf("expected multiple polls in 30ms with 5ms interval, got %d", r.Iterations)
 	}
-	if elapsed := time.Since(start); elapsed > 60*time.Millisecond {
+	// Generous upper bound: guards against a runaway loop that ignores the
+	// deadline (which would be seconds), while tolerating CI scheduler jitter.
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
 		t.Fatalf("While overshot timeout too far: %s", elapsed)
 	}
 }

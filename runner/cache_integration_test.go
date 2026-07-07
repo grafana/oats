@@ -47,7 +47,7 @@ func TestCache_HitShortCircuits(t *testing.T) {
 	r := New(exec, rep, Endpoint{GCXContext: "test"}, Options{
 		Timeout:         100 * time.Millisecond,
 		Interval:        5 * time.Millisecond,
-		SeedSettleDelay: 1,
+		SeedSettleDelay: time.Nanosecond,
 	})
 
 	store, _ := cache.New(t.TempDir(), 0, nil)
@@ -70,7 +70,7 @@ func TestCache_HitShortCircuits(t *testing.T) {
 	r2 := New(exec, rep, Endpoint{GCXContext: "test"}, Options{
 		Timeout:         100 * time.Millisecond,
 		Interval:        5 * time.Millisecond,
-		SeedSettleDelay: 1,
+		SeedSettleDelay: time.Nanosecond,
 	}).WithCache(store, CacheContext{GCXVersion: "v1", OatsVersion: "v2"})
 
 	rep.Emit(report.Event{Type: report.EventRunStart})
@@ -88,7 +88,7 @@ func TestCache_HitShortCircuits(t *testing.T) {
 	}
 }
 
-func TestCache_FailureEvictsStaleEntry(t *testing.T) {
+func TestCache_FailingRunLeavesNoGreenRecord(t *testing.T) {
 	c, _ := cachedRunnerCase(t)
 	cacheDir := t.TempDir()
 	store, _ := cache.New(cacheDir, 0, nil)
@@ -103,14 +103,17 @@ func TestCache_FailureEvictsStaleEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Now the case fails. The runner must evict so the next run is honest.
+	// After the cached (green) run, invalidate the entry and rerun with output
+	// that fails the assertion. This asserts the failing run itself never
+	// records a green entry (the manual Evict below sets up the cache miss; it
+	// does not test runner-driven eviction).
 	exec := &stubExec{stdout: "wrong content"}
 	var buf bytes.Buffer
 	rep := report.NewTextReporter(&buf, report.VerboseDefault)
 	r := New(exec, rep, Endpoint{GCXContext: "test"}, Options{
 		Timeout:         30 * time.Millisecond,
 		Interval:        5 * time.Millisecond,
-		SeedSettleDelay: 1,
+		SeedSettleDelay: time.Nanosecond,
 	}).WithCache(store, CacheContext{GCXVersion: "v1", OatsVersion: "v2"})
 
 	rep.Emit(report.Event{Type: report.EventRunStart})

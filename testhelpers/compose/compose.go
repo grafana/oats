@@ -95,14 +95,15 @@ func (c *Compose) runDocker(cc command) error {
 			return fmt.Errorf("failed to open docker stdout pipe: %w", err)
 		}
 		cmd.Stderr = cmd.Stdout
+		// Start before spawning the consumer: if Start fails the write end of
+		// the pipe never opens, so a consumer started earlier would block on
+		// the read forever and leak.
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("failed to start docker command: %w", err)
+		}
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go cc.logConsumer(stdout, &wg)
-
-		err = cmd.Start()
-		if err != nil {
-			return fmt.Errorf("failed to start docker command: %w", err)
-		}
 		wg.Wait()
 		if err := cmd.Wait(); err != nil {
 			return fmt.Errorf("failed to run docker command: %w", err)

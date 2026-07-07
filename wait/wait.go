@@ -37,8 +37,9 @@ type Options struct {
 }
 
 // Result is what Until and While return. Iterations counts how many poll
-// attempts ran; LastFailures is the most recent failure set observed (nil on
-// success, populated on failure).
+// attempts ran; LastFailures is the most recent failure set observed — nil on
+// success, and also nil when the run is cancelled or stopped early before
+// observing a failure; populated when an assertion actually failed.
 type Result[F any] struct {
 	OK           bool
 	Iterations   int
@@ -54,7 +55,7 @@ func Until[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 	start := time.Now()
 	deadline := start.Add(opts.Timeout)
 	var timer *time.Timer
-	defer stopTimer(timer)
+	defer func() { stopTimer(timer) }()
 
 	var last []F
 	iter := 0
@@ -85,7 +86,7 @@ func While[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 	start := time.Now()
 	deadline := start.Add(opts.Timeout)
 	var timer *time.Timer
-	defer stopTimer(timer)
+	defer func() { stopTimer(timer) }()
 
 	iter := 0
 	for {

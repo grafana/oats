@@ -13,7 +13,7 @@
 //	--gcx          Path to gcx binary (default "gcx" on PATH)
 //	--list         Print the run plan and exit (no execution)
 //	--format       Output format: "text" (default) or "ndjson"
-//	-v / -v=2 / -v=3  Progressive verbosity (passes / commands / lifecycle)
+//	-v=1 / -v=2 / -v=3  Progressive verbosity (passes / commands / lifecycle)
 //	--suite        Comma-separated suite names to include
 //	--tags         Comma-separated tag any-match filter
 package cli
@@ -547,9 +547,15 @@ func startFixture(ctx context.Context, plan discovery.Plan) (suiteFixture, fixtu
 			ComposeFiles:   composeFiles,
 			ComposeProject: project,
 		}
-		if cfg, cfgErr := writeLocalGCXConfig(rt.GrafanaURL); cfgErr == nil {
-			rt.GCXConfig = cfg
+		cfg, cfgErr := writeLocalGCXConfig(rt.GrafanaURL)
+		if cfgErr != nil {
+			if cleanup != nil {
+				_ = cleanup()
+			}
+			return nil, fixtureRuntime{}, fmt.Errorf("write local gcx config: %w", cfgErr)
 		}
+		rt.GCXConfig = cfg
+		cleanup = chainCleanup(func() error { return removeIfExists(cfg) }, cleanup)
 		rt.CustomCheckEnv = composeCheckEnv(plan, rt)
 		rt.ParallelSafe, rt.ParallelDisabled = planSupportsParallel(plan)
 		return composeFixture{suite: suite, cleanup: cleanup}, rt, nil
@@ -570,10 +576,13 @@ func startFixture(ctx context.Context, plan discovery.Plan) (suiteFixture, fixtu
 			ParallelSafe:     false,
 			ParallelDisabled: "k3d fixtures currently use shared clusters and kubectl port-forwards",
 		}
-		if cfg, cfgErr := writeLocalGCXConfig(rt.GrafanaURL); cfgErr == nil {
-			rt.GCXConfig = cfg
+		cfg, cfgErr := writeLocalGCXConfig(rt.GrafanaURL)
+		if cfgErr != nil {
+			_ = ep.Stop(context.Background())
+			return nil, fixtureRuntime{}, fmt.Errorf("write local gcx config: %w", cfgErr)
 		}
-		return endpointFixture{ep: ep}, rt, nil
+		rt.GCXConfig = cfg
+		return endpointFixture{ep: ep, cleanup: func() error { return removeIfExists(cfg) }}, rt, nil
 	default:
 		return nil, fixtureRuntime{}, fmt.Errorf("fixture type %q is not supported in oats", plan.Fixture.Type)
 	}
@@ -657,11 +666,18 @@ func closeFixture(rep report.Reporter, plan discovery.Plan, fix suiteFixture) er
 }
 
 type endpointFixture struct {
-	ep *remote.Endpoint
+	ep      *remote.Endpoint
+	cleanup func() error
 }
 
 func (e endpointFixture) Close() error {
-	return e.ep.Stop(context.Background())
+	err := e.ep.Stop(context.Background())
+	if e.cleanup != nil {
+		if cleanupErr := e.cleanup(); cleanupErr != nil && err == nil {
+			err = cleanupErr
+		}
+	}
+	return err
 }
 
 type composeFixture struct {
@@ -712,6 +728,32 @@ func writeBuiltinLGTMCompose(sourceDir string) (string, error) {
 }
 
 func grafanaURL() string { return "http://localhost:3000" }
+
+// removeIfExists deletes path, ignoring a not-exist error so cleanup is
+// idempotent.
+func removeIfExists(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// chainCleanup returns a cleanup that runs first then second, returning the
+// first non-nil error. Either argument may be nil.
+func chainCleanup(first, second func() error) func() error {
+	return func() error {
+		var err error
+		if first != nil {
+			err = first()
+		}
+		if second != nil {
+			if e := second(); e != nil && err == nil {
+				err = e
+			}
+		}
+		return err
+	}
+}
 
 func writeLocalGCXConfig(grafanaURL string) (string, error) {
 	cfg := fmt.Sprintf(`current-context: local

@@ -63,9 +63,10 @@ type GCX struct {
 	Timeout time.Duration
 }
 
-// Execute runs gcx with args. The --context flag is prepended automatically
-// when GCX.Context is set, so callers pass the verb and its flags (e.g.
-// "traces", "search", "--since=10m", "{ ... }").
+// Execute runs gcx with args. When set, GCX.Config and GCX.Context are
+// prepended automatically (as "--config <cfg> --context <ctx>"), so callers
+// pass just the verb and its flags (e.g. "traces", "search", "--since=10m",
+// "{ ... }").
 func (g *GCX) Execute(ctx context.Context, args ...string) (*Result, error) {
 	if g.Binary == "" {
 		return nil, fmt.Errorf("engine: gcx binary path is empty")

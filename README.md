@@ -56,7 +56,7 @@ oats --config oats.toml --tags traces,logs
 oats --config oats.toml --gcx-context my-lgtm
 oats --config oats.toml --no-cache
 oats --format ndjson
-oats -v
+oats -v=1
 oats -v=2
 oats -v=3
 ```

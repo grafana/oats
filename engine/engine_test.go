@@ -16,8 +16,8 @@ func TestGCX_ExecuteCapturesStdout(t *testing.T) {
 	if r.ExitCode != 0 {
 		t.Errorf("ExitCode: got %d, want 0", r.ExitCode)
 	}
-	if strings.TrimSpace(r.Stdout) != "hello" {
-		t.Errorf("Stdout: got %q, want %q", r.Stdout, "hello\n")
+	if got := strings.TrimSpace(r.Stdout); got != "hello" {
+		t.Errorf("Stdout: got %q, want %q", got, "hello")
 	}
 }
 
@@ -27,8 +27,8 @@ func TestGCX_ExecuteCapturesStderr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if strings.TrimSpace(r.Stderr) != "oops" {
-		t.Errorf("Stderr: got %q, want %q", r.Stderr, "oops\n")
+	if got := strings.TrimSpace(r.Stderr); got != "oops" {
+		t.Errorf("Stderr: got %q, want %q", got, "oops")
 	}
 }
 
