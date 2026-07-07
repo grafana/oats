@@ -12,4 +12,5 @@ expected:
       match_spans:
         - name: seed-operation
           attributes:
-            service.name: gcx-e2e-seed
+            - key: service.name
+              value: gcx-e2e-seed

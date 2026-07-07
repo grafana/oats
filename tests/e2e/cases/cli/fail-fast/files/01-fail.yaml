@@ -1,0 +1,13 @@
+oats-schema-version: 3
+name: ff-first-fails
+seed:
+  type: inline-otlp
+  logs:
+    - service: ff-first-fails
+      body: ff-line
+expected:
+  logs:
+    # This token is never logged, so the first case fails and --fail-fast
+    # must stop the run before the second case executes.
+    - logql: '{service_name="ff-first-fails"}'
+      contains: definitely-absent-token

@@ -1,0 +1,11 @@
+[meta]
+version = 2
+
+[[suite]]
+name = "failfast"
+cases = ["01-fail.yaml", "02-pass.yaml"]
+fixture = "remote-lgtm"
+
+[fixture.remote-lgtm]
+type = "remote"
+endpoint = "{{REMOTE_OTLP_HTTP}}"

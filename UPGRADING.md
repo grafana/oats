@@ -23,6 +23,83 @@ removed. For one-off help migrating old cases, use:
 oats --migrate path/to/legacy.yaml
 ```
 
+### Case schema: `oats-schema-version: 2` → `3`
+
+The case-yaml assertion shape changed with the gcx-driven runner. Bump the tag
+to `3` and update assertions. The `0.5.0` / `0.6.0` notes further down describe
+the **version-2** shape (`equals`, `attribute-regexp`, `flamebearers`,
+`regexp`); the mappings below take you from that shape to version 3.
+
+**Logs — regex.** Version 2's `regexp:` becomes `regex:` (scalar or list).
+`contains` / `not_contains` are also first-class again:
+
+```diff
+ logs:
+   - logql: '{job="app"}'
+-    regexp: "error"
++    regex: "error"
+```
+
+**Traces — span matching.** Version 2's flat `equals` / `attributes` /
+`attribute-regexp` become structured `match_spans` entries with an explicit
+`match_type` and a list-of-`{key, value}` attribute form:
+
+```diff
+ traces:
+   - traceql: '{}'
+-    equals: "GET /api"
+-    attributes:
+-      http.method: "GET"
+-    attribute-regexp:
+-      http.route: "/api/.*"
++    match_spans:
++      - match_type: strict
++        name: "GET /api"
++        attributes:
++          - key: http.method
++            value: "GET"
++      - match_type: regexp
++        attributes:
++          - key: http.route
++            value: "/api/.*"
+```
+
+A span name matched by regex:
+
+```diff
+ traces:
+   - traceql: '{}'
+-    regexp: "GET /api.*"
++    match_spans:
++      - match_type: regexp
++        name: "GET /api.*"
+```
+
+**Profiles.** Version 2's `flamebearers:` block becomes the shared assertion
+vocabulary keyed off `query`:
+
+```diff
+ profiles:
+   - query: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds'
+-    flamebearers:
+-      equals: "my-function"
++    match:
++      - match_type: strict
++        name: "my-function"
+```
+
+**`compose-logs`.** Still supported natively for `compose` fixtures
+(`expected.compose-logs: [ ... ]`). `--migrate` does **not** convert it (it
+emits a warning); either keep it as-is on a compose fixture, or replace it with
+a `custom-checks` script that queries the backend directly — see the
+[custom checks](README.md#custom-checks) contract.
+
+**`matrix`.** Not migrated automatically. `--migrate` flattens a single-entry
+matrix and otherwise emits a hint; multi-entry matrices must be split into
+separate cases by hand.
+
+See [README.md](README.md) for the full version-3 assertion reference.
+
 ## 0.6.0
 
 ⚠️ Breaking Changes - Migration Required: File Version Tag

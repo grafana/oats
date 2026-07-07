@@ -16,6 +16,7 @@
 //	-v=1 / -v=2 / -v=3  Progressive verbosity (passes / commands / lifecycle)
 //	--suite        Comma-separated suite names to include
 //	--tags         Comma-separated tag any-match filter
+//	--fail-fast    Stop scheduling further cases after the first failure
 package cli
 
 import (
@@ -119,6 +120,7 @@ func Run() int {
 	appPort := flag.Int("app-port", 8080, "application port for driving case input requests")
 	otlpHTTP := flag.String("otlp-http", "http://localhost:4318", "OTLP/HTTP base URL for inline-otlp seed mode")
 	parallel := flag.Int("parallel", 1, "number of suites to run in parallel when fixture isolation allows it")
+	failFast := flag.Bool("fail-fast", false, "stop scheduling further cases after the first case failure")
 	noCache := flag.Bool("no-cache", false, "disable the skip-when-unchanged cache for this run")
 	cacheDir := flag.String("cache-dir", defaultCacheDir(), "directory for the skip-when-unchanged cache")
 
@@ -199,6 +201,7 @@ func Run() int {
 		noCache:            *noCache,
 		cacheDir:           *cacheDir,
 		cacheTTLDays:       cfg.Cache.TTLDays,
+		failFast:           *failFast,
 	}
 	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, *parallel)
 	if runErr != nil {
@@ -307,6 +310,7 @@ type runOptions struct {
 	noCache            bool
 	cacheDir           string
 	cacheTTLDays       int
+	failFast           bool
 }
 
 func runPlans(ctx context.Context, rep report.Reporter, plans []discovery.Plan, opts runOptions, parallel int) (int, int, error) {
@@ -330,6 +334,9 @@ func runPlans(ctx context.Context, rep report.Reporter, plans []discovery.Plan, 
 	if err != nil {
 		return totalPass, totalFail, err
 	}
+	if opts.failFast && totalFail > 0 {
+		return totalPass, totalFail, nil
+	}
 
 	pass, fail, err := runPlansSequential(ctx, rep, serialPlans, opts)
 	return totalPass + pass, totalFail + fail, err
@@ -343,6 +350,9 @@ func runPlansSequential(ctx context.Context, rep report.Reporter, plans []discov
 		totalFail += res.fail
 		if res.err != nil {
 			return totalPass, totalFail, res.err
+		}
+		if opts.failFast && totalFail > 0 {
+			break
 		}
 	}
 	return totalPass, totalFail, nil
@@ -369,7 +379,7 @@ func runPlansParallel(parent context.Context, rep report.Reporter, plans []disco
 			defer wg.Done()
 			for plan := range workCh {
 				res := runPlan(ctx, rep, plan, opts)
-				if res.err != nil {
+				if res.err != nil || (opts.failFast && res.fail > 0) {
 					cancel()
 				}
 				resultCh <- res
@@ -465,6 +475,9 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 			suitePass++
 		} else {
 			suiteFail++
+			if opts.failFast {
+				break
+			}
 		}
 	}
 

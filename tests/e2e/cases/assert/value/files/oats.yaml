@@ -1,0 +1,15 @@
+oats-schema-version: 3
+name: value
+fixture:
+  type: remote
+  endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  metrics:
+    - service: {{CASE_NAME}}
+      name: oats_value_ok
+      value: 42
+expected:
+  metrics:
+    - promql: 'oats_value_ok_total{service_name="{{CASE_NAME}}"}'
+      value: '>= 1'

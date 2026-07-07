@@ -1,0 +1,16 @@
+oats-schema-version: 3
+name: value-fail
+fixture:
+  type: remote
+  endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  metrics:
+    - service: {{CASE_NAME}}
+      name: oats_value_bad
+      value: 42
+expected:
+  metrics:
+    # Seeded value is 42, so "> 100" never holds — the case must fail.
+    - promql: 'oats_value_bad_total{service_name="{{CASE_NAME}}"}'
+      value: '> 100'

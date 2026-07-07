@@ -1,0 +1,13 @@
+name: value
+tags: [assert, value, metrics]
+
+run:
+  args:
+    - --timeout
+    - 30s
+    - --interval
+    - 1s
+
+expect:
+  stdout_contains:
+    - PASS 1/1
