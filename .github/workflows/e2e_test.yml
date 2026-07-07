@@ -46,6 +46,8 @@ jobs:
         with:
           name: e2e-tools
           path: .e2e-tools/bin
+      - name: Restore e2e tool permissions
+        run: chmod +x .e2e-tools/bin/oats .e2e-tools/bin/gcx
       - name: Run ${{ matrix.shard }} e2e tests
         # OATS_E2E_FILTER is not part of the matrix to avoid that it shows up in the gh action (too long)
         run: |
