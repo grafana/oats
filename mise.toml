@@ -38,7 +38,7 @@ run = 'GOFLAGS=-buildvcs=false go test $(GOFLAGS=-buildvcs=false go list ./... |
 
 [tasks.e2e-test]
 description = "Run e2e case suite"
-run = "go test -buildvcs=false ./tests/e2e -run TestCases"
+run = "go test -v -buildvcs=false ./tests/e2e -run TestCases"
 
 [tasks.build]
 description = "Build the project"
