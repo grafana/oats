@@ -268,9 +268,12 @@ func findFreePort() (int, error) {
 }
 
 func waitForHTTP(url string, timeout time.Duration) error {
+	// Bound each probe so a target that accepts TCP but never responds can't
+	// block a single GET past the overall deadline.
+	client := &http.Client{Timeout: 10 * time.Second}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		resp, err := http.Get(url) //nolint:gosec
+		resp, err := client.Get(url) //nolint:gosec
 		if err == nil {
 			_ = resp.Body.Close()
 			if resp.StatusCode >= 200 && resp.StatusCode < 500 {

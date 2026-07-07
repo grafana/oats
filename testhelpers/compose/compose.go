@@ -99,6 +99,7 @@ func (c *Compose) runDocker(cc command) error {
 		// the pipe never opens, so a consumer started earlier would block on
 		// the read forever and leak.
 		if err := cmd.Start(); err != nil {
+			_ = stdout.Close()
 			return fmt.Errorf("failed to start docker command: %w", err)
 		}
 		wg := sync.WaitGroup{}
