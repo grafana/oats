@@ -10,7 +10,10 @@ expected:
     # otel-lgtm's Pyroscope self-profiles under service_name="pyroscope", so a
     # CPU flamegraph is always present without seeding (oats cannot seed
     # profiles). This exercises the oats -> gcx -> Pyroscope query + flamebearer
-    # assertion path. runtime.mcall is a Go scheduler frame present in every
-    # Go CPU profile.
+    # assertion path. We assert on the "runtime." prefix rather than a single
+    # frame: any non-empty Go CPU profile contains many runtime.* frames (GC,
+    # scheduler, netpoll, ...), whereas a specific frame like runtime.mcall is
+    # only sampled when goroutines happen to be scheduled mid-sample and flakes
+    # under CI load.
     - query: 'process_cpu:samples:count:cpu:nanoseconds{service_name="pyroscope"}'
-      contains: runtime.mcall
+      contains: runtime.
