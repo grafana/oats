@@ -201,7 +201,7 @@ func (r *Runner) RunCase(ctx context.Context, c *casefile.Case) bool {
 	}
 
 	// Seed.
-	if err := r.seedCase(c); err != nil {
+	if err := r.seedCase(ctx, c); err != nil {
 		r.failCase(c, "seed: "+err.Error(), "")
 		r.reporter.Emit(report.Event{
 			Type:       report.EventCaseFail,
@@ -437,7 +437,7 @@ func trimOutput(s string) string {
 	return s
 }
 
-func (r *Runner) seedCase(c *casefile.Case) error {
+func (r *Runner) seedCase(ctx context.Context, c *casefile.Case) error {
 	switch c.Seed.Type {
 	case "app":
 		// External fixture is responsible for booting the app. Runner
@@ -451,7 +451,7 @@ func (r *Runner) seedCase(c *casefile.Case) error {
 		if err != nil {
 			return err
 		}
-		return r.seeder.Send(payload)
+		return r.seeder.Send(ctx, payload)
 	}
 	return fmt.Errorf("unknown seed type %q", c.Seed.Type)
 }

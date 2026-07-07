@@ -326,10 +326,10 @@ expected:
 	}
 }
 
-func TestValidate_RejectsPresentFalse(t *testing.T) {
+func TestValidate_RejectsDuplicateAttributeKeys(t *testing.T) {
 	_, err := Parse([]byte(`
 oats-schema-version: 3
-name: bad present
+name: duplicate attribute keys
 seed:
   type: app
   compose: x.yml

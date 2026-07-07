@@ -15,6 +15,7 @@ package seed
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -79,30 +80,32 @@ func (s *Sender) httpClient() *http.Client {
 // Send pushes all signals declared in p. Returns the first error encountered,
 // but processes signals in a fixed order (traces, logs, metrics) so that a
 // partial send leaves the backend in a predictable state for assertions.
-func (s *Sender) Send(p Payload) error {
+// Cancelling ctx aborts in-flight and remaining requests so seeding does not
+// outlive a cancelled run.
+func (s *Sender) Send(ctx context.Context, p Payload) error {
 	if s.OTLPEndpoint == "" {
 		return fmt.Errorf("seed: OTLPEndpoint is empty")
 	}
 	now := time.Now()
 	for _, t := range p.Traces {
-		if err := s.sendTrace(t, now); err != nil {
+		if err := s.sendTrace(ctx, t, now); err != nil {
 			return fmt.Errorf("seed traces: %w", err)
 		}
 	}
 	for _, l := range p.Logs {
-		if err := s.sendLog(l, now); err != nil {
+		if err := s.sendLog(ctx, l, now); err != nil {
 			return fmt.Errorf("seed logs: %w", err)
 		}
 	}
 	for _, m := range p.Metrics {
-		if err := s.sendMetric(m, now); err != nil {
+		if err := s.sendMetric(ctx, m, now); err != nil {
 			return fmt.Errorf("seed metrics: %w", err)
 		}
 	}
 	return nil
 }
 
-func (s *Sender) sendTrace(t Trace, now time.Time) error {
+func (s *Sender) sendTrace(ctx context.Context, t Trace, now time.Time) error {
 	dur := t.Span.Duration
 	if dur == 0 {
 		dur = 200 * time.Millisecond
@@ -132,10 +135,10 @@ func (s *Sender) sendTrace(t Trace, now time.Time) error {
     }]
   }]
 }`, t.Service, mustRandHex(16), mustRandHex(8), t.Span.Name, kind, start, end)
-	return s.post("/v1/traces", body)
+	return s.post(ctx, "/v1/traces", body)
 }
 
-func (s *Sender) sendLog(l Log, now time.Time) error {
+func (s *Sender) sendLog(ctx context.Context, l Log, now time.Time) error {
 	sev := l.SeverityNumber
 	if sev == 0 {
 		sev = 9
@@ -160,10 +163,10 @@ func (s *Sender) sendLog(l Log, now time.Time) error {
     }]
   }]
 }`, l.Service, now.UnixNano(), sev, sevText, l.Body)
-	return s.post("/v1/logs", body)
+	return s.post(ctx, "/v1/logs", body)
 }
 
-func (s *Sender) sendMetric(m Metric, now time.Time) error {
+func (s *Sender) sendMetric(ctx context.Context, m Metric, now time.Time) error {
 	end := now.UnixNano()
 	start := now.Add(-time.Second).UnixNano()
 	body := fmt.Sprintf(`{
@@ -188,11 +191,16 @@ func (s *Sender) sendMetric(m Metric, now time.Time) error {
     }]
   }]
 }`, m.Service, m.Name, start, end, m.Value)
-	return s.post("/v1/metrics", body)
+	return s.post(ctx, "/v1/metrics", body)
 }
 
-func (s *Sender) post(path, body string) error {
-	resp, err := s.httpClient().Post(s.OTLPEndpoint+path, "application/json", bytes.NewBufferString(body))
+func (s *Sender) post(ctx context.Context, path, body string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.OTLPEndpoint+path, bytes.NewBufferString(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := s.httpClient().Do(req)
 	if err != nil {
 		return err
 	}

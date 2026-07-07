@@ -38,8 +38,10 @@ type Options struct {
 
 // Result is what Until and While return. Iterations counts how many poll
 // attempts ran; LastFailures is the most recent failure set observed — nil on
-// success, and also nil when the run is cancelled or stopped early before
-// observing a failure; populated when an assertion actually failed.
+// success and when no asserter call ever reported failures (including a run
+// cancelled or stopped before any failure was observed). If any call did
+// report failures, those are returned even when the run was ultimately
+// cancelled or timed out.
 type Result[F any] struct {
 	OK           bool
 	Iterations   int

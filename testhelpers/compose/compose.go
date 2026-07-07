@@ -115,6 +115,13 @@ func (c *Compose) runDocker(cc command) error {
 			return fmt.Errorf("failed to open docker stdout pipe: %w", err)
 		}
 		cmd.Stderr = cmd.Stdout
+		// Start the command before spawning the reader: if Start fails the
+		// write end of the pipe never opens, and a reader started earlier would
+		// block forever on ReadString and leak.
+		if err := cmd.Start(); err != nil {
+			_ = stdout.Close()
+			return fmt.Errorf("failed to start docker command: %w", err)
+		}
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
@@ -127,10 +134,6 @@ func (c *Compose) runDocker(cc command) error {
 			}
 		}()
 
-		err = cmd.Start()
-		if err != nil {
-			return fmt.Errorf("failed to start docker command: %w", err)
-		}
 		err = cmd.Wait()
 		wg.Wait()
 		if err != nil {

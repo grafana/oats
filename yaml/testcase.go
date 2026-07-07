@@ -37,6 +37,10 @@ func ReadTestCases(input []string, evaluateIgnoreFile bool) ([]model.TestCase, e
 // LoadTestCaseDefinition reads one legacy OATS test case definition file,
 // resolving includes exactly like the v1 runner does. Template files return
 // (nil, nil), matching readTestCaseDefinition's semantics.
+//
+// It is exported solely so the `migrate` package can reuse legacy parsing; it
+// is not part of the supported OATS Go API and may change or move without
+// notice.
 func LoadTestCaseDefinition(path string) (*model.TestCaseDefinition, error) {
 	return readTestCaseDefinition(path, false)
 }
@@ -147,7 +151,10 @@ func readTestCase(testBase, filePath string) (*model.TestCase, error) {
 }
 
 func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCaseDefinition, error) {
-	filePath = absolutePath(filePath)
+	filePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve path %s: %w", filePath, err)
+	}
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)

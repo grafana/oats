@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -34,7 +35,7 @@ func TestSender_SendTracesLogsMetrics(t *testing.T) {
 	defer srv.Close()
 
 	s := &Sender{OTLPEndpoint: srv.URL}
-	err := s.Send(Payload{
+	err := s.Send(context.Background(), Payload{
 		Traces: []Trace{{
 			Service: "svc-a",
 			Span:    SpanFields{Name: "do-thing"},
@@ -79,7 +80,7 @@ func TestSender_SendTracesLogsMetrics(t *testing.T) {
 
 func TestSender_EmptyEndpointFailsLoudly(t *testing.T) {
 	s := &Sender{}
-	if err := s.Send(Payload{}); err == nil {
+	if err := s.Send(context.Background(), Payload{}); err == nil {
 		t.Fatal("expected an error for empty endpoint")
 	}
 }
@@ -92,7 +93,7 @@ func TestSender_BackendErrorPropagates(t *testing.T) {
 	defer srv.Close()
 
 	s := &Sender{OTLPEndpoint: srv.URL}
-	err := s.Send(Payload{Traces: []Trace{{Service: "x", Span: SpanFields{Name: "y"}}}})
+	err := s.Send(context.Background(), Payload{Traces: []Trace{{Service: "x", Span: SpanFields{Name: "y"}}}})
 	if err == nil {
 		t.Fatal("expected an error from 400 response")
 	}
@@ -107,7 +108,7 @@ func TestSender_SpanDefaultsApply(t *testing.T) {
 
 	before := time.Now()
 	s := &Sender{OTLPEndpoint: srv.URL}
-	err := s.Send(Payload{Traces: []Trace{{
+	err := s.Send(context.Background(), Payload{Traces: []Trace{{
 		Service: "svc",
 		Span:    SpanFields{Name: "n"},
 	}}})
