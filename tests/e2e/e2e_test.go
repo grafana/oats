@@ -227,6 +227,19 @@ func prepareLocalTools(env *sharedEnv) error {
 	}
 	env.TempDir = tmp
 	binDir := filepath.Join(tmp, "bin")
+	if prebuiltDir := os.Getenv("OATS_E2E_BIN_DIR"); prebuiltDir != "" {
+		oats := filepath.Join(prebuiltDir, "oats")
+		gcx := filepath.Join(prebuiltDir, "gcx")
+		if _, err := os.Stat(oats); err == nil {
+			if _, err := os.Stat(gcx); err == nil {
+				fmt.Fprintf(os.Stderr, "e2e timing: reusing prebuilt tools from %s\n", prebuiltDir)
+				env.OATS = oats
+				env.GCX = gcx
+				env.GCXConfig = filepath.Join(tmp, "gcx.yaml")
+				return nil
+			}
+		}
+	}
 	start := time.Now()
 	fmt.Fprintf(os.Stderr, "e2e timing: building local tools into %s\n", binDir)
 	build := exec.Command("bash", "-lc", fmt.Sprintf("./scripts/build-local-tools.sh %q", binDir))

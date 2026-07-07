@@ -1,4 +1,3 @@
----
 name: E2E tests
 
 on: [pull_request]
@@ -6,7 +5,28 @@ on: [pull_request]
 permissions: {}
 
 jobs:
+  build-e2e-tools:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: v2026.7.0
+          sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
+      - name: Build e2e tools
+        run: ./scripts/build-local-tools.sh .e2e-tools/bin
+      - name: Upload e2e tools
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.6.2
+        with:
+          name: e2e-tools
+          path: .e2e-tools/bin
+          if-no-files-found: error
+
   test-e2e:
+    needs: build-e2e-tools
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -21,6 +41,11 @@ jobs:
         with:
           version: v2026.7.0
           sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
+      - name: Download e2e tools
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: e2e-tools
+          path: .e2e-tools/bin
       - name: Run ${{ matrix.shard }} e2e tests
         # OATS_E2E_FILTER is not part of the matrix to avoid that it shows up in the gh action (too long)
         run: |
@@ -46,7 +71,8 @@ jobs:
               exit 1
               ;;
           esac
-          echo "e2e timing: shard=${{ matrix.shard }} filter=${OATS_E2E_FILTER}"
+          export OATS_E2E_BIN_DIR="$PWD/.e2e-tools/bin"
+          echo "e2e timing: shard=${{ matrix.shard }} filter=${OATS_E2E_FILTER} bin_dir=${OATS_E2E_BIN_DIR}"
           mise run e2e-test
           end_ts="$(date +%s)"
           echo "e2e timing: shard=${{ matrix.shard }} total=$((end_ts-start_ts))s"
