@@ -151,10 +151,11 @@ func readTestCase(testBase, filePath string) (*model.TestCase, error) {
 }
 
 func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCaseDefinition, error) {
-	filePath, err := filepath.Abs(filePath)
+	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve path %s: %w", filePath, err)
 	}
+	filePath = absPath
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
