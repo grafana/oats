@@ -1,0 +1,14 @@
+name: migrate
+tags: [cli, migrate]
+
+# Drives `oats migrate` directly (no fixture / LGTM needed).
+run:
+  command: "{{OATS}}"
+  args:
+    - migrate
+    - "{{CASE_DIR}}/files/legacy.yaml"
+
+expect:
+  stdout_contains:
+    - "oats-schema-version: 3"
+    - "logql"
