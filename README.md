@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="docs/cli.md">CLI</a> ·
   <a href="docs/case-reference.md">Case reference</a> ·
   <a href="docs/ci.md">CI</a> ·
   <a href="UPGRADING.md">Upgrading</a>
@@ -68,82 +69,61 @@ Without mise:
 `oats` drives assertions through `gcx`; for fixture-backed runs OATS can
 bootstrap gcx itself, but pinning it explicitly keeps runs reproducible.
 
-## Quick start
+## Getting started
 
-An OATS project is a directory with an **`oats-config.yaml`** (which suites/cases
-to run and the fixtures they use) plus the case files it points at. `oats` finds
-that config in the working directory or any parent, so you just `cd` in and run:
+An OATS project is a directory with an **`oats-config.yaml`** plus one case per
+subdirectory. The smallest project that runs end-to-end is two files and Docker —
+OATS boots a throwaway Grafana LGTM stack for you, so you need no running backend
+and no app to see it work.
 
-```sh
-cd examples/smoke
+**`oats-config.yaml`** — lists the cases:
 
-# Print the run plan without executing
-oats list
-
-# Run it
-oats
+```yaml
+meta:
+  version: 3
+cases: ["*/oats-case.yaml"]   # one case per subdirectory
 ```
 
-To hack on OATS itself (builds local `oats` + `gcx` into `./bin`):
+**`hello/oats-case.yaml`** — boot an LGTM stack, push a log, assert it lands:
 
-```sh
-./scripts/build-local-tools.sh
-bin/oats version
+```yaml
+name: hello world
+fixture:
+  compose:
+    template: lgtm          # OATS boots grafana/otel-lgtm; no compose file needed
+seed:
+  type: inline-otlp         # push telemetry directly — no instrumented app required
+  logs:
+    - service: hello
+      body: hello from oats
+expected:
+  logs:
+    - logql: '{service_name="hello"}'
+      contains: hello from oats
 ```
 
-## CLI
+Then, from the project directory:
 
 ```sh
-oats                     # run every case (implicit; same as `oats run`)
-oats examples/           # run only cases at or under a path
-oats run [paths...]      # explicit run form
-oats list                # print the run plan and exit
-oats migrate <path>      # migrate a legacy file (stdout) or directory (in place)
-oats cache clear         # delete all cached results
-oats version             # print the version
+oats list   # show the resolved plan
+oats        # boot the fixture, seed it, assert
 ```
 
-`oats-config.yaml` is found in the current directory or any parent (override with
-`--config`), so you can run `oats` from anywhere in the project. Positional paths
-scope *which* cases run without changing where the config is loaded from.
-
-Common flags:
-
-| Flag | Default | Meaning |
-|------|---------|---------|
-| `--config` | `oats-config.yaml`, searched from cwd upward | path to the config file |
-| `--suite` | all | comma-separated suite names to run |
-| `--tags` | all | comma-separated tags; a case runs if it matches any |
-| `--timeout` | `30s` | per-assertion timeout — each assertion is retried until it passes or this elapses |
-| `--interval` | `500ms` | polling interval between assertion retries |
-| `--absent-timeout` | `10s` | window an `absent` assertion must stay empty |
-| `--parallel` | `1` | suites to run concurrently, when fixture isolation allows |
-| `--fail-fast` | `false` | stop scheduling further cases after the first case failure |
-| `--no-cache` | `false` | disable the skip-when-unchanged cache for this run |
-| `--format` | `text` | output format: `text` or `ndjson` |
-| `--gcx` | `gcx` | path to the gcx binary |
-| `--gcx-context` | derived | override the gcx context (otherwise derived from the fixture endpoint) |
-| `-v` / `-vv` / `-vvv` | — | increase verbosity |
-
-Run `oats --help` for the full list, including the inline-OTLP seed host/port
-overrides.
-
-## What it covers
-
-- traces / logs / metrics / profiles, queried through `gcx`
-- structural collector-style row matching (`match` / `match_spans`)
-- app-backed and inline-OTLP seed modes
-- remote / compose / k3d fixtures
-- custom-check scripts
-- best-effort migration from legacy OATS yaml (`oats migrate path/to/legacy.yaml`)
+To test a **real app** instead of inline telemetry, point the fixture at your
+app's compose file and use `seed: {type: app}` with `input:` requests. The
+runnable **[`examples/`](examples/)** projects are the best starting point to
+copy from — `examples/smoke/` (remote fixture + assertions) and
+`examples/fixtures/` (compose and k3d) — see [docs/case-reference.md](docs/case-reference.md)
+for the full shape.
 
 ## Documentation
 
-- **[docs/case-reference.md](docs/case-reference.md)** — the full case + config
+- **[docs/cli.md](docs/cli.md)** — every command and flag
+- **[docs/case-reference.md](docs/case-reference.md)** — the full config + case
   shape: fixtures, seed modes, the assertion vocabulary, custom checks
 - **[docs/ci.md](docs/ci.md)** — installing and running OATS in CI, plus result
   caching and its caveats
 - **[UPGRADING.md](UPGRADING.md)** — migrating older (schema-2) repos to v3
 - **[AGENTS.md](AGENTS.md)** — for contributors and coding agents working *on*
   OATS (build, layout, conventions)
-- `examples/smoke/`, `examples/fixtures/` — small runnable examples
+- **[`examples/`](examples/)** — small runnable projects to copy from

@@ -3,4 +3,4 @@ seed:
   type: app
 expected:
   custom-checks:
-    - script: ../scripts/verify.sh
+    - script: ./verify.sh

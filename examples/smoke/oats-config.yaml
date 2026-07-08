@@ -2,7 +2,7 @@ meta:
   version: 3
 suites:
   - name: smoke
-    cases: ["cases/*.yaml"]
+    cases: ["*/oats-case.yaml"]
     fixture: local-lgtm
     tags: [traces, logs, metrics]
 fixture:

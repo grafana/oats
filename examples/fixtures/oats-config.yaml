@@ -2,11 +2,11 @@ meta:
   version: 3
 suites:
   - name: compose-app
-    cases: ["cases/compose/*.yaml"]
+    cases: ["compose/*/oats-case.yaml"]
     fixture: compose-dev
     tags: [compose, app]
   - name: k3d-app
-    cases: ["cases/k3d/*.yaml"]
+    cases: ["k3d/*/oats-case.yaml"]
     fixture: k3d-dev
     tags: [k3d, app]
 fixture:
