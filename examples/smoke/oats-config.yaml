@@ -5,6 +5,9 @@
 meta:
   version: 3            # OATS schema version (the single version; cases carry none)
 
+# A suite groups cases that share one fixture (booted once, then every case runs
+# against it) and is the unit of parallelism + filtering. These four cases all
+# assert against the same local-lgtm stack, so they belong to one suite.
 suites:
   - name: smoke
     cases: ["*/oats-case.yaml"]   # one case per subdirectory (glob, relative to this file)

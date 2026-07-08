@@ -6,6 +6,8 @@
 meta:
   version: 3
 
+# Two suites because each needs a different fixture — a suite groups the cases
+# that share one fixture, so a compose group and a k3d group are separate suites.
 suites:
   - name: compose-app
     cases: ["compose/*/oats-case.yaml"]   # one case per subdir under compose/

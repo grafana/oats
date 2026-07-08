@@ -35,9 +35,29 @@ python/oats-case.yaml   python/docker-compose.oats.yml
 
 Globs are shell-style (`*` matches one path segment; no recursive `**`), so add a
 segment for deeper trees (e.g. `examples/*/oats-case.yaml`) or list several
-patterns. A top-level `cases:` list may be used instead of `suites:` for the
-one-suite shape. A suite may name a shared fixture (from the `fixture:` map) or
-let each case carry its own case-local `fixture:` block.
+patterns.
+
+### Suites vs cases
+
+A **case** is one test. A **suite** is a named group of cases that **share one
+booted fixture** — so the (often expensive) backend is stood up once and every
+case in the suite runs against it. A suite is also the unit of parallelism
+(`--parallel` runs *suites* concurrently; cases within a suite run in order) and
+of `--suite` / `--tags` filtering. Use one suite per distinct fixture — e.g. a
+`compose` suite and a `k3d` suite side by side.
+
+When you don't need that grouping, use a **top-level `cases:`** list instead of
+`suites:`; each case then becomes its own single-case suite (and typically
+carries its own case-local `fixture:` block):
+
+```yaml
+meta:
+  version: 3
+cases: ["*/oats-case.yaml"]   # no suites; one case per subdir, each self-contained
+```
+
+A suite either names a shared fixture (from the `fixture:` map) or lets each of
+its cases carry a case-local `fixture:` block.
 
 ## Case yaml
 
