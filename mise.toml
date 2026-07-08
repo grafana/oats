@@ -56,7 +56,3 @@ run = "go build -buildvcs=false ."
 [tasks.check]
 description = "Run all checks"
 depends = ["lint", "test"]
-
-[tasks.deps]
-description = "Update dependencies"
-run = "go mod tidy"
