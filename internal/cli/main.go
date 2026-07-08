@@ -14,7 +14,7 @@
 //
 // Run flags (subset):
 //
-//	--config       Path to oats.toml (default ./oats.toml)
+//	--config       Path to oats-config.yaml (default ./oats-config.yaml)
 //	--gcx          Path to gcx binary (default "gcx" on PATH)
 //	--format       Output format: "text" (default) or "ndjson"
 //	--suite        Comma-separated suite names to include
@@ -105,7 +105,7 @@ func newRootCmd(exit *int) *cobra.Command {
 // addRunFlags registers the flags shared by the implicit-run root and the
 // explicit `run` subcommand.
 func addRunFlags(fs *pflag.FlagSet) {
-	fs.String("config", "oats.toml", "path to oats.toml")
+	fs.String("config", "oats-config.yaml", "path to oats-config.yaml")
 	fs.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
 	fs.String("format", "text", "output format: text | ndjson")
 	fs.String("suite", "", "comma-separated suite names")
@@ -134,7 +134,7 @@ func addRunFlags(fs *pflag.FlagSet) {
 func newRunCmd(verbose, exit *int) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "run",
-		Short:         "Run the suites in oats.toml (default when no subcommand is given)",
+		Short:         "Run the suites in oats-config.yaml (default when no subcommand is given)",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -155,7 +155,7 @@ func newListCmd() *cobra.Command {
 			return listAction(cmd)
 		},
 	}
-	cmd.Flags().String("config", "oats.toml", "path to oats.toml")
+	cmd.Flags().String("config", "oats-config.yaml", "path to oats-config.yaml")
 	return cmd
 }
 

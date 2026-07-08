@@ -33,23 +33,23 @@ expected:
 
 func TestLoad_ValidConfig(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name = "lgtm"
-cases = ["cases/*.yaml"]
-fixture = "lgtm-shared"
-tags = ["traces"]
-
-[fixture.lgtm-shared.compose]
-template = "lgtm"
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: lgtm
+    cases: ["cases/*.yaml"]
+    fixture: lgtm-shared
+    tags: ["traces"]
+fixture:
+  lgtm-shared:
+    compose:
+      template: lgtm
 `)
 	writeFile(t, dir, "cases/a.yaml", strings.Replace(validCaseYAML, "%s", "case-a", 1))
 	writeFile(t, dir, "cases/b.yaml", strings.Replace(validCaseYAML, "%s", "case-b", 1))
 
-	cfg, err := Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -74,40 +74,37 @@ template = "lgtm"
 
 func TestLoad_RejectsUnknownKey(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-typooo = "boom"
-[[suite]]
-name = "x"
-cases = ["a.yaml"]
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+typooo: boom
+suites:
+  - name: x
+    cases: ["a.yaml"]
 `)
-	_, err := Load(filepath.Join(dir, "oats.toml"))
-	if err == nil || !strings.Contains(err.Error(), "unknown keys") {
-		t.Errorf("expected unknown-keys error, got %v", err)
+	_, err := Load(filepath.Join(dir, "oats-config.yaml"))
+	if err == nil || !strings.Contains(err.Error(), "typooo") {
+		t.Errorf("expected unknown-key error, got %v", err)
 	}
 }
 
 func TestPlanRun_FilterByTag(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name = "alpha"
-cases = ["a.yaml"]
-tags = ["traces"]
-
-[[suite]]
-name = "beta"
-cases = ["b.yaml"]
-tags = ["logs"]
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: alpha
+    cases: ["a.yaml"]
+    tags: ["traces"]
+  - name: beta
+    cases: ["b.yaml"]
+    tags: ["logs"]
 `)
 	writeFile(t, dir, "a.yaml", strings.Replace(validCaseYAML, "%s", "a", 1))
 	writeFile(t, dir, "b.yaml", strings.Replace(validCaseYAML, "%s", "b", 1))
 
-	cfg, err := Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -122,15 +119,14 @@ tags = ["logs"]
 
 func TestSummary_TopLevelCases(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-cases = ["cases/*.yaml"]
-
-[meta]
-version = 2
+	writeFile(t, dir, "oats-config.yaml", `
+cases: ["cases/*.yaml"]
+meta:
+  version: 2
 `)
 	writeFile(t, dir, "cases/a.yaml", strings.Replace(validCaseYAML, "%s", "case-a", 1))
 
-	cfg, err := Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -146,22 +142,19 @@ version = 2
 
 func TestPlanRun_FilterBySuiteName(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name = "alpha"
-cases = ["a.yaml"]
-
-[[suite]]
-name = "beta"
-cases = ["b.yaml"]
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: alpha
+    cases: ["a.yaml"]
+  - name: beta
+    cases: ["b.yaml"]
 `)
 	writeFile(t, dir, "a.yaml", strings.Replace(validCaseYAML, "%s", "a", 1))
 	writeFile(t, dir, "b.yaml", strings.Replace(validCaseYAML, "%s", "b", 1))
 
-	cfg, err := Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -266,15 +259,14 @@ func TestValidate_K3DRequiresFields(t *testing.T) {
 
 func TestPlanRun_EmptyGlobIsAnError(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name = "s"
-cases = ["nope/*.yaml"]
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: s
+    cases: ["nope/*.yaml"]
 `)
-	cfg, err := Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -297,7 +289,7 @@ func TestSummary(t *testing.T) {
 }
 
 func TestExampleV2SmokeConfigLoads(t *testing.T) {
-	cfg, err := Load(filepath.Join("..", "examples", "smoke", "oats.toml"))
+	cfg, err := Load(filepath.Join("..", "examples", "smoke", "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load example config: %v", err)
 	}
@@ -318,7 +310,7 @@ func TestExampleV2SmokeConfigLoads(t *testing.T) {
 }
 
 func TestExampleV2FixturesConfigLoads(t *testing.T) {
-	cfg, err := Load(filepath.Join("..", "examples", "fixtures", "oats.toml"))
+	cfg, err := Load(filepath.Join("..", "examples", "fixtures", "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load fixture example config: %v", err)
 	}
@@ -350,11 +342,10 @@ func planNames(p []Plan) []string {
 
 func TestLoadTopLevelCases(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-cases = ["cases/a.yaml", "cases/b.yaml"]
-
-[meta]
-version = 2
+	writeFile(t, dir, "oats-config.yaml", `
+cases: ["cases/a.yaml", "cases/b.yaml"]
+meta:
+  version: 2
 `)
 	writeFile(t, dir, "cases/a.yaml", `
 oats-schema-version: 3
@@ -374,7 +365,7 @@ expected:
     - traceql: "{}"
       absent: true
 `)
-	cfg, err := Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

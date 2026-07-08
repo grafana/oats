@@ -56,10 +56,10 @@ bootstrap gcx itself, but pinning it explicitly keeps runs reproducible.
 
 ```sh
 # Print the run plan without executing
-oats list --config examples/smoke/oats.toml
+oats list --config examples/smoke/oats-config.yaml
 
 # Run it
-oats --config examples/smoke/oats.toml
+oats --config examples/smoke/oats-config.yaml
 ```
 
 To hack on OATS itself (builds local `oats` + `gcx` into `./bin`):
@@ -74,7 +74,7 @@ bin/oats version
 ```sh
 oats [flags]                     # run the suites (implicit; same as `oats run`)
 oats run [flags]                 # run the suites
-oats list --config oats.toml     # print the run plan and exit
+oats list --config oats-config.yaml     # print the run plan and exit
 oats migrate legacy.yaml         # convert one legacy yaml to the v3 shape
 oats cache clear                 # delete all cached results
 oats version                     # print the version
@@ -84,7 +84,7 @@ Common flags:
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `--config` | `oats.toml` | path to the config file |
+| `--config` | `oats-config.yaml` | path to the config file |
 | `--suite` | all | comma-separated suite names to run |
 | `--tags` | all | comma-separated tags; a case runs if it matches any |
 | `--timeout` | `30s` | per-assertion timeout — each assertion is retried until it passes or this elapses |

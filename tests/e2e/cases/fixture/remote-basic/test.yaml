@@ -33,7 +33,7 @@ run:
           tempo: tempo
           pyroscope: pyroscope
     CFG
-    cat > "$workdir/files/oats.yaml" <<CFG
+    cat > "$workdir/files/oats-case.yaml" <<CFG
     oats-schema-version: 3
     name: remote-basic
     fixture:
@@ -53,7 +53,7 @@ run:
                 - key: service_name
                   value: remote-basic
     CFG
-    GCX_CONFIG="$workdir/files/gcx.remote.yaml" "{{OATS}}" --config "$workdir/.generated-oats.toml" --gcx "{{GCX}}" --gcx-context remote --no-cache
+    GCX_CONFIG="$workdir/files/gcx.remote.yaml" "{{OATS}}" --config "$workdir/.generated-oats.yaml" --gcx "{{GCX}}" --gcx-context remote --no-cache
 expect:
   stdout_contains:
     - PASS 1/1

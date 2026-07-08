@@ -143,19 +143,19 @@ func TestIntegration_FullPipelineWithFakeGCX(t *testing.T) {
 		t.Skip("fake-gcx is a POSIX shell script")
 	}
 
-	// Build the temp workspace: an oats.toml plus one inline-otlp case.
+	// Build the temp workspace: an oats-config.yaml plus one inline-otlp case.
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name    = "smoke"
-cases   = ["cases/*.yaml"]
-fixture = "remote-lgtm"
-
-[fixture.remote-lgtm.remote]
-endpoint = "REPLACED_AT_RUNTIME"
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: smoke
+    cases: ["cases/*.yaml"]
+    fixture: remote-lgtm
+fixture:
+  remote-lgtm:
+    remote:
+      endpoint: "REPLACED_AT_RUNTIME"
 `)
 	writeFile(t, dir, "cases/inline.yaml", `oats-schema-version: 3
 name: inline seed end-to-end
@@ -204,11 +204,11 @@ expected:
 	}))
 	defer stub.Close()
 
-	// Patch the endpoint into oats.toml after the stub URL is known.
-	tomlPath := filepath.Join(dir, "oats.toml")
-	rewrite(t, tomlPath, "REPLACED_AT_RUNTIME", stub.URL)
+	// Patch the endpoint into oats-config.yaml after the stub URL is known.
+	configPath := filepath.Join(dir, "oats-config.yaml")
+	rewrite(t, configPath, "REPLACED_AT_RUNTIME", stub.URL)
 
-	cfg, err := discovery.Load(tomlPath)
+	cfg, err := discovery.Load(configPath)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -267,17 +267,17 @@ func TestIntegration_AppSeedWithRemoteFixtureAndInput(t *testing.T) {
 	appHost, appPort := splitHostPort(t, app.Listener.Addr().String())
 
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name    = "smoke"
-cases   = ["cases/*.yaml"]
-fixture = "remote-lgtm"
-
-[fixture.remote-lgtm.remote]
-endpoint = "http://localhost:4318"
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: smoke
+    cases: ["cases/*.yaml"]
+    fixture: remote-lgtm
+fixture:
+  remote-lgtm:
+    remote:
+      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/app.yaml", `oats-schema-version: 3
 name: app seed end-to-end
@@ -302,7 +302,7 @@ expected:
             service_name: gcx-e2e-seed
 `)
 
-	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := discovery.Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -353,17 +353,17 @@ func TestIntegration_ProfileQueryWithFakeGCX(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name    = "profiles"
-cases   = ["cases/*.yaml"]
-fixture = "remote-lgtm"
-
-[fixture.remote-lgtm.remote]
-endpoint = "http://localhost:4318"
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: profiles
+    cases: ["cases/*.yaml"]
+    fixture: remote-lgtm
+fixture:
+  remote-lgtm:
+    remote:
+      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/profile.yaml", `oats-schema-version: 3
 name: profile query end-to-end
@@ -377,7 +377,7 @@ expected:
           name: 'main|worker'
 `)
 
-	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := discovery.Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -441,21 +441,21 @@ expected:
 	}
 
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name    = "migrated-profile"
-cases   = ["cases/*.yaml"]
-fixture = "remote-lgtm"
-
-[fixture.remote-lgtm.remote]
-endpoint = "http://localhost:4318"
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: migrated-profile
+    cases: ["cases/*.yaml"]
+    fixture: remote-lgtm
+fixture:
+  remote-lgtm:
+    remote:
+      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
-	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := discovery.Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -528,21 +528,21 @@ expected:
 	}
 
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name    = "migrated"
-cases   = ["cases/*.yaml"]
-fixture = "remote-lgtm"
-
-[fixture.remote-lgtm.remote]
-endpoint = "http://localhost:4318"
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: migrated
+    cases: ["cases/*.yaml"]
+    fixture: remote-lgtm
+fixture:
+  remote-lgtm:
+    remote:
+      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
-	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := discovery.Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -606,21 +606,21 @@ expected:
 	}
 
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name    = "migrated-custom"
-cases   = ["cases/*.yaml"]
-fixture = "remote-lgtm"
-
-[fixture.remote-lgtm.remote]
-endpoint = "http://localhost:4318"
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: migrated-custom
+    cases: ["cases/*.yaml"]
+    fixture: remote-lgtm
+fixture:
+  remote-lgtm:
+    remote:
+      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
-	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := discovery.Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -679,17 +679,17 @@ expected:
 	}
 
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name    = "migrated-custom-path"
-cases   = ["cases/*.yaml"]
-fixture = "remote-lgtm"
-
-[fixture.remote-lgtm.remote]
-endpoint = "http://localhost:4318"
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: migrated-custom-path
+    cases: ["cases/*.yaml"]
+    fixture: remote-lgtm
+fixture:
+  remote-lgtm:
+    remote:
+      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 	writeFile(t, dir, "cases/scripts/verify.sh", "#!/bin/sh\nexit 0\n")
@@ -697,7 +697,7 @@ endpoint = "http://localhost:4318"
 		t.Fatalf("Chmod: %v", err)
 	}
 
-	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := discovery.Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -774,21 +774,21 @@ expected:
 	}
 
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name    = "migrated-matrix"
-cases   = ["cases/*.yaml"]
-fixture = "remote-lgtm"
-
-[fixture.remote-lgtm.remote]
-endpoint = "http://localhost:4318"
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: migrated-matrix
+    cases: ["cases/*.yaml"]
+    fixture: remote-lgtm
+fixture:
+  remote-lgtm:
+    remote:
+      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
-	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := discovery.Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

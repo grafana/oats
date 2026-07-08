@@ -278,18 +278,18 @@ func TestComposeFilePublishesFixedHostPorts(t *testing.T) {
 
 func TestSupportsParallel_ComposeTemplateLGTM(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, "oats.toml", `
-[meta]
-version = 2
-
-[[suite]]
-name = "parallel-safe"
-cases = ["cases/*.yaml"]
-fixture = "stack"
-
-[fixture.stack.compose]
-template = "lgtm"
-file = "docker-compose.oats.yml"
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 2
+suites:
+  - name: parallel-safe
+    cases: ["cases/*.yaml"]
+    fixture: stack
+fixture:
+  stack:
+    compose:
+      template: lgtm
+      file: docker-compose.oats.yml
 `)
 	writeFile(t, dir, "docker-compose.oats.yml", `services:
   app:
@@ -309,7 +309,7 @@ expected:
       contains: line
 `)
 
-	cfg, err := discovery.Load(filepath.Join(dir, "oats.toml"))
+	cfg, err := discovery.Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

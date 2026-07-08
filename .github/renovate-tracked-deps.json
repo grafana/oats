@@ -28,7 +28,6 @@
     },
     "go.mod": {
       "gomod": [
-        "github.com/BurntSushi/toml",
         "github.com/cenkalti/backoff/v5",
         "github.com/cespare/xxhash/v2",
         "github.com/davecgh/go-spew",

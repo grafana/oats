@@ -27,7 +27,7 @@ import (
 const SchemaVersion = 3
 
 // Case is one entry point yaml file. Cases are independently runnable;
-// suites group them via oats.toml.
+// suites group them via oats-config.yaml.
 type Case struct {
 	OatsSchemaVersion int            `yaml:"oats-schema-version"`
 	Name              string         `yaml:"name"`
@@ -59,12 +59,12 @@ type Seed struct {
 
 // FixtureConfig declares how a suite stands up the backends its cases run
 // against. Exactly one of the type-specific blocks is set; the block that is
-// present selects the fixture kind. Dual toml/yaml tags let the same struct
-// load from oats.toml (BurntSushi/toml) and from a case yaml (yaml.v3).
+// present selects the fixture kind. The same struct loads from oats-config.yaml and
+// from a case yaml (both via yaml.v3).
 type FixtureConfig struct {
-	Compose *ComposeFixture `toml:"compose,omitempty" yaml:"compose,omitempty"`
-	K3D     *K3DFixture     `toml:"k3d,omitempty" yaml:"k3d,omitempty"`
-	Remote  *RemoteFixture  `toml:"remote,omitempty" yaml:"remote,omitempty"`
+	Compose *ComposeFixture `yaml:"compose,omitempty"`
+	K3D     *K3DFixture     `yaml:"k3d,omitempty"`
+	Remote  *RemoteFixture  `yaml:"remote,omitempty"`
 }
 
 // ComposeFixture boots a docker-compose stack. template selects a built-in
@@ -72,29 +72,29 @@ type FixtureConfig struct {
 // source dir. app_service + app_port let OATS publish and discover an
 // ephemeral host port for the application under test.
 type ComposeFixture struct {
-	Template   string   `toml:"template,omitempty" yaml:"template,omitempty"`
-	File       string   `toml:"file,omitempty" yaml:"file,omitempty"`
-	Files      []string `toml:"files,omitempty" yaml:"files,omitempty"`
-	Env        []string `toml:"env,omitempty" yaml:"env,omitempty"`
-	AppService string   `toml:"app_service,omitempty" yaml:"app_service,omitempty"`
-	AppPort    int      `toml:"app_port,omitempty" yaml:"app_port,omitempty"`
+	Template   string   `yaml:"template,omitempty"`
+	File       string   `yaml:"file,omitempty"`
+	Files      []string `yaml:"files,omitempty"`
+	Env        []string `yaml:"env,omitempty"`
+	AppService string   `yaml:"app_service,omitempty"`
+	AppPort    int      `yaml:"app_port,omitempty"`
 }
 
 // K3DFixture boots a k3d cluster and builds/imports the application image.
 type K3DFixture struct {
-	K8sDir           string   `toml:"k8s_dir,omitempty" yaml:"k8s_dir,omitempty"`
-	AppService       string   `toml:"app_service,omitempty" yaml:"app_service,omitempty"`
-	AppDockerFile    string   `toml:"app_docker_file,omitempty" yaml:"app_docker_file,omitempty"`
-	AppDockerContext string   `toml:"app_docker_context,omitempty" yaml:"app_docker_context,omitempty"`
-	AppDockerTag     string   `toml:"app_docker_tag,omitempty" yaml:"app_docker_tag,omitempty"`
-	AppPort          int      `toml:"app_port,omitempty" yaml:"app_port,omitempty"`
-	ImportImages     []string `toml:"import_images,omitempty" yaml:"import_images,omitempty"`
-	PoolSize         int      `toml:"pool_size,omitempty" yaml:"pool_size,omitempty"`
+	K8sDir           string   `yaml:"k8s_dir,omitempty"`
+	AppService       string   `yaml:"app_service,omitempty"`
+	AppDockerFile    string   `yaml:"app_docker_file,omitempty"`
+	AppDockerContext string   `yaml:"app_docker_context,omitempty"`
+	AppDockerTag     string   `yaml:"app_docker_tag,omitempty"`
+	AppPort          int      `yaml:"app_port,omitempty"`
+	ImportImages     []string `yaml:"import_images,omitempty"`
+	PoolSize         int      `yaml:"pool_size,omitempty"`
 }
 
 // RemoteFixture points at an already-running stack; OATS boots nothing.
 type RemoteFixture struct {
-	Endpoint string `toml:"endpoint,omitempty" yaml:"endpoint,omitempty"`
+	Endpoint string `yaml:"endpoint,omitempty"`
 }
 
 // Kind returns "compose"/"k3d"/"remote", or "" when no block is set. Exactly
@@ -389,7 +389,7 @@ func (c *Case) Validate() error {
 	switch c.Seed.Type {
 	case "app":
 		// App-backed cases are normally booted by the suite fixture declared in
-		// oats.toml. seed.compose remains accepted as a legacy/migration
+		// oats-config.yaml. seed.compose remains accepted as a legacy/migration
 		// shorthand, but is not required for validation or execution here.
 	case "inline-otlp":
 		if len(c.Seed.Traces)+len(c.Seed.Logs)+len(c.Seed.Metrics) == 0 {
@@ -460,7 +460,7 @@ func (c *Case) Validate() error {
 
 // Validate enforces that exactly one fixture block is set and that the set
 // block carries the fields its kind requires. label names the fixture in
-// error messages (the fixture name from oats.toml, or "fixture" for a
+// error messages (the fixture name from oats-config.yaml, or "fixture" for a
 // case-level block).
 func (f FixtureConfig) Validate(label string) error {
 	set := 0

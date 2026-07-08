@@ -13,7 +13,7 @@ The root `oats` binary now runs the gcx-driven current CLI only.
 
 That means upgrades now require migrating to the current:
 
-- `oats.toml` suite/discovery file
+- `oats-config.yaml` suite/discovery file
 - current case yaml shape documented in [docs/case-reference.md](docs/case-reference.md)
 
 The legacy “pass one or more old yaml files directly to `oats`” runner has been
@@ -122,21 +122,21 @@ expected:
       contains: ["rolling the dice"]
 ```
 
-Run `oats migrate ./oats.yaml`. Split the result into an `oats.toml` and a v3
-case (the migrator prints both the case yaml and a suggested `[fixture]` block):
+Run `oats migrate ./oats.yaml`. Split the result into an `oats-config.yaml` and a v3
+case (the migrator prints both the case yaml and a suggested `fixture:` block):
 
-```toml
-# oats.toml
-[meta]
-version = 2
-
-[[suite]]
-name    = "rolldice"
-cases   = ["cases/*.yaml"]
-fixture = "compose-lgtm"
-
-[fixture.compose-lgtm.compose]
-file = "docker-compose.yaml"
+```yaml
+# oats-config.yaml
+meta:
+  version: 2
+suites:
+  - name: rolldice
+    cases: ["cases/*.yaml"]
+    fixture: compose-lgtm
+fixture:
+  compose-lgtm:
+    compose:
+      file: docker-compose.yaml
 ```
 
 ```yaml

@@ -509,11 +509,11 @@ func runCase(t *testing.T, root, dir string) {
 
 	copyFiles(t, filepath.Join(dir, "files"), filesDir, ph)
 
-	configPath := filepath.Join(tmp, ".generated-oats.toml")
-	if _, err := os.Stat(filepath.Join(filesDir, "oats.toml")); err == nil {
-		configPath = filepath.Join(filesDir, "oats.toml")
+	configPath := filepath.Join(tmp, ".generated-oats.yaml")
+	if _, err := os.Stat(filepath.Join(filesDir, "oats-config.yaml")); err == nil {
+		configPath = filepath.Join(filesDir, "oats-config.yaml")
 	} else {
-		writeFile(t, configPath, "generated oats.toml", []byte("cases = [\"files/oats.yaml\"]\n\n[meta]\nversion = 2\n"))
+		writeFile(t, configPath, "generated oats-config.yaml", []byte("meta:\n  version: 2\ncases:\n  - files/oats-case.yaml\n"))
 	}
 
 	markExecutables(t, filesDir)

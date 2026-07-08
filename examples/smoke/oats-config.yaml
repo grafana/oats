@@ -1,0 +1,11 @@
+meta:
+  version: 2
+suites:
+  - name: smoke
+    cases: ["cases/*.yaml"]
+    fixture: local-lgtm
+    tags: [traces, logs, metrics]
+fixture:
+  local-lgtm:
+    remote:
+      endpoint: http://localhost:4318

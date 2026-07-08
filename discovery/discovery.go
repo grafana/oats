@@ -1,14 +1,15 @@
-// Package discovery turns an oats.toml + a collection of case yamls into a
+// Package discovery turns an oats-config.yaml + a collection of case yamls into a
 // concrete run plan.
 //
 // In OATS v1, the runner walked the file system for any yaml carrying
 // "oats-schema-version" and ran whatever it found. The current format
-// declares the plan up front: oats.toml lists suites, each suite lists cases
+// declares the plan up front: oats-config.yaml lists suites, each suite lists cases
 // (path globs) and the fixture they share. "oats list" prints the plan
 // before "oats run" executes it.
 package discovery
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,56 +17,54 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/BurntSushi/toml"
 	"github.com/grafana/oats/casefile"
+	"go.yaml.in/yaml/v3"
 )
 
-// RootConfig is the parsed oats.toml file. Field names mirror the TOML keys
+// RootConfig is the parsed oats-config.yaml file. Field names mirror the YAML keys
 // directly so a misnamed key surfaces as a "field not defined" error from
-// the toml decoder rather than a silent miss.
+// the yaml decoder rather than a silent miss.
 type RootConfig struct {
-	Meta    Meta                              `toml:"meta"`
-	Cases   []string                          `toml:"cases"`
-	Suites  []SuiteConfig                     `toml:"suite"`
-	Fixture map[string]casefile.FixtureConfig `toml:"fixture"`
-	Cache   CacheConfig                       `toml:"cache,omitempty"`
+	Meta    Meta                              `yaml:"meta"`
+	Cases   []string                          `yaml:"cases,omitempty"`
+	Suites  []SuiteConfig                     `yaml:"suites,omitempty"`
+	Fixture map[string]casefile.FixtureConfig `yaml:"fixture,omitempty"`
+	Cache   CacheConfig                       `yaml:"cache,omitempty"`
 
-	// SourceDir is the directory of the loaded oats.toml. Case glob
+	// SourceDir is the directory of the loaded oats-config.yaml. Case glob
 	// expressions resolve relative to it.
-	SourceDir string `toml:"-"`
+	SourceDir string `yaml:"-"`
 }
 
 type Meta struct {
-	Version int `toml:"version"`
+	Version int `yaml:"version"`
 }
 
 type SuiteConfig struct {
-	Name    string   `toml:"name"`
-	Cases   []string `toml:"cases"` // path globs, relative to oats.toml dir
-	Fixture string   `toml:"fixture,omitempty"`
-	Tags    []string `toml:"tags,omitempty"`
+	Name    string   `yaml:"name"`
+	Cases   []string `yaml:"cases"` // path globs, relative to oats-config.yaml dir
+	Fixture string   `yaml:"fixture,omitempty"`
+	Tags    []string `yaml:"tags,omitempty"`
 }
 
 type CacheConfig struct {
-	TTLDays int `toml:"ttl_days,omitempty"` // zero → use runtime default
+	TTLDays int `yaml:"ttl_days,omitempty"` // zero → use runtime default
 }
 
-// SupportedVersion is the value of [meta].version that this binary parses.
+// SupportedVersion is the value of meta.version that this binary parses.
 const SupportedVersion = 2
 
-// Load reads an oats.toml from disk.
+// Load reads an oats-config.yaml from disk.
 func Load(path string) (*RootConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("discovery load %s: %w", path, err)
 	}
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true) // reject unknown keys
 	var cfg RootConfig
-	md, err := toml.Decode(string(data), &cfg)
-	if err != nil {
+	if err := dec.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("discovery parse %s: %w", path, err)
-	}
-	if undecoded := md.Undecoded(); len(undecoded) > 0 {
-		return nil, fmt.Errorf("discovery: %s contains unknown keys: %v", path, undecoded)
 	}
 	cfg.SourceDir = filepath.Dir(path)
 	if err := cfg.Validate(); err != nil {
@@ -81,10 +80,10 @@ func (c *RootConfig) Validate() error {
 		return fmt.Errorf("meta.version: expected %d, got %d", SupportedVersion, c.Meta.Version)
 	}
 	if len(c.Cases) > 0 && len(c.Suites) > 0 {
-		return fmt.Errorf("use top-level cases or [[suite]], not both")
+		return fmt.Errorf("use top-level cases or suites, not both")
 	}
 	if len(c.Cases) == 0 && len(c.Suites) == 0 {
-		return fmt.Errorf("at least one top-level case or [[suite]] required")
+		return fmt.Errorf("at least one top-level case or suites entry required")
 	}
 	if len(c.Cases) > 0 {
 		for i, path := range c.Cases {
@@ -139,7 +138,7 @@ func (c *RootConfig) effectiveSuites() []SuiteConfig {
 }
 
 // PlanRun expands globs and applies the filter against the loaded config.
-// Returns plans in oats.toml order; cases within a plan are sorted by
+// Returns plans in oats-config.yaml order; cases within a plan are sorted by
 // SourcePath for stable test ordering.
 func (c *RootConfig) PlanRun(f Filter) ([]Plan, error) {
 	wantSuite := func(name string) bool {

@@ -1,21 +1,19 @@
 # Case reference
 
-The full shape of an OATS project: the `oats.toml` config, the case yaml, seed
+The full shape of an OATS project: the `oats-config.yaml` config, the case yaml, seed
 modes, the assertion vocabulary, and custom checks. For a quick start and the
 CLI summary see the [README](../README.md); for running in CI see
 [ci.md](ci.md).
 
-## oats.toml
+## oats-config.yaml
 
-```toml
-[meta]
-version = 2          # oats.toml schema version (distinct from a case's oats-schema-version)
-
-[[suite]]
-cases = ["examples/smoke/cases/*.yaml"]
-
-[cache]
-ttl_days = 7         # skip-when-unchanged TTL; 0 → default (7 days)
+```yaml
+meta:
+  version: 2          # oats-config.yaml schema version (distinct from a case's oats-schema-version)
+suites:
+  - cases: ["examples/smoke/cases/*.yaml"]
+cache:
+  ttl_days: 7         # skip-when-unchanged TTL; 0 → default (7 days)
 ```
 
 A suite may pin its own fixture, or let each case carry a case-local `fixture:`

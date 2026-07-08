@@ -68,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v2   # installs pinned oats + gcx from mise.toml
-      - run: oats --config oats.toml
+      - run: oats --config oats-config.yaml
 ```
 
 The `paths` filter is the cheapest and most important optimization: if a PR
@@ -89,7 +89,7 @@ To persist it across CI runs:
         with:
           path: ~/.cache/oats
           key: oats-${{ hashFiles('mise.toml') }}
-      - run: oats --config oats.toml --cache-dir ~/.cache/oats
+      - run: oats --config oats-config.yaml --cache-dir ~/.cache/oats
 ```
 
 Keying on `hashFiles('mise.toml')` scopes the cache to a gcx/oats version pair,

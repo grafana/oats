@@ -126,8 +126,8 @@ func TestConvertFile_MatrixSampleIsParseable(t *testing.T) {
 	for _, want := range []string{
 		`matrix definitions are not migrated automatically when multiple entries exist`,
 		`suggested matrix expansion for "matrix test.oats"`,
-		`[fixture.matrix-test-oats-docker.compose]`,
-		`[fixture.matrix-test-oats-k8s.k3d]`,
+		`matrix-test-oats-docker:`,
+		`matrix-test-oats-k8s:`,
 	} {
 		if !strings.Contains(joined, want) {
 			fatalf(t, "expected matrix warning to contain %q:\n%s", want, joined)
@@ -212,14 +212,15 @@ func TestConvertDefinition_KubernetesProducesFixtureHint(t *testing.T) {
 	}
 	joined := strings.Join(warnings, "\n")
 	for _, want := range []string{
-		`[fixture.k8s-case.k3d]`,
-		`k8s_dir = "k8s"`,
-		`app_service = "dice"`,
-		`app_docker_file = "Dockerfile"`,
-		`app_docker_context = ".."`,
-		`app_docker_tag = "dice:test"`,
-		`app_port = 8080`,
-		`import_images = ["busybox:latest"]`,
+		`k8s-case:`,
+		`k3d:`,
+		`k8s_dir: k8s`,
+		`app_service: dice`,
+		`app_docker_file: Dockerfile`,
+		`app_docker_context: ..`,
+		`app_docker_tag: dice:test`,
+		`app_port: 8080`,
+		`import_images: ["busybox:latest"]`,
 	} {
 		if !strings.Contains(joined, want) {
 			fatalf(t, "expected kubernetes migration warning to contain %q:\n%s", want, joined)
@@ -278,8 +279,8 @@ func TestConvertDefinition_FlattensSingleMatrixEntry(t *testing.T) {
 	joined := strings.Join(warnings, "\n")
 	for _, want := range []string{
 		`flattened single matrix entry "docker"`,
-		`[fixture.matrix-case-docker.compose]`,
-		`file = "docker-compose.yml"`,
+		`matrix-case-docker:`,
+		`file: docker-compose.yml`,
 	} {
 		if !strings.Contains(joined, want) {
 			fatalf(t, "expected warning to contain %q:\n%s", want, joined)
@@ -326,9 +327,9 @@ func TestConvertDefinition_MultiMatrixEmitsExpansionHint(t *testing.T) {
 	for _, want := range []string{
 		`suggested matrix expansion for "matrix case"`,
 		`- docker`,
-		`[fixture.matrix-case-docker.compose]`,
+		`matrix-case-docker:`,
 		`- k8s`,
-		`[fixture.matrix-case-k8s.k3d]`,
+		`matrix-case-k8s:`,
 	} {
 		if !strings.Contains(joined, want) {
 			fatalf(t, "expected warning to contain %q:\n%s", want, joined)

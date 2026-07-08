@@ -11,14 +11,14 @@ tests/e2e/cases/<group>/<case>/
 
 ## Defaults
 
-- `files/oats.yaml` is the default OATS input.
-- When `files/oats.toml` is absent, the test runner synthesizes one that points
-  at `files/oats.yaml`.
+- `files/oats-config.yaml` is the default OATS config (suite/case list).
+- When `files/oats-config.yaml` is absent, the test runner synthesizes one that points
+  at `files/oats-case.yaml`.
 - The harness boots a shared local LGTM stack plus real `oats` and real `gcx`.
 - The default run command is:
 
   ```bash
-  <built oats> --config .generated-oats.toml --gcx <built gcx> --gcx-context local --no-cache --timeout 10s --interval 1s
+  <built oats> --config .generated-oats.yaml --gcx <built gcx> --gcx-context local --no-cache --timeout 10s --interval 1s
   ```
 
 - Expected exit code defaults to `0`.

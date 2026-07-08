@@ -1,0 +1,14 @@
+meta:
+  version: 2
+suites:
+  - name: alpha
+    cases: ["alpha.yaml"]
+    fixture: shared
+  - name: beta
+    cases: ["beta.yaml"]
+    fixture: shared
+fixture:
+  shared:
+    compose:
+      template: lgtm
+      file: docker-compose.oats.yml

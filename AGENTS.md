@@ -61,16 +61,16 @@ EditorConfig rules live in `.editorconfig`.
 
 Current user-facing syntax is documented in `README.md`. Legacy yaml parsing
 still exists in-package for migration support, but the repo's CLI surface is
-the current `oats.toml` + case-yaml flow.
+the current `oats-config.yaml` + case-yaml flow.
 
 ## CLI Usage
 
 ```bash
 # Print a plan
-oats --config oats.toml --list
+oats --config oats-config.yaml --list
 
 # With flags
-oats --config oats.toml --timeout 1m
+oats --config oats-config.yaml --timeout 1m
 ```
 
 Key flags: `--config`, `--suite`, `--tags`, `--timeout`, `--interval`,

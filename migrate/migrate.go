@@ -47,7 +47,7 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Cas
 
 	if def.Kubernetes != nil {
 		c.Seed.Type = "app"
-		warnings = append(warnings, "legacy kubernetes fixture migrated as an app-backed case; paste the suggested [fixture] block below into oats.toml")
+		warnings = append(warnings, "legacy kubernetes fixture migrated as an app-backed case; paste the suggested fixture: block below into oats-config.yaml")
 		warnings = append(warnings, kubernetesFixtureHint(name, def))
 	}
 	if len(def.Matrix) > 0 {
@@ -61,12 +61,12 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Cas
 				}
 				c.Seed.Type = "app"
 				c.Seed.Compose = selectedMatrix.DockerCompose.Files[0]
-				warnings = append(warnings, "single matrix docker-compose fixture selected; paste the suggested [fixture] block below into oats.toml")
+				warnings = append(warnings, "single matrix docker-compose fixture selected; paste the suggested fixture: block below into oats-config.yaml")
 				warnings = append(warnings, matrixFixtureHint(c.Name, *selectedMatrix))
 			}
 			if selectedMatrix.Kubernetes != nil {
 				c.Seed.Type = "app"
-				warnings = append(warnings, "single matrix kubernetes fixture selected; paste the suggested [fixture] block below into oats.toml")
+				warnings = append(warnings, "single matrix kubernetes fixture selected; paste the suggested fixture: block below into oats-config.yaml")
 				warnings = append(warnings, matrixFixtureHint(c.Name, *selectedMatrix))
 			}
 		} else {
@@ -88,7 +88,7 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Cas
 		}
 		c.Seed.Compose = def.DockerCompose.Files[0]
 		if len(def.DockerCompose.Files) > 1 || len(def.DockerCompose.Environment) > 0 {
-			warnings = append(warnings, "legacy docker-compose fixture uses suite-level config richer than case-level seed.compose; paste the suggested [fixture] block below into oats.toml")
+			warnings = append(warnings, "legacy docker-compose fixture uses suite-level config richer than case-level seed.compose; paste the suggested fixture: block below into oats-config.yaml")
 			warnings = append(warnings, composeFixtureHint(name, def))
 		}
 	} else if def.Kubernetes == nil && selectedMatrix == nil {
@@ -265,15 +265,17 @@ func keepForMatrix(matrixCondition string, selected *model.Matrix) bool {
 func composeFixtureHint(name string, def model.TestCaseDefinition) string {
 	fixtureName := slug(name)
 	var b strings.Builder
-	fmt.Fprintf(&b, "suggested oats.toml fixture snippet for %q:\n", name)
-	fmt.Fprintf(&b, "[fixture.%s.compose]\n", fixtureName)
+	fmt.Fprintf(&b, "suggested oats-config.yaml fixture snippet for %q:\n", name)
+	fmt.Fprintf(&b, "fixture:\n")
+	fmt.Fprintf(&b, "  %s:\n", fixtureName)
+	fmt.Fprintf(&b, "    compose:\n")
 	if len(def.DockerCompose.Files) == 1 {
-		fmt.Fprintf(&b, "file = %q\n", def.DockerCompose.Files[0])
+		fmt.Fprintf(&b, "      file: %s\n", def.DockerCompose.Files[0])
 	} else if len(def.DockerCompose.Files) > 1 {
-		fmt.Fprintf(&b, "files = [%s]\n", quotedList(def.DockerCompose.Files))
+		fmt.Fprintf(&b, "      files: [%s]\n", quotedList(def.DockerCompose.Files))
 	}
 	if len(def.DockerCompose.Environment) > 0 {
-		fmt.Fprintf(&b, "env = [%s]\n", quotedList(def.DockerCompose.Environment))
+		fmt.Fprintf(&b, "      env: [%s]\n", quotedList(def.DockerCompose.Environment))
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
@@ -282,18 +284,20 @@ func kubernetesFixtureHint(name string, def model.TestCaseDefinition) string {
 	fixtureName := slug(name)
 	k := def.Kubernetes
 	var b strings.Builder
-	fmt.Fprintf(&b, "suggested oats.toml fixture snippet for %q:\n", name)
-	fmt.Fprintf(&b, "[fixture.%s.k3d]\n", fixtureName)
-	fmt.Fprintf(&b, "k8s_dir = %q\n", k.Dir)
-	fmt.Fprintf(&b, "app_service = %q\n", k.AppService)
-	fmt.Fprintf(&b, "app_docker_file = %q\n", k.AppDockerFile)
+	fmt.Fprintf(&b, "suggested oats-config.yaml fixture snippet for %q:\n", name)
+	fmt.Fprintf(&b, "fixture:\n")
+	fmt.Fprintf(&b, "  %s:\n", fixtureName)
+	fmt.Fprintf(&b, "    k3d:\n")
+	fmt.Fprintf(&b, "      k8s_dir: %s\n", k.Dir)
+	fmt.Fprintf(&b, "      app_service: %s\n", k.AppService)
+	fmt.Fprintf(&b, "      app_docker_file: %s\n", k.AppDockerFile)
 	if k.AppDockerContext != "" {
-		fmt.Fprintf(&b, "app_docker_context = %q\n", k.AppDockerContext)
+		fmt.Fprintf(&b, "      app_docker_context: %s\n", k.AppDockerContext)
 	}
-	fmt.Fprintf(&b, "app_docker_tag = %q\n", k.AppDockerTag)
-	fmt.Fprintf(&b, "app_port = %d\n", k.AppDockerPort)
+	fmt.Fprintf(&b, "      app_docker_tag: %s\n", k.AppDockerTag)
+	fmt.Fprintf(&b, "      app_port: %d\n", k.AppDockerPort)
 	if len(k.ImportImages) > 0 {
-		fmt.Fprintf(&b, "import_images = [%s]\n", quotedList(k.ImportImages))
+		fmt.Fprintf(&b, "      import_images: [%s]\n", quotedList(k.ImportImages))
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

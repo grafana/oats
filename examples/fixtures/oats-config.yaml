@@ -1,0 +1,25 @@
+meta:
+  version: 2
+suites:
+  - name: compose-app
+    cases: ["cases/compose/*.yaml"]
+    fixture: compose-dev
+    tags: [compose, app]
+  - name: k3d-app
+    cases: ["cases/k3d/*.yaml"]
+    fixture: k3d-dev
+    tags: [k3d, app]
+fixture:
+  compose-dev:
+    compose:
+      files: ["docker-compose.yml", "docker-compose.override.yml"]
+      env: ["OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318"]
+  k3d-dev:
+    k3d:
+      k8s_dir: k8s
+      app_service: rolldice
+      app_docker_file: Dockerfile
+      app_docker_context: .
+      app_docker_tag: rolldice:test
+      app_port: 18080
+      import_images: ["grafana/otel-lgtm:latest"]
