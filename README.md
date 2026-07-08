@@ -1,4 +1,21 @@
-# OpenTelemetry Acceptance Tests (OATs)
+<!-- markdownlint-disable MD033 MD041 -->
+<p align="center">
+  <img src="assets/icon.svg" width="128" height="128" alt="oats logo">
+</p>
+
+<h1 align="center">OpenTelemetry Acceptance Tests (OATs)</h1>
+
+<p align="center">
+  <a href="https://github.com/grafana/oats/actions/workflows/lint.yml"><img src="https://github.com/grafana/oats/actions/workflows/lint.yml/badge.svg" alt="Lint"></a>
+  <a href="https://github.com/grafana/oats/releases"><img src="https://img.shields.io/github/v/release/grafana/oats" alt="GitHub Release"></a>
+</p>
+
+<p align="center">
+  <a href="docs/case-reference.md">Case reference</a> ·
+  <a href="docs/ci.md">CI</a> ·
+  <a href="UPGRADING.md">Upgrading</a>
+</p>
+<!-- markdownlint-enable MD033 MD041 -->
 
 OATs is a declarative acceptance-test framework for OpenTelemetry. You describe,
 in yaml, the telemetry an instrumented app *should* produce — traces, logs,
@@ -53,12 +70,18 @@ bootstrap gcx itself, but pinning it explicitly keeps runs reproducible.
 
 ## Quick start
 
+An OATS project is a directory with an **`oats-config.yaml`** (which suites/cases
+to run and the fixtures they use) plus the case files it points at. `oats` finds
+that config in the working directory or any parent, so you just `cd` in and run:
+
 ```sh
+cd examples/smoke
+
 # Print the run plan without executing
-oats list --config examples/smoke/oats-config.yaml
+oats list
 
 # Run it
-oats --config examples/smoke/oats-config.yaml
+oats
 ```
 
 To hack on OATS itself (builds local `oats` + `gcx` into `./bin`):

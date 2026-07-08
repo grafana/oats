@@ -68,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v2   # installs pinned oats + gcx from mise.toml
-      - run: oats --config oats-config.yaml
+      - run: oats   # finds oats-config.yaml in the repo root
 ```
 
 The `paths` filter is the cheapest and most important optimization: if a PR
@@ -89,7 +89,7 @@ To persist it across CI runs:
         with:
           path: ~/.cache/oats
           key: oats-${{ hashFiles('mise.toml') }}
-      - run: oats --config oats-config.yaml --cache-dir ~/.cache/oats
+      - run: oats --cache-dir ~/.cache/oats
 ```
 
 Keying on `hashFiles('mise.toml')` scopes the cache to a gcx/oats version pair,
@@ -97,8 +97,9 @@ so a version bump starts a fresh cache — no stale skips from version drift.
 
 ### Correctness caveat — floating image tags
 
-The cache key hashes the fixture **config** (`fixture.type`, compose file paths,
-image tags, env, endpoint …), **not** the fixture's **contents**. If the app
+The cache key hashes the fixture **config** (the `compose`/`k3d`/`remote` block —
+compose file paths, image tags, env, endpoint …), **not** the fixture's
+**contents**. If the app
 under test is baked into an image with a floating tag (`:latest`), rebuilding
 that image under the same tag produces an identical key — so a case can be
 skipped against stale bytes (a false green).

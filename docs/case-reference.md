@@ -7,17 +7,25 @@ CLI summary see the [README](../README.md); for running in CI see
 
 ## oats-config.yaml
 
+`oats-config.yaml` is the entry point of an OATS project: it declares the suites,
+the case files each suite runs (path globs), the fixtures they use, and cache
+settings. `oats` looks for it in the current directory and then each parent (so
+you can run from a subdirectory); `--config <path>` overrides the search. Its
+`meta.version` is the single OATS schema version — case files carry no version of
+their own.
+
 ```yaml
 meta:
-  version: 3          # the single OATS schema version; cases carry no version field of their own
+  version: 3
 suites:
-  - cases: ["examples/smoke/cases/*.yaml"]
+  - cases: ["cases/*.yaml"]   # globs, relative to this file's directory
 cache:
-  ttl_days: 7         # skip-when-unchanged TTL; 0 → default (7 days)
+  ttl_days: 7                 # skip-when-unchanged TTL; 0 → default (7 days)
 ```
 
-A suite may pin its own fixture, or let each case carry a case-local `fixture:`
-block (the common one-case-per-suite shape).
+A top-level `cases:` list may be used instead of `suites:` for the common
+one-case-per-suite shape. A suite may name a shared fixture (from the `fixture:`
+map) or let each case carry its own case-local `fixture:` block.
 
 ## Case yaml
 
