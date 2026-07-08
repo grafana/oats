@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="docs/cli.md">CLI</a> ·
-  <a href="docs/case-reference.md">Case reference</a> ·
+  <a href="docs/case-reference.md">Test Case Syntax</a> ·
   <a href="docs/ci.md">CI</a> ·
   <a href="UPGRADING.md">Upgrading</a>
 </p>
@@ -31,8 +31,7 @@ name: rolldice traces have a route attribute
 
 fixture:
   compose:
-    template: lgtm
-    file: docker-compose.oats.yml
+    file: docker-compose.oats.yml   # your app; OATS adds a Grafana LGTM stack by default
 
 seed:
   type: app
@@ -71,59 +70,63 @@ bootstrap gcx itself, but pinning it explicitly keeps runs reproducible.
 
 ## Getting started
 
-An OATS project is a directory with an **`oats-config.yaml`** plus one case per
-subdirectory. The smallest project that runs end-to-end is two files and Docker —
-OATS boots a throwaway Grafana LGTM stack for you, so you need no running backend
-and no app to see it work.
-
-**`oats-config.yaml`** — lists the cases:
-
-```yaml
-meta:
-  version: 3
-cases: ["*/oats-case.yaml"]   # one case per subdirectory
-```
-
-**`hello/oats-case.yaml`** — boot an LGTM stack, push a log, assert it lands:
-
-```yaml
-name: hello world
-fixture:
-  compose:
-    template: lgtm          # OATS boots grafana/otel-lgtm; no compose file needed
-seed:
-  type: inline-otlp         # push telemetry directly — no instrumented app required
-  logs:
-    - service: hello
-      body: hello from oats
-expected:
-  logs:
-    - logql: '{service_name="hello"}'
-      contains: hello from oats
-```
-
-Then, from the project directory:
+The best starting point is **[`examples/python/`](examples/python/)** — a real,
+instrumented Flask "rolldice" app tested end to end. Copy it and run:
 
 ```sh
-oats list   # show the resolved plan
-oats        # boot the fixture, seed it, assert
+cp -r examples/python my-oats-test && cd my-oats-test
+oats   # run it
 ```
 
-To test a **real app** instead of inline telemetry, point the fixture at your
-app's compose file and use `seed: {type: app}` with `input:` requests. The
-runnable **[`examples/`](examples/)** projects are the best starting point to
-copy from — `examples/smoke/` (remote fixture + assertions) and
-`examples/fixtures/` (compose and k3d) — see [docs/case-reference.md](docs/case-reference.md)
-for the full shape.
+With Docker running, `oats` finds `oats-config.yaml` (in the current directory or
+any parent), builds the app and boots it next to a throwaway Grafana LGTM stack
+(the default fixture — no `template: lgtm` needed), calls `/rolldice`, and checks
+the telemetry it produced. The whole test is one file — `oats-case.yaml`:
+
+```yaml
+name: python rolldice
+fixture:
+  compose:
+    file: docker-compose.oats.yml   # your app; OATS adds a Grafana LGTM stack by default
+    app_service: python             # so OATS can reach the app…
+    app_port: 8082                  # …on its container port
+seed:
+  type: app
+input:
+  - path: /rolldice                 # drive the app so it emits telemetry
+expected:
+  traces:
+    - traceql: '{ span.http.route = "/rolldice" }'
+      match_spans:
+        - name: GET /rolldice
+  metrics:
+    - promql: 'http_server_active_requests{http_method="GET"}'
+      value: '>= 0'
+  logs:
+    - logql: '{service_name="rolldice"} |~ `rolling the dice`'
+      regex: 'rolling the dice'
+```
+
+No app of your own yet? A case can seed telemetry directly with
+`seed: {type: inline-otlp}` and skip the app entirely — see
+[docs/case-reference.md](docs/case-reference.md).
+
+## Examples
+
+- **[`examples/python/`](examples/python/)** — flagship: a real Flask app +
+  compose fixture, asserting traces, metrics, and logs. **Start here.**
+- **[`examples/smoke/`](examples/smoke/)** — advanced: a remote fixture with
+  inline-otlp / app / profile / custom-check cases.
+- **[`examples/fixtures/`](examples/fixtures/)** — advanced: compose and k3d
+  fixtures side by side.
 
 ## Documentation
 
 - **[docs/cli.md](docs/cli.md)** — every command and flag
-- **[docs/case-reference.md](docs/case-reference.md)** — the full config + case
-  shape: fixtures, seed modes, the assertion vocabulary, custom checks
+- **[docs/case-reference.md](docs/case-reference.md)** — test case syntax: the
+  full config + case shape (fixtures, seed modes, assertion vocabulary, custom checks)
 - **[docs/ci.md](docs/ci.md)** — installing and running OATS in CI, plus result
   caching and its caveats
 - **[UPGRADING.md](UPGRADING.md)** — migrating older (schema-2) repos to v3
 - **[AGENTS.md](AGENTS.md)** — for contributors and coding agents working *on*
   OATS (build, layout, conventions)
-- **[`examples/`](examples/)** — small runnable projects to copy from

@@ -16,6 +16,11 @@
         "mise"
       ]
     },
+    ".github/workflows/example-python.yml": {
+      "regex": [
+        "mise"
+      ]
+    },
     ".github/workflows/lint.yml": {
       "regex": [
         "mise"

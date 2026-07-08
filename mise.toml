@@ -40,6 +40,15 @@ run = 'GOFLAGS=-buildvcs=false go test $(GOFLAGS=-buildvcs=false go list ./... |
 description = "Run e2e case suite"
 run = "go test -v -buildvcs=false ./tests/e2e -run TestCases"
 
+[tasks.example-test]
+description = "Black-box test: build oats+gcx, then run the python example (needs Docker)"
+run = '''
+root="$PWD"
+./scripts/build-local-tools.sh "$root/bin"
+cd examples/python
+"$root/bin/oats" --gcx "$root/bin/gcx" --no-cache --timeout 90s --interval 2s -v
+'''
+
 [tasks.build]
 description = "Build the project"
 run = "go build -buildvcs=false ."

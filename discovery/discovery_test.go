@@ -204,6 +204,51 @@ suites:
 	}
 }
 
+func TestPlanRun_NoFixtureDefaultsToComposeLGTM(t *testing.T) {
+	// A suite with no fixture (and cases that declare none) now defaults to a
+	// compose fixture booting the builtin lgtm stack, not an external setup.
+	dir := t.TempDir()
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 3
+suites:
+  - name: inline
+    cases: ["cases/*.yaml"]
+`)
+	writeFile(t, dir, "cases/a.yaml", `name: inline smoke
+seed:
+  type: inline-otlp
+  logs:
+    - service: a
+      body: line
+expected:
+  logs:
+    - logql: '{service_name="a"}'
+      contains: line
+`)
+
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	plans, err := cfg.PlanRun(Filter{})
+	if err != nil {
+		t.Fatalf("PlanRun: %v", err)
+	}
+	if len(plans) != 1 {
+		t.Fatalf("plans: got %d, want 1", len(plans))
+	}
+	if plans[0].Fixture.Kind() != "compose" {
+		t.Fatalf("expected no-fixture suite to default to compose, got %q (%+v)", plans[0].Fixture.Kind(), plans[0].Fixture)
+	}
+	if got := plans[0].Fixture.Compose.EffectiveTemplate(); got != "lgtm" {
+		t.Fatalf("expected default compose template lgtm, got %q", got)
+	}
+	if plans[0].FixtureSourceDir != dir {
+		t.Fatalf("expected fixture source dir %q, got %q", dir, plans[0].FixtureSourceDir)
+	}
+}
+
 func TestValidate_EmptyFixtureRejected(t *testing.T) {
 	cfg := &RootConfig{
 		Meta: Meta{Version: 3},

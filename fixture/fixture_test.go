@@ -14,29 +14,52 @@ import (
 	"github.com/grafana/oats/testhelpers/remote"
 )
 
+func isBuiltinLGTMFile(path string) bool {
+	return strings.Contains(filepath.Base(path), ".oats.lgtm.") && strings.HasSuffix(path, ".compose.yml")
+}
+
 func TestResolveComposeFiles(t *testing.T) {
-	got, cleanup, err := resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{File: "stack/compose.yml"})
+	// template=none with a single file: only the user's file, no builtin, no
+	// cleanup.
+	got, cleanup, err := resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{Template: "none", File: "stack/compose.yml"})
 	if err != nil {
-		t.Fatalf("resolveComposeFiles file: %v", err)
+		t.Fatalf("resolveComposeFiles template=none file: %v", err)
 	}
 	if cleanup != nil {
-		t.Fatalf("unexpected cleanup for file fixture")
+		t.Fatalf("unexpected cleanup for template=none file fixture")
 	}
 	if want := []string{"/tmp/work/stack/compose.yml"}; len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("got %q want %q", got, want)
 	}
 
-	got, cleanup, err = resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{Files: []string{"a.yml", "b.yml"}})
+	// template=none with files: only the user's files, no builtin.
+	got, cleanup, err = resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{Template: "none", Files: []string{"a.yml", "b.yml"}})
 	if err != nil {
-		t.Fatalf("resolveComposeFiles files: %v", err)
+		t.Fatalf("resolveComposeFiles template=none files: %v", err)
 	}
 	if cleanup != nil {
-		t.Fatalf("unexpected cleanup for files fixture")
+		t.Fatalf("unexpected cleanup for template=none files fixture")
 	}
 	if len(got) != 2 || got[0] != "/tmp/work/a.yml" || got[1] != "/tmp/work/b.yml" {
 		t.Fatalf("unexpected files resolution: %v", got)
 	}
 
+	// No template + a user file: the builtin lgtm compose is merged in ahead of
+	// the user's file (default template=lgtm), with cleanup for the temp file.
+	got, cleanup, err = resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{File: "stack/compose.yml"})
+	if err != nil {
+		t.Fatalf("resolveComposeFiles default template + file: %v", err)
+	}
+	if cleanup == nil {
+		t.Fatalf("expected cleanup for default (lgtm) fixture")
+	}
+	if len(got) != 2 || !isBuiltinLGTMFile(got[0]) || got[1] != "/tmp/work/stack/compose.yml" {
+		_ = cleanup()
+		t.Fatalf("unexpected default-template resolution: %v", got)
+	}
+	_ = cleanup()
+
+	// Explicit template=lgtm with no file: just the builtin lgtm compose.
 	got, cleanup, err = resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{Template: "lgtm"})
 	if err != nil {
 		t.Fatalf("resolveComposeFiles template=lgtm: %v", err)
@@ -45,7 +68,7 @@ func TestResolveComposeFiles(t *testing.T) {
 		t.Fatalf("expected cleanup for template=lgtm fixture")
 	}
 	defer func() { _ = cleanup() }()
-	if len(got) != 1 || !strings.Contains(filepath.Base(got[0]), ".oats.lgtm.") || !strings.HasSuffix(got[0], ".compose.yml") {
+	if len(got) != 1 || !isBuiltinLGTMFile(got[0]) {
 		t.Fatalf("unexpected template=lgtm resolution: %v", got)
 	}
 }
@@ -80,8 +103,11 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 		Suite: discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
 		Fixture: casefile.FixtureConfig{
 			Compose: &casefile.ComposeFixture{
-				Files: []string{"a.yml", "b.yml"},
-				Env:   []string{"FOO=bar"},
+				// template=none keeps the resolved file list exactly a.yml/b.yml
+				// so this lifecycle test isn't perturbed by the builtin lgtm file.
+				Template: "none",
+				Files:    []string{"a.yml", "b.yml"},
+				Env:      []string{"FOO=bar"},
 			},
 		},
 		FixtureSourceDir: "/tmp/work",
@@ -232,15 +258,15 @@ func TestK3DCheckEnv_UsesConfiguredPorts(t *testing.T) {
 
 func TestResolveComposeFiles_UnsupportedTemplate(t *testing.T) {
 	_, _, err := resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{Template: "weird"})
-	if err == nil || !strings.Contains(err.Error(), `unsupported compose fixture template "weird"`) {
+	if err == nil || !strings.Contains(err.Error(), `unsupported compose template "weird"`) {
 		t.Fatalf("expected unsupported template error, got %v", err)
 	}
 }
 
-func TestResolveComposeFiles_MissingConfig(t *testing.T) {
-	_, _, err := resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{})
-	if err == nil || !strings.Contains(err.Error(), "compose fixture requires file, files, or supported template") {
-		t.Fatalf("expected missing compose config error, got %v", err)
+func TestResolveComposeFiles_TemplateNoneRequiresFile(t *testing.T) {
+	_, _, err := resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{Template: "none"})
+	if err == nil || !strings.Contains(err.Error(), "compose template=none requires file or files") {
+		t.Fatalf("expected template=none missing-file error, got %v", err)
 	}
 }
 

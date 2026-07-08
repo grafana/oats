@@ -20,7 +20,9 @@ suites:
 
 fixture:
   # compose: OATS runs `docker compose up` on these files, waits for readiness,
-  # then tears them down. Add `template: lgtm` to also boot a grafana/otel-lgtm.
+  # then tears them down. A compose fixture defaults to `template: lgtm`, so OATS
+  # boots a grafana/otel-lgtm stack alongside these files — that's the `lgtm`
+  # service the env below points at. Set `template: none` to bring your own stack.
   compose-dev:
     compose:
       files: ["docker-compose.yml", "docker-compose.override.yml"]

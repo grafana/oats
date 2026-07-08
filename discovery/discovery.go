@@ -349,7 +349,12 @@ func (c *RootConfig) resolveSuiteFixture(suite SuiteConfig, cases []*casefile.Ca
 		}
 	}
 	if !seen {
-		return casefile.FixtureConfig{}, "", nil
+		// No suite fixture and no case declares one: default to a compose
+		// fixture with the builtin lgtm template (an empty ComposeFixture
+		// resolves to template=lgtm). This boots just the lgtm stack, which is
+		// handy for inline-otlp smoke tests. External stacks now require an
+		// explicit remote: fixture. Temp compose files land next to the config.
+		return casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}}, c.SourceDir, nil
 	}
 	return fixture, sourceDir, nil
 }

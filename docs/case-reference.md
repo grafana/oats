@@ -99,8 +99,14 @@ one of three nested blocks; the block you set selects how the stack is stood up
 | Block | Meaning |
 |-------|---------|
 | `remote` | point at an already-running stack (`endpoint:` / a gcx context) |
-| `compose` | OATS boots a docker-compose stack; `template: lgtm` lets OATS own the LGTM ports |
+| `compose` | OATS boots a docker-compose stack; `template` defaults to `lgtm`, booting a builtin grafana/otel-lgtm alongside your `file`/`files`. Set `template: none` to bring your own stack |
 | `k3d` | OATS boots a k3d (k3s-in-docker) cluster |
+
+A `compose` fixture with no `template` defaults to `template: lgtm`, so OATS
+boots the builtin LGTM stack next to your `file`/`files`. Omit `file`/`files`
+entirely (or drop the `fixture:` block altogether) to boot just the LGTM stack —
+handy for `inline-otlp` smoke tests. To skip the builtin stack, set
+`template: none` (then `file`/`files` are required).
 
 ```yaml
 fixture:

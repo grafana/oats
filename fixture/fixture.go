@@ -111,7 +111,7 @@ func SupportsParallel(plan discovery.Plan) (bool, string) {
 	case "", "remote":
 		return true, ""
 	case "compose":
-		if plan.Fixture.Compose.Template != "lgtm" {
+		if plan.Fixture.Compose.EffectiveTemplate() != "lgtm" {
 			return false, "compose fixtures are only parallel-safe when OATS owns the LGTM ports via template=lgtm"
 		}
 		for _, c := range plan.Cases {

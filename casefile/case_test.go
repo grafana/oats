@@ -328,6 +328,32 @@ expected:
 	}
 }
 
+func TestValidate_EmptyComposeDefaultsToLGTM(t *testing.T) {
+	// A compose block with no template/file/files is valid: template defaults to
+	// lgtm, so OATS boots the builtin stack.
+	f := FixtureConfig{Compose: &ComposeFixture{}}
+	if err := f.Validate("fixture"); err != nil {
+		t.Fatalf("expected empty compose to validate (defaults to lgtm), got %v", err)
+	}
+	if got := f.Compose.EffectiveTemplate(); got != "lgtm" {
+		t.Fatalf("EffectiveTemplate: got %q, want lgtm", got)
+	}
+}
+
+func TestValidate_ComposeTemplateNoneRequiresFile(t *testing.T) {
+	f := FixtureConfig{Compose: &ComposeFixture{Template: "none"}}
+	err := f.Validate("fixture")
+	if err == nil || !strings.Contains(err.Error(), "compose template=none requires file or files") {
+		t.Fatalf("expected template=none requires-file error, got %v", err)
+	}
+
+	// template=none with a file is valid (bring-your-own-stack).
+	ok := FixtureConfig{Compose: &ComposeFixture{Template: "none", File: "docker-compose.yml"}}
+	if err := ok.Validate("fixture"); err != nil {
+		t.Fatalf("expected template=none with file to validate, got %v", err)
+	}
+}
+
 func TestValidate_RejectsInvalidMatchRegexp(t *testing.T) {
 	_, err := Parse([]byte(`
 name: bad regexp

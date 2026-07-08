@@ -64,9 +64,13 @@ type FixtureConfig struct {
 }
 
 // ComposeFixture boots a docker-compose stack. template selects a built-in
-// stack ("lgtm"); file/files point at compose files relative to the fixture
-// source dir. app_service + app_port let OATS publish and discover an
-// ephemeral host port for the application under test.
+// stack; file/files point at compose files relative to the fixture source dir,
+// merged alongside the template. app_service + app_port let OATS publish and
+// discover an ephemeral host port for the application under test.
+//
+// template defaults to "lgtm" when unset, so OATS boots a builtin
+// grafana/otel-lgtm stack next to the user's file/files. Set template: "none"
+// to opt out and bring your own observability stack via file/files.
 type ComposeFixture struct {
 	Template   string   `yaml:"template,omitempty"`
 	File       string   `yaml:"file,omitempty"`
@@ -74,6 +78,16 @@ type ComposeFixture struct {
 	Env        []string `yaml:"env,omitempty"`
 	AppService string   `yaml:"app_service,omitempty"`
 	AppPort    int      `yaml:"app_port,omitempty"`
+}
+
+// EffectiveTemplate returns the compose template to apply, defaulting an unset
+// template to "lgtm" so the builtin stack is booted unless the case explicitly
+// opts out with "none".
+func (c ComposeFixture) EffectiveTemplate() string {
+	if c.Template == "" {
+		return "lgtm"
+	}
+	return c.Template
 }
 
 // K3DFixture boots a k3d cluster and builds/imports the application image.
@@ -467,11 +481,14 @@ func (f FixtureConfig) Validate(label string) error {
 	switch {
 	case f.Compose != nil:
 		c := f.Compose
-		if c.Template == "" && c.File == "" && len(c.Files) == 0 {
-			return fmt.Errorf("fixture %q: compose requires template, file, or files", label)
-		}
 		if c.File != "" && len(c.Files) > 0 {
 			return fmt.Errorf("fixture %q: compose sets file or files, not both", label)
+		}
+		// template defaults to lgtm, so a compose block is always valid on the
+		// template axis. Only template=none (bring-your-own-stack) needs an
+		// explicit file/files to boot anything.
+		if c.EffectiveTemplate() == "none" && c.File == "" && len(c.Files) == 0 {
+			return fmt.Errorf("fixture %q: compose template=none requires file or files", label)
 		}
 	case f.K3D != nil:
 		k := f.K3D

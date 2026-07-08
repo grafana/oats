@@ -432,12 +432,6 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 			ep.OTLPHTTP = rt.OTLPHTTP
 		}
 		ep.CustomCheckEnv = append(ep.CustomCheckEnv, rt.CustomCheckEnv...)
-	case "":
-		// No fixture configured — caller (or --gcx-context) must supply
-		// everything. Useful while plumbing the new CLI against an external setup.
-		ep.CustomCheckEnv = append(ep.CustomCheckEnv,
-			"OATS_APP_URL="+fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
-		)
 	default:
 		return ep, fmt.Errorf("fixture kind %q is not supported in oats", plan.Fixture.Kind())
 	}

@@ -91,15 +91,19 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 func resolveComposeFiles(sourceDir string, compose *casefile.ComposeFixture) ([]string, func() error, error) {
 	var files []string
 	var cleanup func() error
-	if compose.Template == "lgtm" {
+	template := compose.EffectiveTemplate()
+	switch template {
+	case "lgtm":
 		f, err := writeBuiltinLGTMCompose(sourceDir)
 		if err != nil {
 			return nil, nil, err
 		}
 		files = append(files, f)
 		cleanup = func() error { return os.Remove(f) }
-	} else if compose.Template != "" {
-		return nil, nil, fmt.Errorf("unsupported compose fixture template %q", compose.Template)
+	case "none":
+		// Bring-your-own-stack: no builtin is booted, only the user's file/files.
+	default:
+		return nil, nil, fmt.Errorf("unsupported compose template %q", compose.Template)
 	}
 	switch {
 	case compose.File != "":
@@ -108,8 +112,8 @@ func resolveComposeFiles(sourceDir string, compose *casefile.ComposeFixture) ([]
 		for _, file := range compose.Files {
 			files = append(files, filepath.Join(sourceDir, file))
 		}
-	case compose.Template == "":
-		return nil, nil, fmt.Errorf("compose fixture requires file, files, or supported template")
+	case template == "none":
+		return nil, nil, fmt.Errorf("compose template=none requires file or files")
 	}
 	return files, cleanup, nil
 }
