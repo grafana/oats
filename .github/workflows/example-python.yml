@@ -6,13 +6,12 @@ name: Example (python)
 on:
   pull_request:
     paths:
+      # Black-box test of the whole oats binary — any Go change can affect it,
+      # so match all Go source rather than naming packages (easy to forget one).
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
       - "examples/python/**"
-      - "fixture/**"
-      - "discovery/**"
-      - "casefile/**"
-      - "engine/**"
-      - "seed/**"
-      - "runner/**"
       - "scripts/build-local-tools.sh"
       - ".github/workflows/example-python.yml"
       - "mise.toml"

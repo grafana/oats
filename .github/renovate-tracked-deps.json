@@ -31,6 +31,25 @@
         "mise"
       ]
     },
+    "examples/python/Dockerfile": {
+      "dockerfile": [
+        "python"
+      ],
+      "regex": [
+        "opentelemetry-distro"
+      ]
+    },
+    "examples/python/requirements.txt": {
+      "pip_requirements": [
+        "Flask",
+        "Jinja2",
+        "MarkupSafe",
+        "Werkzeug",
+        "blinker",
+        "click",
+        "itsdangerous"
+      ]
+    },
     "go.mod": {
       "gomod": [
         "github.com/cenkalti/backoff/v5",
@@ -96,6 +115,47 @@
         "shfmt",
         "taplo",
         "typos"
+      ]
+    },
+    "tests/e2e/Dockerfile": {
+      "dockerfile": [
+        "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java",
+        "springio/petclinic"
+      ]
+    },
+    "tests/e2e/cases/fixture/compose-app-seed/files/docker-compose.oats.yml": {
+      "docker-compose": [
+        "ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen"
+      ]
+    },
+    "tests/e2e/cases/fixture/compose-logs-fail/files/docker-compose.oats.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/compose-logs/files/docker-compose.oats.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/k3d-fail/files/Dockerfile": {
+      "dockerfile": [
+        "docker.io/library/alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/k3d-smoke/files/Dockerfile": {
+      "dockerfile": [
+        "docker.io/library/alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/parallel-compose/files/docker-compose.oats.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/remote-basic/files/docker-compose.remote.yml": {
+      "docker-compose": [
+        "docker.io/grafana/otel-lgtm"
       ]
     },
     "yaml/testdata/docker-compose-addition.yaml": {
