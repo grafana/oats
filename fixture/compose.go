@@ -64,6 +64,28 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 		ComposeFiles:   composeFiles,
 		ComposeProject: project,
 	}
+	// When the fixture names an app service, resolve the port docker published
+	// for it. This lets the app bind an ephemeral host port (127.0.0.1::<port>)
+	// instead of a fixed one, which is what makes app-seed suites parallel-safe.
+	if plan.Fixture.AppService != "" && plan.Fixture.AppPort > 0 {
+		appPort, portErr := lookupComposePort(composeFiles, suiteEnv, plan.Fixture.AppService, strconv.Itoa(plan.Fixture.AppPort))
+		if portErr != nil {
+			_ = suite.Close()
+			if cleanup != nil {
+				_ = cleanup()
+			}
+			return nil, Runtime{}, fmt.Errorf("resolve app host port for service %q: %w", plan.Fixture.AppService, portErr)
+		}
+		p, convErr := strconv.Atoi(appPort)
+		if convErr != nil {
+			_ = suite.Close()
+			if cleanup != nil {
+				_ = cleanup()
+			}
+			return nil, Runtime{}, fmt.Errorf("invalid app host port %q for service %q: %w", appPort, plan.Fixture.AppService, convErr)
+		}
+		rt.AppHostPort = p
+	}
 	cfg, cfgErr := writeLocalGCXConfig(rt.GrafanaURL)
 	if cfgErr != nil {
 		if cleanup != nil {

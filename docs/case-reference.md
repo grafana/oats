@@ -67,6 +67,14 @@ selects how it is stood up:
 `compose` and `k3d` fixtures are booted, waited on for readiness, and torn down
 by OATS. `remote` fixtures are assumed ready.
 
+For a `compose` fixture driven by a `seed: app` case, set `app_service` (the
+compose service name of the app) and `app_port` (the app's container port). OATS
+then discovers the host port docker published for that service, so the app can
+bind an **ephemeral** host port (`127.0.0.1::<app_port>`) rather than a fixed one
+— which is what lets app-seed suites run under `--parallel` without colliding.
+Omit them and the app is driven on the fixed `--app-port` (default 8080), which
+forces the suite to run serially.
+
 ## Seed
 
 A case populates the stack before assertions run via one of two `seed.type`
@@ -226,9 +234,12 @@ echo "custom check ok"
 
 - Cases inside one suite run sequentially.
 - Suites can run concurrently with `--parallel N`, but only where fixture
-  isolation allows it: remote suites, and `template = "lgtm"` compose suites
-  without app seeds. k3d suites and app-seed compose suites always run serially
-  regardless of the flag.
+  isolation allows it: remote suites, and `template = "lgtm"` compose suites that
+  publish **no fixed host ports**. An app-seed compose suite qualifies when its
+  app binds an *ephemeral* host port (`127.0.0.1::<port>`) and the fixture sets
+  `app_service` + `app_port` so OATS can discover the published port; an app-seed
+  suite without `app_service`, or any compose file that binds a fixed host port,
+  runs serially. k3d suites always run serially.
 - **Memory, not CPU, is the limit for compose parallelism.** Each parallel
   `template = "lgtm"` suite boots its *own* LGTM stack — a unique compose project
   with dynamically allocated host ports — so suites can neither collide on ports

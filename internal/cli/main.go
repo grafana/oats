@@ -366,6 +366,9 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 		if rt.OTLPHTTP != "" {
 			ep.OTLPHTTP = rt.OTLPHTTP
 		}
+		if rt.AppHostPort > 0 {
+			ep.AppPort = rt.AppHostPort
+		}
 		ep.CustomCheckEnv = append(ep.CustomCheckEnv, rt.CustomCheckEnv...)
 	case "k3d":
 		if rt.GCXConfig != "" {

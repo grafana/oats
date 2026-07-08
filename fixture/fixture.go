@@ -53,6 +53,7 @@ type Runtime struct {
 	GrafanaURL       string
 	OTLPHTTP         string
 	PyroscopeURL     string
+	AppHostPort      int
 	CustomCheckEnv   []string
 	ComposeFiles     []string
 	ComposeProject   string
@@ -113,8 +114,13 @@ func SupportsParallel(plan discovery.Plan) (bool, string) {
 			return false, "compose fixtures are only parallel-safe when OATS owns the LGTM ports via template=lgtm"
 		}
 		for _, c := range plan.Cases {
-			if c.Seed.Type == "app" {
-				return false, "compose suites with app seeds still rely on shared fixed app ports"
+			// App seeds are parallel-safe only when OATS can give the app an
+			// ephemeral host port instead of a shared fixed one — which requires
+			// fixture.app_service (+ app_port) so the published port can be
+			// discovered. Without it the app falls back to the fixed --app-port
+			// and parallel suites would collide.
+			if c.Seed.Type == "app" && (plan.Fixture.AppService == "" || plan.Fixture.AppPort == 0) {
+				return false, "compose app-seed suites need fixture.app_service and app_port so OATS can publish an ephemeral app port; otherwise they share a fixed app port"
 			}
 		}
 		for _, file := range extraComposeFiles(plan) {

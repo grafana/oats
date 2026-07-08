@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/runner"
 	"github.com/grafana/oats/testhelpers/remote"
@@ -314,6 +315,32 @@ expected:
 	safe, reason := SupportsParallel(plans[0])
 	if !safe {
 		t.Fatalf("expected plan to be parallel-safe, got false: %s", reason)
+	}
+}
+
+// TestSupportsParallel_AppSeedRequiresAppService checks the gate that makes
+// app-seed compose suites parallel-safe: only when fixture.app_service and
+// app_port are set (so OATS can publish + discover an ephemeral app port) is the
+// suite safe; otherwise it would share a fixed app port with its peers.
+func TestSupportsParallel_AppSeedRequiresAppService(t *testing.T) {
+	appCase := &casefile.Case{Seed: casefile.Seed{Type: "app"}}
+
+	// app seed, no app_service → not parallel-safe.
+	noService := discovery.Plan{
+		Fixture: discovery.FixtureConfig{Type: "compose", Template: "lgtm"},
+		Cases:   []*casefile.Case{appCase},
+	}
+	if safe, reason := SupportsParallel(noService); safe {
+		t.Fatalf("app-seed without app_service should not be parallel-safe, got safe (%s)", reason)
+	}
+
+	// app seed with app_service + app_port → parallel-safe.
+	withService := discovery.Plan{
+		Fixture: discovery.FixtureConfig{Type: "compose", Template: "lgtm", AppService: "app", AppPort: 8080},
+		Cases:   []*casefile.Case{appCase},
+	}
+	if safe, reason := SupportsParallel(withService); !safe {
+		t.Fatalf("app-seed with app_service+app_port should be parallel-safe: %s", reason)
 	}
 }
 
