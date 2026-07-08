@@ -161,8 +161,19 @@ func newListCmd() *cobra.Command {
 
 func newMigrateCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "migrate <legacy-yaml>",
-		Short:         "Convert one legacy OATS yaml file and print the result to stdout",
+		Use:   "migrate <legacy-yaml | dir>",
+		Short: "Convert legacy OATS yaml to the v3 shape",
+		Long: `Convert legacy OATS test cases to the v3 shape.
+
+File mode (argument is a file):
+  Convert one legacy yaml and print the self-contained v3 case (including its
+  fixture: block) to stdout. Warnings go to stderr.
+
+Directory mode (argument is a directory):
+  Migrate every legacy case found under the directory in place (each file is
+  overwritten with its v3 equivalent) and write an oats-config.yaml listing
+  them explicitly. A human summary and per-file warnings go to stderr; nothing
+  is written to stdout.`,
 		Args:          cobra.ExactArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -223,6 +234,25 @@ func listAction(cmd *cobra.Command) error {
 }
 
 func migrateAction(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		res, err := migrate.ConvertTree(path)
+		if err != nil {
+			return err
+		}
+		for _, w := range res.Warnings {
+			fmt.Fprintln(os.Stderr, "migrate warning:", w)
+		}
+		for _, f := range res.Written {
+			fmt.Fprintln(os.Stderr, "migrated:", f)
+		}
+		fmt.Fprintf(os.Stderr, "wrote %d case(s); config: %s\n", len(res.Written), res.Config)
+		return nil
+	}
+
 	out, warnings, err := migrate.ConvertFile(path)
 	if err != nil {
 		return err

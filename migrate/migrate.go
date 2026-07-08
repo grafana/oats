@@ -1,20 +1,41 @@
 package migrate
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/grafana/oats/casefile"
+	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/model"
 	legacyyaml "github.com/grafana/oats/yaml"
 	goyaml "go.yaml.in/yaml/v3"
 )
 
+// marshalYAML renders v as YAML with 2-space indentation, matching the repo's
+// YAML convention and the shipped examples (goyaml.Marshal defaults to 4).
+func marshalYAML(v any) ([]byte, error) {
+	var b bytes.Buffer
+	enc := goyaml.NewEncoder(&b)
+	enc.SetIndent(2)
+	if err := enc.Encode(v); err != nil {
+		_ = enc.Close()
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
+
 // ConvertFile reads one legacy OATS yaml file and returns a best-effort
 // current-format case yaml plus any warnings about dropped or lossy fields.
+// The migrated case carries its own case-local fixture: block, so the output
+// is self-contained.
 func ConvertFile(path string) ([]byte, []string, error) {
 	def, err := legacyyaml.LoadTestCaseDefinition(path)
 	if err != nil {
@@ -27,15 +48,100 @@ func ConvertFile(path string) ([]byte, []string, error) {
 	if err != nil {
 		return nil, warnings, err
 	}
-	out, err := goyaml.Marshal(c)
+	out, err := marshalYAML(c)
 	if err != nil {
 		return nil, warnings, err
 	}
 	return out, warnings, nil
 }
 
+// TreeResult reports the outcome of a directory ("project") migration.
+type TreeResult struct {
+	// Written lists the absolute paths of the case files rewritten in place.
+	Written []string
+	// Config is the absolute path of the generated oats-config.yaml.
+	Config string
+	// Warnings aggregates every case's warnings, each prefixed with the
+	// relative path of the case it came from.
+	Warnings []string
+}
+
+// ConvertTree migrates every legacy OATS case found under dir in place and
+// writes an oats-config.yaml listing them explicitly. Each legacy file is
+// overwritten with its v3 equivalent (same path/filename); the generated
+// config references each written file by its dir-relative path.
+func ConvertTree(dir string) (*TreeResult, error) {
+	cases, err := legacyyaml.ReadTestCases([]string{dir}, true)
+	if err != nil {
+		return nil, err
+	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &TreeResult{}
+	seen := map[string]bool{}
+	var relpaths []string
+	for _, tc := range cases {
+		// ReadTestCases expands matrix files into one entry per matrix row,
+		// all sharing a Path. Convert each source file once; ConvertDefinition
+		// handles the matrix internally.
+		if seen[tc.Path] {
+			continue
+		}
+		seen[tc.Path] = true
+
+		c, warnings, err := ConvertDefinition(tc.Definition, deriveName(tc.Path))
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", tc.Path, err)
+		}
+		out, err := marshalYAML(c)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", tc.Path, err)
+		}
+		if err := os.WriteFile(tc.Path, out, 0o644); err != nil {
+			return nil, fmt.Errorf("write %s: %w", tc.Path, err)
+		}
+		result.Written = append(result.Written, tc.Path)
+
+		rel, err := filepath.Rel(absDir, tc.Path)
+		if err != nil {
+			return nil, err
+		}
+		rel = filepath.ToSlash(rel)
+		relpaths = append(relpaths, rel)
+		for _, w := range warnings {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: %s", rel, w))
+		}
+	}
+
+	sort.Strings(result.Written)
+	sort.Strings(relpaths)
+
+	configPath := filepath.Join(absDir, "oats-config.yaml")
+	if _, err := os.Stat(configPath); err == nil {
+		result.Warnings = append(result.Warnings, "oats-config.yaml already existed and was overwritten as a migration artifact")
+	}
+	cfg := discovery.RootConfig{
+		Meta:  discovery.Meta{Version: discovery.SupportedVersion},
+		Cases: relpaths,
+	}
+	cfgOut, err := marshalYAML(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(configPath, cfgOut, 0o644); err != nil {
+		return nil, fmt.Errorf("write %s: %w", configPath, err)
+	}
+	result.Config = configPath
+	return result, nil
+}
+
 // ConvertDefinition maps a legacy v1/v1.5-style OATS definition into the
-// current case yaml shape. Unsupported fields are dropped with warnings.
+// current case yaml shape. Unsupported fields are dropped with warnings. The
+// legacy docker-compose/kubernetes fixture is carried over as a case-local
+// fixture: block.
 func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Case, []string, error) {
 	var warnings []string
 	c := &casefile.Case{
@@ -45,33 +151,13 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Cas
 	}
 	selectedMatrix := (*model.Matrix)(nil)
 
-	if def.Kubernetes != nil {
-		c.Seed.Type = "app"
-		warnings = append(warnings, "legacy kubernetes fixture migrated as an app-backed case; paste the suggested fixture: block below into oats-config.yaml")
-		warnings = append(warnings, kubernetesFixtureHint(name, def))
-	}
 	if len(def.Matrix) > 0 {
 		if len(def.Matrix) == 1 {
 			selectedMatrix = &def.Matrix[0]
 			c.Name = fmt.Sprintf("%s [%s]", name, selectedMatrix.Name)
 			warnings = append(warnings, fmt.Sprintf("flattened single matrix entry %q into the migrated case", selectedMatrix.Name))
-			if selectedMatrix.DockerCompose != nil {
-				if len(selectedMatrix.DockerCompose.Files) == 0 {
-					return nil, warnings, fmt.Errorf("matrix docker-compose present but no files declared")
-				}
-				c.Seed.Type = "app"
-				c.Seed.Compose = selectedMatrix.DockerCompose.Files[0]
-				warnings = append(warnings, "single matrix docker-compose fixture selected; paste the suggested fixture: block below into oats-config.yaml")
-				warnings = append(warnings, matrixFixtureHint(c.Name, *selectedMatrix))
-			}
-			if selectedMatrix.Kubernetes != nil {
-				c.Seed.Type = "app"
-				warnings = append(warnings, "single matrix kubernetes fixture selected; paste the suggested fixture: block below into oats-config.yaml")
-				warnings = append(warnings, matrixFixtureHint(c.Name, *selectedMatrix))
-			}
 		} else {
 			warnings = append(warnings, "matrix definitions are not migrated automatically when multiple entries exist; convert expanded matrix cases manually")
-			warnings = append(warnings, matrixExpansionHint(name, def.Matrix))
 		}
 	}
 	if len(def.Include) > 0 {
@@ -81,17 +167,24 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Cas
 		warnings = append(warnings, "compose-logs assertions are not migrated")
 	}
 
-	if def.DockerCompose != nil {
+	// Guard against a docker-compose block with no files before building the
+	// fixture, so the error message stays specific to its source.
+	if selectedMatrix != nil && selectedMatrix.DockerCompose != nil && len(selectedMatrix.DockerCompose.Files) == 0 {
+		return nil, warnings, fmt.Errorf("matrix docker-compose present but no files declared")
+	}
+	if def.DockerCompose != nil && len(def.DockerCompose.Files) == 0 &&
+		(selectedMatrix == nil || selectedMatrix.DockerCompose == nil) {
+		return nil, warnings, fmt.Errorf("docker-compose present but no files declared")
+	}
+
+	c.Fixture = fixtureFor(def, selectedMatrix)
+	switch {
+	case c.Fixture != nil:
 		c.Seed.Type = "app"
-		if len(def.DockerCompose.Files) == 0 {
-			return nil, warnings, fmt.Errorf("docker-compose present but no files declared")
+		if c.Fixture.Compose != nil {
+			warnings = append(warnings, "for parallel-safe app-seed runs, set fixture.compose.app_service + app_port (not derivable from the legacy file)")
 		}
-		c.Seed.Compose = def.DockerCompose.Files[0]
-		if len(def.DockerCompose.Files) > 1 || len(def.DockerCompose.Environment) > 0 {
-			warnings = append(warnings, "legacy docker-compose fixture uses suite-level config richer than case-level seed.compose; paste the suggested fixture: block below into oats-config.yaml")
-			warnings = append(warnings, composeFixtureHint(name, def))
-		}
-	} else if def.Kubernetes == nil && selectedMatrix == nil {
+	default:
 		warnings = append(warnings, "no docker-compose fixture found; defaulting seed.type to inline-otlp placeholder")
 		c.Seed.Type = "inline-otlp"
 		c.Seed.Traces = []casefile.SeedTrace{{Service: "migrated-service", Spans: []casefile.SeedSpan{{Name: "replace-me"}}}}
@@ -167,6 +260,45 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Cas
 		return nil, warnings, fmt.Errorf("migrated case failed validation: %w", err)
 	}
 	return c, warnings, nil
+}
+
+// fixtureFor builds the case-local fixture: block from a legacy definition. A
+// single-matrix override (selectedMatrix) takes precedence over the suite-level
+// blocks. Returns nil when the legacy definition declares no fixture.
+func fixtureFor(def model.TestCaseDefinition, selectedMatrix *model.Matrix) *casefile.FixtureConfig {
+	dc := def.DockerCompose
+	k8s := def.Kubernetes
+	if selectedMatrix != nil {
+		if selectedMatrix.DockerCompose != nil {
+			dc = selectedMatrix.DockerCompose
+		}
+		if selectedMatrix.Kubernetes != nil {
+			k8s = selectedMatrix.Kubernetes
+		}
+	}
+
+	if dc != nil {
+		// Legacy files carry no app_service/app_port; a warning covers it.
+		compose := &casefile.ComposeFixture{Env: dc.Environment}
+		if len(dc.Files) == 1 {
+			compose.File = dc.Files[0]
+		} else {
+			compose.Files = dc.Files
+		}
+		return &casefile.FixtureConfig{Compose: compose}
+	}
+	if k8s != nil {
+		return &casefile.FixtureConfig{K3D: &casefile.K3DFixture{
+			K8sDir:           k8s.Dir,
+			AppService:       k8s.AppService,
+			AppDockerFile:    k8s.AppDockerFile,
+			AppDockerContext: k8s.AppDockerContext,
+			AppDockerTag:     k8s.AppDockerTag,
+			AppPort:          k8s.AppDockerPort,
+			ImportImages:     k8s.ImportImages,
+		}}
+	}
+	return nil
 }
 
 func convertSignal(label string, s model.ExpectedSignal) (casefile.AssertionCommon, []string) {
@@ -260,114 +392,6 @@ func keepForMatrix(matrixCondition string, selected *model.Matrix) bool {
 		return true
 	}
 	return re.MatchString(selected.Name)
-}
-
-func composeFixtureHint(name string, def model.TestCaseDefinition) string {
-	fixtureName := slug(name)
-	var b strings.Builder
-	fmt.Fprintf(&b, "suggested oats-config.yaml fixture snippet for %q:\n", name)
-	fmt.Fprintf(&b, "fixture:\n")
-	fmt.Fprintf(&b, "  %s:\n", fixtureName)
-	fmt.Fprintf(&b, "    compose:\n")
-	if len(def.DockerCompose.Files) == 1 {
-		fmt.Fprintf(&b, "      file: %s\n", def.DockerCompose.Files[0])
-	} else if len(def.DockerCompose.Files) > 1 {
-		fmt.Fprintf(&b, "      files: [%s]\n", quotedList(def.DockerCompose.Files))
-	}
-	if len(def.DockerCompose.Environment) > 0 {
-		fmt.Fprintf(&b, "      env: [%s]\n", quotedList(def.DockerCompose.Environment))
-	}
-	return strings.TrimRight(b.String(), "\n")
-}
-
-func kubernetesFixtureHint(name string, def model.TestCaseDefinition) string {
-	fixtureName := slug(name)
-	k := def.Kubernetes
-	var b strings.Builder
-	fmt.Fprintf(&b, "suggested oats-config.yaml fixture snippet for %q:\n", name)
-	fmt.Fprintf(&b, "fixture:\n")
-	fmt.Fprintf(&b, "  %s:\n", fixtureName)
-	fmt.Fprintf(&b, "    k3d:\n")
-	fmt.Fprintf(&b, "      k8s_dir: %s\n", k.Dir)
-	fmt.Fprintf(&b, "      app_service: %s\n", k.AppService)
-	fmt.Fprintf(&b, "      app_docker_file: %s\n", k.AppDockerFile)
-	if k.AppDockerContext != "" {
-		fmt.Fprintf(&b, "      app_docker_context: %s\n", k.AppDockerContext)
-	}
-	fmt.Fprintf(&b, "      app_docker_tag: %s\n", k.AppDockerTag)
-	fmt.Fprintf(&b, "      app_port: %d\n", k.AppDockerPort)
-	if len(k.ImportImages) > 0 {
-		fmt.Fprintf(&b, "      import_images: [%s]\n", quotedList(k.ImportImages))
-	}
-	return strings.TrimRight(b.String(), "\n")
-}
-
-func matrixFixtureHint(name string, m model.Matrix) string {
-	def := model.TestCaseDefinition{
-		DockerCompose: m.DockerCompose,
-		Kubernetes:    m.Kubernetes,
-	}
-	if m.DockerCompose != nil {
-		return composeFixtureHint(name, def)
-	}
-	if m.Kubernetes != nil {
-		return kubernetesFixtureHint(name, def)
-	}
-	return fmt.Sprintf("matrix %q has no fixture override", m.Name)
-}
-
-func matrixExpansionHint(name string, matrix []model.Matrix) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "suggested matrix expansion for %q:\n", name)
-	for _, m := range matrix {
-		fmt.Fprintf(&b, "- %s\n", m.Name)
-		if m.DockerCompose != nil || m.Kubernetes != nil {
-			fixture := indentLines(matrixFixtureHint(fmt.Sprintf("%s [%s]", name, m.Name), m), "  ")
-			fmt.Fprintf(&b, "%s\n", fixture)
-		}
-	}
-	return strings.TrimRight(b.String(), "\n")
-}
-
-func indentLines(s, prefix string) string {
-	lines := strings.Split(s, "\n")
-	for i := range lines {
-		lines[i] = prefix + lines[i]
-	}
-	return strings.Join(lines, "\n")
-}
-
-func quotedList(items []string) string {
-	quoted := make([]string, 0, len(items))
-	for _, item := range items {
-		quoted = append(quoted, fmt.Sprintf("%q", item))
-	}
-	return strings.Join(quoted, ", ")
-}
-
-func slug(s string) string {
-	s = strings.ToLower(s)
-	s = strings.ReplaceAll(s, "_", "-")
-	s = strings.ReplaceAll(s, " ", "-")
-	var b strings.Builder
-	lastDash := false
-	for _, r := range s {
-		keep := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
-		if keep {
-			b.WriteRune(r)
-			lastDash = false
-			continue
-		}
-		if !lastDash {
-			b.WriteByte('-')
-			lastDash = true
-		}
-	}
-	out := strings.Trim(b.String(), "-")
-	if out == "" {
-		return "migrated"
-	}
-	return out
 }
 
 func strPtr(s string) *string { return &s }

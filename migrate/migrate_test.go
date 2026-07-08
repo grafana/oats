@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/grafana/oats/casefile"
+	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/model"
 	"github.com/grafana/oats/testhelpers/kubernetes"
 )
@@ -50,8 +51,11 @@ func TestConvertDefinition_MapsSignalsToMatchSchema(t *testing.T) {
 	if err != nil {
 		fatalf(t, "ConvertDefinition: %v", err)
 	}
-	if c.Seed.Type != "app" || c.Seed.Compose != "docker-compose.yml" {
+	if c.Seed.Type != "app" {
 		fatalf(t, "unexpected seed mapping: %+v", c.Seed)
+	}
+	if c.Fixture == nil || c.Fixture.Compose == nil || c.Fixture.Compose.File != "docker-compose.yml" {
+		fatalf(t, "expected case-local compose fixture, got %+v", c.Fixture)
 	}
 	if c.Interval != 500*time.Millisecond {
 		fatalf(t, "expected interval to carry over, got %v", c.Interval)
@@ -123,15 +127,8 @@ func TestConvertFile_MatrixSampleIsParseable(t *testing.T) {
 		fatalf(t, "ConvertFile matrix sample: %v", err)
 	}
 	joined := strings.Join(warnings, "\n")
-	for _, want := range []string{
-		`matrix definitions are not migrated automatically when multiple entries exist`,
-		`suggested matrix expansion for "matrix test.oats"`,
-		`matrix-test-oats-docker:`,
-		`matrix-test-oats-k8s:`,
-	} {
-		if !strings.Contains(joined, want) {
-			fatalf(t, "expected matrix warning to contain %q:\n%s", want, joined)
-		}
+	if !strings.Contains(joined, "matrix definitions are not migrated automatically when multiple entries exist") {
+		fatalf(t, "expected multi-matrix warning:\n%s", joined)
 	}
 	c, err := casefile.Parse(out)
 	if err != nil {
@@ -167,8 +164,10 @@ expected:
 	if err != nil {
 		fatalf(t, "ConvertFile custom checks: %v", err)
 	}
-	if len(warnings) != 0 {
-		fatalf(t, "expected no warnings for straightforward custom checks, got %v", warnings)
+	// A compose fixture always warns that app_service/app_port must be set by
+	// hand; that is the only expected warning here.
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "app_service + app_port") {
+		fatalf(t, "expected only the app_service warning for straightforward custom checks, got %v", warnings)
 	}
 	c, err := casefile.Parse(out)
 	if err != nil {
@@ -182,7 +181,7 @@ expected:
 	}
 }
 
-func TestConvertDefinition_KubernetesProducesFixtureHint(t *testing.T) {
+func TestConvertDefinition_KubernetesProducesFixtureBlock(t *testing.T) {
 	def := model.TestCaseDefinition{
 		Kubernetes: &kubernetes.Kubernetes{
 			Dir:              "k8s",
@@ -203,28 +202,23 @@ func TestConvertDefinition_KubernetesProducesFixtureHint(t *testing.T) {
 		},
 	}
 
-	c, warnings, err := ConvertDefinition(def, "k8s case")
+	c, _, err := ConvertDefinition(def, "k8s case")
 	if err != nil {
 		fatalf(t, "ConvertDefinition kubernetes: %v", err)
 	}
 	if c.Seed.Type != "app" {
 		fatalf(t, "expected app seed for kubernetes migration, got %+v", c.Seed)
 	}
-	joined := strings.Join(warnings, "\n")
-	for _, want := range []string{
-		`k8s-case:`,
-		`k3d:`,
-		`k8s_dir: k8s`,
-		`app_service: dice`,
-		`app_docker_file: Dockerfile`,
-		`app_docker_context: ..`,
-		`app_docker_tag: dice:test`,
-		`app_port: 8080`,
-		`import_images: ["busybox:latest"]`,
-	} {
-		if !strings.Contains(joined, want) {
-			fatalf(t, "expected kubernetes migration warning to contain %q:\n%s", want, joined)
-		}
+	if c.Fixture == nil || c.Fixture.K3D == nil {
+		fatalf(t, "expected case-local k3d fixture, got %+v", c.Fixture)
+	}
+	k := c.Fixture.K3D
+	if k.K8sDir != "k8s" || k.AppService != "dice" || k.AppDockerFile != "Dockerfile" ||
+		k.AppDockerContext != ".." || k.AppDockerTag != "dice:test" || k.AppPort != 8080 {
+		fatalf(t, "unexpected k3d fixture: %+v", k)
+	}
+	if len(k.ImportImages) != 1 || k.ImportImages[0] != "busybox:latest" {
+		fatalf(t, "unexpected import images: %+v", k.ImportImages)
 	}
 }
 
@@ -276,19 +270,16 @@ func TestConvertDefinition_FlattensSingleMatrixEntry(t *testing.T) {
 	if got := len(c.Expected.Logs); got != 2 {
 		fatalf(t, "expected 2 kept log assertions, got %d (%+v)", got, c.Expected.Logs)
 	}
+	if c.Fixture == nil || c.Fixture.Compose == nil || c.Fixture.Compose.File != "docker-compose.yml" {
+		fatalf(t, "expected single-matrix compose fixture, got %+v", c.Fixture)
+	}
 	joined := strings.Join(warnings, "\n")
-	for _, want := range []string{
-		`flattened single matrix entry "docker"`,
-		`matrix-case-docker:`,
-		`file: docker-compose.yml`,
-	} {
-		if !strings.Contains(joined, want) {
-			fatalf(t, "expected warning to contain %q:\n%s", want, joined)
-		}
+	if !strings.Contains(joined, `flattened single matrix entry "docker"`) {
+		fatalf(t, "expected flatten warning:\n%s", joined)
 	}
 }
 
-func TestConvertDefinition_MultiMatrixEmitsExpansionHint(t *testing.T) {
+func TestConvertDefinition_MultiMatrixWarnsAndFallsBack(t *testing.T) {
 	def := model.TestCaseDefinition{
 		Matrix: []model.Matrix{
 			{
@@ -319,21 +310,21 @@ func TestConvertDefinition_MultiMatrixEmitsExpansionHint(t *testing.T) {
 		},
 	}
 
-	_, warnings, err := ConvertDefinition(def, "matrix case")
+	c, warnings, err := ConvertDefinition(def, "matrix case")
 	if err != nil {
 		fatalf(t, "ConvertDefinition multi matrix: %v", err)
 	}
+	// Multiple matrix entries are not migrated automatically: no fixture is
+	// selected and the case falls back to the inline-otlp placeholder.
+	if c.Fixture != nil {
+		fatalf(t, "expected no fixture for multi-matrix case, got %+v", c.Fixture)
+	}
+	if c.Seed.Type != "inline-otlp" {
+		fatalf(t, "expected inline-otlp fallback, got %+v", c.Seed)
+	}
 	joined := strings.Join(warnings, "\n")
-	for _, want := range []string{
-		`suggested matrix expansion for "matrix case"`,
-		`- docker`,
-		`matrix-case-docker:`,
-		`- k8s`,
-		`matrix-case-k8s:`,
-	} {
-		if !strings.Contains(joined, want) {
-			fatalf(t, "expected warning to contain %q:\n%s", want, joined)
-		}
+	if !strings.Contains(joined, "matrix definitions are not migrated automatically when multiple entries exist") {
+		fatalf(t, "expected multi-matrix warning:\n%s", joined)
 	}
 }
 
@@ -356,6 +347,78 @@ func TestConvertDefinition_MigratesCustomChecks(t *testing.T) {
 	}
 	if len(warnings) == 0 || !strings.Contains(strings.Join(warnings, "\n"), "defaulting seed.type to inline-otlp placeholder") {
 		fatalf(t, "expected placeholder warning, got %v", warnings)
+	}
+}
+
+func TestConvertTree_RewritesCasesAndWritesConfig(t *testing.T) {
+	dir := t.TempDir()
+	composeCase := filepath.Join(dir, "compose.oats.yaml")
+	if err := os.WriteFile(composeCase, []byte(`
+oats-schema-version: 2
+docker-compose:
+  files:
+    - docker-compose.yml
+expected:
+  metrics:
+    - promql: up
+      value: ">= 1"
+`), 0o644); err != nil {
+		fatalf(t, "WriteFile compose: %v", err)
+	}
+	nested := filepath.Join(dir, "nested")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		fatalf(t, "MkdirAll: %v", err)
+	}
+	minimalCase := filepath.Join(nested, "minimal.oats.yaml")
+	if err := os.WriteFile(minimalCase, []byte(`
+oats-schema-version: 2
+expected:
+  custom-checks:
+    - script: ./verify.sh
+`), 0o644); err != nil {
+		fatalf(t, "WriteFile minimal: %v", err)
+	}
+
+	res, err := ConvertTree(dir)
+	if err != nil {
+		fatalf(t, "ConvertTree: %v", err)
+	}
+	if len(res.Written) != 2 {
+		fatalf(t, "expected 2 written cases, got %v", res.Written)
+	}
+
+	// Both legacy files must now be valid v3 cases parseable in place.
+	compose, err := casefile.Load(composeCase)
+	if err != nil {
+		fatalf(t, "compose case should be v3 after migration: %v", err)
+	}
+	if compose.OatsSchemaVersion != casefile.SchemaVersion {
+		fatalf(t, "expected schema version %d, got %d", casefile.SchemaVersion, compose.OatsSchemaVersion)
+	}
+	if compose.Fixture == nil || compose.Fixture.Compose == nil || compose.Fixture.Compose.File != "docker-compose.yml" {
+		fatalf(t, "expected migrated compose fixture, got %+v", compose.Fixture)
+	}
+	if _, err := casefile.Load(minimalCase); err != nil {
+		fatalf(t, "minimal case should be v3 after migration: %v", err)
+	}
+
+	// The generated config must list both cases as explicit relative paths.
+	configPath := filepath.Join(dir, "oats-config.yaml")
+	if res.Config != configPath {
+		fatalf(t, "unexpected config path: %q", res.Config)
+	}
+	cfg, err := discovery.Load(configPath)
+	if err != nil {
+		fatalf(t, "discovery.Load should accept generated config: %v", err)
+	}
+	want := []string{"compose.oats.yaml", "nested/minimal.oats.yaml"}
+	if len(cfg.Cases) != len(want) {
+		fatalf(t, "expected cases %v, got %v", want, cfg.Cases)
+	}
+	for i, w := range want {
+		if cfg.Cases[i] != w {
+			fatalf(t, "expected sorted explicit case %q at %d, got %v", w, i, cfg.Cases)
+		}
 	}
 }
 
