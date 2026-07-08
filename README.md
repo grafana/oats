@@ -1,108 +1,16 @@
 # OpenTelemetry Acceptance Tests (OATs)
 
-OATs is a declarative acceptance-test framework for OpenTelemetry.
+OATs is a declarative acceptance-test framework for OpenTelemetry. You describe,
+in yaml, the telemetry an instrumented app *should* produce — traces, logs,
+metrics, profiles — and OATS drives the app (or seeds telemetry directly), then
+asserts against a real observability stack (Grafana, Loki, Tempo, Prometheus,
+Pyroscope) via [`gcx`](https://github.com/grafana/gcx).
 
-The `oats` binary is the gcx-driven CLI. Legacy direct-yaml invocation has been
-removed; upgrades now use the current `oats.toml` + case-yaml flow.
-
-## Install
-
-```sh
-go install github.com/grafana/oats@latest
-```
-
-## Quick start
-
-```sh
-# Build local dev binaries (oats + gcx) into ./bin
-./scripts/build-local-tools.sh
-
-# Print the CLI version
-bin/oats version
-
-# Print what would run
-bin/oats list --config examples/smoke/oats.toml
-
-# Run
-bin/oats --config examples/smoke/oats.toml
-```
-
-## Layout
-
-- `examples/smoke/` — small runnable examples
-- `examples/fixtures/` — richer compose / k3d fixture examples
-- `UPGRADING.md` — migration notes for older repos
-
-## Current scope
-
-- traces / logs / metrics / profiles via `gcx`
-- structural collector-style `match_spans` / `match`
-- app-backed and inline-OTLP seed modes
-- remote / compose / k3d fixtures
-- custom checks
-- best-effort migration from legacy OATS yaml via:
-
-  ```sh
-  oats migrate path/to/legacy.yaml
-  ```
-
-## CLI
-
-Commands:
-
-```sh
-oats [flags]                     # run the suites (implicit; same as `oats run`)
-oats run [flags]                 # run the suites
-oats list --config oats.toml     # print the run plan and exit
-oats migrate legacy.yaml         # convert one legacy yaml to the v3 shape
-oats cache clear                 # delete all cached results
-oats version                     # print the version
-```
-
-Run flags (on `oats` / `oats run`):
-
-```sh
-oats --config oats.toml --suite smoke
-oats --config oats.toml --tags traces,logs
-oats --config oats.toml --gcx-context my-lgtm
-oats --config oats.toml --no-cache
-oats --config oats.toml --fail-fast
-oats --config oats.toml --format ndjson
-oats -v    # -v / -vv / -vvv increase verbosity
-```
-
-Key flags:
-
-- `--config`
-- `--suite`
-- `--tags`
-- `--timeout`
-- `--interval`
-- `--absent-timeout`
-- `--parallel`
-- `--fail-fast` — stop scheduling further cases after the first case failure
-- `--gcx`
-- `--gcx-context`
-- `-v` / `-vv` / `-vvv` — verbosity
-
-## Config shape
-
-```toml
-[meta]
-version = 2
-
-[[suite]]
-cases = ["examples/smoke/cases/*.yaml"]
-
-[cache]
-ttl_days = 7
-```
-
-Case yaml:
+A case reads like the outcome you care about:
 
 ```yaml
 oats-schema-version: 3
-name: rolldice traces have route attribute
+name: rolldice traces have a route attribute
 
 fixture:
   type: compose
@@ -119,165 +27,96 @@ expected:
     - traceql: '{ span.http.route = "/rolldice" }'
       match_spans:
         - name: "GET /rolldice"
-  metrics:
-    - promql: 'dice_lib_rolls_counter_total{service_name="dice-server"}'
-      value: '>= 0'
-  logs:
-    - logql: '{service_name="dice-server"}'
-      contains: Received request
-  custom-checks:
-    - script: ./verify.sh
 ```
 
-## Seed
+## Install
 
-A case populates the stack before assertions run via one of two `seed.type`
-modes:
+1. Install [mise](https://mise.jdx.dev/).
 
-```yaml
-# App-backed: the suite fixture boots an instrumented app, and `input`
-# requests drive it so it emits telemetry.
-seed:
-  type: app
-input:
-  - path: /rolldice?rolls=5   # method defaults to GET
+2. Pin `oats` and `gcx` into your repo — mise resolves the latest releases and
+   locks them into `mise.toml`:
+
+   ```sh
+   mise use --pin aqua:grafana/oats aqua:grafana/gcx
+   ```
+
+For CI, see [docs/ci.md](docs/ci.md).
+
+Without mise:
+
+- **GitHub releases** — download for your OS/arch from the
+  [oats](https://github.com/grafana/oats/releases) and
+  [gcx](https://github.com/grafana/gcx/releases) release pages.
+- **go install** (oats from source) — `go install github.com/grafana/oats@latest`.
+
+`oats` drives assertions through `gcx`; for fixture-backed runs OATS can
+bootstrap gcx itself, but pinning it explicitly keeps runs reproducible.
+
+## Quick start
+
+```sh
+# Print the run plan without executing
+oats list --config examples/smoke/oats.toml
+
+# Run it
+oats --config examples/smoke/oats.toml
 ```
 
-```yaml
-# Inline-OTLP: the case carries its own payload, pushed as OTLP/HTTP JSON.
-# No app, no SDK. Declare only the signals you need.
-seed:
-  type: inline-otlp
-  traces:
-    - service: my-service
-      spans:
-        - name: seed-operation      # kind defaults to INTERNAL, duration to 200ms
-  logs:
-    - service: my-service
-      body: seed-log-line           # severity_number defaults to 9 (INFO)
-  metrics:
-    - service: my-service
-      name: seed_counter            # monotonic sum → PromQL `seed_counter_total`
-      value: 42
+To hack on OATS itself (builds local `oats` + `gcx` into `./bin`):
+
+```sh
+./scripts/build-local-tools.sh
+bin/oats version
 ```
 
-> Inline-OTLP can seed traces, logs, and metrics. **Profiles cannot be
-> inline-seeded** — assert profiles against an app-backed fixture that produces
-> them (e.g. an eBPF profiler or a pyroscope-instrumented app).
+## CLI
 
-## Assertions
-
-Every signal block under `expected` shares one assertion vocabulary, plus a
-few signal-specific keys. Each entry first names a query, then the checks that
-must hold against its result.
-
-Shared keys (valid on `traces`, `metrics`, `logs`, `profiles`):
-
-| Key | Meaning |
-|-----|---------|
-| `contains` | string (or list) that must appear in the query output |
-| `not_contains` | string (or list) that must **not** appear |
-| `regex` | RE2 pattern (or list) that must match the output |
-| `match` | structural row match — list of `{match_type, name, attributes}` |
-| `count` | comparison against the number of rows, e.g. `'== 1'`, `'>= 2'` |
-| `absent` | the query must return nothing for the whole `--absent-timeout` window |
-
-`match` (and the trace-only `match_spans`) entries:
-
-```yaml
-match:
-  - match_type: strict     # "strict" (default) or "regexp"
-    name: seed-log-line    # for regexp, an RE2 pattern
-    attributes:            # optional; list of {key, value?}
-      - key: service_name
-        value: my-service  # omit `value` to assert the key is merely present
+```sh
+oats [flags]                     # run the suites (implicit; same as `oats run`)
+oats run [flags]                 # run the suites
+oats list --config oats.toml     # print the run plan and exit
+oats migrate legacy.yaml         # convert one legacy yaml to the v3 shape
+oats cache clear                 # delete all cached results
+oats version                     # print the version
 ```
 
-Signal-specific keys:
+Common flags:
 
-- `traces`: `traceql` (required), `match_spans` (span-row match, same shape as `match`)
-- `metrics`: `promql` (required), `value` (compare the sample value, e.g. `'>= 1'`, `'== 42'`)
-- `logs`: `logql` (required)
-- `profiles`: `query` (required)
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--config` | `oats.toml` | path to the config file |
+| `--suite` | all | comma-separated suite names to run |
+| `--tags` | all | comma-separated tags; a case runs if it matches any |
+| `--timeout` | `30s` | per-assertion timeout — each assertion is retried until it passes or this elapses |
+| `--interval` | `500ms` | polling interval between assertion retries |
+| `--absent-timeout` | `10s` | window an `absent` assertion must stay empty |
+| `--parallel` | `1` | suites to run concurrently, when fixture isolation allows |
+| `--fail-fast` | `false` | stop scheduling further cases after the first case failure |
+| `--no-cache` | `false` | disable the skip-when-unchanged cache for this run |
+| `--format` | `text` | output format: `text` or `ndjson` |
+| `--gcx` | `gcx` | path to the gcx binary |
+| `--gcx-context` | derived | override the gcx context (otherwise derived from the fixture endpoint) |
+| `-v` / `-vv` / `-vvv` | — | increase verbosity |
 
-Example covering several shapes:
+Run `oats --help` for the full list, including the inline-OTLP seed host/port
+overrides.
 
-```yaml
-expected:
-  traces:
-    - traceql: '{ resource.service.name = "my-service" }'
-      match_spans:
-        - match_type: regexp
-          name: '^GET /rolldice.*'
-          attributes:
-            - key: service.name
-              value: my-service
-  metrics:
-    - promql: 'seed_counter_total{service_name="my-service"}'
-      value: '>= 1'
-  logs:
-    - logql: '{service_name="my-service"}'
-      regex: '.*rolling the dice.*'
-      count: '>= 1'
-  profiles:
-    - query: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="my-service"}'
-      contains: main
-```
+## What it covers
 
-### compose-logs
+- traces / logs / metrics / profiles, queried through `gcx`
+- structural collector-style row matching (`match` / `match_spans`)
+- app-backed and inline-OTLP seed modes
+- remote / compose / k3d fixtures
+- custom-check scripts
+- best-effort migration from legacy OATS yaml (`oats migrate path/to/legacy.yaml`)
 
-For `compose` fixtures, `expected.compose-logs` greps the container logs
-(`docker compose logs`) for each string — useful for asserting on output that
-never reaches the OTLP pipeline:
+## Documentation
 
-```yaml
-expected:
-  compose-logs:
-    - app started ok
-```
-
-## Custom checks
-
-`expected.custom-checks` runs an arbitrary script and treats **exit code 0 as
-pass**, non-zero as fail. Combined stdout+stderr is captured and printed on
-failure. Like every assertion it is retried until it passes or `--timeout`
-elapses.
-
-```yaml
-expected:
-  custom-checks:
-    - script: ./verify.sh      # resolved relative to the case file's directory
-```
-
-`script` may be a path (relative to the case dir, or absolute) or an inline
-script beginning with a `#!` shebang. The process runs with its working
-directory set to the case dir and inherits the parent environment plus these
-OATS-provided variables:
-
-| Variable | Fixtures | Meaning |
-|----------|----------|---------|
-| `OATS_FIXTURE_TYPE` | all | `remote` / `compose` / `k3d` |
-| `OATS_GRAFANA_URL` | all | base URL of the fixture's Grafana |
-| `OATS_APP_URL` | remote, k3d | base URL of the app under test |
-| `OATS_OTLP_HTTP` | compose, k3d | OTLP/HTTP endpoint |
-| `OATS_PYROSCOPE_URL` | compose, k3d | Pyroscope base URL |
-| `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE`, `OATS_COMPOSE_FILE_ARGS` | compose | let the script run its own `docker compose` commands |
-
-A custom check that queries Grafana directly (replacing, for example, a legacy
-`compose-logs` grep with a real LogQL query):
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-curl -fsS "${OATS_GRAFANA_URL:?}/api/health" >/dev/null
-echo "custom check ok"
-```
-
-## Notes
-
-- Cases inside one suite still run sequentially.
-- Suites can run in parallel with `--parallel N` when fixture isolation allows
-  it. Today that mainly means remote suites and compose suites where OATS owns
-  the LGTM ports (`template = "lgtm"`).
-- Case-local `fixture:` blocks cover the common one-case-per-suite shape.
-- OATS owns local LGTM bootstrapping and gcx bootstrap for fixture-backed runs.
+- **[docs/case-reference.md](docs/case-reference.md)** — the full case + config
+  shape: fixtures, seed modes, the assertion vocabulary, custom checks
+- **[docs/ci.md](docs/ci.md)** — installing and running OATS in CI, plus result
+  caching and its caveats
+- **[UPGRADING.md](UPGRADING.md)** — migrating older (schema-2) repos to v3
+- **[AGENTS.md](AGENTS.md)** — for contributors and coding agents working *on*
+  OATS (build, layout, conventions)
+- `examples/smoke/`, `examples/fixtures/` — small runnable examples

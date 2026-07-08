@@ -1,0 +1,240 @@
+# Case reference
+
+The full shape of an OATS project: the `oats.toml` config, the case yaml, seed
+modes, the assertion vocabulary, and custom checks. For a quick start and the
+CLI summary see the [README](../README.md); for running in CI see
+[ci.md](ci.md).
+
+## oats.toml
+
+```toml
+[meta]
+version = 2          # oats.toml schema version (distinct from a case's oats-schema-version)
+
+[[suite]]
+cases = ["examples/smoke/cases/*.yaml"]
+
+[cache]
+ttl_days = 7         # skip-when-unchanged TTL; 0 → default (7 days)
+```
+
+A suite may pin its own fixture, or let each case carry a case-local `fixture:`
+block (the common one-case-per-suite shape).
+
+## Case yaml
+
+```yaml
+oats-schema-version: 3
+name: rolldice traces have route attribute
+
+fixture:
+  type: compose
+  template: lgtm
+  compose_file: docker-compose.oats.yml
+
+seed:
+  type: app
+input:
+  - path: /rolldice?rolls=5
+
+expected:
+  traces:
+    - traceql: '{ span.http.route = "/rolldice" }'
+      match_spans:
+        - name: "GET /rolldice"
+  metrics:
+    - promql: 'dice_lib_rolls_counter_total{service_name="dice-server"}'
+      value: '>= 0'
+  logs:
+    - logql: '{service_name="dice-server"}'
+      contains: Received request
+  custom-checks:
+    - script: ./verify.sh
+```
+
+## Fixtures
+
+A fixture is the observability stack a case runs against — Grafana + Loki +
+Tempo + Prometheus + Pyroscope, optionally plus the app under test. `fixture.type`
+selects how it is stood up:
+
+| Type | Meaning |
+|------|---------|
+| `remote` | point at an already-running stack (`endpoint:` / a gcx context) |
+| `compose` | OATS boots a docker-compose stack; `template: lgtm` lets OATS own the LGTM ports |
+| `k3d` | OATS boots a k3d (k3s-in-docker) cluster |
+
+`compose` and `k3d` fixtures are booted, waited on for readiness, and torn down
+by OATS. `remote` fixtures are assumed ready.
+
+## Seed
+
+A case populates the stack before assertions run via one of two `seed.type`
+modes:
+
+- **`app`** is the default for acceptance tests: drive your real instrumented
+  app and assert on what it actually emits end-to-end (SDK → collector →
+  backend). This is what most consumer repos want.
+- **`inline-otlp`** carries a hand-written OTLP payload and pushes it straight
+  at the OTLP endpoint — no app, no SDK. Reach for it when there is no app to
+  drive: to exercise the pipeline or backend in isolation (collector
+  processor/transform config, ingestion, query behaviour), or to pin an exact
+  payload shape a test depends on. OATS's own e2e suite leans on it heavily for
+  precisely this — deterministic telemetry without booting an instrumented app.
+
+```yaml
+# App-backed: the suite fixture boots an instrumented app, and `input`
+# requests drive it so it emits telemetry.
+seed:
+  type: app
+input:
+  - path: /rolldice?rolls=5   # method defaults to GET
+```
+
+```yaml
+# Inline-OTLP: the case carries its own payload, pushed as OTLP/HTTP JSON.
+# No app, no SDK. Declare only the signals you need.
+seed:
+  type: inline-otlp
+  traces:
+    - service: my-service
+      spans:
+        - name: seed-operation      # kind defaults to INTERNAL, duration to 200ms
+  logs:
+    - service: my-service
+      body: seed-log-line           # severity_number defaults to 9 (INFO)
+  metrics:
+    - service: my-service
+      name: seed_counter            # monotonic sum → PromQL `seed_counter_total`
+      value: 42
+```
+
+> Inline-OTLP can seed traces, logs, and metrics. **Profiles cannot be
+> inline-seeded** — assert profiles against an app-backed fixture that produces
+> them (e.g. an eBPF profiler or a pyroscope-instrumented app).
+
+## Assertions
+
+Every signal block under `expected` shares one assertion vocabulary, plus a
+few signal-specific keys. Each entry first names a query, then the checks that
+must hold against its result. Every assertion is retried until it passes or
+`--timeout` elapses.
+
+Shared keys (valid on `traces`, `metrics`, `logs`, `profiles`):
+
+| Key | Meaning |
+|-----|---------|
+| `contains` | string (or list) that must appear in the query output |
+| `not_contains` | string (or list) that must **not** appear |
+| `regex` | RE2 pattern (or list) that must match the output |
+| `match` | structural row match — list of `{match_type, name, attributes}` |
+| `count` | comparison against the number of rows, e.g. `'== 1'`, `'>= 2'` |
+| `absent` | the query must return nothing for the whole `--absent-timeout` window |
+
+`match` (and the trace-only `match_spans`) entries:
+
+```yaml
+match:
+  - match_type: strict     # "strict" (default) or "regexp"
+    name: seed-log-line    # for regexp, an RE2 pattern
+    attributes:            # optional; list of {key, value?}
+      - key: service_name
+        value: my-service  # omit `value` to assert the key is merely present
+```
+
+Signal-specific keys:
+
+- `traces`: `traceql` (required), `match_spans` (span-row match, same shape as `match`)
+- `metrics`: `promql` (required), `value` (compare the sample value, e.g. `'>= 1'`, `'== 42'`)
+- `logs`: `logql` (required)
+- `profiles`: `query` (required)
+
+Example covering several shapes:
+
+```yaml
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "my-service" }'
+      match_spans:
+        - match_type: regexp
+          name: '^GET /rolldice.*'
+          attributes:
+            - key: service.name
+              value: my-service
+  metrics:
+    - promql: 'seed_counter_total{service_name="my-service"}'
+      value: '>= 1'
+  logs:
+    - logql: '{service_name="my-service"}'
+      regex: '.*rolling the dice.*'
+      count: '>= 1'
+  profiles:
+    - query: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{service_name="my-service"}'
+      contains: main
+```
+
+### compose-logs
+
+For `compose` fixtures, `expected.compose-logs` greps the container logs
+(`docker compose logs`) for each string — useful for asserting on output that
+never reaches the OTLP pipeline:
+
+```yaml
+expected:
+  compose-logs:
+    - app started ok
+```
+
+## Custom checks
+
+`expected.custom-checks` runs an arbitrary script and treats **exit code 0 as
+pass**, non-zero as fail. Combined stdout+stderr is captured and printed on
+failure. Like every assertion it is retried until it passes or `--timeout`
+elapses.
+
+```yaml
+expected:
+  custom-checks:
+    - script: ./verify.sh      # resolved relative to the case file's directory
+```
+
+`script` may be a path (relative to the case dir, or absolute) or an inline
+script beginning with a `#!` shebang. The process runs with its working
+directory set to the case dir and inherits the parent environment plus these
+OATS-provided variables:
+
+| Variable | Fixtures | Meaning |
+|----------|----------|---------|
+| `OATS_FIXTURE_TYPE` | all | `remote` / `compose` / `k3d` |
+| `OATS_GRAFANA_URL` | all | base URL of the fixture's Grafana |
+| `OATS_APP_URL` | remote, k3d | base URL of the app under test |
+| `OATS_OTLP_HTTP` | compose, k3d | OTLP/HTTP endpoint |
+| `OATS_PYROSCOPE_URL` | compose, k3d | Pyroscope base URL |
+| `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE`, `OATS_COMPOSE_FILE_ARGS` | compose | let the script run its own `docker compose` commands |
+
+A custom check that queries Grafana directly (replacing, for example, a legacy
+`compose-logs` grep with a real LogQL query):
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+curl -fsS "${OATS_GRAFANA_URL:?}/api/health" >/dev/null
+echo "custom check ok"
+```
+
+## Running in parallel
+
+- Cases inside one suite run sequentially.
+- Suites can run concurrently with `--parallel N`, but only where fixture
+  isolation allows it: remote suites, and `template = "lgtm"` compose suites
+  without app seeds. k3d suites and app-seed compose suites always run serially
+  regardless of the flag.
+- **Memory, not CPU, is the limit for compose parallelism.** Each parallel
+  `template = "lgtm"` suite boots its *own* LGTM stack — a unique compose project
+  with dynamically allocated host ports — so suites can neither collide on ports
+  nor see each other's telemetry. That hermetic isolation costs one full LGTM
+  container per concurrent suite (Grafana + Loki + Tempo + Mimir + Prometheus +
+  Pyroscope + collector, on the order of ~1 GB each). `--parallel` therefore
+  defaults to `1`; raise it deliberately, sized to available RAM rather than core
+  count. Remote suites boot nothing and parallelize cheaply.
+- OATS owns local LGTM bootstrapping and gcx bootstrap for fixture-backed runs.

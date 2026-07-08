@@ -14,7 +14,7 @@ The root `oats` binary now runs the gcx-driven current CLI only.
 That means upgrades now require migrating to the current:
 
 - `oats.toml` suite/discovery file
-- current case yaml shape documented in [README.md](README.md)
+- current case yaml shape documented in [docs/case-reference.md](docs/case-reference.md)
 
 The legacy “pass one or more old yaml files directly to `oats`” runner has been
 removed. For one-off help migrating old cases, use:
@@ -92,7 +92,7 @@ vocabulary keyed off `query`:
 (`expected.compose-logs: [ ... ]`). `oats migrate` does **not** convert it (it
 emits a warning); either keep it as-is on a compose fixture, or replace it with
 a `custom-checks` script that queries the backend directly — see the
-[custom checks](README.md#custom-checks) contract.
+[custom checks](docs/case-reference.md#custom-checks) contract.
 
 **`matrix`.** Not migrated automatically. `oats migrate` flattens a single-entry
 matrix and otherwise emits a hint; multi-entry matrices must be split into
@@ -162,7 +162,7 @@ expected:
       contains: "rolling the dice"
 ```
 
-See [README.md](README.md) for the full version-3 assertion reference.
+See [docs/case-reference.md](docs/case-reference.md) for the full version-3 assertion reference.
 
 ## 0.6.0
 
