@@ -111,7 +111,7 @@ Common flags:
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `--config` | found from cwd upward | path to the config file |
+| `--config` | `oats-config.yaml`, searched from cwd upward | path to the config file |
 | `--suite` | all | comma-separated suite names to run |
 | `--tags` | all | comma-separated tags; a case runs if it matches any |
 | `--timeout` | `30s` | per-assertion timeout — each assertion is retried until it passes or this elapses |

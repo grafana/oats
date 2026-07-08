@@ -18,14 +18,26 @@ their own.
 meta:
   version: 3
 suites:
-  - cases: ["cases/*.yaml"]   # globs, relative to this file's directory
+  - cases: ["*/oats-case.yaml"]   # each case in its own subdir; globs are relative to this file
 cache:
-  ttl_days: 7                 # skip-when-unchanged TTL; 0 → default (7 days)
+  ttl_days: 7                     # skip-when-unchanged TTL; 0 → default (7 days)
 ```
 
-A top-level `cases:` list may be used instead of `suites:` for the common
-one-case-per-suite shape. A suite may name a shared fixture (from the `fixture:`
-map) or let each case carry its own case-local `fixture:` block.
+The common layout is one case per directory — a `oats-case.yaml` alongside the
+files it needs (compose files, custom-check scripts) — collected with a glob like
+`*/oats-case.yaml`:
+
+```text
+oats-config.yaml
+go/oats-case.yaml       go/docker-compose.oats.yml
+python/oats-case.yaml   python/docker-compose.oats.yml
+```
+
+Globs are shell-style (`*` matches one path segment; no recursive `**`), so add a
+segment for deeper trees (e.g. `examples/*/oats-case.yaml`) or list several
+patterns. A top-level `cases:` list may be used instead of `suites:` for the
+one-suite shape. A suite may name a shared fixture (from the `fixture:` map) or
+let each case carry its own case-local `fixture:` block.
 
 ## Case yaml
 
