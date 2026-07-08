@@ -13,9 +13,9 @@ oats-schema-version: 3
 name: rolldice traces have a route attribute
 
 fixture:
-  type: compose
-  template: lgtm
-  compose_file: docker-compose.oats.yml
+  compose:
+    template: lgtm
+    file: docker-compose.oats.yml
 
 seed:
   type: app

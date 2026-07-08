@@ -19,11 +19,13 @@ func startK3D(ctx context.Context, plan discovery.Plan) (Handle, Runtime, error)
 	if err := ep.Start(ctx); err != nil {
 		return nil, Runtime{}, err
 	}
+	appPort := plan.Fixture.K3D.AppPort
 	rt := Runtime{
 		GrafanaURL:       fmt.Sprintf("http://localhost:%d", ports.GrafanaHTTPPort),
 		OTLPHTTP:         fmt.Sprintf("http://localhost:%d", ports.OTLPHTTPPort),
 		PyroscopeURL:     fmt.Sprintf("http://localhost:%d", ports.PyroscopeHttpPort),
-		CustomCheckEnv:   k3dCheckEnv(runner.Endpoint{AppHost: "localhost", AppPort: plan.Fixture.AppPort}, ports),
+		AppHostPort:      appPort,
+		CustomCheckEnv:   k3dCheckEnv(runner.Endpoint{AppHost: "localhost", AppPort: appPort}, ports),
 		ParallelSafe:     false,
 		ParallelDisabled: "k3d fixtures currently use shared clusters and kubectl port-forwards",
 	}

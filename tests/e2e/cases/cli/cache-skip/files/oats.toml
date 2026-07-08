@@ -6,6 +6,5 @@ name = "cache"
 cases = ["case.yaml"]
 fixture = "remote-lgtm"
 
-[fixture.remote-lgtm]
-type = "remote"
+[fixture.remote-lgtm.remote]
 endpoint = "{{REMOTE_OTLP_HTTP}}"

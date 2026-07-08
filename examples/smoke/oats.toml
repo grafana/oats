@@ -7,6 +7,5 @@ cases = ["cases/*.yaml"]
 fixture = "local-lgtm"
 tags = ["traces", "logs", "metrics"]
 
-[fixture.local-lgtm]
-type = "remote"
+[fixture.local-lgtm.remote]
 endpoint = "http://localhost:4318"

@@ -57,21 +57,67 @@ type Seed struct {
 	Vars    map[string]any `yaml:"vars,omitempty"`
 }
 
+// FixtureConfig declares how a suite stands up the backends its cases run
+// against. Exactly one of the type-specific blocks is set; the block that is
+// present selects the fixture kind. Dual toml/yaml tags let the same struct
+// load from oats.toml (BurntSushi/toml) and from a case yaml (yaml.v3).
 type FixtureConfig struct {
-	Type             string   `yaml:"type,omitempty"`
-	Template         string   `yaml:"template,omitempty"`
-	ComposeFile      string   `yaml:"compose_file,omitempty"`
-	ComposeFiles     []string `yaml:"compose_files,omitempty"`
-	Env              []string `yaml:"env,omitempty"`
-	K8sDir           string   `yaml:"k8s_dir,omitempty"`
-	AppService       string   `yaml:"app_service,omitempty"`
-	AppDockerFile    string   `yaml:"app_docker_file,omitempty"`
-	AppDockerContext string   `yaml:"app_docker_context,omitempty"`
-	AppDockerTag     string   `yaml:"app_docker_tag,omitempty"`
-	AppPort          int      `yaml:"app_port,omitempty"`
-	ImportImages     []string `yaml:"import_images,omitempty"`
-	PoolSize         int      `yaml:"pool_size,omitempty"`
-	Endpoint         string   `yaml:"endpoint,omitempty"`
+	Compose *ComposeFixture `toml:"compose,omitempty" yaml:"compose,omitempty"`
+	K3D     *K3DFixture     `toml:"k3d,omitempty" yaml:"k3d,omitempty"`
+	Remote  *RemoteFixture  `toml:"remote,omitempty" yaml:"remote,omitempty"`
+}
+
+// ComposeFixture boots a docker-compose stack. template selects a built-in
+// stack ("lgtm"); file/files point at compose files relative to the fixture
+// source dir. app_service + app_port let OATS publish and discover an
+// ephemeral host port for the application under test.
+type ComposeFixture struct {
+	Template   string   `toml:"template,omitempty" yaml:"template,omitempty"`
+	File       string   `toml:"file,omitempty" yaml:"file,omitempty"`
+	Files      []string `toml:"files,omitempty" yaml:"files,omitempty"`
+	Env        []string `toml:"env,omitempty" yaml:"env,omitempty"`
+	AppService string   `toml:"app_service,omitempty" yaml:"app_service,omitempty"`
+	AppPort    int      `toml:"app_port,omitempty" yaml:"app_port,omitempty"`
+}
+
+// K3DFixture boots a k3d cluster and builds/imports the application image.
+type K3DFixture struct {
+	K8sDir           string   `toml:"k8s_dir,omitempty" yaml:"k8s_dir,omitempty"`
+	AppService       string   `toml:"app_service,omitempty" yaml:"app_service,omitempty"`
+	AppDockerFile    string   `toml:"app_docker_file,omitempty" yaml:"app_docker_file,omitempty"`
+	AppDockerContext string   `toml:"app_docker_context,omitempty" yaml:"app_docker_context,omitempty"`
+	AppDockerTag     string   `toml:"app_docker_tag,omitempty" yaml:"app_docker_tag,omitempty"`
+	AppPort          int      `toml:"app_port,omitempty" yaml:"app_port,omitempty"`
+	ImportImages     []string `toml:"import_images,omitempty" yaml:"import_images,omitempty"`
+	PoolSize         int      `toml:"pool_size,omitempty" yaml:"pool_size,omitempty"`
+}
+
+// RemoteFixture points at an already-running stack; OATS boots nothing.
+type RemoteFixture struct {
+	Endpoint string `toml:"endpoint,omitempty" yaml:"endpoint,omitempty"`
+}
+
+// Kind returns "compose"/"k3d"/"remote", or "" when no block is set. Exactly
+// one block should be set (enforced by Validate).
+func (f FixtureConfig) Kind() string {
+	switch {
+	case f.Compose != nil:
+		return "compose"
+	case f.K3D != nil:
+		return "k3d"
+	case f.Remote != nil:
+		return "remote"
+	default:
+		return ""
+	}
+}
+
+// HasManagedApp reports whether OATS manages the compose app endpoint (so it
+// can publish + discover an ephemeral host port): a compose block with
+// app_service + app_port. It drives both the parallel-safety gate and app-port
+// discovery, so the two stay in lockstep.
+func (f FixtureConfig) HasManagedApp() bool {
+	return f.Compose != nil && f.Compose.AppService != "" && f.Compose.AppPort > 0
 }
 
 type SeedTrace struct {
@@ -412,27 +458,38 @@ func (c *Case) Validate() error {
 	return nil
 }
 
-func (f FixtureConfig) Validate(path string) error {
-	switch f.Type {
-	case "compose":
-		if f.Template == "" && f.ComposeFile == "" && len(f.ComposeFiles) == 0 {
-			return fmt.Errorf("%s: type=compose requires template, compose_file, or compose_files", path)
+// Validate enforces that exactly one fixture block is set and that the set
+// block carries the fields its kind requires. label names the fixture in
+// error messages (the fixture name from oats.toml, or "fixture" for a
+// case-level block).
+func (f FixtureConfig) Validate(label string) error {
+	set := 0
+	for _, present := range []bool{f.Compose != nil, f.K3D != nil, f.Remote != nil} {
+		if present {
+			set++
 		}
-		if f.ComposeFile != "" && len(f.ComposeFiles) > 0 {
-			return fmt.Errorf("%s: use compose_file or compose_files, not both", path)
+	}
+	if set != 1 {
+		return fmt.Errorf("fixture %q: set exactly one of compose/k3d/remote", label)
+	}
+	switch {
+	case f.Compose != nil:
+		c := f.Compose
+		if c.Template == "" && c.File == "" && len(c.Files) == 0 {
+			return fmt.Errorf("fixture %q: compose requires template, file, or files", label)
 		}
-	case "k3d":
-		if f.K8sDir == "" || f.AppService == "" || f.AppDockerFile == "" || f.AppDockerTag == "" || f.AppPort == 0 {
-			return fmt.Errorf("%s: type=k3d requires k8s_dir, app_service, app_docker_file, app_docker_tag, and app_port", path)
+		if c.File != "" && len(c.Files) > 0 {
+			return fmt.Errorf("fixture %q: compose sets file or files, not both", label)
 		}
-	case "remote":
-		if f.Endpoint == "" {
-			return fmt.Errorf("%s: type=remote requires endpoint", path)
+	case f.K3D != nil:
+		k := f.K3D
+		if k.K8sDir == "" || k.AppService == "" || k.AppDockerFile == "" || k.AppDockerTag == "" || k.AppPort == 0 {
+			return fmt.Errorf("fixture %q: k3d requires k8s_dir, app_service, app_docker_file, app_docker_tag, and app_port", label)
 		}
-	case "":
-		return fmt.Errorf("%s.type: required (compose | k3d | remote)", path)
-	default:
-		return fmt.Errorf("%s.type: unknown value %q (expected compose, k3d, or remote)", path, f.Type)
+	case f.Remote != nil:
+		if f.Remote.Endpoint == "" {
+			return fmt.Errorf("fixture %q: remote requires endpoint", label)
+		}
 	}
 	return nil
 }

@@ -31,14 +31,15 @@ var (
 		if sourceDir == "" {
 			sourceDir = "."
 		}
+		k3d := plan.Fixture.K3D
 		model := &kubernetes.Kubernetes{
-			Dir:              plan.Fixture.K8sDir,
-			AppService:       plan.Fixture.AppService,
-			AppDockerFile:    plan.Fixture.AppDockerFile,
-			AppDockerContext: plan.Fixture.AppDockerContext,
-			AppDockerTag:     plan.Fixture.AppDockerTag,
-			AppDockerPort:    plan.Fixture.AppPort,
-			ImportImages:     plan.Fixture.ImportImages,
+			Dir:              k3d.K8sDir,
+			AppService:       k3d.AppService,
+			AppDockerFile:    k3d.AppDockerFile,
+			AppDockerContext: k3d.AppDockerContext,
+			AppDockerTag:     k3d.AppDockerTag,
+			AppDockerPort:    k3d.AppPort,
+			ImportImages:     k3d.ImportImages,
 		}
 		return kubernetes.NewEndpoint("localhost", model, ports, plan.Suite.Name, sourceDir)
 	}
@@ -76,7 +77,7 @@ type startableHandle interface {
 // teardown plus the resolved Runtime. Remote/empty fixtures need no boot and
 // return a nil Handle.
 func Start(ctx context.Context, plan discovery.Plan) (Handle, Runtime, error) {
-	switch plan.Fixture.Type {
+	switch plan.Fixture.Kind() {
 	case "", "remote":
 		return nil, Runtime{ParallelSafe: true}, nil
 	case "compose":
@@ -84,14 +85,14 @@ func Start(ctx context.Context, plan discovery.Plan) (Handle, Runtime, error) {
 	case "k3d":
 		return startK3D(ctx, plan)
 	default:
-		return nil, Runtime{}, fmt.Errorf("fixture type %q is not supported in oats", plan.Fixture.Type)
+		return nil, Runtime{}, fmt.Errorf("fixture kind %q is not supported in oats", plan.Fixture.Kind())
 	}
 }
 
 // WaitForReady blocks until the fixture's Grafana and OTLP endpoints answer, or
 // the per-endpoint timeout elapses. Remote/empty fixtures are assumed ready.
 func WaitForReady(plan discovery.Plan, rt Runtime) error {
-	switch plan.Fixture.Type {
+	switch plan.Fixture.Kind() {
 	case "compose", "k3d":
 		if err := waitForHTTP(rt.GrafanaURL+"/api/health", 2*time.Minute); err != nil {
 			return fmt.Errorf("wait for grafana: %w", err)
@@ -106,11 +107,11 @@ func WaitForReady(plan discovery.Plan, rt Runtime) error {
 // SupportsParallel reports whether a suite on this fixture can run alongside
 // other suites, and if not, a human-readable reason.
 func SupportsParallel(plan discovery.Plan) (bool, string) {
-	switch plan.Fixture.Type {
+	switch plan.Fixture.Kind() {
 	case "", "remote":
 		return true, ""
 	case "compose":
-		if plan.Fixture.Template != "lgtm" {
+		if plan.Fixture.Compose.Template != "lgtm" {
 			return false, "compose fixtures are only parallel-safe when OATS owns the LGTM ports via template=lgtm"
 		}
 		for _, c := range plan.Cases {
@@ -119,7 +120,7 @@ func SupportsParallel(plan discovery.Plan) (bool, string) {
 			// fixture.app_service (+ app_port) so the published port can be
 			// discovered. Without it the app falls back to the fixed --app-port
 			// and parallel suites would collide.
-			if c.Seed.Type == "app" && (plan.Fixture.AppService == "" || plan.Fixture.AppPort == 0) {
+			if c.Seed.Type == "app" && !plan.Fixture.HasManagedApp() {
 				return false, "compose app-seed suites need fixture.app_service and app_port so OATS can publish an ephemeral app port; otherwise they share a fixed app port"
 			}
 		}
@@ -244,7 +245,7 @@ func waitForGrafanaTokenImpl(plan discovery.Plan) (string, error) {
 	for time.Now().Before(deadline) {
 		var token string
 		var err error
-		switch plan.Fixture.Type {
+		switch plan.Fixture.Kind() {
 		case "compose":
 			token, err = readComposeGrafanaToken(plan)
 		case "k3d":

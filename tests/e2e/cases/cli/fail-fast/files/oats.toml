@@ -6,6 +6,5 @@ name = "failfast"
 cases = ["01-fail.yaml", "02-pass.yaml"]
 fixture = "remote-lgtm"
 
-[fixture.remote-lgtm]
-type = "remote"
+[fixture.remote-lgtm.remote]
 endpoint = "{{REMOTE_OTLP_HTTP}}"

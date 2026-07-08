@@ -28,9 +28,9 @@ oats-schema-version: 3
 name: rolldice traces have route attribute
 
 fixture:
-  type: compose
-  template: lgtm
-  compose_file: docker-compose.oats.yml
+  compose:
+    template: lgtm
+    file: docker-compose.oats.yml
 
 seed:
   type: app
@@ -55,23 +55,43 @@ expected:
 ## Fixtures
 
 A fixture is the observability stack a case runs against — Grafana + Loki +
-Tempo + Prometheus + Pyroscope, optionally plus the app under test. `fixture.type`
-selects how it is stood up:
+Tempo + Prometheus + Pyroscope, optionally plus the app under test. Set exactly
+one of three nested blocks; the block you set selects how the stack is stood up
+(there is no separate `type` field):
 
-| Type | Meaning |
-|------|---------|
+| Block | Meaning |
+|-------|---------|
 | `remote` | point at an already-running stack (`endpoint:` / a gcx context) |
 | `compose` | OATS boots a docker-compose stack; `template: lgtm` lets OATS own the LGTM ports |
 | `k3d` | OATS boots a k3d (k3s-in-docker) cluster |
+
+```yaml
+fixture:
+  remote:
+    endpoint: http://localhost:4318
+---
+fixture:
+  compose:
+    template: lgtm
+    file: docker-compose.oats.yml   # or files: [a.yml, b.yml]
+---
+fixture:
+  k3d:
+    k8s_dir: k8s
+    app_service: rolldice
+    app_docker_file: Dockerfile
+    app_port: 8080
+```
 
 `compose` and `k3d` fixtures are booted, waited on for readiness, and torn down
 by OATS. `remote` fixtures are assumed ready.
 
 For a `compose` fixture driven by a `seed: app` case, set `app_service` (the
-compose service name of the app) and `app_port` (the app's container port). OATS
-then discovers the host port docker published for that service, so the app can
-bind an **ephemeral** host port (`127.0.0.1::<app_port>`) rather than a fixed one
-— which is what lets app-seed suites run under `--parallel` without colliding.
+compose service name of the app) and `app_port` (the app's container port) inside
+the `compose` block. OATS then discovers the host port docker published for that
+service, so the app can bind an **ephemeral** host port (`127.0.0.1::<app_port>`)
+rather than a fixed one — which is what lets app-seed suites run under `--parallel`
+without colliding.
 Omit them and the app is driven on the fixed `--app-port` (default 8080), which
 forces the suite to run serially.
 

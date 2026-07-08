@@ -9,16 +9,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 )
 
 func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
-	composeFiles, cleanup, err := resolveComposeFiles(plan.FixtureSourceDir, plan.Fixture)
+	compose := plan.Fixture.Compose
+	composeFiles, cleanup, err := resolveComposeFiles(plan.FixtureSourceDir, compose)
 	if err != nil {
 		return nil, Runtime{}, err
 	}
 	project := composeProjectName(plan)
-	suiteEnv := append([]string(nil), plan.Fixture.Env...)
+	suiteEnv := append([]string(nil), compose.Env...)
 	suiteEnv = append(suiteEnv, "COMPOSE_PROJECT_NAME="+project)
 	suite, err := newComposeSuite(composeFiles, suiteEnv)
 	if err != nil {
@@ -33,29 +35,25 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 		}
 		return nil, Runtime{}, err
 	}
-	grafanaPort, err := lookupComposePort(composeFiles, suiteEnv, "lgtm", "3000")
-	if err != nil {
+	// fail tears the started suite (and any file cleanup) down before returning.
+	fail := func(err error) (Handle, Runtime, error) {
 		_ = suite.Close()
 		if cleanup != nil {
 			_ = cleanup()
 		}
 		return nil, Runtime{}, err
+	}
+	grafanaPort, err := lookupComposePort(composeFiles, suiteEnv, "lgtm", "3000")
+	if err != nil {
+		return fail(err)
 	}
 	otlpPort, err := lookupComposePort(composeFiles, suiteEnv, "lgtm", "4318")
 	if err != nil {
-		_ = suite.Close()
-		if cleanup != nil {
-			_ = cleanup()
-		}
-		return nil, Runtime{}, err
+		return fail(err)
 	}
 	pyroscopePort, err := lookupComposePort(composeFiles, suiteEnv, "lgtm", "4040")
 	if err != nil {
-		_ = suite.Close()
-		if cleanup != nil {
-			_ = cleanup()
-		}
-		return nil, Runtime{}, err
+		return fail(err)
 	}
 	rt := Runtime{
 		GrafanaURL:     "http://127.0.0.1:" + grafanaPort,
@@ -64,34 +62,24 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 		ComposeFiles:   composeFiles,
 		ComposeProject: project,
 	}
-	// When the fixture names an app service, resolve the port docker published
-	// for it. This lets the app bind an ephemeral host port (127.0.0.1::<port>)
-	// instead of a fixed one, which is what makes app-seed suites parallel-safe.
-	if plan.Fixture.AppService != "" && plan.Fixture.AppPort > 0 {
-		appPort, portErr := lookupComposePort(composeFiles, suiteEnv, plan.Fixture.AppService, strconv.Itoa(plan.Fixture.AppPort))
+	// When the fixture manages the app (app_service + app_port), resolve the host
+	// port docker published for it. This lets the app bind an ephemeral host port
+	// (127.0.0.1::<port>) instead of a fixed one, which is what makes app-seed
+	// suites parallel-safe.
+	if plan.Fixture.HasManagedApp() {
+		appPort, portErr := lookupComposePort(composeFiles, suiteEnv, compose.AppService, strconv.Itoa(compose.AppPort))
 		if portErr != nil {
-			_ = suite.Close()
-			if cleanup != nil {
-				_ = cleanup()
-			}
-			return nil, Runtime{}, fmt.Errorf("resolve app host port for service %q: %w", plan.Fixture.AppService, portErr)
+			return fail(fmt.Errorf("resolve app host port for service %q: %w", compose.AppService, portErr))
 		}
 		p, convErr := strconv.Atoi(appPort)
 		if convErr != nil {
-			_ = suite.Close()
-			if cleanup != nil {
-				_ = cleanup()
-			}
-			return nil, Runtime{}, fmt.Errorf("invalid app host port %q for service %q: %w", appPort, plan.Fixture.AppService, convErr)
+			return fail(fmt.Errorf("invalid app host port %q for service %q: %w", appPort, compose.AppService, convErr))
 		}
 		rt.AppHostPort = p
 	}
 	cfg, cfgErr := writeLocalGCXConfig(rt.GrafanaURL)
 	if cfgErr != nil {
-		if cleanup != nil {
-			_ = cleanup()
-		}
-		return nil, Runtime{}, fmt.Errorf("write local gcx config: %w", cfgErr)
+		return fail(fmt.Errorf("write local gcx config: %w", cfgErr))
 	}
 	rt.GCXConfig = cfg
 	cleanup = chainCleanup(func() error { return removeIfExists(cfg) }, cleanup)
@@ -100,28 +88,28 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 	return composeFixture{suite: suite, cleanup: cleanup}, rt, nil
 }
 
-func resolveComposeFiles(sourceDir string, fixture discovery.FixtureConfig) ([]string, func() error, error) {
+func resolveComposeFiles(sourceDir string, compose *casefile.ComposeFixture) ([]string, func() error, error) {
 	var files []string
 	var cleanup func() error
-	if fixture.Template == "lgtm" {
+	if compose.Template == "lgtm" {
 		f, err := writeBuiltinLGTMCompose(sourceDir)
 		if err != nil {
 			return nil, nil, err
 		}
 		files = append(files, f)
 		cleanup = func() error { return os.Remove(f) }
-	} else if fixture.Template != "" {
-		return nil, nil, fmt.Errorf("unsupported compose fixture template %q", fixture.Template)
+	} else if compose.Template != "" {
+		return nil, nil, fmt.Errorf("unsupported compose fixture template %q", compose.Template)
 	}
 	switch {
-	case fixture.ComposeFile != "":
-		files = append(files, filepath.Join(sourceDir, fixture.ComposeFile))
-	case len(fixture.ComposeFiles) > 0:
-		for _, file := range fixture.ComposeFiles {
+	case compose.File != "":
+		files = append(files, filepath.Join(sourceDir, compose.File))
+	case len(compose.Files) > 0:
+		for _, file := range compose.Files {
 			files = append(files, filepath.Join(sourceDir, file))
 		}
-	case fixture.Template == "":
-		return nil, nil, fmt.Errorf("compose fixture requires compose_file, compose_files, or supported template")
+	case compose.Template == "":
+		return nil, nil, fmt.Errorf("compose fixture requires file, files, or supported template")
 	}
 	return files, cleanup, nil
 }
@@ -211,12 +199,13 @@ func composeProjectName(plan discovery.Plan) string {
 }
 
 func extraComposeFiles(plan discovery.Plan) []string {
+	compose := plan.Fixture.Compose
 	switch {
-	case plan.Fixture.ComposeFile != "":
-		return []string{filepath.Join(plan.FixtureSourceDir, plan.Fixture.ComposeFile)}
-	case len(plan.Fixture.ComposeFiles) > 0:
-		files := make([]string, 0, len(plan.Fixture.ComposeFiles))
-		for _, file := range plan.Fixture.ComposeFiles {
+	case compose.File != "":
+		return []string{filepath.Join(plan.FixtureSourceDir, compose.File)}
+	case len(compose.Files) > 0:
+		files := make([]string, 0, len(compose.Files))
+		for _, file := range compose.Files {
 			files = append(files, filepath.Join(plan.FixtureSourceDir, file))
 		}
 		return files
@@ -287,7 +276,8 @@ func fixedShortPortMapping(value string) bool {
 }
 
 func readComposeGrafanaToken(plan discovery.Plan) (string, error) {
-	files, _, err := resolveComposeFiles(plan.FixtureSourceDir, plan.Fixture)
+	compose := plan.Fixture.Compose
+	files, _, err := resolveComposeFiles(plan.FixtureSourceDir, compose)
 	if err != nil {
 		return "", err
 	}
@@ -297,7 +287,7 @@ func readComposeGrafanaToken(plan discovery.Plan) (string, error) {
 	}
 	args = append(args, "exec", "-T", "lgtm", "sh", "-c", "cat /tmp/grafana-sa-token 2>/dev/null || true")
 	cmd := exec.Command("docker", args...)
-	cmd.Env = append(cmd.Environ(), plan.Fixture.Env...)
+	cmd.Env = append(cmd.Environ(), compose.Env...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err

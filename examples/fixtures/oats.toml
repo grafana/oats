@@ -13,13 +13,11 @@ cases = ["cases/k3d/*.yaml"]
 fixture = "k3d-dev"
 tags = ["k3d", "app"]
 
-[fixture.compose-dev]
-type = "compose"
-compose_files = ["docker-compose.yml", "docker-compose.override.yml"]
+[fixture.compose-dev.compose]
+files = ["docker-compose.yml", "docker-compose.override.yml"]
 env = ["OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318"]
 
-[fixture.k3d-dev]
-type = "k3d"
+[fixture.k3d-dev.k3d]
 k8s_dir = "k8s"
 app_service = "rolldice"
 app_docker_file = "Dockerfile"

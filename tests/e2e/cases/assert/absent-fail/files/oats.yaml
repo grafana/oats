@@ -1,8 +1,8 @@
 oats-schema-version: 3
 name: absent-fail
 fixture:
-  type: remote
-  endpoint: {{REMOTE_OTLP_HTTP}}
+  remote:
+    endpoint: {{REMOTE_OTLP_HTTP}}
 seed:
   type: inline-otlp
   logs:

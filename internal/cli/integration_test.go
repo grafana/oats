@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/fixture"
@@ -25,7 +26,7 @@ import (
 func TestResolveEndpoint_ComposeDefaults(t *testing.T) {
 	ep, err := resolveEndpoint(discovery.Plan{
 		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
-		Fixture: discovery.FixtureConfig{Type: "compose", Template: "lgtm"},
+		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}},
 	}, fixture.Runtime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318"}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
@@ -35,11 +36,14 @@ func TestResolveEndpoint_ComposeDefaults(t *testing.T) {
 	}
 }
 
-func TestResolveEndpoint_K3DUsesFixtureAppPort(t *testing.T) {
+func TestResolveEndpoint_UsesRuntimeAppHostPort(t *testing.T) {
+	// The resolved app host port is surfaced uniformly through Runtime (compose
+	// discovers an ephemeral port, k3d copies its configured one), and
+	// resolveEndpoint applies it regardless of fixture type.
 	ep, err := resolveEndpoint(discovery.Plan{
 		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "cluster"},
-		Fixture: discovery.FixtureConfig{Type: "k3d", AppPort: 18080},
-	}, fixture.Runtime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318"}, "", "localhost", 8080, "http://localhost:4318")
+		Fixture: casefile.FixtureConfig{K3D: &casefile.K3DFixture{AppPort: 18080}},
+	}, fixture.Runtime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318", AppHostPort: 18080}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -53,7 +57,7 @@ func TestCloseFixture_EmitsTeardownEvent(t *testing.T) {
 	fix := &fakeSuiteFixture{}
 	plan := discovery.Plan{
 		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
-		Fixture: discovery.FixtureConfig{Type: "compose"},
+		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}},
 	}
 	if err := closeFixture(rep, plan, fix); err != nil {
 		t.Fatalf("closeFixture: %v", err)
@@ -74,7 +78,7 @@ func TestCloseFixture_RemoteDoesNotEmitTeardownEvent(t *testing.T) {
 	fix := &fakeSuiteFixture{}
 	plan := discovery.Plan{
 		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "remote-lgtm"},
-		Fixture: discovery.FixtureConfig{Type: "remote"},
+		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}},
 	}
 	if err := closeFixture(rep, plan, fix); err != nil {
 		t.Fatalf("closeFixture: %v", err)
@@ -91,7 +95,7 @@ func TestEmitFixtureStartAndReady(t *testing.T) {
 	rep := &recordingReporter{}
 	plan := discovery.Plan{
 		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
-		Fixture: discovery.FixtureConfig{Type: "compose"},
+		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}},
 	}
 	start := emitFixtureStart(rep, plan)
 	if start.IsZero() {
@@ -117,7 +121,7 @@ func TestEmitFixtureStartAndReady_NoOpForRemote(t *testing.T) {
 	rep := &recordingReporter{}
 	plan := discovery.Plan{
 		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "remote-lgtm"},
-		Fixture: discovery.FixtureConfig{Type: "remote"},
+		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}},
 	}
 	start := emitFixtureStart(rep, plan)
 	if start.IsZero() {
@@ -150,8 +154,7 @@ name    = "smoke"
 cases   = ["cases/*.yaml"]
 fixture = "remote-lgtm"
 
-[fixture.remote-lgtm]
-type     = "remote"
+[fixture.remote-lgtm.remote]
 endpoint = "REPLACED_AT_RUNTIME"
 `)
 	writeFile(t, dir, "cases/inline.yaml", `oats-schema-version: 3
@@ -273,8 +276,7 @@ name    = "smoke"
 cases   = ["cases/*.yaml"]
 fixture = "remote-lgtm"
 
-[fixture.remote-lgtm]
-type     = "remote"
+[fixture.remote-lgtm.remote]
 endpoint = "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/app.yaml", `oats-schema-version: 3
@@ -360,8 +362,7 @@ name    = "profiles"
 cases   = ["cases/*.yaml"]
 fixture = "remote-lgtm"
 
-[fixture.remote-lgtm]
-type     = "remote"
+[fixture.remote-lgtm.remote]
 endpoint = "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/profile.yaml", `oats-schema-version: 3
@@ -449,8 +450,7 @@ name    = "migrated-profile"
 cases   = ["cases/*.yaml"]
 fixture = "remote-lgtm"
 
-[fixture.remote-lgtm]
-type     = "remote"
+[fixture.remote-lgtm.remote]
 endpoint = "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
@@ -537,8 +537,7 @@ name    = "migrated"
 cases   = ["cases/*.yaml"]
 fixture = "remote-lgtm"
 
-[fixture.remote-lgtm]
-type     = "remote"
+[fixture.remote-lgtm.remote]
 endpoint = "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
@@ -616,8 +615,7 @@ name    = "migrated-custom"
 cases   = ["cases/*.yaml"]
 fixture = "remote-lgtm"
 
-[fixture.remote-lgtm]
-type     = "remote"
+[fixture.remote-lgtm.remote]
 endpoint = "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
@@ -690,8 +688,7 @@ name    = "migrated-custom-path"
 cases   = ["cases/*.yaml"]
 fixture = "remote-lgtm"
 
-[fixture.remote-lgtm]
-type     = "remote"
+[fixture.remote-lgtm.remote]
 endpoint = "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
@@ -786,8 +783,7 @@ name    = "migrated-matrix"
 cases   = ["cases/*.yaml"]
 fixture = "remote-lgtm"
 
-[fixture.remote-lgtm]
-type     = "remote"
+[fixture.remote-lgtm.remote]
 endpoint = "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))

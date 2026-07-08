@@ -135,9 +135,8 @@ name    = "rolldice"
 cases   = ["cases/*.yaml"]
 fixture = "compose-lgtm"
 
-[fixture.compose-lgtm]
-type         = "compose"
-compose_file = "docker-compose.yaml"
+[fixture.compose-lgtm.compose]
+file = "docker-compose.yaml"
 ```
 
 ```yaml

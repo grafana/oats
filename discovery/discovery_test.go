@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/grafana/oats/casefile"
 )
 
 func writeFile(t *testing.T, dir, rel, body string) {
@@ -41,8 +43,7 @@ cases = ["cases/*.yaml"]
 fixture = "lgtm-shared"
 tags = ["traces"]
 
-[fixture.lgtm-shared]
-type = "compose"
+[fixture.lgtm-shared.compose]
 template = "lgtm"
 `)
 	writeFile(t, dir, "cases/a.yaml", strings.Replace(validCaseYAML, "%s", "case-a", 1))
@@ -66,7 +67,7 @@ template = "lgtm"
 	if plans[0].Cases[0].Name != "case-a" {
 		t.Errorf("sort order: got %q first", plans[0].Cases[0].Name)
 	}
-	if plans[0].Fixture.Type != "compose" {
+	if plans[0].Fixture.Kind() != "compose" {
 		t.Errorf("fixture resolved wrong: %+v", plans[0].Fixture)
 	}
 }
@@ -173,17 +174,34 @@ cases = ["b.yaml"]
 	}
 }
 
-func TestValidate_BadFixtureType(t *testing.T) {
+func TestValidate_EmptyFixtureRejected(t *testing.T) {
 	cfg := &RootConfig{
 		Meta: Meta{Version: 2},
 		Suites: []SuiteConfig{{
 			Name: "s", Cases: []string{"a.yaml"}, Fixture: "x",
 		}},
-		Fixture: map[string]FixtureConfig{"x": {Type: "weird"}},
+		Fixture: map[string]casefile.FixtureConfig{"x": {}},
 	}
 	err := cfg.Validate()
-	if err == nil || !strings.Contains(err.Error(), `unknown type "weird"`) {
-		t.Errorf("expected unknown-type error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "set exactly one of compose/k3d/remote") {
+		t.Errorf("expected empty-fixture error, got %v", err)
+	}
+}
+
+func TestValidate_MultipleFixtureBlocksRejected(t *testing.T) {
+	cfg := &RootConfig{
+		Meta: Meta{Version: 2},
+		Suites: []SuiteConfig{{
+			Name: "s", Cases: []string{"a.yaml"}, Fixture: "x",
+		}},
+		Fixture: map[string]casefile.FixtureConfig{"x": {
+			Compose: &casefile.ComposeFixture{Template: "lgtm"},
+			Remote:  &casefile.RemoteFixture{Endpoint: "http://localhost:4318"},
+		}},
+	}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "set exactly one of compose/k3d/remote") {
+		t.Errorf("expected multiple-block error, got %v", err)
 	}
 }
 
@@ -204,7 +222,7 @@ func TestValidate_RemoteRequiresEndpoint(t *testing.T) {
 	cfg := &RootConfig{
 		Meta:    Meta{Version: 2},
 		Suites:  []SuiteConfig{{Name: "s", Cases: []string{"a.yaml"}}},
-		Fixture: map[string]FixtureConfig{"r": {Type: "remote"}},
+		Fixture: map[string]casefile.FixtureConfig{"r": {Remote: &casefile.RemoteFixture{}}},
 	}
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "endpoint") {
 		t.Errorf("expected endpoint error, got %v", err)
@@ -217,15 +235,16 @@ func TestValidate_ComposeFilesConflict(t *testing.T) {
 		Suites: []SuiteConfig{{
 			Name: "s", Cases: []string{"a.yaml"}, Fixture: "c",
 		}},
-		Fixture: map[string]FixtureConfig{"c": {
-			Type:        "compose",
-			ComposeFile: "one.yml",
-			ComposeFiles: []string{
-				"two.yml",
+		Fixture: map[string]casefile.FixtureConfig{"c": {
+			Compose: &casefile.ComposeFixture{
+				File: "one.yml",
+				Files: []string{
+					"two.yml",
+				},
 			},
 		}},
 	}
-	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "compose_file or compose_files") {
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "compose sets file or files, not both") {
 		t.Errorf("expected compose conflict error, got %v", err)
 	}
 }
@@ -236,11 +255,11 @@ func TestValidate_K3DRequiresFields(t *testing.T) {
 		Suites: []SuiteConfig{{
 			Name: "s", Cases: []string{"a.yaml"}, Fixture: "k",
 		}},
-		Fixture: map[string]FixtureConfig{"k": {
-			Type: "k3d",
+		Fixture: map[string]casefile.FixtureConfig{"k": {
+			K3D: &casefile.K3DFixture{},
 		}},
 	}
-	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "type=k3d requires") {
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "k3d requires") {
 		t.Errorf("expected k3d field error, got %v", err)
 	}
 }
@@ -310,10 +329,10 @@ func TestExampleV2FixturesConfigLoads(t *testing.T) {
 	if len(plans) != 2 {
 		t.Fatalf("expected two suites, got %+v", plans)
 	}
-	if plans[0].Suite.Name != "compose-app" || plans[0].Fixture.Type != "compose" || len(plans[0].Cases) != 1 {
+	if plans[0].Suite.Name != "compose-app" || plans[0].Fixture.Kind() != "compose" || len(plans[0].Cases) != 1 {
 		t.Fatalf("unexpected first plan: %+v", plans[0])
 	}
-	if plans[1].Suite.Name != "k3d-app" || plans[1].Fixture.Type != "k3d" || len(plans[1].Cases) != 1 {
+	if plans[1].Suite.Name != "k3d-app" || plans[1].Fixture.Kind() != "k3d" || len(plans[1].Cases) != 1 {
 		t.Fatalf("unexpected second plan: %+v", plans[1])
 	}
 	if plans[1].Cases[0].Name != "k3d fixture app smoke" {

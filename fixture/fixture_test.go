@@ -15,29 +15,29 @@ import (
 )
 
 func TestResolveComposeFiles(t *testing.T) {
-	got, cleanup, err := resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", ComposeFile: "stack/compose.yml"})
+	got, cleanup, err := resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{File: "stack/compose.yml"})
 	if err != nil {
-		t.Fatalf("resolveComposeFiles compose_file: %v", err)
+		t.Fatalf("resolveComposeFiles file: %v", err)
 	}
 	if cleanup != nil {
-		t.Fatalf("unexpected cleanup for compose_file fixture")
+		t.Fatalf("unexpected cleanup for file fixture")
 	}
 	if want := []string{"/tmp/work/stack/compose.yml"}; len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("got %q want %q", got, want)
 	}
 
-	got, cleanup, err = resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", ComposeFiles: []string{"a.yml", "b.yml"}})
+	got, cleanup, err = resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{Files: []string{"a.yml", "b.yml"}})
 	if err != nil {
-		t.Fatalf("resolveComposeFiles compose_files: %v", err)
+		t.Fatalf("resolveComposeFiles files: %v", err)
 	}
 	if cleanup != nil {
-		t.Fatalf("unexpected cleanup for compose_files fixture")
+		t.Fatalf("unexpected cleanup for files fixture")
 	}
 	if len(got) != 2 || got[0] != "/tmp/work/a.yml" || got[1] != "/tmp/work/b.yml" {
-		t.Fatalf("unexpected compose_files resolution: %v", got)
+		t.Fatalf("unexpected files resolution: %v", got)
 	}
 
-	got, cleanup, err = resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", Template: "lgtm"})
+	got, cleanup, err = resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{Template: "lgtm"})
 	if err != nil {
 		t.Fatalf("resolveComposeFiles template=lgtm: %v", err)
 	}
@@ -78,10 +78,11 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 
 	fix, _, err := Start(context.Background(), discovery.Plan{
 		Suite: discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
-		Fixture: discovery.FixtureConfig{
-			Type:         "compose",
-			ComposeFiles: []string{"a.yml", "b.yml"},
-			Env:          []string{"FOO=bar"},
+		Fixture: casefile.FixtureConfig{
+			Compose: &casefile.ComposeFixture{
+				Files: []string{"a.yml", "b.yml"},
+				Env:   []string{"FOO=bar"},
+			},
 		},
 		FixtureSourceDir: "/tmp/work",
 	})
@@ -115,7 +116,7 @@ func TestStart_ComposeStartFailure(t *testing.T) {
 
 	_, _, err := Start(context.Background(), discovery.Plan{
 		Suite:            discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
-		Fixture:          discovery.FixtureConfig{Type: "compose", ComposeFile: "compose.yml"},
+		Fixture:          casefile.FixtureConfig{Compose: &casefile.ComposeFixture{File: "compose.yml"}},
 		FixtureSourceDir: "/tmp/work",
 	})
 	if err == nil || !strings.Contains(err.Error(), "boom") {
@@ -142,27 +143,31 @@ func TestStart_K3DLifecycle(t *testing.T) {
 		}, nil)
 	}
 
-	fix, _, err := Start(context.Background(), discovery.Plan{
+	fix, rt, err := Start(context.Background(), discovery.Plan{
 		Suite: discovery.SuiteConfig{Name: "cluster-smoke", Fixture: "cluster"},
-		Fixture: discovery.FixtureConfig{
-			Type:             "k3d",
-			K8sDir:           "k8s",
-			AppService:       "dice",
-			AppDockerFile:    "Dockerfile",
-			AppDockerContext: ".",
-			AppDockerTag:     "dice:test",
-			AppPort:          18080,
-			ImportImages:     []string{"busybox:latest"},
+		Fixture: casefile.FixtureConfig{
+			K3D: &casefile.K3DFixture{
+				K8sDir:           "k8s",
+				AppService:       "dice",
+				AppDockerFile:    "Dockerfile",
+				AppDockerContext: ".",
+				AppDockerTag:     "dice:test",
+				AppPort:          18080,
+				ImportImages:     []string{"busybox:latest"},
+			},
 		},
 		FixtureSourceDir: "/tmp/work",
 	})
 	if err != nil {
 		t.Fatalf("Start k3d: %v", err)
 	}
+	if rt.AppHostPort != 18080 {
+		t.Fatalf("expected Runtime.AppHostPort=18080 from fixture config, got %d", rt.AppHostPort)
+	}
 	if starts != 1 {
 		t.Fatalf("expected one endpoint start, got %d", starts)
 	}
-	if capturedPlan.FixtureSourceDir != "/tmp/work" || capturedPlan.Suite.Name != "cluster-smoke" || capturedPlan.Fixture.AppPort != 18080 {
+	if capturedPlan.FixtureSourceDir != "/tmp/work" || capturedPlan.Suite.Name != "cluster-smoke" || capturedPlan.Fixture.K3D.AppPort != 18080 {
 		t.Fatalf("unexpected endpoint factory args: plan=%+v", capturedPlan)
 	}
 	if capturedPorts.GrafanaHTTPPort == 0 || capturedPorts.OTLPHTTPPort == 0 || capturedPorts.LokiHttpPort == 0 || capturedPorts.PrometheusHTTPPort == 0 || capturedPorts.TempoHTTPPort == 0 || capturedPorts.PyroscopeHttpPort == 0 {
@@ -190,14 +195,15 @@ func TestStart_K3DStartFailure(t *testing.T) {
 
 	_, _, err := Start(context.Background(), discovery.Plan{
 		Suite: discovery.SuiteConfig{Name: "cluster-smoke", Fixture: "cluster"},
-		Fixture: discovery.FixtureConfig{
-			Type:             "k3d",
-			K8sDir:           "k8s",
-			AppService:       "dice",
-			AppDockerFile:    "Dockerfile",
-			AppDockerContext: ".",
-			AppDockerTag:     "dice:test",
-			AppPort:          18080,
+		Fixture: casefile.FixtureConfig{
+			K3D: &casefile.K3DFixture{
+				K8sDir:           "k8s",
+				AppService:       "dice",
+				AppDockerFile:    "Dockerfile",
+				AppDockerContext: ".",
+				AppDockerTag:     "dice:test",
+				AppPort:          18080,
+			},
 		},
 		FixtureSourceDir: "/tmp/work",
 	})
@@ -225,15 +231,15 @@ func TestK3DCheckEnv_UsesConfiguredPorts(t *testing.T) {
 }
 
 func TestResolveComposeFiles_UnsupportedTemplate(t *testing.T) {
-	_, _, err := resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose", Template: "weird"})
+	_, _, err := resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{Template: "weird"})
 	if err == nil || !strings.Contains(err.Error(), `unsupported compose fixture template "weird"`) {
 		t.Fatalf("expected unsupported template error, got %v", err)
 	}
 }
 
 func TestResolveComposeFiles_MissingConfig(t *testing.T) {
-	_, _, err := resolveComposeFiles("/tmp/work", discovery.FixtureConfig{Type: "compose"})
-	if err == nil || !strings.Contains(err.Error(), "compose fixture requires compose_file, compose_files, or supported template") {
+	_, _, err := resolveComposeFiles("/tmp/work", &casefile.ComposeFixture{})
+	if err == nil || !strings.Contains(err.Error(), "compose fixture requires file, files, or supported template") {
 		t.Fatalf("expected missing compose config error, got %v", err)
 	}
 }
@@ -281,10 +287,9 @@ name = "parallel-safe"
 cases = ["cases/*.yaml"]
 fixture = "stack"
 
-[fixture.stack]
-type = "compose"
+[fixture.stack.compose]
 template = "lgtm"
-compose_file = "docker-compose.oats.yml"
+file = "docker-compose.oats.yml"
 `)
 	writeFile(t, dir, "docker-compose.oats.yml", `services:
   app:
@@ -327,7 +332,7 @@ func TestSupportsParallel_AppSeedRequiresAppService(t *testing.T) {
 
 	// app seed, no app_service → not parallel-safe.
 	noService := discovery.Plan{
-		Fixture: discovery.FixtureConfig{Type: "compose", Template: "lgtm"},
+		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}},
 		Cases:   []*casefile.Case{appCase},
 	}
 	if safe, reason := SupportsParallel(noService); safe {
@@ -336,7 +341,7 @@ func TestSupportsParallel_AppSeedRequiresAppService(t *testing.T) {
 
 	// app seed with app_service + app_port → parallel-safe.
 	withService := discovery.Plan{
-		Fixture: discovery.FixtureConfig{Type: "compose", Template: "lgtm", AppService: "app", AppPort: 8080},
+		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm", AppService: "app", AppPort: 8080}},
 		Cases:   []*casefile.Case{appCase},
 	}
 	if safe, reason := SupportsParallel(withService); !safe {
@@ -349,7 +354,7 @@ func TestSupportsParallel_AppSeedRequiresAppService(t *testing.T) {
 // empty token and no error.
 func TestWaitForGrafanaToken_DefaultFixtureReturnsEmpty(t *testing.T) {
 	token, err := waitForGrafanaToken(discovery.Plan{
-		Fixture: discovery.FixtureConfig{Type: "remote"},
+		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}},
 	})
 	if err != nil {
 		t.Fatalf("waitForGrafanaToken: %v", err)

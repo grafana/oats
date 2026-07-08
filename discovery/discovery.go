@@ -24,11 +24,11 @@ import (
 // directly so a misnamed key surfaces as a "field not defined" error from
 // the toml decoder rather than a silent miss.
 type RootConfig struct {
-	Meta    Meta                     `toml:"meta"`
-	Cases   []string                 `toml:"cases"`
-	Suites  []SuiteConfig            `toml:"suite"`
-	Fixture map[string]FixtureConfig `toml:"fixture"`
-	Cache   CacheConfig              `toml:"cache,omitempty"`
+	Meta    Meta                              `toml:"meta"`
+	Cases   []string                          `toml:"cases"`
+	Suites  []SuiteConfig                     `toml:"suite"`
+	Fixture map[string]casefile.FixtureConfig `toml:"fixture"`
+	Cache   CacheConfig                       `toml:"cache,omitempty"`
 
 	// SourceDir is the directory of the loaded oats.toml. Case glob
 	// expressions resolve relative to it.
@@ -44,23 +44,6 @@ type SuiteConfig struct {
 	Cases   []string `toml:"cases"` // path globs, relative to oats.toml dir
 	Fixture string   `toml:"fixture,omitempty"`
 	Tags    []string `toml:"tags,omitempty"`
-}
-
-type FixtureConfig struct {
-	Type             string   `toml:"type"` // "compose" | "k3d" | "remote"
-	Template         string   `toml:"template,omitempty"`
-	ComposeFile      string   `toml:"compose_file,omitempty"`
-	ComposeFiles     []string `toml:"compose_files,omitempty"`
-	Env              []string `toml:"env,omitempty"`
-	K8sDir           string   `toml:"k8s_dir,omitempty"`
-	AppService       string   `toml:"app_service,omitempty"`
-	AppDockerFile    string   `toml:"app_docker_file,omitempty"`
-	AppDockerContext string   `toml:"app_docker_context,omitempty"`
-	AppDockerTag     string   `toml:"app_docker_tag,omitempty"`
-	AppPort          int      `toml:"app_port,omitempty"`
-	ImportImages     []string `toml:"import_images,omitempty"`
-	PoolSize         int      `toml:"pool_size,omitempty"`
-	Endpoint         string   `toml:"endpoint,omitempty"` // remote only
 }
 
 type CacheConfig struct {
@@ -121,27 +104,8 @@ func (c *RootConfig) Validate() error {
 		}
 	}
 	for name, f := range c.Fixture {
-		switch f.Type {
-		case "compose":
-			if f.Template == "" && f.ComposeFile == "" && len(f.ComposeFiles) == 0 {
-				return fmt.Errorf("fixture %q: type=compose requires template, compose_file, or compose_files", name)
-			}
-			if f.ComposeFile != "" && len(f.ComposeFiles) > 0 {
-				return fmt.Errorf("fixture %q: use compose_file or compose_files, not both", name)
-			}
-		case "k3d":
-			if f.K8sDir == "" || f.AppService == "" || f.AppDockerFile == "" || f.AppDockerTag == "" || f.AppPort == 0 {
-				return fmt.Errorf("fixture %q: type=k3d requires k8s_dir, app_service, app_docker_file, app_docker_tag, and app_port", name)
-			}
-			// PoolSize=0 means "single ephemeral cluster" — valid.
-		case "remote":
-			if f.Endpoint == "" {
-				return fmt.Errorf("fixture %q: type=remote requires endpoint", name)
-			}
-		case "":
-			return fmt.Errorf("fixture %q: type is required (compose | k3d | remote)", name)
-		default:
-			return fmt.Errorf("fixture %q: unknown type %q", name, f.Type)
+		if err := f.Validate(name); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -158,7 +122,7 @@ type Filter struct {
 // Plan is one suite plus the cases it expanded to.
 type Plan struct {
 	Suite            SuiteConfig
-	Fixture          FixtureConfig
+	Fixture          casefile.FixtureConfig
 	FixtureSourceDir string
 	Cases            []*casefile.Case
 }
@@ -328,12 +292,12 @@ func dirLabel(dir string) string {
 	return base
 }
 
-func (c *RootConfig) resolveSuiteFixture(suite SuiteConfig, cases []*casefile.Case) (FixtureConfig, string, error) {
+func (c *RootConfig) resolveSuiteFixture(suite SuiteConfig, cases []*casefile.Case) (casefile.FixtureConfig, string, error) {
 	if suite.Fixture != "" {
 		return c.Fixture[suite.Fixture], c.SourceDir, nil
 	}
 	var (
-		fixture   FixtureConfig
+		fixture   casefile.FixtureConfig
 		sourceDir string
 		seen      bool
 	)
@@ -341,39 +305,20 @@ func (c *RootConfig) resolveSuiteFixture(suite SuiteConfig, cases []*casefile.Ca
 		if tc.Fixture == nil {
 			continue
 		}
-		next := fixtureConfigFromCase(*tc.Fixture)
+		next := *tc.Fixture
 		nextSourceDir := filepath.Dir(tc.SourcePath)
 		if !seen {
 			fixture, sourceDir, seen = next, nextSourceDir, true
 			continue
 		}
 		if !reflect.DeepEqual(fixture, next) || sourceDir != nextSourceDir {
-			return FixtureConfig{}, "", fmt.Errorf("suite omits fixture but cases do not agree on one shared fixture")
+			return casefile.FixtureConfig{}, "", fmt.Errorf("suite omits fixture but cases do not agree on one shared fixture")
 		}
 	}
 	if !seen {
-		return FixtureConfig{}, "", nil
+		return casefile.FixtureConfig{}, "", nil
 	}
 	return fixture, sourceDir, nil
-}
-
-func fixtureConfigFromCase(f casefile.FixtureConfig) FixtureConfig {
-	return FixtureConfig{
-		Type:             f.Type,
-		Template:         f.Template,
-		ComposeFile:      f.ComposeFile,
-		ComposeFiles:     append([]string(nil), f.ComposeFiles...),
-		Env:              append([]string(nil), f.Env...),
-		K8sDir:           f.K8sDir,
-		AppService:       f.AppService,
-		AppDockerFile:    f.AppDockerFile,
-		AppDockerContext: f.AppDockerContext,
-		AppDockerTag:     f.AppDockerTag,
-		AppPort:          f.AppPort,
-		ImportImages:     append([]string(nil), f.ImportImages...),
-		PoolSize:         f.PoolSize,
-		Endpoint:         f.Endpoint,
-	}
 }
 
 // Summary renders a single line per plan suitable for `oats list`. It does

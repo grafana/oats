@@ -1,8 +1,8 @@
 oats-schema-version: 3
 name: remote-basic
 fixture:
-  type: remote
-  endpoint: http://localhost:4319
+  remote:
+    endpoint: http://localhost:4319
 seed:
   type: inline-otlp
   logs:

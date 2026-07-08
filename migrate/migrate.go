@@ -266,12 +266,11 @@ func composeFixtureHint(name string, def model.TestCaseDefinition) string {
 	fixtureName := slug(name)
 	var b strings.Builder
 	fmt.Fprintf(&b, "suggested oats.toml fixture snippet for %q:\n", name)
-	fmt.Fprintf(&b, "[fixture.%s]\n", fixtureName)
-	fmt.Fprintf(&b, "type = \"compose\"\n")
+	fmt.Fprintf(&b, "[fixture.%s.compose]\n", fixtureName)
 	if len(def.DockerCompose.Files) == 1 {
-		fmt.Fprintf(&b, "compose_file = %q\n", def.DockerCompose.Files[0])
+		fmt.Fprintf(&b, "file = %q\n", def.DockerCompose.Files[0])
 	} else if len(def.DockerCompose.Files) > 1 {
-		fmt.Fprintf(&b, "compose_files = [%s]\n", quotedList(def.DockerCompose.Files))
+		fmt.Fprintf(&b, "files = [%s]\n", quotedList(def.DockerCompose.Files))
 	}
 	if len(def.DockerCompose.Environment) > 0 {
 		fmt.Fprintf(&b, "env = [%s]\n", quotedList(def.DockerCompose.Environment))
@@ -284,8 +283,7 @@ func kubernetesFixtureHint(name string, def model.TestCaseDefinition) string {
 	k := def.Kubernetes
 	var b strings.Builder
 	fmt.Fprintf(&b, "suggested oats.toml fixture snippet for %q:\n", name)
-	fmt.Fprintf(&b, "[fixture.%s]\n", fixtureName)
-	fmt.Fprintf(&b, "type = \"k3d\"\n")
+	fmt.Fprintf(&b, "[fixture.%s.k3d]\n", fixtureName)
 	fmt.Fprintf(&b, "k8s_dir = %q\n", k.Dir)
 	fmt.Fprintf(&b, "app_service = %q\n", k.AppService)
 	fmt.Fprintf(&b, "app_docker_file = %q\n", k.AppDockerFile)

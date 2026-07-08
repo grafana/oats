@@ -37,8 +37,8 @@ run:
     oats-schema-version: 3
     name: remote-basic
     fixture:
-      type: remote
-      endpoint: http://127.0.0.1:${otlp_port}
+      remote:
+        endpoint: http://127.0.0.1:${otlp_port}
     seed:
       type: inline-otlp
       logs:

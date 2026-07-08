@@ -347,13 +347,13 @@ func verbosityFromInt(n int) report.Verbosity {
 // concrete endpoint the runner needs.
 func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride, appHost string, appPort int, otlpHTTP string) (runner.Endpoint, error) {
 	ep := runner.Endpoint{AppHost: appHost, AppPort: appPort, OTLPHTTP: otlpHTTP}
-	switch plan.Fixture.Type {
+	switch plan.Fixture.Kind() {
 	case "remote":
 		// For a remote fixture, the gcx context is configured externally
 		// (e.g. `gcx login` already ran). We pass the fixture name as a
 		// best-effort default; --gcx-context overrides.
 		ep.GCXContext = plan.Suite.Fixture
-		ep.OTLPHTTP = plan.Fixture.Endpoint
+		ep.OTLPHTTP = plan.Fixture.Remote.Endpoint
 		ep.CustomCheckEnv = append(ep.CustomCheckEnv,
 			"OATS_FIXTURE_TYPE=remote",
 			"OATS_GRAFANA_URL="+grafanaURL(),
@@ -366,9 +366,6 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 		if rt.OTLPHTTP != "" {
 			ep.OTLPHTTP = rt.OTLPHTTP
 		}
-		if rt.AppHostPort > 0 {
-			ep.AppPort = rt.AppHostPort
-		}
 		ep.CustomCheckEnv = append(ep.CustomCheckEnv, rt.CustomCheckEnv...)
 	case "k3d":
 		if rt.GCXConfig != "" {
@@ -376,9 +373,6 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 		}
 		if rt.OTLPHTTP != "" {
 			ep.OTLPHTTP = rt.OTLPHTTP
-		}
-		if plan.Fixture.AppPort > 0 {
-			ep.AppPort = plan.Fixture.AppPort
 		}
 		ep.CustomCheckEnv = append(ep.CustomCheckEnv, rt.CustomCheckEnv...)
 	case "":
@@ -388,7 +382,14 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 			"OATS_APP_URL="+fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
 		)
 	default:
-		return ep, fmt.Errorf("fixture type %q is not supported in oats", plan.Fixture.Type)
+		return ep, fmt.Errorf("fixture kind %q is not supported in oats", plan.Fixture.Kind())
+	}
+	// A fixture that resolved a concrete app host port drives the app there —
+	// compose discovers the published ephemeral port, k3d uses the configured
+	// one. Surfaced uniformly through Runtime so every fixture type reads it the
+	// same way.
+	if rt.AppHostPort > 0 {
+		ep.AppPort = rt.AppHostPort
 	}
 	if gcxContextOverride != "" {
 		ep.GCXContext = gcxContextOverride
@@ -542,7 +543,7 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 		Type:        report.EventSuiteStart,
 		Suite:       plan.Suite.Name,
 		Fixture:     plan.Suite.Fixture,
-		FixtureType: plan.Fixture.Type,
+		FixtureType: plan.Fixture.Kind(),
 		CaseCount:   len(plan.Cases),
 	})
 
@@ -599,12 +600,12 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 
 func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {
 	start := time.Now()
-	if plan.Fixture.Type != "" && plan.Fixture.Type != "remote" {
+	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureStart,
 			Suite:       plan.Suite.Name,
 			Fixture:     plan.Suite.Fixture,
-			FixtureType: plan.Fixture.Type,
+			FixtureType: plan.Fixture.Kind(),
 			Ts:          start,
 		})
 	}
@@ -612,12 +613,12 @@ func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {
 }
 
 func emitFixtureReady(rep report.Reporter, plan discovery.Plan, start time.Time) {
-	if plan.Fixture.Type != "" && plan.Fixture.Type != "remote" {
+	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureReady,
 			Suite:       plan.Suite.Name,
 			Fixture:     plan.Suite.Fixture,
-			FixtureType: plan.Fixture.Type,
+			FixtureType: plan.Fixture.Kind(),
 			DurationMs:  time.Since(start).Milliseconds(),
 		})
 	}
@@ -628,12 +629,12 @@ func closeFixture(rep report.Reporter, plan discovery.Plan, fix fixture.Handle) 
 	if err := fix.Close(); err != nil {
 		return err
 	}
-	if plan.Fixture.Type != "" && plan.Fixture.Type != "remote" {
+	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureTeardown,
 			Suite:       plan.Suite.Name,
 			Fixture:     plan.Suite.Fixture,
-			FixtureType: plan.Fixture.Type,
+			FixtureType: plan.Fixture.Kind(),
 			DurationMs:  time.Since(start).Milliseconds(),
 		})
 	}
