@@ -1,4 +1,4 @@
-package yaml
+package legacyyaml
 
 import (
 	"path/filepath"
@@ -21,7 +21,9 @@ func TestReadTestCase(t *testing.T) {
 	tc, err := readTestCase("testdata", "testdata/valid-tests/oats.yaml")
 	require.NoError(t, err)
 	require.Equal(t, "runvalid-tests-oats", tc.Name)
-	require.Equal(t, absolutePath("testdata/valid-tests"), tc.Dir)
+	expectedDir, err := absolutePath("testdata/valid-tests")
+	require.NoError(t, err)
+	require.Equal(t, expectedDir, tc.Dir)
 }
 
 func TestIncludePath(t *testing.T) {
@@ -73,24 +75,24 @@ func TestInputDefinitionsInvalidFiles(t *testing.T) {
 		{
 			name:     "malformed yaml",
 			filePath: "testdata/invalid-tests/malformed-yaml.yaml",
-			errorMsg: "failed to parse file .*/yaml/testdata/invalid-tests/malformed-yaml.yaml: yaml: mapping values are not allowed in this context",
+			errorMsg: "failed to parse file \".*/legacyyaml/testdata/invalid-tests/malformed-yaml.yaml\": yaml: mapping values are not allowed in this context",
 		},
 		{
 			name:     "outdated file version",
 			filePath: "testdata/invalid-tests/outdated-version.yaml",
-			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/outdated-version.yaml - " +
+			errorMsg: "error parsing test case definition .*/legacyyaml/testdata/invalid-tests/outdated-version.yaml - " +
 				"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - unsupported oats-schema-version '1' required version is '2'",
 		},
 		{
 			name:     "file version is not a number",
 			filePath: "testdata/invalid-tests/version-not-int.yaml",
-			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/version-not-int.yaml - " +
+			errorMsg: "error parsing test case definition .*/legacyyaml/testdata/invalid-tests/version-not-int.yaml - " +
 				"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - oats-schema-version '1' is not a number",
 		},
 		{
 			name:     "unknown field",
 			filePath: "testdata/invalid-tests/unknown-field.yaml",
-			errorMsg: "error parsing test case definition .*/yaml/testdata/invalid-tests/unknown-field.yaml - " +
+			errorMsg: "error parsing test case definition .*/legacyyaml/testdata/invalid-tests/unknown-field.yaml - " +
 				"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - yaml: unmarshal errors:\n" +
 				".*line 5: field spans not found in type model.ExpectedTraces",
 		},

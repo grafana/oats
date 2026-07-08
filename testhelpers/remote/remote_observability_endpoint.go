@@ -41,6 +41,9 @@ func (p PortsConfig) EffectiveOTLPHTTPPort() int {
 	if p.OTLPHTTPPort != 0 {
 		return p.OTLPHTTPPort
 	}
+	if p.TracesHTTPPort != 0 {
+		return p.TracesHTTPPort
+	}
 	return 4318
 }
 

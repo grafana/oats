@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -45,13 +46,16 @@ func NewEndpoint(host string, model *Kubernetes, ports remote.PortsConfig, testN
 	return remote.NewEndpoint(host, ports, func(ctx context.Context) error {
 		return start(model, ports, testName, run)
 	}, func(ctx context.Context) error {
+		var errs []error
 		for _, p := range killList {
-			err := p.Kill()
-			if err != nil {
-				return err
+			if err := p.Kill(); err != nil {
+				errs = append(errs, err)
 			}
 		}
-		return run(exec.Command("k3d", "cluster", "delete", cluster), false)
+		if err := run(exec.Command("k3d", "cluster", "delete", cluster), false); err != nil {
+			errs = append(errs, err)
+		}
+		return errors.Join(errs...)
 	},
 		func(f func(io.ReadCloser, *sync.WaitGroup)) error {
 			return fmt.Errorf("compose log reading is not implemented for kubernetes fixtures")
@@ -123,13 +127,17 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 	if err != nil {
 		return err
 	}
-	err = portForward(ports.EffectiveGrafanaHTTPPort(), 3000)
-	if err != nil {
-		return err
+	if ports.GrafanaHTTPPort != 0 {
+		err = portForward(ports.GrafanaHTTPPort, 3000)
+		if err != nil {
+			return err
+		}
 	}
-	err = portForward(ports.EffectiveOTLPHTTPPort(), 4318)
-	if err != nil {
-		return err
+	if ports.OTLPHTTPPort != 0 {
+		err = portForward(ports.OTLPHTTPPort, 4318)
+		if err != nil {
+			return err
+		}
 	}
 	err = portForward(ports.PrometheusHTTPPort, 9090)
 	if err != nil {

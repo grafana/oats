@@ -1,4 +1,4 @@
-package yaml
+package legacyyaml
 
 import (
 	"bytes"
@@ -22,7 +22,10 @@ func ReadTestCases(input []string, evaluateIgnoreFile bool) ([]model.TestCase, e
 	var cases []model.TestCase
 
 	for _, base := range input {
-		base = absolutePath(base)
+		base, err := absolutePath(base)
+		if err != nil {
+			return nil, err
+		}
 
 		c, err := collectTestCases(base, evaluateIgnoreFile)
 		if err != nil {
@@ -117,12 +120,12 @@ func addTestCase(cases []model.TestCase, base string, path string) ([]model.Test
 	return cases, nil
 }
 
-func absolutePath(dir string) string {
+func absolutePath(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to resolve path %q: %w", dir, err)
 	}
-	return abs
+	return abs, nil
 }
 
 func readTestCase(testBase, filePath string) (*model.TestCase, error) {
@@ -134,9 +137,16 @@ func readTestCase(testBase, filePath string) (*model.TestCase, error) {
 		return nil, nil
 	}
 
-	absoluteFilePath := absolutePath(filePath)
+	absoluteFilePath, err := absolutePath(filePath)
+	if err != nil {
+		return nil, err
+	}
 	dir := filepath.Dir(absoluteFilePath)
-	name := strings.TrimPrefix(dir, absolutePath(testBase)) + "-" + strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
+	absoluteTestBase, err := absolutePath(testBase)
+	if err != nil {
+		return nil, err
+	}
+	name := strings.TrimPrefix(dir, absoluteTestBase) + "-" + strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
 	sep := string(filepath.Separator)
 	name = strings.TrimPrefix(name, sep)
 	name = strings.ReplaceAll(name, sep, "-")
@@ -151,19 +161,18 @@ func readTestCase(testBase, filePath string) (*model.TestCase, error) {
 }
 
 func readTestCaseDefinition(filePath string, templateMode bool) (*model.TestCaseDefinition, error) {
-	absPath, err := filepath.Abs(filePath)
+	filePath, err := absolutePath(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve path %s: %w", filePath, err)
+		return nil, err
 	}
-	filePath = absPath
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to read file %q: %w", filePath, err)
 	}
 	var parsed map[string]interface{}
 	err = yaml.Unmarshal(content, &parsed)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse file %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to parse file %q: %w", filePath, err)
 	}
 	schemaVersion, ok := parsed["oats-schema-version"]
 	if !ok {

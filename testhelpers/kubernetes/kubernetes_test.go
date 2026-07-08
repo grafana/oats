@@ -125,7 +125,7 @@ func TestStartWaitsForLgtmDeploymentAvailability(t *testing.T) {
 	})
 }
 
-func TestStart_FallsBackToLegacyGrafanaAndOTLPPorts(t *testing.T) {
+func TestStart_SkipsGrafanaAndOTLPPortsWhenUnset(t *testing.T) {
 	t.Parallel()
 
 	model := &Kubernetes{
@@ -156,19 +156,9 @@ func TestStart_FallsBackToLegacyGrafanaAndOTLPPorts(t *testing.T) {
 	if err := start(model, ports, "legacy-ports", run); err != nil {
 		t.Fatalf("start: %v", err)
 	}
-	if !contains(calls, "bg: kubectl port-forward service/lgtm 3000:3000") {
-		t.Fatalf("expected Grafana legacy fallback port-forward, got %#v", calls)
-	}
-	if !contains(calls, "bg: kubectl port-forward service/lgtm 4318:4318") {
-		t.Fatalf("expected OTLP legacy fallback port-forward, got %#v", calls)
-	}
-}
-
-func contains(items []string, want string) bool {
-	for _, item := range items {
-		if item == want {
-			return true
+	for _, call := range calls {
+		if strings.Contains(call, ":3000") || strings.Contains(call, ":4318") {
+			t.Fatalf("expected no Grafana/OTLP port-forward when ports are unset, got %#v", calls)
 		}
 	}
-	return false
 }

@@ -27,7 +27,9 @@ for arg in "$@"; do
 	fi
 done
 
-query="${*: -1}"
+# Last positional arg (portable: bash 3.2 lacks ${*: -1} negative indexing).
+query=""
+for query in "$@"; do :; done
 is_missing=false
 if [[ "$query" == *"missing"* ]]; then
 	is_missing=true

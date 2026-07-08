@@ -29,6 +29,27 @@ func defaultEnv() []string {
 	return os.Environ()
 }
 
+// mergeEnv combines the parent environment with explicitly provided vars,
+// ensuring the provided vars deterministically override any parent duplicates
+// (e.g. COMPOSE_PROJECT_NAME) regardless of platform-specific exec behavior.
+func mergeEnv(parent, override []string) []string {
+	merged := make([]string, 0, len(parent)+len(override))
+	index := make(map[string]int, len(parent)+len(override))
+	for _, kv := range append(append([]string{}, parent...), override...) {
+		key := kv
+		if i := strings.IndexByte(kv, '='); i >= 0 {
+			key = kv[:i]
+		}
+		if pos, ok := index[key]; ok {
+			merged[pos] = kv
+			continue
+		}
+		index[key] = len(merged)
+		merged = append(merged, kv)
+	}
+	return merged
+}
+
 func Suite(composeFile string) (*Compose, error) {
 	return SuiteFiles([]string{composeFile}, nil)
 }
@@ -43,8 +64,7 @@ func SuiteFiles(composeFiles []string, env []string) (*Compose, error) {
 	if len(composeFiles) == 0 {
 		return nil, fmt.Errorf("at least one compose file is required")
 	}
-	mergedEnv := defaultEnv()
-	mergedEnv = append(mergedEnv, env...)
+	mergedEnv := mergeEnv(defaultEnv(), env)
 	return &Compose{
 		Command:     command,
 		DefaultArgs: defaultArgs,
@@ -128,10 +148,18 @@ func (c *Compose) runDocker(cc command) error {
 		go func() {
 			defer wg.Done()
 			reader := bufio.NewReader(stdout)
-			line, err := reader.ReadString('\n')
-			for err == nil {
-				slog.Info(line)
-				line, err = reader.ReadString('\n')
+			for {
+				// ReadString returns any final data together with io.EOF, so
+				// log the chunk before checking err to avoid dropping a
+				// trailing line without a newline. Reading to EOF also fully
+				// drains the pipe so the child never blocks on a full pipe.
+				line, err := reader.ReadString('\n')
+				if line != "" {
+					slog.Info(line)
+				}
+				if err != nil {
+					return
+				}
 			}
 		}()
 

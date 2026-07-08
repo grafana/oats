@@ -44,9 +44,14 @@ run = "go test -v -buildvcs=false ./tests/e2e -run TestCases"
 description = "Black-box test: build oats+gcx, then run the python example (needs Docker)"
 run = '''
 root="$PWD"
-./scripts/build-local-tools.sh "$root/bin"
+# Reuse a prebuilt bin dir when given one (CI shares the e2e-tools artifact),
+# otherwise build the binaries locally — same pattern as e2e-test.
+bin_dir="${OATS_EXAMPLE_BIN_DIR:-$root/bin}"
+if [ ! -x "$bin_dir/oats" ] || [ ! -x "$bin_dir/gcx" ]; then
+  ./scripts/build-local-tools.sh "$bin_dir"
+fi
 cd examples/python
-"$root/bin/oats" --gcx "$root/bin/gcx" --no-cache --timeout 90s --interval 2s -v
+"$bin_dir/oats" --gcx "$bin_dir/gcx" --no-cache --timeout 90s --interval 2s -v
 '''
 
 [tasks.build]

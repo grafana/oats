@@ -11,8 +11,8 @@ import (
 
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
+	"github.com/grafana/oats/internal/legacyyaml"
 	"github.com/grafana/oats/model"
-	legacyyaml "github.com/grafana/oats/yaml"
 	goyaml "go.yaml.in/yaml/v3"
 )
 

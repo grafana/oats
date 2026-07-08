@@ -104,7 +104,7 @@ func TestConvertDefinition_SingleMatrixComposeRequiresFile(t *testing.T) {
 }
 
 func TestConvertFile_RendersYAML(t *testing.T) {
-	sample := filepath.Join("..", "yaml", "testdata", "valid-tests", "oats.yaml")
+	sample := filepath.Join("..", "internal", "legacyyaml", "testdata", "valid-tests", "oats.yaml")
 	out, warnings, err := ConvertFile(sample)
 	if err != nil {
 		fatalf(t, "ConvertFile: %v", err)
@@ -121,7 +121,7 @@ func TestConvertFile_RendersYAML(t *testing.T) {
 }
 
 func TestConvertFile_MatrixSampleIsParseable(t *testing.T) {
-	sample := filepath.Join("..", "yaml", "testdata", "valid-tests", "matrix-test.oats.yaml")
+	sample := filepath.Join("..", "internal", "legacyyaml", "testdata", "valid-tests", "matrix-test.oats.yaml")
 	out, warnings, err := ConvertFile(sample)
 	if err != nil {
 		fatalf(t, "ConvertFile matrix sample: %v", err)

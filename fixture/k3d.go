@@ -17,6 +17,7 @@ func startK3D(ctx context.Context, plan discovery.Plan) (Handle, Runtime, error)
 	}
 	ep := newKubernetesEndpoint(plan, ports)
 	if err := ep.Start(ctx); err != nil {
+		_ = ep.Stop(context.Background())
 		return nil, Runtime{}, err
 	}
 	appPort := plan.Fixture.K3D.AppPort

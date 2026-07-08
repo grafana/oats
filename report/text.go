@@ -140,6 +140,7 @@ func (r *TextReporter) emitGHAAnnotation(e Event) {
 		msg = "OATS assertion failed"
 	}
 	msg = ghaEscape(msg)
+	file = ghaEscapeProp(file)
 	if line > 0 {
 		r.write("::error file=%s,line=%d::%s\n", file, line, msg)
 	} else {
@@ -147,10 +148,24 @@ func (r *TextReporter) emitGHAAnnotation(e Event) {
 	}
 }
 
+// ghaEscape percent-encodes a workflow-command message body. GitHub requires
+// %, CR and LF to be encoded or the annotation truncates at the first newline
+// (failures often carry multi-line HTTP bodies or stderr excerpts).
 func ghaEscape(s string) string {
 	s = strings.ReplaceAll(s, "%", "%25")
 	s = strings.ReplaceAll(s, "\r", "%0D")
 	s = strings.ReplaceAll(s, "\n", "%0A")
+	return s
+}
+
+// ghaEscapeProp percent-encodes a workflow-command property value such as the
+// file= path. Properties carry the message rules plus : and , which would
+// otherwise be read as property delimiters (file paths can contain colons —
+// see splitSource).
+func ghaEscapeProp(s string) string {
+	s = ghaEscape(s)
+	s = strings.ReplaceAll(s, ":", "%3A")
+	s = strings.ReplaceAll(s, ",", "%2C")
 	return s
 }
 

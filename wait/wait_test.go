@@ -69,6 +69,24 @@ func TestUntil_RunsAtLeastOnceEvenWithTightDeadline(t *testing.T) {
 	}
 }
 
+func TestUntil_CancelledContextDoesNotPass(t *testing.T) {
+	// Even when the asserter passes, an already-cancelled context must not be
+	// reported as success — consistent with While.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	called := false
+	r := Until[string](ctx, Options{Timeout: time.Second, Interval: 5 * time.Millisecond}, func() []string {
+		called = true
+		return nil // passes
+	})
+	if !called {
+		t.Error("asserter should still run once before honoring cancel")
+	}
+	if r.OK {
+		t.Errorf("cancelled context should not pass even when asserter succeeds: %+v", r)
+	}
+}
+
 func TestWhile_HoldsForEntireWindow(t *testing.T) {
 	start := time.Now()
 	r := While[string](context.Background(), Options{Timeout: 30 * time.Millisecond, Interval: 5 * time.Millisecond}, func() []string {

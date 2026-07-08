@@ -110,6 +110,32 @@ func TestTextReporter_GHAAnnotationsWithoutSource(t *testing.T) {
 	}
 }
 
+func TestTextReporter_GHAAnnotationEscaping(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "true")
+
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventRunStart})
+	r.Emit(Event{
+		Type:   EventAssertFail,
+		Case:   "x",
+		Source: "path/with,comma:x/a.yaml:8",
+		Msg:    "line one\nline two 50% off",
+	})
+	r.Emit(Event{Type: EventCaseFail, Case: "x"})
+	r.Emit(Event{Type: EventRunEnd})
+
+	out := buf.String()
+	// Message: %, CR and LF encoded so the annotation is not truncated.
+	if !strings.Contains(out, "line one%0Aline two 50%25 off") {
+		t.Errorf("message not escaped:\n%s", out)
+	}
+	// Property: message rules plus : and , so delimiters are not misread.
+	if !strings.Contains(out, "file=path/with%2Ccomma%3Ax/a.yaml,line=8::") {
+		t.Errorf("file property not escaped:\n%s", out)
+	}
+}
+
 func TestTextReporter_VerbosePassPrintsPasses(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewTextReporter(&buf, VerbosePasses)

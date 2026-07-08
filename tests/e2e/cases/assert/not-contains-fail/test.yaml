@@ -1,5 +1,5 @@
 name: not-contains-fail
-tags: [assert, not_contains, fail]
+tags: [assert, not-contains, fail]
 
 run:
   args:

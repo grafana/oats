@@ -16,11 +16,6 @@
         "mise"
       ]
     },
-    ".github/workflows/example-python.yml": {
-      "regex": [
-        "mise"
-      ]
-    },
     ".github/workflows/lint.yml": {
       "regex": [
         "mise"
@@ -94,6 +89,22 @@
         "gopkg.in/yaml.v3"
       ]
     },
+    "internal/legacyyaml/testdata/docker-compose-addition.yaml": {
+      "docker-compose": [
+        "mongo"
+      ]
+    },
+    "internal/legacyyaml/testdata/docker-compose-expected.yaml": {
+      "docker-compose": [
+        "grafana/grafana",
+        "mongo"
+      ]
+    },
+    "internal/legacyyaml/testdata/docker-compose-template.yaml": {
+      "docker-compose": [
+        "grafana/grafana"
+      ]
+    },
     "mise.toml": {
       "mise": [
         "actionlint",
@@ -156,22 +167,6 @@
     "tests/e2e/cases/fixture/remote-basic/files/docker-compose.remote.yml": {
       "docker-compose": [
         "docker.io/grafana/otel-lgtm"
-      ]
-    },
-    "yaml/testdata/docker-compose-addition.yaml": {
-      "docker-compose": [
-        "mongo"
-      ]
-    },
-    "yaml/testdata/docker-compose-expected.yaml": {
-      "docker-compose": [
-        "grafana/grafana",
-        "mongo"
-      ]
-    },
-    "yaml/testdata/docker-compose-template.yaml": {
-      "docker-compose": [
-        "grafana/grafana"
       ]
     }
   }

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 )
 
 type recordingHandler struct {
@@ -106,7 +105,6 @@ func TestSender_SpanDefaultsApply(t *testing.T) {
 	srv, h := newRecorder()
 	defer srv.Close()
 
-	before := time.Now()
 	s := &Sender{OTLPEndpoint: srv.URL}
 	err := s.Send(context.Background(), Payload{Traces: []Trace{{
 		Service: "svc",
@@ -138,5 +136,4 @@ func TestSender_SpanDefaultsApply(t *testing.T) {
 	if span.StartTimeUnixNano == "" || span.EndTimeUnixNano == "" {
 		t.Errorf("timestamps empty: %+v", span)
 	}
-	_ = before
 }
