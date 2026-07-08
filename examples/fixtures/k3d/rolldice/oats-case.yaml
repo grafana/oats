@@ -1,11 +1,14 @@
+# Runs against the suite's k3d-dev fixture (see ../../oats-config.yaml).
 name: k3d fixture app smoke
+
 seed:
   type: app
 input:
   - path: /rolldice?rolls=2
+
 expected:
   metrics:
     - promql: 'http_server_active_requests{service_name="rolldice"}'
       value: '>= 0'
   custom-checks:
-    - script: ./verify.sh
+    - script: ./verify.sh   # colocated next to this case

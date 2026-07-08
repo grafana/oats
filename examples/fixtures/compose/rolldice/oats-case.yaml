@@ -1,8 +1,11 @@
+# Runs against the suite's compose-dev fixture (see ../../oats-config.yaml).
 name: compose fixture app smoke
+
 seed:
   type: app
 input:
   - path: /rolldice?rolls=3
+
 expected:
   traces:
     - traceql: '{ resource.service.name = "rolldice" }'

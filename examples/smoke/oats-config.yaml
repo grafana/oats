@@ -1,11 +1,21 @@
+# oats-config.yaml is the entry point of an OATS project. `oats` finds it in the
+# current directory or any parent. It declares the suites, the cases each runs,
+# and the fixtures (the backend the cases assert against).
+
 meta:
-  version: 3
+  version: 3            # OATS schema version (the single version; cases carry none)
+
 suites:
   - name: smoke
-    cases: ["*/oats-case.yaml"]
-    fixture: local-lgtm
-    tags: [traces, logs, metrics]
+    cases: ["*/oats-case.yaml"]   # one case per subdirectory (glob, relative to this file)
+    fixture: local-lgtm           # the fixture (defined below) these cases run against
+    tags: [traces, logs, metrics] # optional labels; filter with `oats --tags traces`
+
 fixture:
+  # A "remote" fixture points at an already-running stack — here a local
+  # grafana/otel-lgtm on the default OTLP port. OATS does not boot or tear it
+  # down; start it yourself, e.g.
+  #   docker run -p 3000:3000 -p 4317:4317 -p 4318:4318 grafana/otel-lgtm
   local-lgtm:
     remote:
       endpoint: http://localhost:4318

@@ -1,20 +1,28 @@
+# A case: drive an app, then assert on the telemetry it produced. This one
+# exercises all three main signals (traces, metrics, logs).
 name: rolldice smoke
+
+# `input` HTTP requests drive the app so it emits telemetry (method defaults to GET).
 input:
   - path: /rolldice?rolls=5
+
 seed:
-  type: app
-  compose: docker-compose.app.yml
+  type: app                        # an instrumented app produces the telemetry
+  compose: docker-compose.app.yml  # legacy shorthand to boot the app via compose
+
+# Each assertion names a query, then what must hold for its result. OATS retries
+# every assertion until it passes or --timeout elapses.
 expected:
   traces:
-    - traceql: '{ resource.service.name = "rolldice" }'
-      match_spans:
+    - traceql: '{ resource.service.name = "rolldice" }'   # TraceQL
+      match_spans:                                         # a matching span must exist
         - match_type: regexp
           name: '^GET /rolldice.*$'
   metrics:
-    - promql: 'http_server_active_requests{service_name="rolldice"}'
-      value: '>= 0'
+    - promql: 'http_server_active_requests{service_name="rolldice"}'  # PromQL
+      value: '>= 0'                                                   # compare the sample value
   logs:
-    - logql: '{service_name="rolldice"} |~ `rolling the dice`'
+    - logql: '{service_name="rolldice"} |~ `rolling the dice`'        # LogQL
       match:
         - match_type: regexp
           name: '.*rolling the dice.*'
