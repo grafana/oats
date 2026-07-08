@@ -16,8 +16,7 @@ import (
 
 func cachedRunnerCase(t *testing.T) (*casefile.Case, []byte) {
 	t.Helper()
-	src := []byte(`oats-schema-version: 3
-name: cached
+	src := []byte(`name: cached
 seed:
   type: app
   compose: x.yml

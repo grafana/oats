@@ -1,4 +1,3 @@
-oats-schema-version: 3
 name: ff-first-fails
 seed:
   type: inline-otlp

@@ -9,7 +9,6 @@ Pyroscope) via [`gcx`](https://github.com/grafana/gcx).
 A case reads like the outcome you care about:
 
 ```yaml
-oats-schema-version: 3
 name: rolldice traces have a route attribute
 
 fixture:

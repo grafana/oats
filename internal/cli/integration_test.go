@@ -147,7 +147,7 @@ func TestIntegration_FullPipelineWithFakeGCX(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: smoke
     cases: ["cases/*.yaml"]
@@ -157,8 +157,7 @@ fixture:
     remote:
       endpoint: "REPLACED_AT_RUNTIME"
 `)
-	writeFile(t, dir, "cases/inline.yaml", `oats-schema-version: 3
-name: inline seed end-to-end
+	writeFile(t, dir, "cases/inline.yaml", `name: inline seed end-to-end
 seed:
   type: inline-otlp
   traces:
@@ -269,7 +268,7 @@ func TestIntegration_AppSeedWithRemoteFixtureAndInput(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: smoke
     cases: ["cases/*.yaml"]
@@ -279,8 +278,7 @@ fixture:
     remote:
       endpoint: "http://localhost:4318"
 `)
-	writeFile(t, dir, "cases/app.yaml", `oats-schema-version: 3
-name: app seed end-to-end
+	writeFile(t, dir, "cases/app.yaml", `name: app seed end-to-end
 seed:
   type: app
 input:
@@ -355,7 +353,7 @@ func TestIntegration_ProfileQueryWithFakeGCX(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: profiles
     cases: ["cases/*.yaml"]
@@ -365,8 +363,7 @@ fixture:
     remote:
       endpoint: "http://localhost:4318"
 `)
-	writeFile(t, dir, "cases/profile.yaml", `oats-schema-version: 3
-name: profile query end-to-end
+	writeFile(t, dir, "cases/profile.yaml", `name: profile query end-to-end
 seed:
   type: app
 expected:
@@ -443,7 +440,7 @@ expected:
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: migrated-profile
     cases: ["cases/*.yaml"]
@@ -530,7 +527,7 @@ expected:
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: migrated
     cases: ["cases/*.yaml"]
@@ -608,7 +605,7 @@ expected:
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: migrated-custom
     cases: ["cases/*.yaml"]
@@ -681,7 +678,7 @@ expected:
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: migrated-custom-path
     cases: ["cases/*.yaml"]
@@ -776,7 +773,7 @@ expected:
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: migrated-matrix
     cases: ["cases/*.yaml"]

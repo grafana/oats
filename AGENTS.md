@@ -9,9 +9,11 @@ OpenTelemetry written in Go. It enables full round-trip testing from
 instrumented applications to the observability stack (LGTM: Loki, Grafana,
 Tempo, Prometheus, Mimir, OpenTelemetry Collector).
 
-Test cases are defined in YAML files with `oats-schema-version: 3` and can
-validate traces (TraceQL), logs (LogQL), metrics (PromQL), and profiles
-(Pyroscope queries) using Docker Compose or Kubernetes backends.
+Test cases are defined in YAML files, discovered through an `oats-config.yaml`
+whose `meta.version: 3` is the single schema version (cases carry no version
+field of their own). They can validate traces (TraceQL), logs (LogQL), metrics
+(PromQL), and profiles (Pyroscope queries) using Docker Compose or Kubernetes
+backends.
 
 ## Build Commands
 

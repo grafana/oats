@@ -10,5 +10,7 @@ run:
 
 expect:
   stdout_contains:
-    - "oats-schema-version: 3"
+    - "name: legacy"
     - "logql"
+  stdout_not_contains:
+    - "oats-schema-version"

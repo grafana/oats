@@ -513,7 +513,7 @@ func runCase(t *testing.T, root, dir string) {
 	if _, err := os.Stat(filepath.Join(filesDir, "oats-config.yaml")); err == nil {
 		configPath = filepath.Join(filesDir, "oats-config.yaml")
 	} else {
-		writeFile(t, configPath, "generated oats-config.yaml", []byte("meta:\n  version: 2\ncases:\n  - files/oats-case.yaml\n"))
+		writeFile(t, configPath, "generated oats-config.yaml", []byte("meta:\n  version: 3\ncases:\n  - files/oats-case.yaml\n"))
 	}
 
 	markExecutables(t, filesDir)

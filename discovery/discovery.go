@@ -51,8 +51,10 @@ type CacheConfig struct {
 	TTLDays int `yaml:"ttl_days,omitempty"` // zero → use runtime default
 }
 
-// SupportedVersion is the value of meta.version that this binary parses.
-const SupportedVersion = 2
+// SupportedVersion is the value of meta.version that this binary parses. It is
+// the single schema version for a v3 project: cases carry no version field of
+// their own.
+const SupportedVersion = 3
 
 // Load reads an oats-config.yaml from disk.
 func Load(path string) (*RootConfig, error) {

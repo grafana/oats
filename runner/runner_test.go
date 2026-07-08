@@ -59,7 +59,6 @@ func mustParse(t *testing.T, src string) *casefile.Case {
 }
 
 const tracesCase = `
-oats-schema-version: 3
 name: traces pass
 seed:
   type: app
@@ -94,7 +93,6 @@ func TestRunCase_TracesPass(t *testing.T) {
 }
 
 const containsMissingCase = `
-oats-schema-version: 3
 name: traces fail
 seed:
   type: app
@@ -125,7 +123,6 @@ func TestRunCase_TracesFail_ContainsMissing(t *testing.T) {
 }
 
 const metricsValueCase = `
-oats-schema-version: 3
 name: metric value
 seed:
   type: app
@@ -172,7 +169,6 @@ func TestRunCase_LogsStructuredMatchPass(t *testing.T) {
 	r, buf := newRunner(t, exec, Options{Timeout: 100 * time.Millisecond, Interval: 5 * time.Millisecond, SeedSettleDelay: 1})
 
 	c := mustParse(t, `
-oats-schema-version: 3
 name: logs structured match
 seed:
   type: app
@@ -205,7 +201,6 @@ func TestRunCase_MetricsStructuredMatchPass(t *testing.T) {
 	r, _ := newRunner(t, exec, Options{Timeout: 100 * time.Millisecond, Interval: 5 * time.Millisecond, SeedSettleDelay: 1})
 
 	c := mustParse(t, `
-oats-schema-version: 3
 name: metrics structured match
 seed:
   type: app
@@ -245,7 +240,6 @@ func TestRunCase_DrivesInputRequests(t *testing.T) {
 	r.endpoint.AppPort = port
 
 	c := mustParse(t, `
-oats-schema-version: 3
 name: traces pass with input
 seed:
   type: app
@@ -273,7 +267,6 @@ expected:
 
 func TestRunCase_InlineOTLPSeedRequiresEndpoint(t *testing.T) {
 	c := mustParse(t, `
-oats-schema-version: 3
 name: inline seed
 seed:
   type: inline-otlp
@@ -312,7 +305,6 @@ func TestRunCase_CustomCheckScriptPath(t *testing.T) {
 	}
 
 	c := mustParse(t, `
-oats-schema-version: 3
 name: custom check path
 seed:
   type: app
@@ -337,7 +329,6 @@ expected:
 
 func TestRunCase_CustomCheckInlineScript(t *testing.T) {
 	c := mustParse(t, `
-oats-schema-version: 3
 name: custom check inline
 seed:
   type: app
@@ -363,7 +354,6 @@ expected:
 
 func TestRunCase_CustomCheckFailureSurfaced(t *testing.T) {
 	c := mustParse(t, `
-oats-schema-version: 3
 name: custom check fail
 seed:
   type: app
@@ -404,7 +394,6 @@ func TestRunCase_ComposeLogsPass(t *testing.T) {
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	c := mustParse(t, `
-oats-schema-version: 3
 name: compose logs pass
 seed:
   type: app
@@ -448,7 +437,6 @@ func TestRunCase_ComposeLogsMissingSurfaced(t *testing.T) {
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	c := mustParse(t, `
-oats-schema-version: 3
 name: compose logs missing
 seed:
   type: app
@@ -484,7 +472,6 @@ expected:
 
 func TestRunCase_ComposeLogsRequireComposeFixture(t *testing.T) {
 	c := mustParse(t, `
-oats-schema-version: 3
 name: compose logs wrong fixture
 seed:
   type: app

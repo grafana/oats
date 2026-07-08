@@ -1,4 +1,3 @@
-oats-schema-version: 3
 name: rolldice smoke
 input:
   - path: /rolldice?rolls=5

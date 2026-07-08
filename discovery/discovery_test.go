@@ -20,8 +20,7 @@ func writeFile(t *testing.T, dir, rel, body string) {
 	}
 }
 
-const validCaseYAML = `oats-schema-version: 3
-name: %s
+const validCaseYAML = `name: %s
 seed:
   type: app
   compose: docker-compose.app.yml
@@ -35,7 +34,7 @@ func TestLoad_ValidConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: lgtm
     cases: ["cases/*.yaml"]
@@ -76,7 +75,7 @@ func TestLoad_RejectsUnknownKey(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 typooo: boom
 suites:
   - name: x
@@ -92,7 +91,7 @@ func TestPlanRun_FilterByTag(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: alpha
     cases: ["a.yaml"]
@@ -122,7 +121,7 @@ func TestSummary_TopLevelCases(t *testing.T) {
 	writeFile(t, dir, "oats-config.yaml", `
 cases: ["cases/*.yaml"]
 meta:
-  version: 2
+  version: 3
 `)
 	writeFile(t, dir, "cases/a.yaml", strings.Replace(validCaseYAML, "%s", "case-a", 1))
 
@@ -144,7 +143,7 @@ func TestPlanRun_FilterBySuiteName(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: alpha
     cases: ["a.yaml"]
@@ -169,7 +168,7 @@ suites:
 
 func TestValidate_EmptyFixtureRejected(t *testing.T) {
 	cfg := &RootConfig{
-		Meta: Meta{Version: 2},
+		Meta: Meta{Version: 3},
 		Suites: []SuiteConfig{{
 			Name: "s", Cases: []string{"a.yaml"}, Fixture: "x",
 		}},
@@ -183,7 +182,7 @@ func TestValidate_EmptyFixtureRejected(t *testing.T) {
 
 func TestValidate_MultipleFixtureBlocksRejected(t *testing.T) {
 	cfg := &RootConfig{
-		Meta: Meta{Version: 2},
+		Meta: Meta{Version: 3},
 		Suites: []SuiteConfig{{
 			Name: "s", Cases: []string{"a.yaml"}, Fixture: "x",
 		}},
@@ -200,7 +199,7 @@ func TestValidate_MultipleFixtureBlocksRejected(t *testing.T) {
 
 func TestValidate_FixtureRefNotDefined(t *testing.T) {
 	cfg := &RootConfig{
-		Meta: Meta{Version: 2},
+		Meta: Meta{Version: 3},
 		Suites: []SuiteConfig{{
 			Name: "s", Cases: []string{"a.yaml"}, Fixture: "missing",
 		}},
@@ -213,7 +212,7 @@ func TestValidate_FixtureRefNotDefined(t *testing.T) {
 
 func TestValidate_RemoteRequiresEndpoint(t *testing.T) {
 	cfg := &RootConfig{
-		Meta:    Meta{Version: 2},
+		Meta:    Meta{Version: 3},
 		Suites:  []SuiteConfig{{Name: "s", Cases: []string{"a.yaml"}}},
 		Fixture: map[string]casefile.FixtureConfig{"r": {Remote: &casefile.RemoteFixture{}}},
 	}
@@ -224,7 +223,7 @@ func TestValidate_RemoteRequiresEndpoint(t *testing.T) {
 
 func TestValidate_ComposeFilesConflict(t *testing.T) {
 	cfg := &RootConfig{
-		Meta: Meta{Version: 2},
+		Meta: Meta{Version: 3},
 		Suites: []SuiteConfig{{
 			Name: "s", Cases: []string{"a.yaml"}, Fixture: "c",
 		}},
@@ -244,7 +243,7 @@ func TestValidate_ComposeFilesConflict(t *testing.T) {
 
 func TestValidate_K3DRequiresFields(t *testing.T) {
 	cfg := &RootConfig{
-		Meta: Meta{Version: 2},
+		Meta: Meta{Version: 3},
 		Suites: []SuiteConfig{{
 			Name: "s", Cases: []string{"a.yaml"}, Fixture: "k",
 		}},
@@ -261,7 +260,7 @@ func TestPlanRun_EmptyGlobIsAnError(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: s
     cases: ["nope/*.yaml"]
@@ -345,10 +344,9 @@ func TestLoadTopLevelCases(t *testing.T) {
 	writeFile(t, dir, "oats-config.yaml", `
 cases: ["cases/a.yaml", "cases/b.yaml"]
 meta:
-  version: 2
+  version: 3
 `)
 	writeFile(t, dir, "cases/a.yaml", `
-oats-schema-version: 3
 name: a
 seed: { type: app }
 expected:
@@ -357,7 +355,6 @@ expected:
       absent: true
 `)
 	writeFile(t, dir, "cases/b.yaml", `
-oats-schema-version: 3
 name: b
 seed: { type: app }
 expected:

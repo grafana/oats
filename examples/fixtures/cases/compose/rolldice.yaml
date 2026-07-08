@@ -1,4 +1,3 @@
-oats-schema-version: 3
 name: compose fixture app smoke
 seed:
   type: app

@@ -145,9 +145,8 @@ func ConvertTree(dir string) (*TreeResult, error) {
 func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Case, []string, error) {
 	var warnings []string
 	c := &casefile.Case{
-		OatsSchemaVersion: casefile.SchemaVersion,
-		Name:              name,
-		Interval:          def.Interval,
+		Name:     name,
+		Interval: def.Interval,
 	}
 	selectedMatrix := (*model.Matrix)(nil)
 

@@ -1,4 +1,3 @@
-oats-schema-version: 3
 name: ff-second-should-not-run
 seed:
   type: inline-otlp

@@ -23,12 +23,15 @@ removed. For one-off help migrating old cases, use:
 oats migrate path/to/legacy.yaml
 ```
 
-### Case schema: `oats-schema-version: 2` → `3`
+### Case schema: version 2 → 3
 
-The case-yaml assertion shape changed with the gcx-driven runner. Bump the tag
-to `3` and update assertions. The `0.5.0` / `0.6.0` notes further down describe
-the **version-2** shape (`equals`, `attribute-regexp`, `flamebearers`,
-`regexp`); the mappings below take you from that shape to version 3.
+The case-yaml assertion shape changed with the gcx-driven runner, and the schema
+version moved. A v3 case no longer carries an `oats-schema-version` field: cases
+are only ever loaded through `oats-config.yaml`, whose `meta.version: 3` is the
+single schema version. Drop the per-case `oats-schema-version` tag and update
+assertions. The `0.5.0` / `0.6.0` notes further down describe the **version-2**
+shape (`equals`, `attribute-regexp`, `flamebearers`, `regexp`); the mappings
+below take you from that shape to version 3.
 
 **Logs — regex.** Version 2's `regexp:` becomes `regex:` (scalar or list).
 `contains` / `not_contains` are also first-class again:
@@ -128,7 +131,7 @@ case (the migrator prints both the case yaml and a suggested `fixture:` block):
 ```yaml
 # oats-config.yaml
 meta:
-  version: 2
+  version: 3
 suites:
   - name: rolldice
     cases: ["cases/*.yaml"]
@@ -141,7 +144,6 @@ fixture:
 
 ```yaml
 # cases/rolldice.yaml (v3)
-oats-schema-version: 3
 name: rolldice
 seed:
   type: app

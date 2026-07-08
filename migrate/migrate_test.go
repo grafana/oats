@@ -113,7 +113,7 @@ func TestConvertFile_RendersYAML(t *testing.T) {
 		fatalf(t, "expected at least one warning for flattened include or fixture migration")
 	}
 	text := string(out)
-	for _, want := range []string{"oats-schema-version: 3", "seed:", "input:", "path: /stock", "match_spans:", "match_type: regexp", "key: db.system", "value: h2", "promql: foo"} {
+	for _, want := range []string{"seed:", "input:", "path: /stock", "match_spans:", "match_type: regexp", "key: db.system", "value: h2", "promql: foo"} {
 		if !strings.Contains(text, want) {
 			fatalf(t, "expected migrated yaml to contain %q:\n%s", want, text)
 		}
@@ -391,9 +391,6 @@ expected:
 	compose, err := casefile.Load(composeCase)
 	if err != nil {
 		fatalf(t, "compose case should be v3 after migration: %v", err)
-	}
-	if compose.OatsSchemaVersion != casefile.SchemaVersion {
-		fatalf(t, "expected schema version %d, got %d", casefile.SchemaVersion, compose.OatsSchemaVersion)
 	}
 	if compose.Fixture == nil || compose.Fixture.Compose == nil || compose.Fixture.Compose.File != "docker-compose.yml" {
 		fatalf(t, "expected migrated compose fixture, got %+v", compose.Fixture)

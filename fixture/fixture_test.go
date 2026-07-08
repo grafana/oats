@@ -280,7 +280,7 @@ func TestSupportsParallel_ComposeTemplateLGTM(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
-  version: 2
+  version: 3
 suites:
   - name: parallel-safe
     cases: ["cases/*.yaml"]
@@ -296,8 +296,7 @@ fixture:
     image: alpine
     command: ["sh", "-c", "sleep 1"]
 `)
-	writeFile(t, dir, "cases/a.yaml", `oats-schema-version: 3
-name: a
+	writeFile(t, dir, "cases/a.yaml", `name: a
 seed:
   type: inline-otlp
   logs:

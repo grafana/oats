@@ -1,4 +1,3 @@
-oats-schema-version: 3
 name: inline seed smoke
 seed:
   type: inline-otlp

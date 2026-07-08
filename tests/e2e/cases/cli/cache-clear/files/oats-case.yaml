@@ -1,4 +1,3 @@
-oats-schema-version: 3
 name: cache-clear-case
 seed:
   type: inline-otlp

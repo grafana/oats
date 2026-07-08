@@ -1,4 +1,3 @@
-oats-schema-version: 3
 name: not-contains-fail
 fixture:
   remote:

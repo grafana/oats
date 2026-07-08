@@ -21,19 +21,15 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// SchemaVersion is the value of the top-level `oats-schema-version` field
-// that this loader understands. Cases with any other value are rejected at
-// parse time.
-const SchemaVersion = 3
-
 // Case is one entry point yaml file. Cases are independently runnable;
-// suites group them via oats-config.yaml.
+// suites group them via oats-config.yaml. A case carries no version field of
+// its own: cases are only ever loaded through oats-config.yaml, whose
+// meta.version is the single schema version (see discovery.SupportedVersion).
 type Case struct {
-	OatsSchemaVersion int            `yaml:"oats-schema-version"`
-	Name              string         `yaml:"name"`
-	Tags              []string       `yaml:"tags,omitempty"`
-	Interval          time.Duration  `yaml:"interval,omitempty"`
-	Fixture           *FixtureConfig `yaml:"fixture,omitempty"`
+	Name     string         `yaml:"name"`
+	Tags     []string       `yaml:"tags,omitempty"`
+	Interval time.Duration  `yaml:"interval,omitempty"`
+	Fixture  *FixtureConfig `yaml:"fixture,omitempty"`
 
 	Seed     Seed     `yaml:"seed"`
 	Input    []Input  `yaml:"input,omitempty"`
@@ -371,10 +367,6 @@ func Parse(data []byte) (*Case, error) {
 // Called automatically by Parse; exported for tests that construct Cases
 // programmatically.
 func (c *Case) Validate() error {
-	if c.OatsSchemaVersion != SchemaVersion {
-		return fmt.Errorf("unsupported oats-schema-version '%d' required version is '%d'",
-			c.OatsSchemaVersion, SchemaVersion)
-	}
 	if c.Name == "" {
 		return fmt.Errorf("name: required, non-empty")
 	}

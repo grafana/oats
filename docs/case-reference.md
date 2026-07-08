@@ -9,7 +9,7 @@ CLI summary see the [README](../README.md); for running in CI see
 
 ```yaml
 meta:
-  version: 2          # oats-config.yaml schema version (distinct from a case's oats-schema-version)
+  version: 3          # the single OATS schema version; cases carry no version field of their own
 suites:
   - cases: ["examples/smoke/cases/*.yaml"]
 cache:
@@ -22,7 +22,6 @@ block (the common one-case-per-suite shape).
 ## Case yaml
 
 ```yaml
-oats-schema-version: 3
 name: rolldice traces have route attribute
 
 fixture:

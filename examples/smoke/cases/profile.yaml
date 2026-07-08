@@ -1,4 +1,3 @@
-oats-schema-version: 3
 name: profile smoke
 seed:
   type: app
