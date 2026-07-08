@@ -118,6 +118,33 @@ func (c *RootConfig) Validate() error {
 type Filter struct {
 	Suites []string // exact suite names; empty = all suites
 	Tags   []string // any-match
+	// Paths restricts the run to cases at (or under) these absolute file/dir
+	// paths. Empty = no path restriction. Backs the positional `oats <path>…`
+	// scoping, which selects which cases run without changing where the config
+	// is loaded from.
+	Paths []string
+}
+
+// keepCasesUnderPaths returns the cases whose source file is one of paths or
+// lives under one of them (dir scope). paths must be absolute and cleaned.
+func keepCasesUnderPaths(cases []*casefile.Case, paths []string) []*casefile.Case {
+	if len(paths) == 0 {
+		return cases
+	}
+	var kept []*casefile.Case
+	for _, tc := range cases {
+		abs, err := filepath.Abs(tc.SourcePath)
+		if err != nil {
+			continue
+		}
+		for _, p := range paths {
+			if abs == p || strings.HasPrefix(abs, p+string(filepath.Separator)) {
+				kept = append(kept, tc)
+				break
+			}
+		}
+	}
+	return kept
 }
 
 // Plan is one suite plus the cases it expanded to.
@@ -173,6 +200,11 @@ func (c *RootConfig) PlanRun(f Filter) ([]Plan, error) {
 		cases, err := c.loadSuiteCases(suite)
 		if err != nil {
 			return nil, fmt.Errorf("suite %q: %w", suiteLabel(suite), err)
+		}
+		cases = keepCasesUnderPaths(cases, f.Paths)
+		if len(cases) == 0 {
+			// No cases in this suite fall under the requested path scope.
+			continue
 		}
 		suite = materializeSuite(suite, cases)
 		if !wantSuite(suite.Name) {

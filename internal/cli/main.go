@@ -5,16 +5,20 @@
 //
 // Usage:
 //
-//	oats [flags]          run the suites (implicit; same as `oats run`)
-//	oats run [flags]      run the suites
-//	oats list             print the run plan and exit
-//	oats migrate <file>   convert one legacy yaml to the v3 shape
-//	oats cache clear      delete all cached results
-//	oats version          print the version
+//	oats [paths...]        run the cases (implicit; same as `oats run`)
+//	oats run [paths...]    run the cases; positional paths scope which cases run
+//	oats list              print the run plan and exit
+//	oats migrate <path>    migrate a legacy file (stdout) or directory (in place)
+//	oats cache clear       delete all cached results
+//	oats version           print the version
+//
+// The config (oats-config.yaml) is found in the current directory or any parent
+// unless --config is given. Positional paths (e.g. `oats examples/`) restrict the
+// run to cases at or under them.
 //
 // Run flags (subset):
 //
-//	--config       Path to oats-config.yaml (default ./oats-config.yaml)
+//	--config       Path to oats-config.yaml (default: found from cwd upward)
 //	--gcx          Path to gcx binary (default "gcx" on PATH)
 //	--format       Output format: "text" (default) or "ndjson"
 //	--suite        Comma-separated suite names to include
@@ -80,13 +84,17 @@ func Run() int {
 func newRootCmd(exit *int) *cobra.Command {
 	var verbose int
 	root := &cobra.Command{
-		Use:           "oats",
-		Short:         "OpenTelemetry Acceptance Tests — the gcx-driven runner",
+		Use:   "oats [paths...]",
+		Short: "OpenTelemetry Acceptance Tests — the gcx-driven runner",
+		Long: "OpenTelemetry Acceptance Tests — the gcx-driven runner.\n\n" +
+			"With no subcommand, oats runs the cases in oats-config.yaml (found in the\n" +
+			"current directory or any parent). Optional positional paths scope the run to\n" +
+			"cases at or under them, e.g. `oats examples/` or `oats examples/go/oats-case.yaml`.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		// Bare `oats [flags]` is an implicit `run` for backward compatibility.
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runAction(cmd, verbose, exit)
+		// Bare `oats [paths...] [flags]` is an implicit `run`.
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAction(cmd, args, verbose, exit)
 		},
 	}
 	root.PersistentFlags().CountVarP(&verbose, "verbose", "v", "increase verbosity (-v, -vv, -vvv)")
@@ -133,12 +141,16 @@ func addRunFlags(fs *pflag.FlagSet) {
 
 func newRunCmd(verbose, exit *int) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "run",
-		Short:         "Run the suites in oats-config.yaml (default when no subcommand is given)",
+		Use:   "run [paths...]",
+		Short: "Run the cases in oats-config.yaml (default when no subcommand is given)",
+		Long: "Run the cases declared by oats-config.yaml.\n\n" +
+			"The config is found in the current directory or any parent (override with\n" +
+			"--config). Optional positional paths scope the run to cases at or under those\n" +
+			"files/directories, e.g. `oats run examples/` runs only the cases under examples/.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runAction(cmd, *verbose, exit)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAction(cmd, args, *verbose, exit)
 		},
 	}
 	addRunFlags(cmd.Flags())
@@ -224,7 +236,10 @@ func newVersionCmd() *cobra.Command {
 }
 
 func listAction(cmd *cobra.Command) error {
-	configPath, _ := cmd.Flags().GetString("config")
+	configPath, err := resolveConfigPath(cmd.Flags())
+	if err != nil {
+		return err
+	}
 	cfg, err := discovery.Load(configPath)
 	if err != nil {
 		return err
@@ -265,8 +280,9 @@ func migrateAction(path string) error {
 }
 
 // runAction is the shared implementation behind the implicit-run root and the
-// explicit `run` subcommand.
-func runAction(cmd *cobra.Command, verbose int, exit *int) error {
+// explicit `run` subcommand. Positional args are file/dir paths that scope which
+// cases run; the config is resolved from cwd (walking up), independent of them.
+func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error {
 	fs := cmd.Flags()
 
 	// Honor the deprecated --list / --migrate flags.
@@ -277,21 +293,32 @@ func runAction(cmd *cobra.Command, verbose int, exit *int) error {
 		return migrateAction(migratePath)
 	}
 
-	configPath, _ := fs.GetString("config")
+	configPath, err := resolveConfigPath(fs)
+	if err != nil {
+		return err
+	}
 	cfg, err := discovery.Load(configPath)
 	if err != nil {
 		return err
 	}
 
+	paths, err := absArgs(args)
+	if err != nil {
+		return err
+	}
 	filter := discovery.Filter{
 		Suites: splitCSV(flagStr(fs, "suite")),
 		Tags:   splitCSV(flagStr(fs, "tags")),
+		Paths:  paths,
 	}
 	plans, err := cfg.PlanRun(filter)
 	if err != nil {
 		return err
 	}
 	if len(plans) == 0 {
+		if len(paths) > 0 {
+			return fmt.Errorf("no cases matched the given path(s)")
+		}
 		return fmt.Errorf("no suites matched the filter")
 	}
 
@@ -704,6 +731,48 @@ func gcxVersion(bin string) string {
 // defaultCacheDir returns $XDG_STATE_HOME/oats or ~/.cache/oats. The cache
 // lives under XDG_STATE_HOME on purpose (it is regeneratable state, not
 // configuration). Falls back to a relative path if HOME is unset.
+// resolveConfigPath returns the oats-config.yaml to load. An explicit --config
+// is honored as-is; otherwise the default filename is searched for in the
+// current directory and each parent (so `oats` works from a subdirectory).
+func resolveConfigPath(fs *pflag.FlagSet) (string, error) {
+	name, _ := fs.GetString("config")
+	if fs.Changed("config") {
+		return name, nil
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for dir := cwd; ; {
+		candidate := filepath.Join(dir, name)
+		if _, statErr := os.Stat(candidate); statErr == nil {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("no %s found in %s or any parent directory (use --config)", name, cwd)
+		}
+		dir = parent
+	}
+}
+
+// absArgs cleans positional path args to absolute paths (relative to cwd) for
+// case-path scoping.
+func absArgs(args []string) ([]string, error) {
+	if len(args) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(args))
+	for _, a := range args {
+		abs, err := filepath.Abs(a)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, filepath.Clean(abs))
+	}
+	return out, nil
+}
+
 func defaultCacheDir() string {
 	if s := os.Getenv("XDG_STATE_HOME"); s != "" {
 		return filepath.Join(s, "oats")

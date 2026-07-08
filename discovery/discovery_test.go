@@ -139,6 +139,44 @@ meta:
 	}
 }
 
+func TestPlanRun_FilterByPath(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 3
+suites:
+  - name: alpha
+    cases: ["a/*.yaml"]
+  - name: beta
+    cases: ["b/*.yaml"]
+`)
+	writeFile(t, dir, "a/x.yaml", strings.Replace(validCaseYAML, "%s", "ax", 1))
+	writeFile(t, dir, "b/y.yaml", strings.Replace(validCaseYAML, "%s", "by", 1))
+
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	// Directory scope: only the suite whose cases live under a/ survives.
+	plans, err := cfg.PlanRun(Filter{Paths: []string{filepath.Join(dir, "a")}})
+	if err != nil {
+		t.Fatalf("PlanRun dir scope: %v", err)
+	}
+	if len(plans) != 1 || plans[0].Suite.Name != "alpha" || len(plans[0].Cases) != 1 {
+		t.Fatalf("dir path filter: %+v", planNames(plans))
+	}
+
+	// Single-file scope: the exact case file.
+	plans, err = cfg.PlanRun(Filter{Paths: []string{filepath.Join(dir, "b", "y.yaml")}})
+	if err != nil {
+		t.Fatalf("PlanRun file scope: %v", err)
+	}
+	if len(plans) != 1 || plans[0].Suite.Name != "beta" || len(plans[0].Cases) != 1 {
+		t.Fatalf("file path filter: %+v", planNames(plans))
+	}
+}
+
 func TestPlanRun_FilterBySuiteName(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `

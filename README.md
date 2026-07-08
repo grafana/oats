@@ -71,19 +71,24 @@ bin/oats version
 ## CLI
 
 ```sh
-oats [flags]                     # run the suites (implicit; same as `oats run`)
-oats run [flags]                 # run the suites
-oats list --config oats-config.yaml     # print the run plan and exit
-oats migrate legacy.yaml         # convert one legacy yaml to the v3 shape
-oats cache clear                 # delete all cached results
-oats version                     # print the version
+oats                     # run every case (implicit; same as `oats run`)
+oats examples/           # run only cases at or under a path
+oats run [paths...]      # explicit run form
+oats list                # print the run plan and exit
+oats migrate <path>      # migrate a legacy file (stdout) or directory (in place)
+oats cache clear         # delete all cached results
+oats version             # print the version
 ```
+
+`oats-config.yaml` is found in the current directory or any parent (override with
+`--config`), so you can run `oats` from anywhere in the project. Positional paths
+scope *which* cases run without changing where the config is loaded from.
 
 Common flags:
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `--config` | `oats-config.yaml` | path to the config file |
+| `--config` | found from cwd upward | path to the config file |
 | `--suite` | all | comma-separated suite names to run |
 | `--tags` | all | comma-separated tags; a case runs if it matches any |
 | `--timeout` | `30s` | per-assertion timeout — each assertion is retried until it passes or this elapses |
