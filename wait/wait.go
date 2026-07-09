@@ -1,4 +1,4 @@
-// Package wait holds OATS v2's polling primitive: "keep trying until this
+// Package wait holds OATS's polling primitive: "keep trying until this
 // passes, or give up at the deadline."
 //
 // In v1 this was gomega.Eventually. v2 drops gomega, so wait provides the

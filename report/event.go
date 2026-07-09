@@ -1,4 +1,4 @@
-// Package report carries OATS v2's observation channel.
+// Package report carries OATS's observation channel.
 //
 // Every interesting moment in a run — a case started, an assertion failed, a
 // fixture became ready — is published as an Event. A Reporter renders the

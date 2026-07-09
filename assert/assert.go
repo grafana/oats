@@ -6,7 +6,7 @@
 // first failure within a group. A case yaml that declares five Contains
 // substrings reports all five misses in one run, not just the first.
 //
-// The shape mirrors the YAML keys documented in the OATS v2 impl plan:
+// The shape mirrors the case yaml keys documented in docs/case-reference.md:
 // contains, not_contains, regex, value, count, absent.
 package assert
 

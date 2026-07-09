@@ -46,7 +46,7 @@ type GCX struct {
 	Binary string
 
 	// Context is the value passed via --context, prepended to every invocation
-	// when non-empty. OATS sets this per suite so that a single binary install
+	// when non-empty. OATS sets this per fixture group so that a single binary install
 	// can drive multiple Grafana endpoints.
 	Context string
 

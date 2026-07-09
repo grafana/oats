@@ -1,4 +1,4 @@
-// Package cache holds OATS v2's skip-when-unchanged store.
+// Package cache holds OATS's skip-when-unchanged store.
 //
 // Idea: if (this case yaml, this fixture config, this gcx version) all hash
 // to the same value as a previous green run within the TTL, skip the case.
