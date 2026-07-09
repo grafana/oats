@@ -32,9 +32,10 @@ type Result struct {
 // Executor runs a gcx invocation and returns its Result.
 //
 // Implementations must never return a non-nil error for a non-zero exit code —
-// that is conveyed via Result.ExitCode. A non-nil error means the process
-// could not be launched (missing binary, context cancelled before start,
-// permission denied, etc.).
+// that is conveyed via Result.ExitCode. A non-nil error means the invocation
+// did not complete normally: the process could not be launched (missing
+// binary, permission denied) or the context was cancelled / timed out (before
+// or during the run).
 type Executor interface {
 	Execute(ctx context.Context, args ...string) (*Result, error)
 }

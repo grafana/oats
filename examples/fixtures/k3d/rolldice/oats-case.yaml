@@ -11,7 +11,7 @@ fixture:
     app_docker_file: Dockerfile  # build the app image from this Dockerfile…
     app_docker_context: .        # …with this build context
     app_docker_tag: rolldice:test
-    app_port: 18080              # app's container port
+    app_port: 18080              # local port to reach the app on (forwarded to the container's 8080)
     import_images: ["grafana/otel-lgtm:latest"]  # images to load into the cluster
 
 input:

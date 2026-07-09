@@ -195,7 +195,10 @@ func (s *Sender) sendMetric(ctx context.Context, m Metric, now time.Time) error 
 }
 
 func (s *Sender) post(ctx context.Context, path, body string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.OTLPEndpoint+path, bytes.NewBufferString(body))
+	// Trim a trailing slash so a user-supplied endpoint like "http://h:4318/"
+	// doesn't produce "...//v1/traces", which some OTLP receivers reject.
+	endpoint := strings.TrimRight(s.OTLPEndpoint, "/")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+path, bytes.NewBufferString(body))
 	if err != nil {
 		return err
 	}
