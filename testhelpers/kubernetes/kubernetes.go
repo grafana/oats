@@ -48,7 +48,9 @@ func NewEndpoint(host string, model *Kubernetes, ports remote.PortsConfig, testN
 	}, func(ctx context.Context) error {
 		var errs []error
 		for _, p := range killList {
-			if err := p.Kill(); err != nil {
+			// A port-forward that already exited returns os.ErrProcessDone;
+			// that means cleanup is already done, not a teardown failure.
+			if err := p.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 				errs = append(errs, err)
 			}
 		}
