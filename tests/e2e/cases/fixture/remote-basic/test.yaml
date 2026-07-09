@@ -11,12 +11,18 @@ run:
     docker compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" up -d >/dev/null
     grafana_port="$(docker compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" port lgtm 3000 | awk -F: '{print $NF}')"
     otlp_port="$(docker compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" port lgtm 4318 | awk -F: '{print $NF}')"
+    healthy=false
     for i in $(seq 1 60); do
       if curl -fsS "http://127.0.0.1:${grafana_port}/api/health" >/dev/null; then
+        healthy=true
         break
       fi
       sleep 2
     done
+    if [ "$healthy" != true ]; then
+      echo "grafana never became healthy on port ${grafana_port} after 120s" >&2
+      exit 1
+    fi
     cat > "$workdir/files/gcx.remote.yaml" <<CFG
     current-context: remote
     contexts:

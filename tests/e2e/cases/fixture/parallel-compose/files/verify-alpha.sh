@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# The harness copies files/ into a fresh t.TempDir() per run, so this proof
+# directory starts empty every run — the markers cannot be stale.
 dir="$(cd "$(dirname "$0")" && pwd)"
 proof="$dir/.parallel-proof"
 mkdir -p "$proof"
