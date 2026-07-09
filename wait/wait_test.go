@@ -87,6 +87,28 @@ func TestUntil_CancelledContextDoesNotPass(t *testing.T) {
 	}
 }
 
+func TestUntil_CancelPreservesEarlierFailures(t *testing.T) {
+	// Iterations fail, then the context is cancelled and the asserter passes.
+	// The run is not a success, and the earlier failures must be preserved so
+	// the caller can see what was failing before cancellation.
+	ctx, cancel := context.WithCancel(context.Background())
+	iter := 0
+	r := Until[string](ctx, Options{Timeout: time.Second, Interval: time.Millisecond}, func() []string {
+		iter++
+		if iter < 3 {
+			return []string{"boom"}
+		}
+		cancel()   // cancel, then report success on this poll
+		return nil // passes, but ctx is now cancelled
+	})
+	if r.OK {
+		t.Errorf("cancelled run should not pass: %+v", r)
+	}
+	if len(r.LastFailures) != 1 || r.LastFailures[0] != "boom" {
+		t.Errorf("expected earlier failures preserved on cancel, got %+v", r.LastFailures)
+	}
+}
+
 func TestWhile_HoldsForEntireWindow(t *testing.T) {
 	start := time.Now()
 	r := While[string](context.Background(), Options{Timeout: 30 * time.Millisecond, Interval: 5 * time.Millisecond}, func() []string {

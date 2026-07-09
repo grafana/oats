@@ -59,7 +59,7 @@ func Until[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 	var timer *time.Timer
 	defer func() { stopTimer(timer) }()
 
-	var last []F
+	var last, lastFailures []F
 	iter := 0
 	for {
 		iter++
@@ -67,12 +67,15 @@ func Until[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 		if len(last) == 0 {
 			// A cancelled context must not be reported as success, even when
 			// the asserter passed — consistent with While. The asserter has
-			// still run at least once per contract.
+			// still run at least once per contract. Preserve any failures seen
+			// on earlier iterations so the caller can still see what was
+			// failing right before cancellation (per Result's docstring).
 			if ctx.Err() != nil {
-				return Result[F]{OK: false, Iterations: iter, Elapsed: time.Since(start), LastFailures: nil}
+				return Result[F]{OK: false, Iterations: iter, Elapsed: time.Since(start), LastFailures: lastFailures}
 			}
 			return Result[F]{OK: true, Iterations: iter, Elapsed: time.Since(start), LastFailures: nil}
 		}
+		lastFailures = last // remember the most recent non-empty failure set
 		if !time.Now().Before(deadline) {
 			return Result[F]{OK: false, Iterations: iter, Elapsed: time.Since(start), LastFailures: last}
 		}
