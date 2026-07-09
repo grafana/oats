@@ -2,6 +2,7 @@
 # imports the app image, applies the manifests in k8s_dir, and port-forwards to
 # reach it. Every case in a suite must declare the same fixture.
 name: k3d fixture app smoke
+tags: [k3d, app]   # filter with `oats --tags k3d`
 
 fixture:
   k3d:

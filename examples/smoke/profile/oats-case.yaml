@@ -1,6 +1,7 @@
 # Profiles are queried from Pyroscope. They can't be inline-seeded, so assert
 # them against an app-backed fixture that produces CPU profiles.
 name: profile smoke
+tags: [profiles]
 
 fixture:
   remote:

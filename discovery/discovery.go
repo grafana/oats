@@ -1,19 +1,22 @@
-// Package discovery turns an oats-config.yaml + a collection of case yamls into a
-// concrete run plan.
+// Package discovery turns an oats-config.yaml + a collection of case yamls into
+// concrete run plans.
 //
 // In OATS v1, the runner walked the file system for any yaml carrying
-// "oats-schema-version" and ran whatever it found. The current format
-// declares the plan up front: oats-config.yaml lists suites, each suite lists cases
-// (path globs) and the fixture they share. "oats list" prints the plan
-// before "oats run" executes it.
+// "oats-schema-version" and ran whatever it found. The current format declares
+// the cases up front: oats-config.yaml lists case files (path globs). Each case
+// carries its own fixture; discovery groups cases that share one fixture into a
+// single plan so the (often expensive) fixture boots once and every case in the
+// group runs against it. Distinct plans are independent and may run in parallel
+// where fixture isolation allows. "oats list" prints the plans before "oats run"
+// executes them.
 package discovery
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -25,10 +28,9 @@ import (
 // directly so a misnamed key surfaces as a "field not defined" error from
 // the yaml decoder rather than a silent miss.
 type RootConfig struct {
-	Meta   Meta          `yaml:"meta"`
-	Cases  []string      `yaml:"cases,omitempty"`
-	Suites []SuiteConfig `yaml:"suites,omitempty"`
-	Cache  CacheConfig   `yaml:"cache,omitempty"`
+	Meta  Meta        `yaml:"meta"`
+	Cases []string    `yaml:"cases"` // path globs, relative to oats-config.yaml dir
+	Cache CacheConfig `yaml:"cache,omitempty"`
 
 	// SourceDir is the directory of the loaded oats-config.yaml. Case glob
 	// expressions resolve relative to it.
@@ -37,12 +39,6 @@ type RootConfig struct {
 
 type Meta struct {
 	Version int `yaml:"version"`
-}
-
-type SuiteConfig struct {
-	Name  string   `yaml:"name"`
-	Cases []string `yaml:"cases"` // path globs, relative to oats-config.yaml dir
-	Tags  []string `yaml:"tags,omitempty"`
 }
 
 type CacheConfig struct {
@@ -73,39 +69,28 @@ func Load(path string) (*RootConfig, error) {
 	return &cfg, nil
 }
 
-// Validate checks structural rules a toml parser cannot. Called by Load;
+// Validate checks structural rules the yaml parser cannot. Called by Load;
 // exposed for tests that construct RootConfigs in memory.
 func (c *RootConfig) Validate() error {
 	if c.Meta.Version != SupportedVersion {
 		return fmt.Errorf("meta.version: expected %d, got %d", SupportedVersion, c.Meta.Version)
 	}
-	if len(c.Cases) > 0 && len(c.Suites) > 0 {
-		return fmt.Errorf("use top-level cases or suites, not both")
+	if len(c.Cases) == 0 {
+		return fmt.Errorf("cases: at least one case glob is required")
 	}
-	if len(c.Cases) == 0 && len(c.Suites) == 0 {
-		return fmt.Errorf("at least one top-level case or suites entry required")
-	}
-	if len(c.Cases) > 0 {
-		for i, path := range c.Cases {
-			if strings.TrimSpace(path) == "" {
-				return fmt.Errorf("cases[%d]: path is required and non-empty", i)
-			}
-		}
-	}
-	for i, s := range c.Suites {
-		if len(s.Cases) == 0 {
-			return fmt.Errorf("suite[%d]: cases is required and non-empty", i)
+	for i, path := range c.Cases {
+		if strings.TrimSpace(path) == "" {
+			return fmt.Errorf("cases[%d]: path is required and non-empty", i)
 		}
 	}
 	return nil
 }
 
-// Filter describes which suites and cases to include in a Plan.
-// Empty fields impose no restriction. Tag filtering uses any-match semantics:
-// a suite passes if any of its tags appears in the filter list.
+// Filter describes which cases to include in the run. Empty fields impose no
+// restriction. Tag filtering uses any-match semantics: a case passes if any of
+// its tags appears in the filter list.
 type Filter struct {
-	Suites []string // exact suite names; empty = all suites
-	Tags   []string // any-match
+	Tags []string // any-match against each case's tags
 	// Paths restricts the run to cases at (or under) these absolute file/dir
 	// paths. Empty = no path restriction. Backs the positional `oats <path>…`
 	// scoping, which selects which cases run without changing where the config
@@ -113,113 +98,68 @@ type Filter struct {
 	Paths []string
 }
 
-// keepCasesUnderPaths returns the cases whose source file is one of paths or
-// lives under one of them (dir scope). paths must be absolute and cleaned.
-func keepCasesUnderPaths(cases []*casefile.Case, paths []string) []*casefile.Case {
-	if len(paths) == 0 {
-		return cases
-	}
-	var kept []*casefile.Case
-	for _, tc := range cases {
-		abs, err := filepath.Abs(tc.SourcePath)
-		if err != nil {
-			continue
-		}
-		for _, p := range paths {
-			if abs == p || strings.HasPrefix(abs, p+string(filepath.Separator)) {
-				kept = append(kept, tc)
-				break
-			}
-		}
-	}
-	return kept
-}
-
-// Plan is one suite plus the cases it expanded to.
+// Plan is a fixture-boot group: one fixture plus the cases that share it. The
+// fixture boots once and the plan's cases run serially against it; distinct
+// plans are independent and may run in parallel where fixture isolation allows.
 type Plan struct {
-	Suite            SuiteConfig
+	Name             string   // derived label for reporting/filtering output
+	Tags             []string // union of the member cases' tags (sorted)
 	Fixture          casefile.FixtureConfig
 	FixtureSourceDir string
 	Cases            []*casefile.Case
 }
 
-func (c *RootConfig) effectiveSuites() []SuiteConfig {
-	if len(c.Suites) > 0 {
-		return c.Suites
-	}
-	suites := make([]SuiteConfig, 0, len(c.Cases))
-	for _, path := range c.Cases {
-		suites = append(suites, SuiteConfig{Cases: []string{path}})
-	}
-	return suites
-}
-
-// PlanRun expands globs and applies the filter against the loaded config.
-// Returns plans in oats-config.yaml order; cases within a plan are sorted by
-// SourcePath for stable test ordering.
+// PlanRun loads the configured cases, applies the filter, and groups the
+// survivors into plans by fixture identity. Plans are returned in the order
+// their fixtures first appear; cases are sorted by SourcePath for stable
+// ordering, so a plan's cases keep that order too.
 func (c *RootConfig) PlanRun(f Filter) ([]Plan, error) {
-	wantSuite := func(name string) bool {
-		if len(f.Suites) == 0 {
-			return true
-		}
-		for _, s := range f.Suites {
-			if s == name {
-				return true
-			}
-		}
-		return false
+	cases, err := c.loadCases()
+	if err != nil {
+		return nil, err
 	}
-	wantTag := func(tags []string) bool {
-		if len(f.Tags) == 0 {
-			return true
-		}
-		for _, want := range f.Tags {
-			for _, has := range tags {
-				if want == has {
-					return true
-				}
-			}
-		}
-		return false
+	cases = keepCasesUnderPaths(cases, f.Paths)
+	cases = keepCasesWithTags(cases, f.Tags)
+	if len(cases) == 0 {
+		return nil, nil
 	}
 
-	var plans []Plan
-	for _, suite := range c.effectiveSuites() {
-		cases, err := c.loadSuiteCases(suite)
-		if err != nil {
-			return nil, fmt.Errorf("suite %q: %w", suiteLabel(suite), err)
+	// Group by fixture identity, preserving first-appearance order.
+	var order []string
+	groups := map[string][]*casefile.Case{}
+	fixtures := map[string]casefile.FixtureConfig{}
+	dirs := map[string]string{}
+	for _, tc := range cases {
+		fx, dir := c.fixtureFor(tc)
+		key := groupKey(fx, dir)
+		if _, ok := groups[key]; !ok {
+			order = append(order, key)
+			fixtures[key] = fx
+			dirs[key] = dir
 		}
-		cases = keepCasesUnderPaths(cases, f.Paths)
-		if len(cases) == 0 {
-			// No cases in this suite fall under the requested path scope.
-			continue
-		}
-		suite = materializeSuite(suite, cases)
-		if !wantSuite(suite.Name) {
-			continue
-		}
-		if !wantTag(suite.Tags) {
-			continue
-		}
-		fixture, fixtureSourceDir, err := c.resolveSuiteFixture(cases)
-		if err != nil {
-			return nil, fmt.Errorf("suite %q: %w", suite.Name, err)
-		}
+		groups[key] = append(groups[key], tc)
+	}
 
+	plans := make([]Plan, 0, len(order))
+	for _, key := range order {
+		gcs := groups[key]
 		plans = append(plans, Plan{
-			Suite:            suite,
-			Fixture:          fixture,
-			FixtureSourceDir: fixtureSourceDir,
-			Cases:            cases,
+			Name:             deriveGroupName(fixtures[key], gcs),
+			Tags:             unionTags(gcs),
+			Fixture:          fixtures[key],
+			FixtureSourceDir: dirs[key],
+			Cases:            gcs,
 		})
 	}
 	return plans, nil
 }
 
-func (c *RootConfig) loadSuiteCases(suite SuiteConfig) ([]*casefile.Case, error) {
-	seen := make(map[string]struct{}) // dedupe overlapping globs
+// loadCases expands every glob in Cases (relative to SourceDir), dedupes
+// overlapping matches, loads each case, and returns them sorted by SourcePath.
+func (c *RootConfig) loadCases() ([]*casefile.Case, error) {
+	seen := make(map[string]struct{})
 	var cases []*casefile.Case
-	for _, pattern := range suite.Cases {
+	for _, pattern := range c.Cases {
 		abs := filepath.Join(c.SourceDir, pattern)
 		matches, err := filepath.Glob(abs)
 		if err != nil {
@@ -246,57 +186,140 @@ func (c *RootConfig) loadSuiteCases(suite SuiteConfig) ([]*casefile.Case, error)
 	return cases, nil
 }
 
-func suiteLabel(s SuiteConfig) string {
-	if s.Name != "" {
-		return s.Name
+// fixtureFor returns the case's fixture (or the default lgtm compose when the
+// case declares none) and the directory its relative paths resolve against.
+func (c *RootConfig) fixtureFor(tc *casefile.Case) (casefile.FixtureConfig, string) {
+	if tc.Fixture == nil {
+		// No fixture: default to a compose fixture with the builtin lgtm
+		// template (an empty ComposeFixture resolves to template=lgtm). This
+		// boots just the lgtm stack, which is handy for inline-otlp cases.
+		// Temp compose files land next to the config.
+		return casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}}, c.SourceDir
 	}
-	if len(s.Cases) == 1 {
-		p := filepath.Clean(s.Cases[0])
-		if base := dirLabel(filepath.Dir(p)); base != "" {
-			return base
-		}
-		return strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
-	}
-	return fmt.Sprintf("suite[%d cases]", len(s.Cases))
+	return *tc.Fixture, filepath.Dir(tc.SourcePath)
 }
 
-func materializeSuite(s SuiteConfig, cases []*casefile.Case) SuiteConfig {
-	if s.Name == "" {
-		s.Name = deriveSuiteName(s, cases)
+// groupKey identifies the fixture-boot group a case belongs to. Cases with
+// deep-equal fixtures share one boot; a fixture that resolves files relative to
+// its directory (compose file/files, k3d manifests) additionally keys on that
+// directory, since the same relative path means different files in different
+// directories. A path-less fixture (remote, or a template-only compose) keys on
+// the fixture alone, so identical copies in different directories share one boot.
+func groupKey(f casefile.FixtureConfig, dir string) string {
+	b, _ := json.Marshal(f)
+	key := string(b)
+	if f.UsesRelativePaths() {
+		key += "\x00" + dir
 	}
-	if len(s.Tags) == 0 {
-		seen := make(map[string]struct{})
-		for _, c := range cases {
-			for _, tag := range c.Tags {
-				if _, ok := seen[tag]; ok {
-					continue
-				}
-				seen[tag] = struct{}{}
-				s.Tags = append(s.Tags, tag)
+	return key
+}
+
+// keepCasesUnderPaths returns the cases whose source file is one of paths or
+// lives under one of them (dir scope). paths must be absolute and cleaned.
+func keepCasesUnderPaths(cases []*casefile.Case, paths []string) []*casefile.Case {
+	if len(paths) == 0 {
+		return cases
+	}
+	var kept []*casefile.Case
+	for _, tc := range cases {
+		abs, err := filepath.Abs(tc.SourcePath)
+		if err != nil {
+			continue
+		}
+		for _, p := range paths {
+			if abs == p || strings.HasPrefix(abs, p+string(filepath.Separator)) {
+				kept = append(kept, tc)
+				break
 			}
 		}
-		sort.Strings(s.Tags)
 	}
-	return s
+	return kept
 }
 
-func deriveSuiteName(s SuiteConfig, cases []*casefile.Case) string {
+// keepCasesWithTags returns the cases with at least one tag in tags (any-match).
+func keepCasesWithTags(cases []*casefile.Case, tags []string) []*casefile.Case {
+	if len(tags) == 0 {
+		return cases
+	}
+	var kept []*casefile.Case
+	for _, tc := range cases {
+		for _, want := range tags {
+			if slicesContains(tc.Tags, want) {
+				kept = append(kept, tc)
+				break
+			}
+		}
+	}
+	return kept
+}
+
+func slicesContains(haystack []string, want string) bool {
+	for _, h := range haystack {
+		if h == want {
+			return true
+		}
+	}
+	return false
+}
+
+func unionTags(cases []*casefile.Case) []string {
+	seen := make(map[string]struct{})
+	var tags []string
+	for _, tc := range cases {
+		for _, t := range tc.Tags {
+			if _, ok := seen[t]; ok {
+				continue
+			}
+			seen[t] = struct{}{}
+			tags = append(tags, t)
+		}
+	}
+	sort.Strings(tags)
+	return tags
+}
+
+// deriveGroupName produces a readable label for a plan. A single case uses its
+// name (or its directory); multiple cases use their common directory, falling
+// back to the fixture kind and count.
+func deriveGroupName(f casefile.FixtureConfig, cases []*casefile.Case) string {
 	if len(cases) == 1 {
-		if strings.TrimSpace(cases[0].Name) != "" {
-			return cases[0].Name
+		if n := strings.TrimSpace(cases[0].Name); n != "" {
+			return n
 		}
-		if base := dirLabel(filepath.Dir(cases[0].SourcePath)); base != "" {
-			return base
+		if lbl := dirLabel(filepath.Dir(cases[0].SourcePath)); lbl != "" {
+			return lbl
 		}
 	}
-	if len(s.Cases) == 1 {
-		p := filepath.Clean(s.Cases[0])
-		if base := dirLabel(filepath.Dir(p)); base != "" {
-			return base
-		}
-		return strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
+	if lbl := dirLabel(commonDir(cases)); lbl != "" {
+		return lbl
 	}
-	return fmt.Sprintf("suite-%d-cases", len(cases))
+	kind := f.Kind()
+	if kind == "" {
+		kind = "cases"
+	}
+	return fmt.Sprintf("%s (%d cases)", kind, len(cases))
+}
+
+// commonDir returns the longest directory prefix shared by every case's source
+// file, or "" if they share none.
+func commonDir(cases []*casefile.Case) string {
+	if len(cases) == 0 {
+		return ""
+	}
+	parts := strings.Split(filepath.Dir(cases[0].SourcePath), string(filepath.Separator))
+	for _, tc := range cases[1:] {
+		other := strings.Split(filepath.Dir(tc.SourcePath), string(filepath.Separator))
+		n := len(parts)
+		if len(other) < n {
+			n = len(other)
+		}
+		i := 0
+		for i < n && parts[i] == other[i] {
+			i++
+		}
+		parts = parts[:i]
+	}
+	return strings.Join(parts, string(filepath.Separator))
 }
 
 func dirLabel(dir string) string {
@@ -313,60 +336,15 @@ func dirLabel(dir string) string {
 	return base
 }
 
-// resolveSuiteFixture derives the one fixture a suite boots from its cases. A
-// suite boots a single fixture once and runs every case against it, so all
-// cases that declare a fixture must declare the same one. Cases carry the
-// fixture (backend + app together); there is no suite- or config-level fixture.
-// (Sharing one backend across cases with *different* apps is a deferred
-// follow-up — see the shared-LGTM parallel model.)
-func (c *RootConfig) resolveSuiteFixture(cases []*casefile.Case) (casefile.FixtureConfig, string, error) {
-	var (
-		fixture   casefile.FixtureConfig
-		sourceDir string
-		seen      bool
-	)
-	for _, tc := range cases {
-		if tc.Fixture == nil {
-			continue
+// Summary renders one line per plan for `oats list`.
+func Summary(plans []Plan) string {
+	var out strings.Builder
+	for _, p := range plans {
+		names := make([]string, len(p.Cases))
+		for i, tc := range p.Cases {
+			names[i] = tc.Name
 		}
-		next := *tc.Fixture
-		nextSourceDir := filepath.Dir(tc.SourcePath)
-		if !seen {
-			fixture, sourceDir, seen = next, nextSourceDir, true
-			continue
-		}
-		if !reflect.DeepEqual(fixture, next) {
-			return casefile.FixtureConfig{}, "", fmt.Errorf("suite cases do not agree on one shared fixture")
-		}
-		// Identical fixtures in different directories only conflict when the
-		// fixture resolves files relative to that directory (compose file/files,
-		// k3d manifests). A remote or template-only fixture references no paths,
-		// so different dirs are fine — keep the first case's dir.
-		if sourceDir != nextSourceDir && next.UsesRelativePaths() {
-			return casefile.FixtureConfig{}, "", fmt.Errorf("suite cases share a fixture with relative paths but live in different directories")
-		}
+		fmt.Fprintf(&out, "plan=%s fixture=%s tags=%v cases=%v\n", p.Name, p.Fixture.Kind(), p.Tags, names)
 	}
-	if !seen {
-		// No case declares a fixture: default to a compose fixture with the
-		// builtin lgtm template (an empty ComposeFixture resolves to
-		// template=lgtm). This boots just the lgtm stack, which is handy for
-		// inline-otlp smoke tests. External stacks require an explicit remote:
-		// fixture. Temp compose files land next to the config.
-		return casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}}, c.SourceDir, nil
-	}
-	return fixture, sourceDir, nil
-}
-
-// Summary renders a single line per plan suitable for `oats list`. It does
-// not load any cases — useful for a dry-run before deciding to expand globs.
-func (c *RootConfig) Summary() string {
-	var out string
-	for _, s := range c.effectiveSuites() {
-		label := s.Name
-		if label == "" {
-			label = suiteLabel(s)
-		}
-		out += fmt.Sprintf("suite=%s tags=%v cases=%v\n", label, s.Tags, s.Cases)
-	}
-	return out
+	return out.String()
 }

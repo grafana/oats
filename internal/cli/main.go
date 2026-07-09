@@ -21,8 +21,7 @@
 //	--config       Path to oats-config.yaml (default: found from cwd upward)
 //	--gcx          Path to gcx binary (default "gcx" on PATH)
 //	--format       Output format: "text" (default) or "ndjson"
-//	--suite        Comma-separated suite names to include
-//	--tags         Comma-separated tag any-match filter
+//	--tags         Comma-separated tag any-match filter (on case tags)
 //	--fail-fast    Stop scheduling further cases after the first failure
 //	-v / -vv / -vvv  Progressive verbosity (passes / commands / lifecycle)
 package cli
@@ -116,7 +115,6 @@ func addRunFlags(fs *pflag.FlagSet) {
 	fs.String("config", "oats-config.yaml", "path to oats-config.yaml")
 	fs.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
 	fs.String("format", "text", "output format: text | ndjson")
-	fs.String("suite", "", "comma-separated suite names")
 	fs.String("tags", "", "comma-separated tag any-match")
 	fs.Duration("timeout", 30*time.Second, "per-assertion timeout")
 	fs.Duration("interval", 500*time.Millisecond, "polling interval")
@@ -126,7 +124,7 @@ func addRunFlags(fs *pflag.FlagSet) {
 	fs.String("app-host", "localhost", "application host for driving case input requests")
 	fs.Int("app-port", 8080, "application port for driving case input requests")
 	fs.String("otlp-http", "http://localhost:4318", "OTLP/HTTP base URL for inline-otlp seed mode")
-	fs.Int("parallel", 1, "number of suites to run in parallel when fixture isolation allows it")
+	fs.Int("parallel", 1, "number of fixture groups to run in parallel when fixture isolation allows it")
 	fs.Bool("fail-fast", false, "stop scheduling further cases after the first case failure")
 	fs.Bool("no-cache", false, "disable the skip-when-unchanged cache for this run")
 	fs.String("cache-dir", defaultCacheDir(), "directory for the skip-when-unchanged cache")
@@ -244,7 +242,11 @@ func listAction(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	fmt.Print(cfg.Summary())
+	plans, err := cfg.PlanRun(discovery.Filter{})
+	if err != nil {
+		return err
+	}
+	fmt.Print(discovery.Summary(plans))
 	return nil
 }
 
@@ -307,9 +309,8 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		return err
 	}
 	filter := discovery.Filter{
-		Suites: splitCSV(flagStr(fs, "suite")),
-		Tags:   splitCSV(flagStr(fs, "tags")),
-		Paths:  paths,
+		Tags:  splitCSV(flagStr(fs, "tags")),
+		Paths: paths,
 	}
 	plans, err := cfg.PlanRun(filter)
 	if err != nil {
@@ -409,7 +410,7 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 		// For a remote fixture, the gcx context is configured externally
 		// (e.g. `gcx login` already ran). We pass the suite name as a
 		// best-effort default; --gcx-context overrides.
-		ep.GCXContext = plan.Suite.Name
+		ep.GCXContext = plan.Name
 		ep.OTLPHTTP = plan.Fixture.Remote.Endpoint
 		ep.CustomCheckEnv = append(ep.CustomCheckEnv,
 			"OATS_FIXTURE_TYPE=remote",
@@ -573,13 +574,13 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 	fixtureStart := emitFixtureStart(rep, plan)
 	fix, rt, err := fixture.Start(ctx, plan)
 	if err != nil {
-		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Suite.Name, err)}
+		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Name, err)}
 	}
 	if err := fixture.WaitForReady(plan, rt); err != nil {
 		if fix != nil {
 			_ = closeFixture(rep, plan, fix)
 		}
-		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Suite.Name, err)}
+		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Name, err)}
 	}
 	emitFixtureReady(rep, plan, fixtureStart)
 	ep, err := resolveEndpoint(plan, rt, opts.gcxContextOverride, opts.appHost, opts.appPort, opts.otlpHTTP)
@@ -587,12 +588,12 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 		if fix != nil {
 			_ = closeFixture(rep, plan, fix)
 		}
-		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Suite.Name, err)}
+		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Name, err)}
 	}
 
 	rep.Emit(report.Event{
 		Type:        report.EventSuiteStart,
-		Suite:       plan.Suite.Name,
+		Suite:       plan.Name,
 		FixtureType: plan.Fixture.Kind(),
 		CaseCount:   len(plan.Cases),
 	})
@@ -636,13 +637,13 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 
 	rep.Emit(report.Event{
 		Type:  report.EventSuiteEnd,
-		Suite: plan.Suite.Name,
+		Suite: plan.Name,
 		Pass:  suitePass,
 		Fail:  suiteFail,
 	})
 	if fix != nil {
 		if closeErr := closeFixture(rep, plan, fix); closeErr != nil {
-			return suiteResult{pass: suitePass, fail: suiteFail, err: fmt.Errorf("suite %q: fixture shutdown: %w", plan.Suite.Name, closeErr)}
+			return suiteResult{pass: suitePass, fail: suiteFail, err: fmt.Errorf("suite %q: fixture shutdown: %w", plan.Name, closeErr)}
 		}
 	}
 	return suiteResult{pass: suitePass, fail: suiteFail}
@@ -653,7 +654,7 @@ func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {
 	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureStart,
-			Suite:       plan.Suite.Name,
+			Suite:       plan.Name,
 			FixtureType: plan.Fixture.Kind(),
 			Ts:          start,
 		})
@@ -665,7 +666,7 @@ func emitFixtureReady(rep report.Reporter, plan discovery.Plan, start time.Time)
 	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureReady,
-			Suite:       plan.Suite.Name,
+			Suite:       plan.Name,
 			FixtureType: plan.Fixture.Kind(),
 			DurationMs:  time.Since(start).Milliseconds(),
 		})
@@ -680,7 +681,7 @@ func closeFixture(rep report.Reporter, plan discovery.Plan, fix fixture.Handle) 
 	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureTeardown,
-			Suite:       plan.Suite.Name,
+			Suite:       plan.Name,
 			FixtureType: plan.Fixture.Kind(),
 			DurationMs:  time.Since(start).Milliseconds(),
 		})

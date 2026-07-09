@@ -1,6 +1,7 @@
 # A case: drive an app, then assert on the telemetry it produced. This one
 # exercises all three main signals (traces, metrics, logs).
 name: rolldice smoke
+tags: [traces, metrics, logs]
 
 # A "remote" fixture points at an already-running stack — here a local
 # grafana/otel-lgtm on the default OTLP port. OATS does not boot or tear it down;

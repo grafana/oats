@@ -2,6 +2,7 @@
 # pipeline/backend in isolation or to pin an exact payload. Here we push one span
 # and assert it comes back.
 name: inline seed smoke
+tags: [traces]
 
 fixture:
   remote:

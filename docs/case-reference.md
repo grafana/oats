@@ -7,21 +7,20 @@ CLI summary see the [README](../README.md); for running in CI see
 
 ## oats-config.yaml
 
-`oats-config.yaml` is the entry point of an OATS project: it declares `meta`, the
-suites (or a top-level `cases:` list) with the case files each runs (path globs),
-and cache settings. It does **not** declare fixtures — each fixture lives on its
-case (see [Fixtures](#fixtures)). `oats` looks for the config in the current
-directory and then each parent (so you can run from a subdirectory); `--config
-<path>` overrides the search. Its `meta.version` is the single OATS schema
-version — case files carry no version of their own.
+`oats-config.yaml` is the entry point of an OATS project: it declares `meta`, a
+top-level `cases:` list of the case files to run (path globs), and cache
+settings. It does **not** declare fixtures or any grouping — each fixture lives
+on its case (see [Fixtures](#fixtures)), and OATS derives the boot-grouping from
+those fixtures (see [How cases are grouped](#how-cases-are-grouped)). `oats`
+looks for the config in the current directory and then each parent (so you can
+run from a subdirectory); `--config <path>` overrides the search. Its
+`meta.version` is the single OATS schema version — case files carry no version of
+their own.
 
 ```yaml
 meta:
   version: 3
-suites:
-  - name: smoke                   # optional label; also the `--suite` filter key
-    cases: ["*/oats-case.yaml"]   # each case in its own subdir; globs are relative to this file
-    tags: [traces, logs]          # optional labels; filter with `--tags`
+cases: ["*/oats-case.yaml"]       # each case in its own subdir; globs are relative to this file
 cache:
   ttl_days: 7                     # skip-when-unchanged TTL; 0 → default (7 days)
 ```
@@ -40,38 +39,34 @@ Globs are shell-style (`*` matches one path segment; no recursive `**`), so add 
 segment for deeper trees (e.g. `examples/*/oats-case.yaml`) or list several
 patterns.
 
-### Suites vs cases
+### How cases are grouped
 
-A **case** is one test. A **suite** boots **one fixture, shared by all its
-cases**, and runs each case against it — so the (often expensive) backend is
-stood up once. A suite is also the unit of parallelism (`--parallel` runs
-*suites* concurrently; cases within a suite run in order) and of `--suite` /
-`--tags` filtering.
+You write **cases**; OATS derives the grouping. A case is one test, and each
+case carries its own `fixture:` (see [Fixtures](#fixtures)). OATS groups cases
+by **fixture identity**: cases with the same fixture form one **boot-group** —
+the fixture boots once and those cases run serially against it — while cases with
+different fixtures form independent groups that can run in parallel (where
+fixture isolation allows; see [Running in parallel](#running-in-parallel)).
+There is no grouping to declare. This is why, for example,
+docker-otel-lgtm's per-language cases — each its own `compose` fixture — auto-
+group into independent parallel boots with no grouping config.
 
-The suite's fixture is **derived from its cases**, never declared on the suite:
-every case in the suite that declares a `fixture:` must declare the **same** one
-(compared deep-equal). If they disagree it's an error ("suite cases do not agree
-on one shared fixture"); if no case declares a fixture, the suite defaults to a
-`compose` fixture with the builtin `lgtm` template. Group cases into a suite when
-you want them to share a boot: for a `compose`/`k3d` fixture that shared boot is
-the real win, whereas a `remote` fixture boots nothing, so grouping it into a
-suite mainly buys `--tags`/`--suite` filtering.
+For a `compose`/`k3d` fixture that shared boot is the real win, since the
+(often expensive) backend is stood up once. A `remote` fixture boots nothing, so
+grouping there only affects reporting.
 
-Cases in **different directories** can share a fixture only if it references no
-directory-relative paths — a `remote:` fixture, or a template-only `compose`
-fixture. A `compose` fixture with `file:`/`files:` (or `k3d` with `k8s_dir` /
-`app_docker_file`) is directory-relative, so cases sharing it must live in the
-same directory.
+Fixture identity has one subtlety: a fixture that resolves files relative to the
+case dir (a `compose` `file`/`files`, or a `k3d` `k8s_dir` / `app_docker_file` /
+`app_docker_context`) **additionally groups by directory** — the same relative
+path means different files in different dirs, so such cases group only with
+others in the same directory. A path-less fixture (a `remote` fixture, or a
+template-only `compose` fixture) groups on the fixture alone, so identical copies
+in different directories share one boot.
 
-When you don't need that grouping, use a **top-level `cases:`** list instead of
-`suites:`; each case then becomes its own single-case suite carrying its own
-`fixture:` block:
-
-```yaml
-meta:
-  version: 3
-cases: ["*/oats-case.yaml"]   # no suites; one case per subdir, each self-contained
-```
+**Tags and filtering are per-case.** Put `tags: [...]` on the case
+(`oats-case.yaml`), and `oats --tags <t>` filters cases (any match). If no case
+declares a fixture, it defaults to a `compose` fixture with the builtin `lgtm`
+template.
 
 ## Case yaml
 
@@ -108,12 +103,13 @@ expected:
 A fixture describes **both the backend and the app under test, together** — the
 observability stack (Grafana + Loki + Tempo + Prometheus + Pyroscope) plus, for
 an app-seed case, the app that feeds it. It is declared **on the case**, in a
-`fixture:` block (there is no config- or suite-level fixture); a suite boots the
-one its cases agree on. For a `compose` fixture the builtin `lgtm` template
-supplies the backend and the case's `file:` supplies the app.
+`fixture:` block (there is no config-level fixture); OATS boots each distinct
+fixture once and runs the cases that share it against it (see [How cases are
+grouped](#how-cases-are-grouped)). For a `compose` fixture the builtin `lgtm`
+template supplies the backend and the case's `file:` supplies the app.
 
-Because a suite boots a single fixture, all of its cases today share the same
-app+backend, booted once. (Not yet: sharing one backend across cases that run
+Because cases that share a fixture share one boot, they run against the same
+app+backend, stood up once. (Not yet: sharing one backend across cases that run
 *different* apps — the shared-LGTM parallel model — is a deliberately deferred
 follow-up.)
 
@@ -157,10 +153,10 @@ For a `compose` fixture driven by a `seed: app` case, set `app_service` (the
 compose service name of the app) and `app_port` (the app's container port) inside
 the `compose` block. OATS then discovers the host port docker published for that
 service, so the app can bind an **ephemeral** host port (`127.0.0.1::<app_port>`)
-rather than a fixed one — which is what lets app-seed suites run under `--parallel`
+rather than a fixed one — which is what lets app-seed groups run under `--parallel`
 without colliding.
 Omit them and the app is driven on the fixed `--app-port` (default 8080), which
-forces the suite to run serially.
+forces the group to run serially.
 
 ## Seed
 
@@ -174,11 +170,11 @@ modes:
   at the OTLP endpoint — no app, no SDK. Reach for it when there is no app to
   drive: to exercise the pipeline or backend in isolation (collector
   processor/transform config, ingestion, query behaviour), or to pin an exact
-  payload shape a test depends on. OATS's own e2e suite leans on it heavily for
+  payload shape a test depends on. OATS's own e2e tests lean on it heavily for
   precisely this — deterministic telemetry without booting an instrumented app.
 
 ```yaml
-# App-backed: the suite fixture boots an instrumented app, and `input`
+# App-backed: the case's fixture boots an instrumented app, and `input`
 # requests drive it so it emits telemetry.
 seed:
   type: app
@@ -319,20 +315,20 @@ echo "custom check ok"
 
 ## Running in parallel
 
-- Cases inside one suite run sequentially.
-- Suites can run concurrently with `--parallel N`, but only where fixture
-  isolation allows it: remote suites, and `template = "lgtm"` compose suites that
-  publish **no fixed host ports**. An app-seed compose suite qualifies when its
+- Cases inside one fixture group run sequentially.
+- Fixture groups can run concurrently with `--parallel N`, but only where fixture
+  isolation allows it: remote groups, and `template = "lgtm"` compose groups that
+  publish **no fixed host ports**. An app-seed compose group qualifies when its
   app binds an *ephemeral* host port (`127.0.0.1::<port>`) and the fixture sets
   `app_service` + `app_port` so OATS can discover the published port; an app-seed
-  suite without `app_service`, or any compose file that binds a fixed host port,
-  runs serially. k3d suites always run serially.
+  group without `app_service`, or any compose file that binds a fixed host port,
+  runs serially. k3d groups always run serially.
 - **Memory, not CPU, is the limit for compose parallelism.** Each parallel
-  `template = "lgtm"` suite boots its *own* LGTM stack — a unique compose project
-  with dynamically allocated host ports — so suites can neither collide on ports
+  `template = "lgtm"` group boots its *own* LGTM stack — a unique compose project
+  with dynamically allocated host ports — so groups can neither collide on ports
   nor see each other's telemetry. That hermetic isolation costs one full LGTM
-  container per concurrent suite (Grafana + Loki + Tempo + Mimir + Prometheus +
+  container per concurrent group (Grafana + Loki + Tempo + Mimir + Prometheus +
   Pyroscope + collector, on the order of ~1 GB each). `--parallel` therefore
   defaults to `1`; raise it deliberately, sized to available RAM rather than core
-  count. Remote suites boot nothing and parallelize cheaply.
+  count. Remote groups boot nothing and parallelize cheaply.
 - OATS owns local LGTM bootstrapping and gcx bootstrap for fixture-backed runs.

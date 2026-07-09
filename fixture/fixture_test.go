@@ -100,7 +100,7 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 	}
 
 	fix, _, err := Start(context.Background(), discovery.Plan{
-		Suite: discovery.SuiteConfig{Name: "smoke"},
+		Name: "smoke",
 		Fixture: casefile.FixtureConfig{
 			Compose: &casefile.ComposeFixture{
 				// template=none keeps the resolved file list exactly a.yml/b.yml
@@ -141,7 +141,7 @@ func TestStart_ComposeStartFailure(t *testing.T) {
 	}
 
 	_, _, err := Start(context.Background(), discovery.Plan{
-		Suite:            discovery.SuiteConfig{Name: "smoke"},
+		Name:             "smoke",
 		Fixture:          casefile.FixtureConfig{Compose: &casefile.ComposeFixture{File: "compose.yml"}},
 		FixtureSourceDir: "/tmp/work",
 	})
@@ -170,7 +170,7 @@ func TestStart_K3DLifecycle(t *testing.T) {
 	}
 
 	fix, rt, err := Start(context.Background(), discovery.Plan{
-		Suite: discovery.SuiteConfig{Name: "cluster-smoke"},
+		Name: "cluster-smoke",
 		Fixture: casefile.FixtureConfig{
 			K3D: &casefile.K3DFixture{
 				K8sDir:           "k8s",
@@ -193,7 +193,7 @@ func TestStart_K3DLifecycle(t *testing.T) {
 	if starts != 1 {
 		t.Fatalf("expected one endpoint start, got %d", starts)
 	}
-	if capturedPlan.FixtureSourceDir != "/tmp/work" || capturedPlan.Suite.Name != "cluster-smoke" || capturedPlan.Fixture.K3D.AppPort != 18080 {
+	if capturedPlan.FixtureSourceDir != "/tmp/work" || capturedPlan.Name != "cluster-smoke" || capturedPlan.Fixture.K3D.AppPort != 18080 {
 		t.Fatalf("unexpected endpoint factory args: plan=%+v", capturedPlan)
 	}
 	if capturedPorts.GrafanaHTTPPort == 0 || capturedPorts.OTLPHTTPPort == 0 || capturedPorts.LokiHttpPort == 0 || capturedPorts.PrometheusHTTPPort == 0 || capturedPorts.TempoHTTPPort == 0 || capturedPorts.PyroscopeHttpPort == 0 {
@@ -220,7 +220,7 @@ func TestStart_K3DStartFailure(t *testing.T) {
 	}
 
 	_, _, err := Start(context.Background(), discovery.Plan{
-		Suite: discovery.SuiteConfig{Name: "cluster-smoke"},
+		Name: "cluster-smoke",
 		Fixture: casefile.FixtureConfig{
 			K3D: &casefile.K3DFixture{
 				K8sDir:           "k8s",
@@ -307,9 +307,7 @@ func TestSupportsParallel_ComposeTemplateLGTM(t *testing.T) {
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: parallel-safe
-    cases: ["cases/*.yaml"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/docker-compose.oats.yml", `services:
   app:

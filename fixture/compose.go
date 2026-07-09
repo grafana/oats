@@ -179,7 +179,7 @@ func shellQuote(s string) string {
 }
 
 func composeProjectName(plan discovery.Plan) string {
-	name := strings.ToLower(plan.Suite.Name)
+	name := strings.ToLower(plan.Name)
 	if name == "" {
 		name = "oats"
 	}

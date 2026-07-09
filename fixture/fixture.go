@@ -41,7 +41,7 @@ var (
 			AppDockerPort:    k3d.AppPort,
 			ImportImages:     k3d.ImportImages,
 		}
-		return kubernetes.NewEndpoint("localhost", model, ports, plan.Suite.Name, sourceDir)
+		return kubernetes.NewEndpoint("localhost", model, ports, plan.Name, sourceDir)
 	}
 	waitForGrafanaToken = waitForGrafanaTokenImpl
 	lookupComposePort   = dockerComposePort

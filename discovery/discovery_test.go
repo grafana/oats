@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/grafana/oats/casefile"
 )
 
 func writeFile(t *testing.T, dir, rel, body string) {
@@ -33,15 +31,46 @@ expected:
       contains: ["x"]
 `
 
+// remoteCaseYAML builds a minimal case that points at a remote fixture. Optional
+// tags let the tag-filter test exercise case-level tag matching.
+func remoteCaseYAML(name, endpoint string, tags ...string) string {
+	body := "name: " + name + "\n"
+	if len(tags) > 0 {
+		body += "tags: [" + strings.Join(tags, ", ") + "]\n"
+	}
+	body += "fixture:\n  remote:\n    endpoint: " + endpoint + "\n"
+	body += `seed:
+  type: app
+expected:
+  traces:
+    - traceql: '{}'
+      absent: true
+`
+	return body
+}
+
+// composeFileCaseYAML builds a case with a dir-relative compose file fixture, so
+// its group key includes the case's directory.
+func composeFileCaseYAML(name string) string {
+	return "name: " + name + `
+fixture:
+  compose:
+    file: docker-compose.oats.yml
+seed:
+  type: app
+expected:
+  traces:
+    - traceql: '{}'
+      absent: true
+`
+}
+
 func TestLoad_ValidConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: lgtm
-    cases: ["cases/*.yaml"]
-    tags: ["traces"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/a.yaml", strings.Replace(validCaseYAML, "%s", "case-a", 1))
 	writeFile(t, dir, "cases/b.yaml", strings.Replace(validCaseYAML, "%s", "case-b", 1))
@@ -51,6 +80,8 @@ suites:
 		t.Fatalf("Load: %v", err)
 	}
 
+	// Both cases declare the same path-less compose fixture, so they group into
+	// one plan.
 	plans, err := cfg.PlanRun(Filter{})
 	if err != nil {
 		t.Fatalf("PlanRun: %v", err)
@@ -75,9 +106,7 @@ func TestLoad_RejectsUnknownKey(t *testing.T) {
 meta:
   version: 3
 typooo: boom
-suites:
-  - name: x
-    cases: ["a.yaml"]
+cases: ["a.yaml"]
 `)
 	_, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err == nil || !strings.Contains(err.Error(), "typooo") {
@@ -90,50 +119,53 @@ func TestPlanRun_FilterByTag(t *testing.T) {
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: alpha
-    cases: ["a.yaml"]
-    tags: ["traces"]
-  - name: beta
-    cases: ["b.yaml"]
-    tags: ["logs"]
+cases: ["cases/*.yaml"]
 `)
-	writeFile(t, dir, "a.yaml", strings.Replace(validCaseYAML, "%s", "a", 1))
-	writeFile(t, dir, "b.yaml", strings.Replace(validCaseYAML, "%s", "b", 1))
+	writeFile(t, dir, "cases/a.yaml", remoteCaseYAML("a", "http://localhost:4318", "traces"))
+	writeFile(t, dir, "cases/b.yaml", remoteCaseYAML("b", "http://localhost:4318", "logs"))
 
 	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
+	// Tag filtering is case-level (any-match) and runs before grouping, so only
+	// the traces-tagged case survives.
 	plans, err := cfg.PlanRun(Filter{Tags: []string{"traces"}})
 	if err != nil {
 		t.Fatalf("PlanRun: %v", err)
 	}
-	if len(plans) != 1 || plans[0].Suite.Name != "alpha" {
+	if len(plans) != 1 || len(plans[0].Cases) != 1 || plans[0].Cases[0].Name != "a" {
 		t.Errorf("tag filter: %+v", planNames(plans))
 	}
 }
 
-func TestSummary_TopLevelCases(t *testing.T) {
+func TestSummary(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
-cases: ["cases/*.yaml"]
 meta:
   version: 3
+cases: ["cases/*.yaml"]
 `)
-	writeFile(t, dir, "cases/a.yaml", strings.Replace(validCaseYAML, "%s", "case-a", 1))
+	writeFile(t, dir, "cases/a.yaml", remoteCaseYAML("case-a", "http://localhost:4318", "traces"))
 
 	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-
-	got := cfg.Summary()
-	if !strings.Contains(got, `suite=cases`) {
-		t.Fatalf("Summary missing synthesized suite label: %q", got)
+	plans, err := cfg.PlanRun(Filter{})
+	if err != nil {
+		t.Fatalf("PlanRun: %v", err)
 	}
-	if !strings.Contains(got, `cases=[cases/*.yaml]`) {
-		t.Fatalf("Summary missing cases glob: %q", got)
+
+	got := Summary(plans)
+	if !strings.Contains(got, "plan=case-a") {
+		t.Fatalf("Summary missing plan name: %q", got)
+	}
+	if !strings.Contains(got, "fixture=remote") {
+		t.Fatalf("Summary missing fixture kind: %q", got)
+	}
+	if !strings.Contains(got, "case-a") {
+		t.Fatalf("Summary missing case name: %q", got)
 	}
 }
 
@@ -142,11 +174,7 @@ func TestPlanRun_FilterByPath(t *testing.T) {
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: alpha
-    cases: ["a/*.yaml"]
-  - name: beta
-    cases: ["b/*.yaml"]
+cases: ["a/*.yaml", "b/*.yaml"]
 `)
 	writeFile(t, dir, "a/x.yaml", strings.Replace(validCaseYAML, "%s", "ax", 1))
 	writeFile(t, dir, "b/y.yaml", strings.Replace(validCaseYAML, "%s", "by", 1))
@@ -156,12 +184,12 @@ suites:
 		t.Fatalf("Load: %v", err)
 	}
 
-	// Directory scope: only the suite whose cases live under a/ survives.
+	// Directory scope: only the case under a/ survives.
 	plans, err := cfg.PlanRun(Filter{Paths: []string{filepath.Join(dir, "a")}})
 	if err != nil {
 		t.Fatalf("PlanRun dir scope: %v", err)
 	}
-	if len(plans) != 1 || plans[0].Suite.Name != "alpha" || len(plans[0].Cases) != 1 {
+	if len(plans) != 1 || len(plans[0].Cases) != 1 || plans[0].Cases[0].Name != "ax" {
 		t.Fatalf("dir path filter: %+v", planNames(plans))
 	}
 
@@ -170,48 +198,19 @@ suites:
 	if err != nil {
 		t.Fatalf("PlanRun file scope: %v", err)
 	}
-	if len(plans) != 1 || plans[0].Suite.Name != "beta" || len(plans[0].Cases) != 1 {
+	if len(plans) != 1 || len(plans[0].Cases) != 1 || plans[0].Cases[0].Name != "by" {
 		t.Fatalf("file path filter: %+v", planNames(plans))
 	}
 }
 
-func TestPlanRun_FilterBySuiteName(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "oats-config.yaml", `
-meta:
-  version: 3
-suites:
-  - name: alpha
-    cases: ["a.yaml"]
-  - name: beta
-    cases: ["b.yaml"]
-`)
-	writeFile(t, dir, "a.yaml", strings.Replace(validCaseYAML, "%s", "a", 1))
-	writeFile(t, dir, "b.yaml", strings.Replace(validCaseYAML, "%s", "b", 1))
-
-	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	plans, err := cfg.PlanRun(Filter{Suites: []string{"beta"}})
-	if err != nil {
-		t.Fatalf("PlanRun: %v", err)
-	}
-	if len(plans) != 1 || plans[0].Suite.Name != "beta" {
-		t.Errorf("suite filter: %+v", planNames(plans))
-	}
-}
-
 func TestPlanRun_NoFixtureDefaultsToComposeLGTM(t *testing.T) {
-	// A suite with no fixture (and cases that declare none) now defaults to a
-	// compose fixture booting the builtin lgtm stack, not an external setup.
+	// A case that declares no fixture defaults to a compose fixture booting the
+	// builtin lgtm stack, rooted at the config's source dir.
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: inline
-    cases: ["cases/*.yaml"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/a.yaml", `name: inline smoke
 seed:
@@ -237,7 +236,7 @@ expected:
 		t.Fatalf("plans: got %d, want 1", len(plans))
 	}
 	if plans[0].Fixture.Kind() != "compose" {
-		t.Fatalf("expected no-fixture suite to default to compose, got %q (%+v)", plans[0].Fixture.Kind(), plans[0].Fixture)
+		t.Fatalf("expected no-fixture case to default to compose, got %q (%+v)", plans[0].Fixture.Kind(), plans[0].Fixture)
 	}
 	if got := plans[0].Fixture.Compose.EffectiveTemplate(); got != "lgtm" {
 		t.Fatalf("expected default compose template lgtm, got %q", got)
@@ -247,94 +246,65 @@ expected:
 	}
 }
 
-// TestResolveSuiteFixture_SingleInferred verifies a suite infers its one shared
-// fixture from cases that all declare the same fixture, with the source dir
-// taken from the declaring cases.
-func TestResolveSuiteFixture_SingleInferred(t *testing.T) {
-	cfg := &RootConfig{SourceDir: "/cfg"}
-	cases := []*casefile.Case{
-		{Name: "a", SourcePath: "/suite/a.yaml", Fixture: &casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}}},
-		{Name: "b", SourcePath: "/suite/b.yaml", Fixture: &casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}}},
-	}
-	fixture, sourceDir, err := cfg.resolveSuiteFixture(cases)
+// TestPlanRun_GroupsPathlessFixtureAcrossDirs verifies that cases with identical
+// path-less fixtures (here remote) in different directories land in one plan:
+// grouping keys on the fixture alone, since a remote fixture references no
+// directory-relative paths.
+func TestPlanRun_GroupsPathlessFixtureAcrossDirs(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 3
+cases: ["*/oats-case.yaml"]
+`)
+	writeFile(t, dir, "a/oats-case.yaml", remoteCaseYAML("a", "http://localhost:4318"))
+	writeFile(t, dir, "b/oats-case.yaml", remoteCaseYAML("b", "http://localhost:4318"))
+
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
-		t.Fatalf("resolveSuiteFixture: %v", err)
+		t.Fatalf("Load: %v", err)
 	}
-	if fixture.Kind() != "compose" {
-		t.Errorf("expected compose fixture, got %q (%+v)", fixture.Kind(), fixture)
-	}
-	if sourceDir != "/suite" {
-		t.Errorf("expected source dir /suite, got %q", sourceDir)
-	}
-}
-
-// TestResolveSuiteFixture_DefaultsToComposeLGTM verifies that when no case
-// declares a fixture, the suite defaults to a compose fixture booting the
-// builtin lgtm template, rooted at the config's source dir.
-func TestResolveSuiteFixture_DefaultsToComposeLGTM(t *testing.T) {
-	cfg := &RootConfig{SourceDir: "/cfg"}
-	cases := []*casefile.Case{
-		{Name: "a", SourcePath: "/suite/a.yaml"},
-		{Name: "b", SourcePath: "/suite/b.yaml"},
-	}
-	fixture, sourceDir, err := cfg.resolveSuiteFixture(cases)
+	plans, err := cfg.PlanRun(Filter{})
 	if err != nil {
-		t.Fatalf("resolveSuiteFixture: %v", err)
+		t.Fatalf("PlanRun: %v", err)
 	}
-	if fixture.Kind() != "compose" || fixture.Compose.EffectiveTemplate() != "lgtm" {
-		t.Errorf("expected default compose/lgtm fixture, got %q (%+v)", fixture.Kind(), fixture)
+	if len(plans) != 1 || len(plans[0].Cases) != 2 {
+		t.Fatalf("expected one plan with two cases, got %+v", planNames(plans))
 	}
-	if sourceDir != "/cfg" {
-		t.Errorf("expected source dir /cfg, got %q", sourceDir)
-	}
-}
-
-// TestResolveSuiteFixture_Disagreement verifies that a suite whose cases declare
-// conflicting fixtures is rejected: a suite boots exactly one shared fixture.
-func TestResolveSuiteFixture_Disagreement(t *testing.T) {
-	cfg := &RootConfig{SourceDir: "/cfg"}
-	cases := []*casefile.Case{
-		{Name: "a", SourcePath: "/suite/a.yaml", Fixture: &casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}}},
-		{Name: "b", SourcePath: "/suite/b.yaml", Fixture: &casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}}},
-	}
-	if _, _, err := cfg.resolveSuiteFixture(cases); err == nil || !strings.Contains(err.Error(), "do not agree on one shared fixture") {
-		t.Errorf("expected disagreement error, got %v", err)
+	if plans[0].Fixture.Kind() != "remote" {
+		t.Fatalf("expected remote fixture, got %q", plans[0].Fixture.Kind())
 	}
 }
 
-// A path-less fixture (remote) is the same fixture regardless of directory, so
-// identical copies in different dirs must agree.
-func TestResolveSuiteFixture_RemoteAcrossDirsAgrees(t *testing.T) {
-	cfg := &RootConfig{SourceDir: "/cfg"}
-	remote := func() *casefile.FixtureConfig {
-		return &casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}}
-	}
-	cases := []*casefile.Case{
-		{Name: "a", SourcePath: "/suite/a/oats-case.yaml", Fixture: remote()},
-		{Name: "b", SourcePath: "/suite/b/oats-case.yaml", Fixture: remote()},
-	}
-	got, _, err := cfg.resolveSuiteFixture(cases)
+// TestPlanRun_SeparatesDirRelativeFixtureAcrossDirs verifies that cases with the
+// same dir-relative fixture (compose file) in different directories land in
+// separate plans: the relative file means different files per directory, so the
+// group key includes the directory.
+func TestPlanRun_SeparatesDirRelativeFixtureAcrossDirs(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "oats-config.yaml", `
+meta:
+  version: 3
+cases: ["*/oats-case.yaml"]
+`)
+	writeFile(t, dir, "a/oats-case.yaml", composeFileCaseYAML("a"))
+	writeFile(t, dir, "b/oats-case.yaml", composeFileCaseYAML("b"))
+
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
-		t.Fatalf("expected remote fixtures in different dirs to agree, got %v", err)
+		t.Fatalf("Load: %v", err)
 	}
-	if got.Kind() != "remote" {
-		t.Errorf("resolved fixture kind: got %q want remote", got.Kind())
+	plans, err := cfg.PlanRun(Filter{})
+	if err != nil {
+		t.Fatalf("PlanRun: %v", err)
 	}
-}
-
-// A dir-relative fixture (compose file/files) means different files in different
-// dirs, so identical copies across dirs must NOT agree.
-func TestResolveSuiteFixture_ComposeFilesAcrossDirsConflict(t *testing.T) {
-	cfg := &RootConfig{SourceDir: "/cfg"}
-	compose := func() *casefile.FixtureConfig {
-		return &casefile.FixtureConfig{Compose: &casefile.ComposeFixture{File: "docker-compose.oats.yml"}}
+	if len(plans) != 2 {
+		t.Fatalf("expected two plans (one per dir), got %+v", planNames(plans))
 	}
-	cases := []*casefile.Case{
-		{Name: "a", SourcePath: "/suite/a/oats-case.yaml", Fixture: compose()},
-		{Name: "b", SourcePath: "/suite/b/oats-case.yaml", Fixture: compose()},
-	}
-	if _, _, err := cfg.resolveSuiteFixture(cases); err == nil || !strings.Contains(err.Error(), "different directories") {
-		t.Errorf("expected different-directories error, got %v", err)
+	for _, p := range plans {
+		if len(p.Cases) != 1 || p.Fixture.Kind() != "compose" {
+			t.Fatalf("unexpected plan: %+v", p)
+		}
 	}
 }
 
@@ -343,9 +313,7 @@ func TestPlanRun_EmptyGlobIsAnError(t *testing.T) {
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: s
-    cases: ["nope/*.yaml"]
+cases: ["nope/*.yaml"]
 `)
 	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
@@ -354,18 +322,6 @@ suites:
 	_, err = cfg.PlanRun(Filter{})
 	if err == nil || !strings.Contains(err.Error(), "matched zero files") {
 		t.Errorf("expected zero-match error, got %v", err)
-	}
-}
-
-func TestSummary(t *testing.T) {
-	cfg := &RootConfig{
-		Suites: []SuiteConfig{
-			{Name: "alpha", Tags: []string{"traces"}, Cases: []string{"a.yaml"}},
-		},
-	}
-	s := cfg.Summary()
-	if !strings.Contains(s, "suite=alpha") {
-		t.Errorf("Summary missing suite line: %q", s)
 	}
 }
 
@@ -378,8 +334,9 @@ func TestExampleV2SmokeConfigLoads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PlanRun example config: %v", err)
 	}
+	// All four smoke cases share one remote fixture, so they form a single plan.
 	if len(plans) != 1 || len(plans[0].Cases) != 4 {
-		t.Fatalf("expected one suite/four cases, got %+v", plans)
+		t.Fatalf("expected one plan/four cases, got %+v", plans)
 	}
 	got := []string{plans[0].Cases[0].Name, plans[0].Cases[1].Name, plans[0].Cases[2].Name, plans[0].Cases[3].Name}
 	want := []string{"custom check smoke", "inline seed smoke", "profile smoke", "rolldice smoke"}
@@ -399,13 +356,16 @@ func TestExampleV2FixturesConfigLoads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PlanRun fixture example config: %v", err)
 	}
+	// The compose case and k3d case declare different fixtures, so they form two
+	// independent plans, ordered by first fixture appearance (compose case sorts
+	// before the k3d case by source path).
 	if len(plans) != 2 {
-		t.Fatalf("expected two suites, got %+v", plans)
+		t.Fatalf("expected two plans, got %+v", plans)
 	}
-	if plans[0].Suite.Name != "compose-app" || plans[0].Fixture.Kind() != "compose" || len(plans[0].Cases) != 1 {
+	if plans[0].Fixture.Kind() != "compose" || len(plans[0].Cases) != 1 {
 		t.Fatalf("unexpected first plan: %+v", plans[0])
 	}
-	if plans[1].Suite.Name != "k3d-app" || plans[1].Fixture.Kind() != "k3d" || len(plans[1].Cases) != 1 {
+	if plans[1].Fixture.Kind() != "k3d" || len(plans[1].Cases) != 1 {
 		t.Fatalf("unexpected second plan: %+v", plans[1])
 	}
 	if plans[1].Cases[0].Name != "k3d fixture app smoke" {
@@ -416,34 +376,22 @@ func TestExampleV2FixturesConfigLoads(t *testing.T) {
 func planNames(p []Plan) []string {
 	out := make([]string, len(p))
 	for i := range p {
-		out[i] = p[i].Suite.Name
+		out[i] = p[i].Name
 	}
 	return out
 }
 
 func TestLoadTopLevelCases(t *testing.T) {
+	// Two cases with different fixtures (distinct remote endpoints) become two
+	// separate plans.
 	dir := t.TempDir()
 	writeFile(t, dir, "oats-config.yaml", `
 cases: ["cases/a.yaml", "cases/b.yaml"]
 meta:
   version: 3
 `)
-	writeFile(t, dir, "cases/a.yaml", `
-name: a
-seed: { type: app }
-expected:
-  traces:
-    - traceql: "{}"
-      absent: true
-`)
-	writeFile(t, dir, "cases/b.yaml", `
-name: b
-seed: { type: app }
-expected:
-  traces:
-    - traceql: "{}"
-      absent: true
-`)
+	writeFile(t, dir, "cases/a.yaml", remoteCaseYAML("a", "http://localhost:4318"))
+	writeFile(t, dir, "cases/b.yaml", remoteCaseYAML("b", "http://localhost:4319"))
 	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -455,7 +403,7 @@ expected:
 	if len(plans) != 2 {
 		t.Fatalf("expected 2 plans, got %d", len(plans))
 	}
-	if plans[0].Suite.Name != "a" || plans[1].Suite.Name != "b" {
-		t.Fatalf("unexpected suite names: %q, %q", plans[0].Suite.Name, plans[1].Suite.Name)
+	if plans[0].Name != "a" || plans[1].Name != "b" {
+		t.Fatalf("unexpected plan names: %q, %q", plans[0].Name, plans[1].Name)
 	}
 }

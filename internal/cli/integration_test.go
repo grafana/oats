@@ -25,7 +25,7 @@ import (
 
 func TestResolveEndpoint_ComposeDefaults(t *testing.T) {
 	ep, err := resolveEndpoint(discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke"},
+		Name:    "smoke",
 		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}},
 	}, fixture.Runtime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318"}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
@@ -41,7 +41,7 @@ func TestResolveEndpoint_UsesRuntimeAppHostPort(t *testing.T) {
 	// discovers an ephemeral port, k3d copies its configured one), and
 	// resolveEndpoint applies it regardless of fixture type.
 	ep, err := resolveEndpoint(discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke"},
+		Name:    "smoke",
 		Fixture: casefile.FixtureConfig{K3D: &casefile.K3DFixture{AppPort: 18080}},
 	}, fixture.Runtime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318", AppHostPort: 18080}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
@@ -56,7 +56,7 @@ func TestCloseFixture_EmitsTeardownEvent(t *testing.T) {
 	rep := &recordingReporter{}
 	fix := &fakeSuiteFixture{}
 	plan := discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke"},
+		Name:    "smoke",
 		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}},
 	}
 	if err := closeFixture(rep, plan, fix); err != nil {
@@ -77,7 +77,7 @@ func TestCloseFixture_RemoteDoesNotEmitTeardownEvent(t *testing.T) {
 	rep := &recordingReporter{}
 	fix := &fakeSuiteFixture{}
 	plan := discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke"},
+		Name:    "smoke",
 		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}},
 	}
 	if err := closeFixture(rep, plan, fix); err != nil {
@@ -94,7 +94,7 @@ func TestCloseFixture_RemoteDoesNotEmitTeardownEvent(t *testing.T) {
 func TestEmitFixtureStartAndReady(t *testing.T) {
 	rep := &recordingReporter{}
 	plan := discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke"},
+		Name:    "smoke",
 		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}},
 	}
 	start := emitFixtureStart(rep, plan)
@@ -120,7 +120,7 @@ func TestEmitFixtureStartAndReady(t *testing.T) {
 func TestEmitFixtureStartAndReady_NoOpForRemote(t *testing.T) {
 	rep := &recordingReporter{}
 	plan := discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke"},
+		Name:    "smoke",
 		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}},
 	}
 	start := emitFixtureStart(rep, plan)
@@ -148,9 +148,7 @@ func TestIntegration_FullPipelineWithFakeGCX(t *testing.T) {
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: smoke
-    cases: ["cases/*.yaml"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/inline.yaml", `name: inline seed end-to-end
 fixture:
@@ -266,9 +264,7 @@ func TestIntegration_AppSeedWithRemoteFixtureAndInput(t *testing.T) {
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: smoke
-    cases: ["cases/*.yaml"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/app.yaml", `name: app seed end-to-end
 fixture:
@@ -349,9 +345,7 @@ func TestIntegration_ProfileQueryWithFakeGCX(t *testing.T) {
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: profiles
-    cases: ["cases/*.yaml"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/profile.yaml", `name: profile query end-to-end
 fixture:
@@ -438,9 +432,7 @@ expected:
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: migrated-profile
-    cases: ["cases/*.yaml"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
@@ -524,9 +516,7 @@ expected:
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: migrated
-    cases: ["cases/*.yaml"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
@@ -601,9 +591,7 @@ expected:
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: migrated-custom
-    cases: ["cases/*.yaml"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
@@ -673,9 +661,7 @@ expected:
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: migrated-custom-path
-    cases: ["cases/*.yaml"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 	writeFile(t, dir, "cases/scripts/verify.sh", "#!/bin/sh\nexit 0\n")
@@ -767,9 +753,7 @@ expected:
 	writeFile(t, dir, "oats-config.yaml", `
 meta:
   version: 3
-suites:
-  - name: migrated-matrix
-    cases: ["cases/*.yaml"]
+cases: ["cases/*.yaml"]
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
