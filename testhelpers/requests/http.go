@@ -6,12 +6,16 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 var tr = &http.Transport{
 	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 }
-var testHTTPClient = &http.Client{Transport: tr}
+var testHTTPClient = &http.Client{
+	Transport: tr,
+	Timeout:   10 * time.Second,
+}
 
 func doRequest(req *http.Request, statusCode int) error {
 	r, err := testHTTPClient.Do(req)
