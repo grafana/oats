@@ -1,10 +1,3 @@
 meta:
   version: 3
-suites:
-  - name: cache
-    cases: ["oats-case.yaml"]
-    fixture: remote-lgtm
-fixture:
-  remote-lgtm:
-    remote:
-      endpoint: "{{REMOTE_OTLP_HTTP}}"
+cases: ["oats-case.yaml"]

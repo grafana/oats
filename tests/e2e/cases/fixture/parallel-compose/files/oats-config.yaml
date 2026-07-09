@@ -1,14 +1,6 @@
 meta:
   version: 3
-suites:
-  - name: alpha
-    cases: ["alpha.yaml"]
-    fixture: shared
-  - name: beta
-    cases: ["beta.yaml"]
-    fixture: shared
-fixture:
-  shared:
-    compose:
-      template: lgtm
-      file: docker-compose.oats.yml
+# alpha and beta declare DIFFERENT compose fixtures (different files), so they
+# form two independent boot-groups. With --parallel 2 they boot their own lgtm
+# stacks concurrently — which is what the verify-*.sh rendezvous proves.
+cases: ["alpha.yaml", "beta.yaml"]

@@ -1,4 +1,8 @@
 name: beta
+fixture:
+  compose:
+    template: lgtm
+    file: docker-compose.beta.yml
 seed:
   type: inline-otlp
   logs:

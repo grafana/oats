@@ -1,4 +1,7 @@
 name: ff-first-fails
+fixture:
+  remote:
+    endpoint: "{{REMOTE_OTLP_HTTP}}"
 seed:
   type: inline-otlp
   logs:

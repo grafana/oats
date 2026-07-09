@@ -159,7 +159,12 @@
         "docker.io/library/alpine"
       ]
     },
-    "tests/e2e/cases/fixture/parallel-compose/files/docker-compose.oats.yml": {
+    "tests/e2e/cases/fixture/parallel-compose/files/docker-compose.alpha.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/parallel-compose/files/docker-compose.beta.yml": {
       "docker-compose": [
         "alpine"
       ]

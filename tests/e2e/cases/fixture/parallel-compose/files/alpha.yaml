@@ -1,4 +1,8 @@
 name: alpha
+fixture:
+  compose:
+    template: lgtm
+    file: docker-compose.alpha.yml
 seed:
   type: inline-otlp
   logs:

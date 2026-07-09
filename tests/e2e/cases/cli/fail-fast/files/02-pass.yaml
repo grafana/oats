@@ -1,4 +1,7 @@
 name: ff-second-should-not-run
+fixture:
+  remote:
+    endpoint: "{{REMOTE_OTLP_HTTP}}"
 seed:
   type: inline-otlp
   logs:

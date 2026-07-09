@@ -1,4 +1,7 @@
 name: cache-case
+fixture:
+  remote:
+    endpoint: "{{REMOTE_OTLP_HTTP}}"
 seed:
   type: inline-otlp
   logs:
