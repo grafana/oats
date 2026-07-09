@@ -25,7 +25,7 @@ import (
 
 func TestResolveEndpoint_ComposeDefaults(t *testing.T) {
 	ep, err := resolveEndpoint(discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Suite:   discovery.SuiteConfig{Name: "smoke"},
 		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}},
 	}, fixture.Runtime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318"}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
@@ -41,7 +41,7 @@ func TestResolveEndpoint_UsesRuntimeAppHostPort(t *testing.T) {
 	// discovers an ephemeral port, k3d copies its configured one), and
 	// resolveEndpoint applies it regardless of fixture type.
 	ep, err := resolveEndpoint(discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "cluster"},
+		Suite:   discovery.SuiteConfig{Name: "smoke"},
 		Fixture: casefile.FixtureConfig{K3D: &casefile.K3DFixture{AppPort: 18080}},
 	}, fixture.Runtime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318", AppHostPort: 18080}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
@@ -56,7 +56,7 @@ func TestCloseFixture_EmitsTeardownEvent(t *testing.T) {
 	rep := &recordingReporter{}
 	fix := &fakeSuiteFixture{}
 	plan := discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Suite:   discovery.SuiteConfig{Name: "smoke"},
 		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}},
 	}
 	if err := closeFixture(rep, plan, fix); err != nil {
@@ -68,7 +68,7 @@ func TestCloseFixture_EmitsTeardownEvent(t *testing.T) {
 	if len(rep.events) != 1 || rep.events[0].Type != report.EventFixtureTeardown {
 		t.Fatalf("expected one teardown event, got %+v", rep.events)
 	}
-	if rep.events[0].Fixture != "local" || rep.events[0].Suite != "smoke" || rep.events[0].FixtureType != "compose" {
+	if rep.events[0].Suite != "smoke" || rep.events[0].FixtureType != "compose" {
 		t.Fatalf("unexpected teardown event: %+v", rep.events[0])
 	}
 }
@@ -77,7 +77,7 @@ func TestCloseFixture_RemoteDoesNotEmitTeardownEvent(t *testing.T) {
 	rep := &recordingReporter{}
 	fix := &fakeSuiteFixture{}
 	plan := discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "remote-lgtm"},
+		Suite:   discovery.SuiteConfig{Name: "smoke"},
 		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}},
 	}
 	if err := closeFixture(rep, plan, fix); err != nil {
@@ -94,7 +94,7 @@ func TestCloseFixture_RemoteDoesNotEmitTeardownEvent(t *testing.T) {
 func TestEmitFixtureStartAndReady(t *testing.T) {
 	rep := &recordingReporter{}
 	plan := discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Suite:   discovery.SuiteConfig{Name: "smoke"},
 		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}},
 	}
 	start := emitFixtureStart(rep, plan)
@@ -104,7 +104,7 @@ func TestEmitFixtureStartAndReady(t *testing.T) {
 	if len(rep.events) != 1 || rep.events[0].Type != report.EventFixtureStart {
 		t.Fatalf("expected one fixture.start event, got %+v", rep.events)
 	}
-	if rep.events[0].Fixture != "local" || rep.events[0].Suite != "smoke" || rep.events[0].FixtureType != "compose" {
+	if rep.events[0].Suite != "smoke" || rep.events[0].FixtureType != "compose" {
 		t.Fatalf("unexpected fixture.start event: %+v", rep.events[0])
 	}
 
@@ -120,7 +120,7 @@ func TestEmitFixtureStartAndReady(t *testing.T) {
 func TestEmitFixtureStartAndReady_NoOpForRemote(t *testing.T) {
 	rep := &recordingReporter{}
 	plan := discovery.Plan{
-		Suite:   discovery.SuiteConfig{Name: "smoke", Fixture: "remote-lgtm"},
+		Suite:   discovery.SuiteConfig{Name: "smoke"},
 		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}},
 	}
 	start := emitFixtureStart(rep, plan)
@@ -151,13 +151,11 @@ meta:
 suites:
   - name: smoke
     cases: ["cases/*.yaml"]
-    fixture: remote-lgtm
-fixture:
-  remote-lgtm:
-    remote:
-      endpoint: "REPLACED_AT_RUNTIME"
 `)
 	writeFile(t, dir, "cases/inline.yaml", `name: inline seed end-to-end
+fixture:
+  remote:
+    endpoint: "REPLACED_AT_RUNTIME"
 seed:
   type: inline-otlp
   traces:
@@ -203,11 +201,10 @@ expected:
 	}))
 	defer stub.Close()
 
-	// Patch the endpoint into oats-config.yaml after the stub URL is known.
-	configPath := filepath.Join(dir, "oats-config.yaml")
-	rewrite(t, configPath, "REPLACED_AT_RUNTIME", stub.URL)
+	// Patch the endpoint into the case's remote fixture after the stub URL is known.
+	rewrite(t, filepath.Join(dir, "cases", "inline.yaml"), "REPLACED_AT_RUNTIME", stub.URL)
 
-	cfg, err := discovery.Load(configPath)
+	cfg, err := discovery.Load(filepath.Join(dir, "oats-config.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -272,13 +269,11 @@ meta:
 suites:
   - name: smoke
     cases: ["cases/*.yaml"]
-    fixture: remote-lgtm
-fixture:
-  remote-lgtm:
-    remote:
-      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/app.yaml", `name: app seed end-to-end
+fixture:
+  remote:
+    endpoint: "http://localhost:4318"
 seed:
   type: app
 input:
@@ -357,13 +352,11 @@ meta:
 suites:
   - name: profiles
     cases: ["cases/*.yaml"]
-    fixture: remote-lgtm
-fixture:
-  remote-lgtm:
-    remote:
-      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/profile.yaml", `name: profile query end-to-end
+fixture:
+  remote:
+    endpoint: "http://localhost:4318"
 seed:
   type: app
 expected:
@@ -386,7 +379,11 @@ expected:
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "", "localhost", 8080, "http://localhost:4318")
+	// Compose fixtures derive their gcx context from the booted stack; these
+	// tests don't boot one, so pass the context explicitly via the override
+	// (fake-gcx ignores the value). Harmless for the remote profile test, whose
+	// endpoint still comes from its fixture.
+	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "oats-test", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -444,11 +441,6 @@ meta:
 suites:
   - name: migrated-profile
     cases: ["cases/*.yaml"]
-    fixture: remote-lgtm
-fixture:
-  remote-lgtm:
-    remote:
-      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
@@ -464,7 +456,11 @@ fixture:
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "", "localhost", 8080, "http://localhost:4318")
+	// Compose fixtures derive their gcx context from the booted stack; these
+	// tests don't boot one, so pass the context explicitly via the override
+	// (fake-gcx ignores the value). Harmless for the remote profile test, whose
+	// endpoint still comes from its fixture.
+	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "oats-test", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -531,11 +527,6 @@ meta:
 suites:
   - name: migrated
     cases: ["cases/*.yaml"]
-    fixture: remote-lgtm
-fixture:
-  remote-lgtm:
-    remote:
-      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
@@ -551,7 +542,11 @@ fixture:
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "", "localhost", 8080, "http://localhost:4318")
+	// Compose fixtures derive their gcx context from the booted stack; these
+	// tests don't boot one, so pass the context explicitly via the override
+	// (fake-gcx ignores the value). Harmless for the remote profile test, whose
+	// endpoint still comes from its fixture.
+	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "oats-test", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -609,11 +604,6 @@ meta:
 suites:
   - name: migrated-custom
     cases: ["cases/*.yaml"]
-    fixture: remote-lgtm
-fixture:
-  remote-lgtm:
-    remote:
-      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
@@ -629,7 +619,11 @@ fixture:
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "", "localhost", 8080, "http://localhost:4318")
+	// Compose fixtures derive their gcx context from the booted stack; these
+	// tests don't boot one, so pass the context explicitly via the override
+	// (fake-gcx ignores the value). Harmless for the remote profile test, whose
+	// endpoint still comes from its fixture.
+	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "oats-test", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -682,11 +676,6 @@ meta:
 suites:
   - name: migrated-custom-path
     cases: ["cases/*.yaml"]
-    fixture: remote-lgtm
-fixture:
-  remote-lgtm:
-    remote:
-      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 	writeFile(t, dir, "cases/scripts/verify.sh", "#!/bin/sh\nexit 0\n")
@@ -706,7 +695,11 @@ fixture:
 		t.Fatalf("expected one plan with one case, got %+v", plans)
 	}
 
-	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "", "localhost", 8080, "http://localhost:4318")
+	// Compose fixtures derive their gcx context from the booted stack; these
+	// tests don't boot one, so pass the context explicitly via the override
+	// (fake-gcx ignores the value). Harmless for the remote profile test, whose
+	// endpoint still comes from its fixture.
+	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "oats-test", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
@@ -777,11 +770,6 @@ meta:
 suites:
   - name: migrated-matrix
     cases: ["cases/*.yaml"]
-    fixture: remote-lgtm
-fixture:
-  remote-lgtm:
-    remote:
-      endpoint: "http://localhost:4318"
 `)
 	writeFile(t, dir, "cases/migrated.yaml", string(migrated))
 
@@ -803,7 +791,11 @@ fixture:
 		t.Fatalf("expected k8s-only assertion to be filtered out, got %d traces", got)
 	}
 
-	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "", "localhost", 8080, "http://localhost:4318")
+	// Compose fixtures derive their gcx context from the booted stack; these
+	// tests don't boot one, so pass the context explicitly via the override
+	// (fake-gcx ignores the value). Harmless for the remote profile test, whose
+	// endpoint still comes from its fixture.
+	ep, err := resolveEndpoint(plans[0], fixture.Runtime{}, "oats-test", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}

@@ -1,24 +1,17 @@
 # oats-config.yaml is the entry point of an OATS project. `oats` finds it in the
-# current directory or any parent. It declares the suites, the cases each runs,
-# and the fixtures (the backend the cases assert against).
-
+# current directory or any parent.
+#
+# A suite groups cases that share one fixture and is the unit of parallelism +
+# filtering. The fixture lives on the cases (there is no suite- or config-level
+# fixture): every case here declares the same remote grafana/otel-lgtm, so they
+# agree and form one suite. A remote fixture boots nothing — OATS just points at
+# an already-running stack — so "sharing" it costs nothing; the suite mainly buys
+# grouping + tags here. (When a fixture is expensive to boot, like compose/k3d,
+# the shared boot is the real win — see examples/fixtures.)
 meta:
-  version: 3            # OATS schema version (the single version; cases carry none)
+  version: 3                        # OATS schema version (the single version; cases carry none)
 
-# A suite groups cases that share one fixture (booted once, then every case runs
-# against it) and is the unit of parallelism + filtering. These four cases all
-# assert against the same local-lgtm stack, so they belong to one suite.
 suites:
   - name: smoke
-    cases: ["*/oats-case.yaml"]   # one case per subdirectory (glob, relative to this file)
-    fixture: local-lgtm           # the fixture (defined below) these cases run against
-    tags: [traces, logs, metrics] # optional labels; filter with `oats --tags traces`
-
-fixture:
-  # A "remote" fixture points at an already-running stack — here a local
-  # grafana/otel-lgtm on the default OTLP port. OATS does not boot or tear it
-  # down; start it yourself, e.g.
-  #   docker run -p 3000:3000 -p 4317:4317 -p 4318:4318 grafana/otel-lgtm
-  local-lgtm:
-    remote:
-      endpoint: http://localhost:4318
+    cases: ["*/oats-case.yaml"]     # one case per subdirectory (glob, relative to this file)
+    tags: [traces, logs, metrics]   # optional labels; filter with `oats --tags traces`

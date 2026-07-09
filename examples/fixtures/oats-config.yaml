@@ -8,33 +8,12 @@ meta:
 
 # Two suites because each needs a different fixture — a suite groups the cases
 # that share one fixture, so a compose group and a k3d group are separate suites.
+# The fixture itself lives on each case (see the `fixture:` block in the
+# referenced oats-case.yaml files); a suite boots the one its cases agree on.
 suites:
   - name: compose-app
     cases: ["compose/*/oats-case.yaml"]   # one case per subdir under compose/
-    fixture: compose-dev
     tags: [compose, app]
   - name: k3d-app
     cases: ["k3d/*/oats-case.yaml"]
-    fixture: k3d-dev
     tags: [k3d, app]
-
-fixture:
-  # compose: OATS runs `docker compose up` on these files, waits for readiness,
-  # then tears them down. A compose fixture defaults to `template: lgtm`, so OATS
-  # boots a grafana/otel-lgtm stack alongside these files — that's the `lgtm`
-  # service the env below points at. Set `template: none` to bring your own stack.
-  compose-dev:
-    compose:
-      files: ["docker-compose.yml", "docker-compose.override.yml"]
-      env: ["OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318"]
-  # k3d: OATS spins up a k3d (k3s-in-docker) cluster, builds + imports the app
-  # image, applies the manifests in k8s_dir, and port-forwards to reach it.
-  k3d-dev:
-    k3d:
-      k8s_dir: k8s                 # directory of k8s manifests to apply
-      app_service: rolldice        # service exposing the app
-      app_docker_file: Dockerfile  # build the app image from this Dockerfile…
-      app_docker_context: .        # …with this build context
-      app_docker_tag: rolldice:test
-      app_port: 18080              # app's container port
-      import_images: ["grafana/otel-lgtm:latest"]  # images to load into the cluster

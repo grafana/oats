@@ -55,7 +55,6 @@ type Event struct {
 
 	// Identifying context.
 	Suite       string `json:"suite,omitempty"`
-	Fixture     string `json:"fixture,omitempty"`
 	FixtureType string `json:"fixture_type,omitempty"`
 	Case        string `json:"case,omitempty"`
 	Source      string `json:"source,omitempty"`

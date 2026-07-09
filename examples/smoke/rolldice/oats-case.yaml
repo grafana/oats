@@ -2,6 +2,14 @@
 # exercises all three main signals (traces, metrics, logs).
 name: rolldice smoke
 
+# A "remote" fixture points at an already-running stack — here a local
+# grafana/otel-lgtm on the default OTLP port. OATS does not boot or tear it down;
+# start it yourself, e.g.
+#   docker run -p 3000:3000 -p 4317:4317 -p 4318:4318 grafana/otel-lgtm
+fixture:
+  remote:
+    endpoint: http://localhost:4318
+
 # `input` HTTP requests drive the app so it emits telemetry (method defaults to GET).
 input:
   - path: /rolldice?rolls=5

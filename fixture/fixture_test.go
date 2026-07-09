@@ -100,7 +100,7 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 	}
 
 	fix, _, err := Start(context.Background(), discovery.Plan{
-		Suite: discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Suite: discovery.SuiteConfig{Name: "smoke"},
 		Fixture: casefile.FixtureConfig{
 			Compose: &casefile.ComposeFixture{
 				// template=none keeps the resolved file list exactly a.yml/b.yml
@@ -141,7 +141,7 @@ func TestStart_ComposeStartFailure(t *testing.T) {
 	}
 
 	_, _, err := Start(context.Background(), discovery.Plan{
-		Suite:            discovery.SuiteConfig{Name: "smoke", Fixture: "local"},
+		Suite:            discovery.SuiteConfig{Name: "smoke"},
 		Fixture:          casefile.FixtureConfig{Compose: &casefile.ComposeFixture{File: "compose.yml"}},
 		FixtureSourceDir: "/tmp/work",
 	})
@@ -170,7 +170,7 @@ func TestStart_K3DLifecycle(t *testing.T) {
 	}
 
 	fix, rt, err := Start(context.Background(), discovery.Plan{
-		Suite: discovery.SuiteConfig{Name: "cluster-smoke", Fixture: "cluster"},
+		Suite: discovery.SuiteConfig{Name: "cluster-smoke"},
 		Fixture: casefile.FixtureConfig{
 			K3D: &casefile.K3DFixture{
 				K8sDir:           "k8s",
@@ -220,7 +220,7 @@ func TestStart_K3DStartFailure(t *testing.T) {
 	}
 
 	_, _, err := Start(context.Background(), discovery.Plan{
-		Suite: discovery.SuiteConfig{Name: "cluster-smoke", Fixture: "cluster"},
+		Suite: discovery.SuiteConfig{Name: "cluster-smoke"},
 		Fixture: casefile.FixtureConfig{
 			K3D: &casefile.K3DFixture{
 				K8sDir:           "k8s",
@@ -310,19 +310,17 @@ meta:
 suites:
   - name: parallel-safe
     cases: ["cases/*.yaml"]
-    fixture: stack
-fixture:
-  stack:
-    compose:
-      template: lgtm
-      file: docker-compose.oats.yml
 `)
-	writeFile(t, dir, "docker-compose.oats.yml", `services:
+	writeFile(t, dir, "cases/docker-compose.oats.yml", `services:
   app:
     image: alpine
     command: ["sh", "-c", "sleep 1"]
 `)
 	writeFile(t, dir, "cases/a.yaml", `name: a
+fixture:
+  compose:
+    template: lgtm
+    file: docker-compose.oats.yml
 seed:
   type: inline-otlp
   logs:

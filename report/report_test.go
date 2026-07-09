@@ -151,15 +151,15 @@ func TestTextReporter_VerbosePassPrintsPasses(t *testing.T) {
 func TestTextReporter_VerboseAllPrintsFixtureLifecycle(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewTextReporter(&buf, VerboseAll)
-	r.Emit(Event{Type: EventFixtureStart, Fixture: "local", DurationMs: 1})
-	r.Emit(Event{Type: EventFixtureReady, Fixture: "local", DurationMs: 12})
-	r.Emit(Event{Type: EventFixtureTeardown, Fixture: "local", DurationMs: 3})
+	r.Emit(Event{Type: EventFixtureStart, FixtureType: "compose", DurationMs: 1})
+	r.Emit(Event{Type: EventFixtureReady, FixtureType: "compose", DurationMs: 12})
+	r.Emit(Event{Type: EventFixtureTeardown, FixtureType: "compose", DurationMs: 3})
 
 	out := buf.String()
 	for _, want := range []string{
-		"[fixture local] fixture.start",
-		"[fixture local] fixture.ready",
-		"[fixture local] fixture.teardown",
+		"[fixture compose] fixture.start",
+		"[fixture compose] fixture.ready",
+		"[fixture compose] fixture.teardown",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected fixture lifecycle line %q in:\n%s", want, out)
@@ -203,9 +203,9 @@ func TestNDJSONReporter_FiltersPassByDefault(t *testing.T) {
 func TestNDJSONReporter_EmitsFixtureLifecycleAtVerboseAll(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewNDJSONReporter(&buf, VerboseAll)
-	r.Emit(Event{Type: EventFixtureStart, Fixture: "local"})
-	r.Emit(Event{Type: EventFixtureReady, Fixture: "local"})
-	r.Emit(Event{Type: EventFixtureTeardown, Fixture: "local"})
+	r.Emit(Event{Type: EventFixtureStart, FixtureType: "compose"})
+	r.Emit(Event{Type: EventFixtureReady, FixtureType: "compose"})
+	r.Emit(Event{Type: EventFixtureTeardown, FixtureType: "compose"})
 
 	out := buf.String()
 	for _, want := range []string{`"fixture.start"`, `"fixture.ready"`, `"fixture.teardown"`} {

@@ -7,18 +7,21 @@ CLI summary see the [README](../README.md); for running in CI see
 
 ## oats-config.yaml
 
-`oats-config.yaml` is the entry point of an OATS project: it declares the suites,
-the case files each suite runs (path globs), the fixtures they use, and cache
-settings. `oats` looks for it in the current directory and then each parent (so
-you can run from a subdirectory); `--config <path>` overrides the search. Its
-`meta.version` is the single OATS schema version — case files carry no version of
-their own.
+`oats-config.yaml` is the entry point of an OATS project: it declares `meta`, the
+suites (or a top-level `cases:` list) with the case files each runs (path globs),
+and cache settings. It does **not** declare fixtures — each fixture lives on its
+case (see [Fixtures](#fixtures)). `oats` looks for the config in the current
+directory and then each parent (so you can run from a subdirectory); `--config
+<path>` overrides the search. Its `meta.version` is the single OATS schema
+version — case files carry no version of their own.
 
 ```yaml
 meta:
   version: 3
 suites:
-  - cases: ["*/oats-case.yaml"]   # each case in its own subdir; globs are relative to this file
+  - name: smoke                   # optional label; also the `--suite` filter key
+    cases: ["*/oats-case.yaml"]   # each case in its own subdir; globs are relative to this file
+    tags: [traces, logs]          # optional labels; filter with `--tags`
 cache:
   ttl_days: 7                     # skip-when-unchanged TTL; 0 → default (7 days)
 ```
@@ -39,25 +42,36 @@ patterns.
 
 ### Suites vs cases
 
-A **case** is one test. A **suite** is a named group of cases that **share one
-booted fixture** — so the (often expensive) backend is stood up once and every
-case in the suite runs against it. A suite is also the unit of parallelism
-(`--parallel` runs *suites* concurrently; cases within a suite run in order) and
-of `--suite` / `--tags` filtering. Use one suite per distinct fixture — e.g. a
-`compose` suite and a `k3d` suite side by side.
+A **case** is one test. A **suite** boots **one fixture, shared by all its
+cases**, and runs each case against it — so the (often expensive) backend is
+stood up once. A suite is also the unit of parallelism (`--parallel` runs
+*suites* concurrently; cases within a suite run in order) and of `--suite` /
+`--tags` filtering.
+
+The suite's fixture is **derived from its cases**, never declared on the suite:
+every case in the suite that declares a `fixture:` must declare the **same** one
+(compared deep-equal). If they disagree it's an error ("suite cases do not agree
+on one shared fixture"); if no case declares a fixture, the suite defaults to a
+`compose` fixture with the builtin `lgtm` template. Group cases into a suite when
+you want them to share a boot: for a `compose`/`k3d` fixture that shared boot is
+the real win, whereas a `remote` fixture boots nothing, so grouping it into a
+suite mainly buys `--tags`/`--suite` filtering.
+
+Cases in **different directories** can share a fixture only if it references no
+directory-relative paths — a `remote:` fixture, or a template-only `compose`
+fixture. A `compose` fixture with `file:`/`files:` (or `k3d` with `k8s_dir` /
+`app_docker_file`) is directory-relative, so cases sharing it must live in the
+same directory.
 
 When you don't need that grouping, use a **top-level `cases:`** list instead of
-`suites:`; each case then becomes its own single-case suite (and typically
-carries its own case-local `fixture:` block):
+`suites:`; each case then becomes its own single-case suite carrying its own
+`fixture:` block:
 
 ```yaml
 meta:
   version: 3
 cases: ["*/oats-case.yaml"]   # no suites; one case per subdir, each self-contained
 ```
-
-A suite either names a shared fixture (from the `fixture:` map) or lets each of
-its cases carry a case-local `fixture:` block.
 
 ## Case yaml
 
@@ -91,10 +105,20 @@ expected:
 
 ## Fixtures
 
-A fixture is the observability stack a case runs against — Grafana + Loki +
-Tempo + Prometheus + Pyroscope, optionally plus the app under test. Set exactly
-one of three nested blocks; the block you set selects how the stack is stood up
-(there is no separate `type` field):
+A fixture describes **both the backend and the app under test, together** — the
+observability stack (Grafana + Loki + Tempo + Prometheus + Pyroscope) plus, for
+an app-seed case, the app that feeds it. It is declared **on the case**, in a
+`fixture:` block (there is no config- or suite-level fixture); a suite boots the
+one its cases agree on. For a `compose` fixture the builtin `lgtm` template
+supplies the backend and the case's `file:` supplies the app.
+
+Because a suite boots a single fixture, all of its cases today share the same
+app+backend, booted once. (Not yet: sharing one backend across cases that run
+*different* apps — the shared-LGTM parallel model — is a deliberately deferred
+follow-up.)
+
+Set exactly one of three nested blocks; the block you set selects how the stack
+is stood up (there is no separate `type` field):
 
 | Block | Meaning |
 |-------|---------|

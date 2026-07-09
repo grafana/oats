@@ -25,11 +25,10 @@ import (
 // directly so a misnamed key surfaces as a "field not defined" error from
 // the yaml decoder rather than a silent miss.
 type RootConfig struct {
-	Meta    Meta                              `yaml:"meta"`
-	Cases   []string                          `yaml:"cases,omitempty"`
-	Suites  []SuiteConfig                     `yaml:"suites,omitempty"`
-	Fixture map[string]casefile.FixtureConfig `yaml:"fixture,omitempty"`
-	Cache   CacheConfig                       `yaml:"cache,omitempty"`
+	Meta   Meta          `yaml:"meta"`
+	Cases  []string      `yaml:"cases,omitempty"`
+	Suites []SuiteConfig `yaml:"suites,omitempty"`
+	Cache  CacheConfig   `yaml:"cache,omitempty"`
 
 	// SourceDir is the directory of the loaded oats-config.yaml. Case glob
 	// expressions resolve relative to it.
@@ -41,10 +40,9 @@ type Meta struct {
 }
 
 type SuiteConfig struct {
-	Name    string   `yaml:"name"`
-	Cases   []string `yaml:"cases"` // path globs, relative to oats-config.yaml dir
-	Fixture string   `yaml:"fixture,omitempty"`
-	Tags    []string `yaml:"tags,omitempty"`
+	Name  string   `yaml:"name"`
+	Cases []string `yaml:"cases"` // path globs, relative to oats-config.yaml dir
+	Tags  []string `yaml:"tags,omitempty"`
 }
 
 type CacheConfig struct {
@@ -97,16 +95,6 @@ func (c *RootConfig) Validate() error {
 	for i, s := range c.Suites {
 		if len(s.Cases) == 0 {
 			return fmt.Errorf("suite[%d]: cases is required and non-empty", i)
-		}
-		if s.Fixture != "" {
-			if _, ok := c.Fixture[s.Fixture]; !ok {
-				return fmt.Errorf("suite[%d] (%q): fixture %q not defined", i, suiteLabel(s), s.Fixture)
-			}
-		}
-	}
-	for name, f := range c.Fixture {
-		if err := f.Validate(name); err != nil {
-			return err
 		}
 	}
 	return nil
@@ -213,7 +201,7 @@ func (c *RootConfig) PlanRun(f Filter) ([]Plan, error) {
 		if !wantTag(suite.Tags) {
 			continue
 		}
-		fixture, fixtureSourceDir, err := c.resolveSuiteFixture(suite, cases)
+		fixture, fixtureSourceDir, err := c.resolveSuiteFixture(cases)
 		if err != nil {
 			return nil, fmt.Errorf("suite %q: %w", suite.Name, err)
 		}
@@ -325,10 +313,13 @@ func dirLabel(dir string) string {
 	return base
 }
 
-func (c *RootConfig) resolveSuiteFixture(suite SuiteConfig, cases []*casefile.Case) (casefile.FixtureConfig, string, error) {
-	if suite.Fixture != "" {
-		return c.Fixture[suite.Fixture], c.SourceDir, nil
-	}
+// resolveSuiteFixture derives the one fixture a suite boots from its cases. A
+// suite boots a single fixture once and runs every case against it, so all
+// cases that declare a fixture must declare the same one. Cases carry the
+// fixture (backend + app together); there is no suite- or config-level fixture.
+// (Sharing one backend across cases with *different* apps is a deferred
+// follow-up — see the shared-LGTM parallel model.)
+func (c *RootConfig) resolveSuiteFixture(cases []*casefile.Case) (casefile.FixtureConfig, string, error) {
 	var (
 		fixture   casefile.FixtureConfig
 		sourceDir string
@@ -344,16 +335,23 @@ func (c *RootConfig) resolveSuiteFixture(suite SuiteConfig, cases []*casefile.Ca
 			fixture, sourceDir, seen = next, nextSourceDir, true
 			continue
 		}
-		if !reflect.DeepEqual(fixture, next) || sourceDir != nextSourceDir {
-			return casefile.FixtureConfig{}, "", fmt.Errorf("suite omits fixture but cases do not agree on one shared fixture")
+		if !reflect.DeepEqual(fixture, next) {
+			return casefile.FixtureConfig{}, "", fmt.Errorf("suite cases do not agree on one shared fixture")
+		}
+		// Identical fixtures in different directories only conflict when the
+		// fixture resolves files relative to that directory (compose file/files,
+		// k3d manifests). A remote or template-only fixture references no paths,
+		// so different dirs are fine — keep the first case's dir.
+		if sourceDir != nextSourceDir && next.UsesRelativePaths() {
+			return casefile.FixtureConfig{}, "", fmt.Errorf("suite cases share a fixture with relative paths but live in different directories")
 		}
 	}
 	if !seen {
-		// No suite fixture and no case declares one: default to a compose
-		// fixture with the builtin lgtm template (an empty ComposeFixture
-		// resolves to template=lgtm). This boots just the lgtm stack, which is
-		// handy for inline-otlp smoke tests. External stacks now require an
-		// explicit remote: fixture. Temp compose files land next to the config.
+		// No case declares a fixture: default to a compose fixture with the
+		// builtin lgtm template (an empty ComposeFixture resolves to
+		// template=lgtm). This boots just the lgtm stack, which is handy for
+		// inline-otlp smoke tests. External stacks require an explicit remote:
+		// fixture. Temp compose files land next to the config.
 		return casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}}, c.SourceDir, nil
 	}
 	return fixture, sourceDir, nil
@@ -368,7 +366,7 @@ func (c *RootConfig) Summary() string {
 		if label == "" {
 			label = suiteLabel(s)
 		}
-		out += fmt.Sprintf("suite=%s fixture=%s tags=%v cases=%v\n", label, s.Fixture, s.Tags, s.Cases)
+		out += fmt.Sprintf("suite=%s tags=%v cases=%v\n", label, s.Tags, s.Cases)
 	}
 	return out
 }

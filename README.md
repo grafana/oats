@@ -71,17 +71,25 @@ bootstrap gcx itself, but pinning it explicitly keeps runs reproducible.
 ## Getting started
 
 The best starting point is **[`examples/python/`](examples/python/)** — a real,
-instrumented Flask "rolldice" app tested end to end. Copy it and run:
+instrumented Flask "rolldice" app tested end to end. With Docker running, copy it
+and run:
 
 ```sh
 cp -r examples/python my-oats-test && cd my-oats-test
 oats   # run it
 ```
 
-With Docker running, `oats` finds `oats-config.yaml` (in the current directory or
-any parent), builds the app and boots it next to a throwaway Grafana LGTM stack
-(the default fixture — no `template: lgtm` needed), calls `/rolldice`, and checks
-the telemetry it produced. The whole test is one file — `oats-case.yaml`:
+An OATS project is two files. **`oats-config.yaml`** lists the cases to run;
+`oats` finds it in the current directory or any parent:
+
+```yaml
+meta:
+  version: 3
+cases: ["oats-case.yaml"]
+```
+
+**`oats-case.yaml`** is the test itself — the app to drive and the telemetry to
+expect:
 
 ```yaml
 name: python rolldice
@@ -106,6 +114,10 @@ expected:
     - logql: '{service_name="rolldice"} |~ `rolling the dice`'
       regex: 'rolling the dice'
 ```
+
+`oats` boots the app next to a throwaway Grafana LGTM stack (the default fixture —
+no `template: lgtm` needed), drives `/rolldice`, and retries each assertion until
+it passes or times out.
 
 No app of your own yet? A case can seed telemetry directly with
 `seed: {type: inline-otlp}` and skip the app entirely — see

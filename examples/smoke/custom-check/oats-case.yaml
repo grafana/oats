@@ -4,6 +4,10 @@
 # OATS_OTLP_HTTP, …) — see docs/case-reference.md.
 name: custom check smoke
 
+fixture:
+  remote:
+    endpoint: http://localhost:4318   # already-running grafana/otel-lgtm (not booted by OATS)
+
 seed:
   type: app
 

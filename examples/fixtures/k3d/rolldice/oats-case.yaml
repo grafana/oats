@@ -1,5 +1,17 @@
-# Runs against the suite's k3d-dev fixture (see ../../oats-config.yaml).
+# Boots a k3d fixture: OATS spins up a k3d (k3s-in-docker) cluster, builds +
+# imports the app image, applies the manifests in k8s_dir, and port-forwards to
+# reach it. Every case in a suite must declare the same fixture.
 name: k3d fixture app smoke
+
+fixture:
+  k3d:
+    k8s_dir: k8s                 # directory of k8s manifests to apply
+    app_service: rolldice        # service exposing the app
+    app_docker_file: Dockerfile  # build the app image from this Dockerfile…
+    app_docker_context: .        # …with this build context
+    app_docker_tag: rolldice:test
+    app_port: 18080              # app's container port
+    import_images: ["grafana/otel-lgtm:latest"]  # images to load into the cluster
 
 seed:
   type: app

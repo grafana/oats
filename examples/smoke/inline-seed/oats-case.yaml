@@ -3,6 +3,10 @@
 # and assert it comes back.
 name: inline seed smoke
 
+fixture:
+  remote:
+    endpoint: http://localhost:4318   # already-running grafana/otel-lgtm (not booted by OATS)
+
 seed:
   type: inline-otlp
   traces:

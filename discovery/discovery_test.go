@@ -21,6 +21,9 @@ func writeFile(t *testing.T, dir, rel, body string) {
 }
 
 const validCaseYAML = `name: %s
+fixture:
+  compose:
+    template: lgtm
 seed:
   type: app
   compose: docker-compose.app.yml
@@ -38,12 +41,7 @@ meta:
 suites:
   - name: lgtm
     cases: ["cases/*.yaml"]
-    fixture: lgtm-shared
     tags: ["traces"]
-fixture:
-  lgtm-shared:
-    compose:
-      template: lgtm
 `)
 	writeFile(t, dir, "cases/a.yaml", strings.Replace(validCaseYAML, "%s", "case-a", 1))
 	writeFile(t, dir, "cases/b.yaml", strings.Replace(validCaseYAML, "%s", "case-b", 1))
@@ -249,93 +247,94 @@ expected:
 	}
 }
 
-func TestValidate_EmptyFixtureRejected(t *testing.T) {
-	cfg := &RootConfig{
-		Meta: Meta{Version: 3},
-		Suites: []SuiteConfig{{
-			Name: "s", Cases: []string{"a.yaml"}, Fixture: "x",
-		}},
-		Fixture: map[string]casefile.FixtureConfig{"x": {}},
+// TestResolveSuiteFixture_SingleInferred verifies a suite infers its one shared
+// fixture from cases that all declare the same fixture, with the source dir
+// taken from the declaring cases.
+func TestResolveSuiteFixture_SingleInferred(t *testing.T) {
+	cfg := &RootConfig{SourceDir: "/cfg"}
+	cases := []*casefile.Case{
+		{Name: "a", SourcePath: "/suite/a.yaml", Fixture: &casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}}},
+		{Name: "b", SourcePath: "/suite/b.yaml", Fixture: &casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}}},
 	}
-	err := cfg.Validate()
-	if err == nil || !strings.Contains(err.Error(), "set exactly one of compose/k3d/remote") {
-		t.Errorf("expected empty-fixture error, got %v", err)
+	fixture, sourceDir, err := cfg.resolveSuiteFixture(cases)
+	if err != nil {
+		t.Fatalf("resolveSuiteFixture: %v", err)
 	}
-}
-
-func TestValidate_MultipleFixtureBlocksRejected(t *testing.T) {
-	cfg := &RootConfig{
-		Meta: Meta{Version: 3},
-		Suites: []SuiteConfig{{
-			Name: "s", Cases: []string{"a.yaml"}, Fixture: "x",
-		}},
-		Fixture: map[string]casefile.FixtureConfig{"x": {
-			Compose: &casefile.ComposeFixture{Template: "lgtm"},
-			Remote:  &casefile.RemoteFixture{Endpoint: "http://localhost:4318"},
-		}},
+	if fixture.Kind() != "compose" {
+		t.Errorf("expected compose fixture, got %q (%+v)", fixture.Kind(), fixture)
 	}
-	err := cfg.Validate()
-	if err == nil || !strings.Contains(err.Error(), "set exactly one of compose/k3d/remote") {
-		t.Errorf("expected multiple-block error, got %v", err)
+	if sourceDir != "/suite" {
+		t.Errorf("expected source dir /suite, got %q", sourceDir)
 	}
 }
 
-func TestValidate_FixtureRefNotDefined(t *testing.T) {
-	cfg := &RootConfig{
-		Meta: Meta{Version: 3},
-		Suites: []SuiteConfig{{
-			Name: "s", Cases: []string{"a.yaml"}, Fixture: "missing",
-		}},
+// TestResolveSuiteFixture_DefaultsToComposeLGTM verifies that when no case
+// declares a fixture, the suite defaults to a compose fixture booting the
+// builtin lgtm template, rooted at the config's source dir.
+func TestResolveSuiteFixture_DefaultsToComposeLGTM(t *testing.T) {
+	cfg := &RootConfig{SourceDir: "/cfg"}
+	cases := []*casefile.Case{
+		{Name: "a", SourcePath: "/suite/a.yaml"},
+		{Name: "b", SourcePath: "/suite/b.yaml"},
 	}
-	err := cfg.Validate()
-	if err == nil || !strings.Contains(err.Error(), `fixture "missing" not defined`) {
-		t.Errorf("expected fixture-missing error, got %v", err)
+	fixture, sourceDir, err := cfg.resolveSuiteFixture(cases)
+	if err != nil {
+		t.Fatalf("resolveSuiteFixture: %v", err)
 	}
-}
-
-func TestValidate_RemoteRequiresEndpoint(t *testing.T) {
-	cfg := &RootConfig{
-		Meta:    Meta{Version: 3},
-		Suites:  []SuiteConfig{{Name: "s", Cases: []string{"a.yaml"}}},
-		Fixture: map[string]casefile.FixtureConfig{"r": {Remote: &casefile.RemoteFixture{}}},
+	if fixture.Kind() != "compose" || fixture.Compose.EffectiveTemplate() != "lgtm" {
+		t.Errorf("expected default compose/lgtm fixture, got %q (%+v)", fixture.Kind(), fixture)
 	}
-	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "endpoint") {
-		t.Errorf("expected endpoint error, got %v", err)
+	if sourceDir != "/cfg" {
+		t.Errorf("expected source dir /cfg, got %q", sourceDir)
 	}
 }
 
-func TestValidate_ComposeFilesConflict(t *testing.T) {
-	cfg := &RootConfig{
-		Meta: Meta{Version: 3},
-		Suites: []SuiteConfig{{
-			Name: "s", Cases: []string{"a.yaml"}, Fixture: "c",
-		}},
-		Fixture: map[string]casefile.FixtureConfig{"c": {
-			Compose: &casefile.ComposeFixture{
-				File: "one.yml",
-				Files: []string{
-					"two.yml",
-				},
-			},
-		}},
+// TestResolveSuiteFixture_Disagreement verifies that a suite whose cases declare
+// conflicting fixtures is rejected: a suite boots exactly one shared fixture.
+func TestResolveSuiteFixture_Disagreement(t *testing.T) {
+	cfg := &RootConfig{SourceDir: "/cfg"}
+	cases := []*casefile.Case{
+		{Name: "a", SourcePath: "/suite/a.yaml", Fixture: &casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}}},
+		{Name: "b", SourcePath: "/suite/b.yaml", Fixture: &casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}}},
 	}
-	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "compose sets file or files, not both") {
-		t.Errorf("expected compose conflict error, got %v", err)
+	if _, _, err := cfg.resolveSuiteFixture(cases); err == nil || !strings.Contains(err.Error(), "do not agree on one shared fixture") {
+		t.Errorf("expected disagreement error, got %v", err)
 	}
 }
 
-func TestValidate_K3DRequiresFields(t *testing.T) {
-	cfg := &RootConfig{
-		Meta: Meta{Version: 3},
-		Suites: []SuiteConfig{{
-			Name: "s", Cases: []string{"a.yaml"}, Fixture: "k",
-		}},
-		Fixture: map[string]casefile.FixtureConfig{"k": {
-			K3D: &casefile.K3DFixture{},
-		}},
+// A path-less fixture (remote) is the same fixture regardless of directory, so
+// identical copies in different dirs must agree.
+func TestResolveSuiteFixture_RemoteAcrossDirsAgrees(t *testing.T) {
+	cfg := &RootConfig{SourceDir: "/cfg"}
+	remote := func() *casefile.FixtureConfig {
+		return &casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}}
 	}
-	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "k3d requires") {
-		t.Errorf("expected k3d field error, got %v", err)
+	cases := []*casefile.Case{
+		{Name: "a", SourcePath: "/suite/a/oats-case.yaml", Fixture: remote()},
+		{Name: "b", SourcePath: "/suite/b/oats-case.yaml", Fixture: remote()},
+	}
+	got, _, err := cfg.resolveSuiteFixture(cases)
+	if err != nil {
+		t.Fatalf("expected remote fixtures in different dirs to agree, got %v", err)
+	}
+	if got.Kind() != "remote" {
+		t.Errorf("resolved fixture kind: got %q want remote", got.Kind())
+	}
+}
+
+// A dir-relative fixture (compose file/files) means different files in different
+// dirs, so identical copies across dirs must NOT agree.
+func TestResolveSuiteFixture_ComposeFilesAcrossDirsConflict(t *testing.T) {
+	cfg := &RootConfig{SourceDir: "/cfg"}
+	compose := func() *casefile.FixtureConfig {
+		return &casefile.FixtureConfig{Compose: &casefile.ComposeFixture{File: "docker-compose.oats.yml"}}
+	}
+	cases := []*casefile.Case{
+		{Name: "a", SourcePath: "/suite/a/oats-case.yaml", Fixture: compose()},
+		{Name: "b", SourcePath: "/suite/b/oats-case.yaml", Fixture: compose()},
+	}
+	if _, _, err := cfg.resolveSuiteFixture(cases); err == nil || !strings.Contains(err.Error(), "different directories") {
+		t.Errorf("expected different-directories error, got %v", err)
 	}
 }
 
@@ -361,7 +360,7 @@ suites:
 func TestSummary(t *testing.T) {
 	cfg := &RootConfig{
 		Suites: []SuiteConfig{
-			{Name: "alpha", Fixture: "x", Tags: []string{"traces"}, Cases: []string{"a.yaml"}},
+			{Name: "alpha", Tags: []string{"traces"}, Cases: []string{"a.yaml"}},
 		},
 	}
 	s := cfg.Summary()

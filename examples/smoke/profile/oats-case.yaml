@@ -2,6 +2,10 @@
 # them against an app-backed fixture that produces CPU profiles.
 name: profile smoke
 
+fixture:
+  remote:
+    endpoint: http://localhost:4318   # already-running grafana/otel-lgtm (not booted by OATS)
+
 seed:
   type: app
 

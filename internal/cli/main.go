@@ -407,9 +407,9 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 	switch plan.Fixture.Kind() {
 	case "remote":
 		// For a remote fixture, the gcx context is configured externally
-		// (e.g. `gcx login` already ran). We pass the fixture name as a
+		// (e.g. `gcx login` already ran). We pass the suite name as a
 		// best-effort default; --gcx-context overrides.
-		ep.GCXContext = plan.Suite.Fixture
+		ep.GCXContext = plan.Suite.Name
 		ep.OTLPHTTP = plan.Fixture.Remote.Endpoint
 		ep.CustomCheckEnv = append(ep.CustomCheckEnv,
 			"OATS_FIXTURE_TYPE=remote",
@@ -593,7 +593,6 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 	rep.Emit(report.Event{
 		Type:        report.EventSuiteStart,
 		Suite:       plan.Suite.Name,
-		Fixture:     plan.Suite.Fixture,
 		FixtureType: plan.Fixture.Kind(),
 		CaseCount:   len(plan.Cases),
 	})
@@ -655,7 +654,6 @@ func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureStart,
 			Suite:       plan.Suite.Name,
-			Fixture:     plan.Suite.Fixture,
 			FixtureType: plan.Fixture.Kind(),
 			Ts:          start,
 		})
@@ -668,7 +666,6 @@ func emitFixtureReady(rep report.Reporter, plan discovery.Plan, start time.Time)
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureReady,
 			Suite:       plan.Suite.Name,
-			Fixture:     plan.Suite.Fixture,
 			FixtureType: plan.Fixture.Kind(),
 			DurationMs:  time.Since(start).Milliseconds(),
 		})
@@ -684,7 +681,6 @@ func closeFixture(rep report.Reporter, plan discovery.Plan, fix fixture.Handle) 
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureTeardown,
 			Suite:       plan.Suite.Name,
-			Fixture:     plan.Suite.Fixture,
 			FixtureType: plan.Fixture.Kind(),
 			DurationMs:  time.Since(start).Milliseconds(),
 		})

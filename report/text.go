@@ -72,7 +72,7 @@ func (r *TextReporter) Emit(e Event) {
 		}
 	case EventFixtureStart, EventFixtureReady, EventFixtureTeardown:
 		if r.v >= VerboseAll {
-			r.write("[fixture %s] %s (%dms)\n", e.Fixture, e.Type, e.DurationMs)
+			r.write("[fixture %s] %s (%dms)\n", e.FixtureType, e.Type, e.DurationMs)
 		}
 	}
 }

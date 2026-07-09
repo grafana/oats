@@ -130,6 +130,22 @@ func (f FixtureConfig) HasManagedApp() bool {
 	return f.Compose != nil && f.Compose.AppService != "" && f.Compose.AppPort > 0
 }
 
+// UsesRelativePaths reports whether the fixture references files/directories
+// resolved relative to the case's directory (compose file/files, k3d manifests
+// or build context). Such fixtures mean different things in different
+// directories, so cases sharing one only agree if they live in the same dir. A
+// remote fixture (or a template-only compose) references no paths, so identical
+// copies in different directories are genuinely the same fixture.
+func (f FixtureConfig) UsesRelativePaths() bool {
+	if f.Compose != nil && (f.Compose.File != "" || len(f.Compose.Files) > 0) {
+		return true
+	}
+	if f.K3D != nil && (f.K3D.K8sDir != "" || f.K3D.AppDockerFile != "" || f.K3D.AppDockerContext != "") {
+		return true
+	}
+	return false
+}
+
 type SeedTrace struct {
 	Service string     `yaml:"service"`
 	Spans   []SeedSpan `yaml:"spans"`
