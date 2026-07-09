@@ -5,9 +5,8 @@
 // they expect, not how to run gcx — the runner picks gcx args from the
 // expectation block.
 //
-// The struct shape mirrors the case yaml documented in the OATS v2
-// implementation plan (internal-docs #14). Field tags follow the yaml.v3
-// convention.
+// The struct shape mirrors the case yaml described in docs/case-reference.md.
+// Field tags follow the yaml.v3 convention.
 package casefile
 
 import (
@@ -22,9 +21,10 @@ import (
 )
 
 // Case is one entry point yaml file. Cases are independently runnable;
-// suites group them via oats-config.yaml. A case carries no version field of
-// its own: cases are only ever loaded through oats-config.yaml, whose
-// meta.version is the single schema version (see discovery.SupportedVersion).
+// oats-config.yaml lists them and the runner groups them into fixture-boot
+// groups. A case carries no version field of its own: cases are only ever
+// loaded through oats-config.yaml, whose meta.version is the single schema
+// version (see discovery.SupportedVersion).
 type Case struct {
 	Name     string         `yaml:"name"`
 	Tags     []string       `yaml:"tags,omitempty"`
@@ -49,7 +49,7 @@ type Case struct {
 // entirely (fixture + input + expected).
 type Seed struct {
 	Type    string         `yaml:"type,omitempty"`    // "app" (default) or "inline-otlp"
-	Compose string         `yaml:"compose,omitempty"` // optional legacy shorthand; suite fixture normally owns app boot
+	Compose string         `yaml:"compose,omitempty"` // optional compose-file shorthand; the fixture block normally owns app boot
 	Traces  []SeedTrace    `yaml:"traces,omitempty"`
 	Logs    []SeedLog      `yaml:"logs,omitempty"`
 	Metrics []SeedMetric   `yaml:"metrics,omitempty"`
@@ -65,10 +65,9 @@ func (s Seed) EffectiveType() string {
 	return s.Type
 }
 
-// FixtureConfig declares how a suite stands up the backends its cases run
-// against. Exactly one of the type-specific blocks is set; the block that is
-// present selects the fixture kind. The same struct loads from oats-config.yaml and
-// from a case yaml (both via yaml.v3).
+// FixtureConfig declares how OATS stands up the backends a case runs against.
+// Exactly one of the type-specific blocks is set; the block that is present
+// selects the fixture kind. It loads from a case yaml via yaml.v3.
 type FixtureConfig struct {
 	Compose *ComposeFixture `yaml:"compose,omitempty"`
 	K3D     *K3DFixture     `yaml:"k3d,omitempty"`
@@ -85,8 +84,8 @@ type FixtureConfig struct {
 // to opt out and bring your own observability stack via file/files.
 type ComposeFixture struct {
 	Template   string   `yaml:"template,omitempty"`
-	File       string   `yaml:"file,omitempty"`
-	Files      []string `yaml:"files,omitempty"`
+	File       string   `yaml:"file,omitempty"`  // single compose file; mutually exclusive with files (Validate rejects both)
+	Files      []string `yaml:"files,omitempty"` // multiple compose files; mutually exclusive with file (Validate rejects both)
 	Env        []string `yaml:"env,omitempty"`
 	AppService string   `yaml:"app_service,omitempty"`
 	AppPort    int      `yaml:"app_port,omitempty"`
@@ -183,7 +182,8 @@ type SeedMetric struct {
 }
 
 // Input drives the application under test so telemetry is emitted before
-// assertions run. It mirrors the legacy OATS HTTP request shape.
+// assertions run. It keeps the HTTP request shape unchanged from the legacy
+// format (schema version 2).
 type Input struct {
 	Scheme  string            `yaml:"scheme,omitempty"`
 	Host    string            `yaml:"host,omitempty"`
