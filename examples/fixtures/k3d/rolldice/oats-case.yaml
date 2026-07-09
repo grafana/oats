@@ -14,8 +14,6 @@ fixture:
     app_port: 18080              # app's container port
     import_images: ["grafana/otel-lgtm:latest"]  # images to load into the cluster
 
-seed:
-  type: app
 input:
   - path: /rolldice?rolls=2
 

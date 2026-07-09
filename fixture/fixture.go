@@ -120,7 +120,7 @@ func SupportsParallel(plan discovery.Plan) (bool, string) {
 			// fixture.app_service (+ app_port) so the published port can be
 			// discovered. Without it the app falls back to the fixed --app-port
 			// and parallel suites would collide.
-			if c.Seed.Type == "app" && !plan.Fixture.HasManagedApp() {
+			if c.Seed.EffectiveType() == "app" && !plan.Fixture.HasManagedApp() {
 				return false, "compose app-seed suites need fixture.app_service and app_port so OATS can publish an ephemeral app port; otherwise they share a fixed app port"
 			}
 		}

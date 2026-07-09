@@ -222,6 +222,17 @@ func TestValidate_UnknownSeedType(t *testing.T) {
 	}
 }
 
+func TestValidate_EmptySeedDefaultsToApp(t *testing.T) {
+	// An app-backed case can omit the seed block entirely.
+	c := &Case{Name: "x", Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
+	if got := c.Seed.EffectiveType(); got != "app" {
+		t.Errorf("EffectiveType: got %q, want app", got)
+	}
+	if err := c.Validate(); err != nil {
+		t.Errorf("expected empty seed to validate as app, got %v", err)
+	}
+}
+
 func TestValidate_AppSeedAllowsFixtureManagedBoot(t *testing.T) {
 	c := &Case{Name: "x", Seed: Seed{Type: "app"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
 	err := c.Validate()

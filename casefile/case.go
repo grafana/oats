@@ -42,15 +42,27 @@ type Case struct {
 // Seed declares how a case populates the stack before assertions run.
 // Exactly one of the fields beyond Type is meaningful per Type value:
 //
-//	type: app          → external suite fixture boots the app; Compose is optional
+//	type: app          → the fixture boots the app; input drives it (the default)
 //	type: inline-otlp  → Traces/Logs/Metrics describe the payload to push
+//
+// Type defaults to "app", so an app-backed case can omit the seed block
+// entirely (fixture + input + expected).
 type Seed struct {
-	Type    string         `yaml:"type"`              // "app" or "inline-otlp"
+	Type    string         `yaml:"type,omitempty"`    // "app" (default) or "inline-otlp"
 	Compose string         `yaml:"compose,omitempty"` // optional legacy shorthand; suite fixture normally owns app boot
 	Traces  []SeedTrace    `yaml:"traces,omitempty"`
 	Logs    []SeedLog      `yaml:"logs,omitempty"`
 	Metrics []SeedMetric   `yaml:"metrics,omitempty"`
 	Vars    map[string]any `yaml:"vars,omitempty"`
+}
+
+// EffectiveType returns the seed type, defaulting to "app" when unset so an
+// app-backed case can omit the seed block entirely.
+func (s Seed) EffectiveType() string {
+	if s.Type == "" {
+		return "app"
+	}
+	return s.Type
 }
 
 // FixtureConfig declares how a suite stands up the backends its cases run
@@ -408,11 +420,11 @@ func (c *Case) Validate() error {
 			return err
 		}
 	}
-	switch c.Seed.Type {
+	switch c.Seed.EffectiveType() {
 	case "app":
-		// App-backed cases are normally booted by the suite fixture declared in
-		// oats-config.yaml. seed.compose remains accepted as a legacy/migration
-		// shorthand, but is not required for validation or execution here.
+		// App-backed cases are booted by the case's fixture; input drives them.
+		// This is the default when seed.type is omitted. seed.compose remains
+		// accepted as a legacy/migration shorthand, but is not required.
 	case "inline-otlp":
 		if len(c.Seed.Traces)+len(c.Seed.Logs)+len(c.Seed.Metrics) == 0 {
 			return fmt.Errorf("seed: inline-otlp must declare at least one trace, log, or metric")
@@ -427,8 +439,6 @@ func (c *Case) Validate() error {
 				}
 			}
 		}
-	case "":
-		return fmt.Errorf("seed.type: required (app | inline-otlp)")
 	default:
 		return fmt.Errorf("seed.type: unknown value %q (expected app or inline-otlp)", c.Seed.Type)
 	}

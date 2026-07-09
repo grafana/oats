@@ -9,9 +9,6 @@ fixture:
   remote:
     endpoint: http://localhost:4318   # already-running grafana/otel-lgtm (not booted by OATS)
 
-seed:
-  type: app
-
 expected:
   custom-checks:
     - script: ./verify.sh   # path relative to this case dir (verify.sh sits next to it)

@@ -438,7 +438,7 @@ func trimOutput(s string) string {
 }
 
 func (r *Runner) seedCase(ctx context.Context, c *casefile.Case) error {
-	switch c.Seed.Type {
+	switch c.Seed.EffectiveType() {
 	case "app":
 		// External fixture is responsible for booting the app. Runner
 		// assumes the app is already emitting; nothing to do here.

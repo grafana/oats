@@ -11,8 +11,6 @@ fixture:
     files: ["docker-compose.yml", "docker-compose.override.yml"]
     env: ["OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318"]
 
-seed:
-  type: app
 input:
   - path: /rolldice?rolls=3
 

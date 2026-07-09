@@ -7,9 +7,6 @@ fixture:
   remote:
     endpoint: http://localhost:4318   # already-running grafana/otel-lgtm (not booted by OATS)
 
-seed:
-  type: app
-
 expected:
   profiles:
     - query: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds{}'   # Pyroscope query

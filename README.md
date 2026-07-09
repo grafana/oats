@@ -33,10 +33,8 @@ fixture:
   compose:
     file: docker-compose.oats.yml   # your app; OATS adds a Grafana LGTM stack by default
 
-seed:
-  type: app
 input:
-  - path: /rolldice?rolls=5
+  - path: /rolldice?rolls=5         # drive the app (seed defaults to type: app)
 
 expected:
   traces:
@@ -98,10 +96,8 @@ fixture:
     file: docker-compose.oats.yml   # your app; OATS adds a Grafana LGTM stack by default
     app_service: python             # so OATS can reach the app…
     app_port: 8082                  # …on its container port
-seed:
-  type: app
 input:
-  - path: /rolldice                 # drive the app so it emits telemetry
+  - path: /rolldice                 # drive the app (seed defaults to type: app)
 expected:
   traces:
     - traceql: '{ span.http.route = "/rolldice" }'

@@ -78,9 +78,7 @@ fixture:
     template: lgtm
     file: docker-compose.oats.yml
 
-seed:
-  type: app
-input:
+input:                       # drive the app (seed defaults to type: app)
   - path: /rolldice?rolls=5
 
 expected:
@@ -163,7 +161,7 @@ forces the group to run serially.
 A case populates the stack before assertions run via one of two `seed.type`
 modes:
 
-- **`app`** is the default for acceptance tests: drive your real instrumented
+- **`app`** is the default (omit `seed` entirely): drive your real instrumented
   app and assert on what it actually emits end-to-end (SDK → collector →
   backend). This is what most consumer repos want.
 - **`inline-otlp`** carries a hand-written OTLP payload and pushes it straight
@@ -174,10 +172,8 @@ modes:
   precisely this — deterministic telemetry without booting an instrumented app.
 
 ```yaml
-# App-backed: the case's fixture boots an instrumented app, and `input`
-# requests drive it so it emits telemetry.
-seed:
-  type: app
+# App-backed (the default — no seed block needed): the case's fixture boots an
+# instrumented app, and `input` requests drive it so it emits telemetry.
 input:
   - path: /rolldice?rolls=5   # method defaults to GET
 ```

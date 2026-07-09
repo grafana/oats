@@ -11,10 +11,9 @@ fixture:
     app_service: python   # the app service in the compose file…
     app_port: 8082        # …and its container port, so OATS can drive it
 
-seed:
-  type: app               # an instrumented app produces the telemetry
+# Drive the app so it emits telemetry (seed defaults to type: app).
 input:
-  - path: /rolldice       # drive it so it emits a trace, metric, and log
+  - path: /rolldice       # method defaults to GET
 
 expected:
   traces:

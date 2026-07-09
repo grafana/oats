@@ -15,10 +15,6 @@ fixture:
 input:
   - path: /rolldice?rolls=5
 
-seed:
-  type: app                        # an instrumented app produces the telemetry
-  compose: docker-compose.app.yml  # legacy shorthand to boot the app via compose
-
 # Each assertion names a query, then what must hold for its result. OATS retries
 # every assertion until it passes or --timeout elapses.
 expected:
