@@ -87,6 +87,10 @@ func (g *GCX) Execute(ctx context.Context, args ...string) (*Result, error) {
 		defer cancel()
 	}
 
+	// CommandContext ties the process lifetime to ctx: when ctx is cancelled —
+	// by the per-invocation timeout above, or by an interrupt (the CLI runs
+	// under a context cancelled on SIGINT/SIGTERM) — the gcx process is killed
+	// rather than left running.
 	cmd := exec.CommandContext(ctx, g.Binary, full...)
 	if len(g.Env) > 0 {
 		cmd.Env = append(cmd.Environ(), g.Env...)

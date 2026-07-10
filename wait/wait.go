@@ -51,7 +51,9 @@ type Result[F any] struct {
 
 // Until polls the asserter until it returns no failures (success) or the
 // deadline elapses (failure). It runs the asserter at least once even when
-// the deadline has already passed.
+// the deadline has already passed. Between polls it waits on ctx, so a
+// cancelled context — e.g. the CLI cancelling on Ctrl+C (SIGINT) — returns
+// promptly rather than sleeping out the interval.
 func Until[F any](ctx context.Context, opts Options, asserter Asserter[F]) Result[F] {
 	opts = withDefaults(opts)
 	start := time.Now()
@@ -91,7 +93,8 @@ func Until[F any](ctx context.Context, opts Options, asserter Asserter[F]) Resul
 // While polls the asserter for the entire window, requiring no failures on
 // every iteration. Used for absence checks ("data we DON'T want must stay
 // absent for at least N seconds"). Reports the first failing iteration's
-// failures, if any.
+// failures, if any. Like Until, it waits on ctx between polls, so a cancelled
+// context (e.g. Ctrl+C) returns promptly.
 func While[F any](ctx context.Context, opts Options, asserter Asserter[F]) Result[F] {
 	opts = withDefaults(opts)
 	start := time.Now()

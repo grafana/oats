@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -40,7 +41,7 @@ func NewTextReporter(w io.Writer, v Verbosity) *TextReporter {
 	return &TextReporter{
 		w:          w,
 		v:          v,
-		ghaEnabled: os.Getenv("GITHUB_ACTIONS") == "true",
+		ghaEnabled: ghaAnnotationsEnabled(),
 		knownErrAt: make(map[string]struct{}),
 	}
 }
@@ -140,7 +141,7 @@ func (r *TextReporter) emitGHAAnnotation(e Event) {
 		msg = "OATS assertion failed"
 	}
 	msg = ghaEscape(msg)
-	file = ghaEscapeProp(file)
+	file = ghaEscapeProp(relToWorkspace(file))
 	if line > 0 {
 		r.write("::error file=%s,line=%d::%s\n", file, line, msg)
 	} else {
@@ -202,6 +203,38 @@ func durationOr(e Event, fallback time.Duration) time.Duration {
 		return time.Duration(e.DurationMs) * time.Millisecond
 	}
 	return fallback.Round(time.Millisecond)
+}
+
+// ghaAnnotationsEnabled reports whether to emit GitHub Actions ::error::
+// annotations. They are on by default inside GitHub Actions, but can be turned
+// off with OATS_GHA_ANNOTATIONS=false (also 0/no/off) for anyone who prefers
+// the plain text output without inline PR annotations.
+func ghaAnnotationsEnabled() bool {
+	if os.Getenv("GITHUB_ACTIONS") != "true" {
+		return false
+	}
+	switch strings.ToLower(os.Getenv("OATS_GHA_ANNOTATIONS")) {
+	case "false", "0", "no", "off":
+		return false
+	}
+	return true
+}
+
+// relToWorkspace makes an absolute path repo-relative for GitHub annotations.
+// GitHub attaches file= annotations by workspace-relative path, so an absolute
+// path like /home/runner/work/<repo>/<repo>/foo/case.yaml must become
+// foo/case.yaml to land on the file in the PR. No-op when GITHUB_WORKSPACE is
+// unset, the path is already relative, or the path lies outside the workspace.
+func relToWorkspace(file string) string {
+	ws := os.Getenv("GITHUB_WORKSPACE")
+	if ws == "" || !filepath.IsAbs(file) {
+		return file
+	}
+	rel, err := filepath.Rel(ws, file)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return file
+	}
+	return rel
 }
 
 // splitSource splits "path/to/file.yaml:42" into (file, line). When no line

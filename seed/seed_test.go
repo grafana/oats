@@ -77,6 +77,48 @@ func TestSender_SendTracesLogsMetrics(t *testing.T) {
 	}
 }
 
+func TestSender_EscapesSpecialCharacters(t *testing.T) {
+	// Values a case author could plausibly write that Go's %q renders as
+	// non-JSON (\v, a control char) or that need escaping (" \ newline tab).
+	// Every captured payload must parse as JSON and round-trip the value.
+	srv, h := newRecorder()
+	defer srv.Close()
+
+	tricky := "a\"b\\c\nd\te\vf\x01g"
+	s := &Sender{OTLPEndpoint: srv.URL}
+	err := s.Send(context.Background(), Payload{
+		Traces:  []Trace{{Service: tricky, Span: SpanFields{Name: tricky}}},
+		Logs:    []Log{{Service: tricky, Body: tricky, SeverityText: tricky}},
+		Metrics: []Metric{{Service: tricky, Name: tricky, Value: 1}},
+	})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	for _, path := range []string{"/v1/traces", "/v1/logs", "/v1/metrics"} {
+		if !json.Valid(h.requests[path]) {
+			t.Errorf("payload at %s is not valid JSON:\n%s", path, h.requests[path])
+		}
+	}
+
+	// Spot-check the value round-trips intact via the trace span name.
+	var traces struct {
+		ResourceSpans []struct {
+			ScopeSpans []struct {
+				Spans []struct {
+					Name string `json:"name"`
+				} `json:"spans"`
+			} `json:"scopeSpans"`
+		} `json:"resourceSpans"`
+	}
+	if err := json.Unmarshal(h.requests["/v1/traces"], &traces); err != nil {
+		t.Fatalf("unmarshal traces: %v", err)
+	}
+	if got := traces.ResourceSpans[0].ScopeSpans[0].Spans[0].Name; got != tricky {
+		t.Errorf("span name round-trip: got %q, want %q", got, tricky)
+	}
+}
+
 func TestSender_EmptyEndpointFailsLoudly(t *testing.T) {
 	s := &Sender{}
 	if err := s.Send(context.Background(), Payload{}); err == nil {

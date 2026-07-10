@@ -95,11 +95,11 @@ func Regex(stdout string, patterns []string) []Failure {
 // Used by metrics assertions; the actual value comes from parsing gcx
 // metrics query's JSON output upstream of this function.
 func Value(actual float64, expr string) []Failure {
-	op, rhs, err := parseValueExpr(expr)
+	op, threshold, err := parseValueExpr(expr)
 	if err != nil {
 		return []Failure{{Rule: "value", Detail: err.Error()}}
 	}
-	if !applyComparison(actual, op, rhs) {
+	if !applyComparison(actual, op, threshold) {
 		return []Failure{{
 			Rule:   "value",
 			Detail: fmt.Sprintf("expected value %s, got %v", expr, actual),
@@ -109,7 +109,7 @@ func Value(actual float64, expr string) []Failure {
 }
 
 // Count is Value's sibling for integer cardinality. Same operators, integer
-// rhs only — "== 0", ">= 1", "< 10".
+// threshold only — "== 0", ">= 1", "< 10".
 func Count(actual int, expr string) []Failure {
 	// Delegate to Value via float64 — the parser is the same and integer
 	// comparisons through float64 are exact for any count we'd plausibly
@@ -177,6 +177,9 @@ func rowMatches(row Row, entry casefile.MatchEntry) bool {
 			return false
 		}
 	}
+	// All specified constraints held. This is never vacuously true: casefile's
+	// validateMatchEntries rejects an entry with no name and no attributes, so
+	// a row reaching here has matched at least one real constraint.
 	return true
 }
 
@@ -215,6 +218,9 @@ func describeMatch(entry casefile.MatchEntry) string {
 	return strings.Join(parts, ", ")
 }
 
+// retag relabels a failure set's Rule field. Count and Absent delegate their
+// numeric comparison to Value, then retag the resulting "value" failures as
+// "count"/"absent" so the reported rule matches the assertion the author wrote.
 func retag(fails []Failure, rule string) []Failure {
 	for i := range fails {
 		fails[i].Rule = rule
@@ -222,35 +228,36 @@ func retag(fails []Failure, rule string) []Failure {
 	return fails
 }
 
-func parseValueExpr(expr string) (op string, rhs float64, err error) {
+func parseValueExpr(expr string) (op string, threshold float64, err error) {
 	expr = strings.TrimSpace(expr)
+	// Longest operators first so ">=" is matched before ">".
 	for _, candidate := range []string{">=", "<=", "==", "!=", ">", "<"} {
 		if strings.HasPrefix(expr, candidate) {
 			numStr := strings.TrimSpace(strings.TrimPrefix(expr, candidate))
 			n, parseErr := strconv.ParseFloat(numStr, 64)
 			if parseErr != nil {
-				return "", 0, fmt.Errorf("invalid numeric rhs in %q: %v", expr, parseErr)
+				return "", 0, fmt.Errorf("invalid numeric threshold in %q: %v", expr, parseErr)
 			}
 			return candidate, n, nil
 		}
 	}
-	return "", 0, fmt.Errorf("expected comparison operator (>, >=, <, <=, ==, !=) at start of %q", expr)
+	return "", 0, fmt.Errorf("expected comparison operator (>=, <=, ==, !=, >, <) at start of %q", expr)
 }
 
-func applyComparison(lhs float64, op string, rhs float64) bool {
+func applyComparison(actual float64, op string, threshold float64) bool {
 	switch op {
-	case ">":
-		return lhs > rhs
 	case ">=":
-		return lhs >= rhs
-	case "<":
-		return lhs < rhs
+		return actual >= threshold
 	case "<=":
-		return lhs <= rhs
+		return actual <= threshold
 	case "==":
-		return lhs == rhs
+		return actual == threshold
 	case "!=":
-		return lhs != rhs
+		return actual != threshold
+	case ">":
+		return actual > threshold
+	case "<":
+		return actual < threshold
 	}
 	return false
 }

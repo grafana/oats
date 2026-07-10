@@ -8,8 +8,13 @@
 //
 // Storage is one file per hash under cacheDir, holding a single RFC3339
 // timestamp. Crude on purpose — there is no daemon to coordinate eviction,
-// no concurrent-write protocol beyond "last writer wins." A v2.1 enhancement
+// no concurrent-write protocol beyond "last writer wins." A future enhancement
 // could move to a single index file if directory listings become slow.
+//
+// There is no hard cap on entry count: files accumulate one per
+// (case, fixture, gcx version) key, and expired entries are evicted lazily on
+// access, so TTL bounds growth in practice. A size/count cap is a possible
+// future enhancement if a long-lived cache dir ever grows unwieldy.
 package cache
 
 import (

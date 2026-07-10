@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,19 @@ import (
 )
 
 var defaultHTTPClient = &http.Client{Timeout: 10 * time.Second}
+
+// userAgent identifies inline-otlp seed traffic to the receiving backend.
+const userAgent = "oats-seed"
+
+// jsonString renders s as a JSON string literal (quotes included), escaped per
+// JSON rules. Payloads are assembled with fmt.Sprintf, so any field carrying
+// user-supplied text (service names, span/metric names, log bodies) must go
+// through this rather than %q: Go's %q is close to JSON but diverges for a few
+// escapes (\a, \v) and invalid UTF-8, which would emit a non-JSON document.
+func jsonString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}
 
 // Payload describes one inline-otlp seed declaration as it arrives from a
 // case yaml. All three signal slices are optional; emitting only the ones
@@ -120,21 +134,21 @@ func (s *Sender) sendTrace(ctx context.Context, t Trace, now time.Time) error {
 	body := fmt.Sprintf(`{
   "resourceSpans": [{
     "resource": {"attributes": [
-      {"key":"service.name","value":{"stringValue":%q}}
+      {"key":"service.name","value":{"stringValue":%s}}
     ]},
     "scopeSpans": [{
       "scope": {"name":"oats-inline-seed"},
       "spans": [{
         "traceId": %q,
         "spanId": %q,
-        "name": %q,
+        "name": %s,
         "kind": %d,
         "startTimeUnixNano": "%d",
         "endTimeUnixNano": "%d"
       }]
     }]
   }]
-}`, t.Service, mustRandHex(16), mustRandHex(8), t.Span.Name, kind, start, end)
+}`, jsonString(t.Service), mustRandHex(16), mustRandHex(8), jsonString(t.Span.Name), kind, start, end)
 	return s.post(ctx, "/v1/traces", body)
 }
 
@@ -150,19 +164,19 @@ func (s *Sender) sendLog(ctx context.Context, l Log, now time.Time) error {
 	body := fmt.Sprintf(`{
   "resourceLogs": [{
     "resource": {"attributes": [
-      {"key":"service.name","value":{"stringValue":%q}}
+      {"key":"service.name","value":{"stringValue":%s}}
     ]},
     "scopeLogs": [{
       "scope": {"name":"oats-inline-seed"},
       "logRecords": [{
         "timeUnixNano": "%d",
         "severityNumber": %d,
-        "severityText": %q,
-        "body": {"stringValue": %q}
+        "severityText": %s,
+        "body": {"stringValue": %s}
       }]
     }]
   }]
-}`, l.Service, now.UnixNano(), sev, sevText, l.Body)
+}`, jsonString(l.Service), now.UnixNano(), sev, jsonString(sevText), jsonString(l.Body))
 	return s.post(ctx, "/v1/logs", body)
 }
 
@@ -172,12 +186,12 @@ func (s *Sender) sendMetric(ctx context.Context, m Metric, now time.Time) error 
 	body := fmt.Sprintf(`{
   "resourceMetrics": [{
     "resource": {"attributes": [
-      {"key":"service.name","value":{"stringValue":%q}}
+      {"key":"service.name","value":{"stringValue":%s}}
     ]},
     "scopeMetrics": [{
       "scope": {"name":"oats-inline-seed"},
       "metrics": [{
-        "name": %q,
+        "name": %s,
         "sum": {
           "isMonotonic": true,
           "aggregationTemporality": 2,
@@ -190,7 +204,7 @@ func (s *Sender) sendMetric(ctx context.Context, m Metric, now time.Time) error 
       }]
     }]
   }]
-}`, m.Service, m.Name, start, end, m.Value)
+}`, jsonString(m.Service), jsonString(m.Name), start, end, m.Value)
 	return s.post(ctx, "/v1/metrics", body)
 }
 
@@ -203,6 +217,7 @@ func (s *Sender) post(ctx context.Context, path, body string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", userAgent)
 	resp, err := s.httpClient().Do(req)
 	if err != nil {
 		return err
