@@ -28,9 +28,6 @@ import (
 
 var defaultHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
-// userAgent identifies inline-otlp seed traffic to the receiving backend.
-const userAgent = "oats-seed"
-
 // jsonString renders s as a JSON string literal (quotes included), escaped per
 // JSON rules. Payloads are assembled with fmt.Sprintf, so any field carrying
 // user-supplied text (service names, span/metric names, log bodies) must go
@@ -82,6 +79,19 @@ type Metric struct {
 type Sender struct {
 	OTLPEndpoint string
 	Client       *http.Client
+	// Version is the OATS version used to build the User-Agent. When empty the
+	// User-Agent is bare "oats"; the runner sets it so seed traffic is
+	// identifiable to the receiving backend as "oats/<version>".
+	Version string
+}
+
+// userAgent identifies inline-otlp seed traffic as "oats/<version>", or bare
+// "oats" when the version is unset.
+func (s *Sender) userAgent() string {
+	if s.Version == "" {
+		return "oats"
+	}
+	return "oats/" + s.Version
 }
 
 func (s *Sender) httpClient() *http.Client {
@@ -217,7 +227,7 @@ func (s *Sender) post(ctx context.Context, path, body string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", s.userAgent())
 	resp, err := s.httpClient().Do(req)
 	if err != nil {
 		return err
