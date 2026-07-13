@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -244,22 +245,13 @@ func keepCasesWithTags(cases []*casefile.Case, tags []string) []*casefile.Case {
 	var kept []*casefile.Case
 	for _, tc := range cases {
 		for _, want := range tags {
-			if slicesContains(tc.Tags, want) {
+			if slices.Contains(tc.Tags, want) {
 				kept = append(kept, tc)
 				break
 			}
 		}
 	}
 	return kept
-}
-
-func slicesContains(haystack []string, want string) bool {
-	for _, h := range haystack {
-		if h == want {
-			return true
-		}
-	}
-	return false
 }
 
 func unionTags(cases []*casefile.Case) []string {
