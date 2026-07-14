@@ -17,12 +17,17 @@ var testHTTPClient = &http.Client{
 	Timeout:   10 * time.Second,
 }
 
-func doRequest(req *http.Request, statusCode int) error {
+func doRequest(req *http.Request, statusCode int) (err error) {
 	r, err := testHTTPClient.Do(req)
-
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, r.Body)
+		if closeErr := r.Body.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
 
 	if r.StatusCode != statusCode {
 		return fmt.Errorf("expected HTTP status %d, but got: %d", statusCode, r.StatusCode)
