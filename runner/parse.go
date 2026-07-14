@@ -12,7 +12,7 @@ import (
 
 // approxRowCount counts non-empty, non-banner output lines in gcx text mode.
 // It is intentionally approximate — gcx's row-counting story will mature as
-// we use it, and a v2.1 enhancement can swap this for a structured-output
+// we use it, and a future enhancement can swap this for a structured-output
 // path. For now, "did anything come back?" is enough for absent / count.
 func approxRowCount(stdout string) int {
 	n := 0
