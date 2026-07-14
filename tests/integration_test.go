@@ -269,7 +269,10 @@ func TestIntegration(t *testing.T) {
 	}
 	c.ValidateAndSetVariables(gomega.Default)
 
-	checkTimeout := 2 * time.Second
+	// On GitHub Actions, Tempo can take a little longer than Loki/Prometheus to
+	// surface fresh spans after the app request, so use a slightly wider steady-
+	// state present timeout to avoid trace-only flakes.
+	checkTimeout := 5 * time.Second
 	startupTimeout := 2 * time.Minute
 
 	settings := model.Settings{
