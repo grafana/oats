@@ -301,6 +301,7 @@ func TestIntegration(t *testing.T) {
 
 	failFast = false
 
+	steadyStateTimeout := false
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c.Name = tt.name
@@ -309,13 +310,18 @@ func TestIntegration(t *testing.T) {
 			failed = ""
 			r.ExecuteChecks()
 
-			// docker compose is already started, so speed up the checks for all subsequent tests
-			r.Settings.PresentTimeout = checkTimeout
-
 			if tt.shouldPanic {
 				require.NotEmpty(t, failed)
 			} else {
 				require.Empty(t, failed)
+				if !steadyStateTimeout && tt.name == "traces check pass" {
+					// Keep the longer startup timeout until Tempo has proven it can
+					// return fresh traces for this booted stack. After that we can
+					// safely use the shorter steady-state timeout for the rest of
+					// the suite, including expected-failure checks.
+					r.Settings.PresentTimeout = checkTimeout
+					steadyStateTimeout = true
+				}
 			}
 		})
 	}
