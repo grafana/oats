@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path"
 	"strings"
 	"sync"
 
@@ -20,29 +19,66 @@ import (
 type Compose struct {
 	Command     string
 	DefaultArgs []string
-	Path        string
+	Paths       []string
 	Env         []string
 }
+
+const composeCLIBinary = "docker"
+
+var dockerPruneMutex sync.Mutex
 
 func defaultEnv() []string {
 	return os.Environ()
 }
 
-func Suite(composeFile string) (*Compose, error) {
-	command := "docker"
-	defaultArgs := []string{"compose"}
+// mergeEnv combines the parent environment with explicitly provided vars,
+// ensuring the provided vars deterministically override any parent duplicates
+// (e.g. COMPOSE_PROJECT_NAME) regardless of platform-specific exec behavior.
+func mergeEnv(parent, override []string) []string {
+	merged := make([]string, 0, len(parent)+len(override))
+	index := make(map[string]int, len(parent)+len(override))
+	for _, kv := range append(append([]string{}, parent...), override...) {
+		key := kv
+		if i := strings.IndexByte(kv, '='); i >= 0 {
+			key = kv[:i]
+		}
+		if pos, ok := index[key]; ok {
+			merged[pos] = kv
+			continue
+		}
+		index[key] = len(merged)
+		merged = append(merged, kv)
+	}
+	return merged
+}
 
+func Suite(composeFile string) (*Compose, error) {
+	return SuiteFiles([]string{composeFile}, nil)
+}
+
+func SuiteFiles(composeFiles []string, env []string) (*Compose, error) {
+	defaultArgs := []string{"compose"}
+	for _, file := range composeFiles {
+		defaultArgs = append(defaultArgs, "-f", file)
+	}
+
+	if len(composeFiles) == 0 {
+		return nil, fmt.Errorf("at least one compose file is required")
+	}
+	mergedEnv := mergeEnv(defaultEnv(), env)
 	return &Compose{
-		Command:     command,
+		Command:     composeCLIBinary,
 		DefaultArgs: defaultArgs,
-		Path:        path.Join(composeFile),
-		Env:         defaultEnv(),
+		Paths:       composeFiles,
+		Env:         mergedEnv,
 	}, nil
 }
 
 func (c *Compose) Up() error {
 	// networks accumulate over time and can cause issues with the tests
+	dockerPruneMutex.Lock()
 	err := c.runDocker(newCommand("network", "prune", "-f", "--filter", "until=5m").withCompose(false))
+	dockerPruneMutex.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to prune docker networks: %w", err)
 	}
@@ -69,43 +105,72 @@ func (c *Compose) Remove() error {
 func (c *Compose) runDocker(cc command) error {
 	var cmdArgs []string
 	if cc.compose {
-		cmdArgs = c.DefaultArgs
-		cmdArgs = append(cmdArgs, "-f", c.Path)
+		cmdArgs = append([]string(nil), c.DefaultArgs...)
 	}
 	cmdArgs = append(cmdArgs, cc.args...)
 	cmd := exec.Command(c.Command, cmdArgs...)
 	cmd.Env = c.Env
 	if cc.logConsumer != nil {
-		stdout, _ := cmd.StdoutPipe()
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return fmt.Errorf("failed to open docker stdout pipe: %w", err)
+		}
 		cmd.Stderr = cmd.Stdout
+		// Start before spawning the consumer: if Start fails the write end of
+		// the pipe never opens, so a consumer started earlier would block on
+		// the read forever and leak.
+		if err := cmd.Start(); err != nil {
+			_ = stdout.Close()
+			return fmt.Errorf("failed to start docker command: %w", err)
+		}
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go cc.logConsumer(stdout, &wg)
-
-		err := cmd.Start()
+		wg.Wait()
+		if err := cmd.Wait(); err != nil {
+			return fmt.Errorf("failed to run docker command: %w", err)
+		}
+	} else if cc.background {
+		slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
+		stdout, err := cmd.StdoutPipe()
 		if err != nil {
+			return fmt.Errorf("failed to open docker stdout pipe: %w", err)
+		}
+		cmd.Stderr = cmd.Stdout
+		// Start the command before spawning the reader: if Start fails the
+		// write end of the pipe never opens, and a reader started earlier would
+		// block forever on ReadString and leak.
+		if err := cmd.Start(); err != nil {
+			_ = stdout.Close()
 			return fmt.Errorf("failed to start docker command: %w", err)
 		}
-		wg.Wait()
-	} else if cc.background {
-		slog.Info("Running", "command", cmd.String(), "dir", c.Path)
-		stdout, _ := cmd.StdoutPipe()
-		cmd.Stderr = cmd.Stdout
+		wg := sync.WaitGroup{}
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			reader := bufio.NewReader(stdout)
-			line, err := reader.ReadString('\n')
-			for err == nil {
-				slog.Info(line)
-				line, err = reader.ReadString('\n')
+			for {
+				// ReadString returns any final data together with io.EOF, so
+				// log the chunk before checking err to avoid dropping a
+				// trailing line without a newline. Reading to EOF also fully
+				// drains the pipe so the child never blocks on a full pipe.
+				line, err := reader.ReadString('\n')
+				if line != "" {
+					slog.Info(line)
+				}
+				if err != nil {
+					return
+				}
 			}
 		}()
 
-		err := cmd.Start()
+		err = cmd.Wait()
+		wg.Wait()
 		if err != nil {
-			return fmt.Errorf("failed to start docker command: %w", err)
+			return fmt.Errorf("failed to run docker command: %w", err)
 		}
 	} else {
-		slog.Info("Running", "command", cmd.String(), "dir", c.Path)
+		slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		err := cmd.Run()
