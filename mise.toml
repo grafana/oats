@@ -37,7 +37,7 @@ run = "go test $(go list ./...)"
 [tasks.integration-test]
 description = "Run integration tests"
 env.INTEGRATION_TESTS = "true"
-run = "go test github.com/grafana/oats/tests"
+run = "go test ./internal/cli"
 
 [tasks.build]
 description = "Build the project"
