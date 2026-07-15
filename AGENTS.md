@@ -9,9 +9,11 @@ OpenTelemetry written in Go. It enables full round-trip testing from
 instrumented applications to the observability stack (LGTM: Loki, Grafana,
 Tempo, Prometheus, Mimir, OpenTelemetry Collector).
 
-Test cases are defined in YAML files with `oats-schema-version: 2` and can
-validate traces (TraceQL), logs (LogQL), metrics (PromQL), and profiles
-(Pyroscope queries) using Docker Compose or Kubernetes backends.
+Test cases are defined in YAML files, discovered through an `oats-config.yaml`
+whose `meta.version: 3` is the single schema version (cases carry no version
+field of their own). They can validate traces (TraceQL), logs (LogQL), metrics
+(PromQL), and profiles (Pyroscope queries) using Docker Compose or Kubernetes
+backends.
 
 ## Build Commands
 
@@ -19,13 +21,10 @@ validate traces (TraceQL), logs (LogQL), metrics (PromQL), and profiles
 # Build
 mise run build
 
-# Run unit tests
+# Run non-e2e tests
 mise run test
 
-# Run integration tests (requires Docker)
-mise run integration-test
-
-# Run end-to-end tests
+# Run e2e tests
 mise run e2e-test
 ```
 
@@ -51,41 +50,36 @@ EditorConfig rules live in `.editorconfig`.
 
 ### Package Organization
 
-- **`main.go`** — CLI entry point. Parses flags, discovers YAML test files, runs them sequentially
+- **`main.go`** — Root `oats` CLI entry point
+- **`internal/cli/`** — The gcx-driven CLI implementation used by the root binary
 - **`model/`** — Core data models (`TestCaseDefinition`, expected signals)
-- **`yaml/`** — Test case parsing, execution, signal-specific assertions
-  (`runner.go`, `traces.go`, `metrics.go`, `logs.go`, `profiles.go`)
+- **`internal/legacyyaml/`** — legacy (v1/v2) test-case parsing, execution, and
+  signal-specific assertions (`runner.go`, `traces.go`, `metrics.go`,
+  `logs.go`, `profiles.go`); used only by `migrate`
 - **`testhelpers/`** — Docker Compose management, Kubernetes (k3d), HTTP request helpers, response parsing
 - **`observability/`** — Observability endpoint interface
 - **`tests/`** — Integration and e2e test fixtures
 
 ### Test Case Schema
 
-Required fields:
-
-- `oats-schema-version: 2` (must be present in all test files)
-- `oats-template: true` (for template files used in `include`)
-
-Core sections: `include`, `docker-compose`, `kubernetes`, `matrix`, `input`, `interval`, `expected`
-
-File discovery scans for `.yaml`/`.yml` files containing
-`oats-schema-version`. Files with `oats-template: true` are skipped as entry
-points. `.oatsignore` causes a directory to be ignored.
+Current user-facing syntax is documented in `README.md`. Legacy yaml parsing
+still exists in-package for migration support, but the repo's CLI surface is
+the current `oats-config.yaml` + case-yaml flow.
 
 ## CLI Usage
 
 ```bash
-# Run specific test file
-oats /path/to/test.yaml
-
-# Scan directory for all tests
-oats /path/to/tests/
+# Print a plan
+oats list
 
 # With flags
-oats -timeout 1m -lgtm-version latest /path/to/test.yaml
+oats --config oats-config.yaml --timeout 1m
 ```
 
-Key flags: `-timeout` (default 30s), `-lgtm-version` (default "latest"), `-manual-debug` (keep containers running)
+Subcommands: `run` (default), `list`, `migrate`, `cache clear`, `version`.
+
+Key flags: `--config`, `--suite`, `--tags`, `--timeout`, `--interval`,
+`--absent-timeout`, `--parallel`, `--gcx`, `--gcx-context`
 
 ## Code Conventions
 
@@ -98,11 +92,10 @@ Key flags: `-timeout` (default 30s), `-lgtm-version` (default "latest"), `-manua
 ## Testing
 
 - Unit tests: `mise run test`
-- Integration tests require `INTEGRATION_TESTS=true` env var
 - Uses gomega for assertions, stretchr/testify for test utilities
 
 ## CI
 
 - Lint on PRs (`mise run lint`), build on PRs (`mise run build`), tests on PRs (`mise run test`)
-- Integration tests and e2e tests in separate workflows
+- E2E tests in a separate workflow
 - Linting via flint

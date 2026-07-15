@@ -1,0 +1,31 @@
+# Acceptance-test a real instrumented app end to end: OATS boots this Flask
+# "rolldice" app next to a Grafana LGTM stack, calls /rolldice, then asserts on
+# the trace, metric, and log the app actually produced.
+name: python rolldice
+
+fixture:
+  compose:
+    # Your app's compose file. OATS adds a grafana/otel-lgtm stack by default
+    # (template: lgtm) — set `template: none` to bring your own.
+    file: docker-compose.oats.yml
+    app_service: python   # the app service in the compose file…
+    app_port: 8082        # …and its container port, so OATS can drive it
+
+# Drive the app so it emits telemetry (seed defaults to type: app).
+input:
+  - path: /rolldice       # method defaults to GET
+
+expected:
+  traces:
+    - traceql: '{ span.http.route = "/rolldice" }'
+      match_spans:
+        - name: GET /rolldice
+          attributes:
+            - key: otel.library.name
+              value: opentelemetry.instrumentation.flask
+  metrics:
+    - promql: 'http_server_active_requests{http_method="GET"}'
+      value: '>= 0'
+  logs:
+    - logql: '{service_name="rolldice"} |~ `Anonymous player is rolling the dice.*`'
+      regex: 'Anonymous player is rolling the dice'
