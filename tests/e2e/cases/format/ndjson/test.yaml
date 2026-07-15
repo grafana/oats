@@ -1,0 +1,16 @@
+name: ndjson
+tags: [format, ndjson]
+
+run:
+  args:
+    - --format
+    - ndjson
+    - --timeout
+    - 30s
+    - --interval
+    - 2s
+
+expect:
+  stdout_contains:
+    - '"event":"run.end"'
+    - '"pass":1'

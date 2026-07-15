@@ -1,0 +1,6 @@
+name: contains
+tags: [assert, contains]
+
+expect:
+  stdout_contains:
+    - PASS 1/1

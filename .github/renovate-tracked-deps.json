@@ -16,11 +16,6 @@
         "mise"
       ]
     },
-    ".github/workflows/integration_test.yml": {
-      "regex": [
-        "mise"
-      ]
-    },
     ".github/workflows/lint.yml": {
       "regex": [
         "mise"
@@ -29,6 +24,25 @@
     ".github/workflows/release.yml": {
       "regex": [
         "mise"
+      ]
+    },
+    "examples/python/Dockerfile": {
+      "dockerfile": [
+        "python"
+      ],
+      "regex": [
+        "opentelemetry-distro"
+      ]
+    },
+    "examples/python/requirements.txt": {
+      "pip_requirements": [
+        "Flask",
+        "Jinja2",
+        "MarkupSafe",
+        "Werkzeug",
+        "blinker",
+        "click",
+        "itsdangerous"
       ]
     },
     "internal/legacyyaml/testdata/docker-compose-addition.yaml": {
@@ -69,6 +83,52 @@
         "shfmt",
         "taplo",
         "typos"
+      ]
+    },
+    "tests/e2e/Dockerfile": {
+      "dockerfile": [
+        "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java",
+        "springio/petclinic"
+      ]
+    },
+    "tests/e2e/cases/fixture/compose-app-seed/files/docker-compose.oats.yml": {
+      "docker-compose": [
+        "ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen"
+      ]
+    },
+    "tests/e2e/cases/fixture/compose-logs-fail/files/docker-compose.oats.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/compose-logs/files/docker-compose.oats.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/k3d-fail/files/Dockerfile": {
+      "dockerfile": [
+        "docker.io/library/alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/k3d-smoke/files/Dockerfile": {
+      "dockerfile": [
+        "docker.io/library/alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/parallel-compose/files/docker-compose.alpha.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/parallel-compose/files/docker-compose.beta.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/remote-basic/files/docker-compose.remote.yml": {
+      "docker-compose": [
+        "docker.io/grafana/otel-lgtm"
       ]
     }
   }

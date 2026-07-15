@@ -1,0 +1,18 @@
+name: not-contains-fail
+tags: [assert, not-contains, fail]
+
+run:
+  args:
+    # Settle so the seeded log is ingested before the assertion runs, otherwise
+    # not_contains would trivially hold on an empty result.
+    - --seed-settle
+    - 6s
+    - --timeout
+    - 20s
+    - --interval
+    - 2s
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL
