@@ -1,0 +1,16 @@
+# This project shows the two fixtures OATS can boot and tear down itself
+# (unlike examples/smoke, which points at a remote stack). NOTE: the referenced
+# compose files / k8s dir are illustrative — this config is here to show the
+# shape, not to run as-is.
+
+meta:
+  version: 3
+
+# Just list the cases — there is no suite/grouping to declare. Each case carries
+# its own fixture (see the `fixture:` block in each oats-case.yaml), and OATS
+# groups cases by fixture: the compose case and the k3d case declare different
+# fixtures, so they become two independent boot-groups (each fixture booted once,
+# and the two can run in parallel). Filter with `oats --tags compose`.
+cases:
+  - compose/*/oats-case.yaml   # one case per subdir under compose/
+  - k3d/*/oats-case.yaml
