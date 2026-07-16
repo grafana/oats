@@ -1,7 +1,7 @@
 # This project shows the two fixtures OATS can boot and tear down itself
-# (unlike examples/smoke, which points at a remote stack). NOTE: the referenced
-# compose files / k8s dir are illustrative — this config is here to show the
-# shape, not to run as-is.
+# (unlike examples/smoke, which points at a remote stack). The compose and k3d
+# cases are runnable independently; filter with `oats --tags compose` or
+# `oats --tags k3d` when only one runtime is available.
 
 meta:
   version: 3

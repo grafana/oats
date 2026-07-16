@@ -51,6 +51,7 @@
       "mise": [
         "actionlint",
         "aqua:grafana/flint",
+        "aqua:grafana/gcx",
         "aqua:owenlamont/ryl",
         "biome",
         "editorconfig-checker",
@@ -58,6 +59,8 @@
         "golangci-lint",
         "goreleaser",
         "hadolint",
+        "k3d",
+        "kubectl",
         "lychee",
         "node",
         "npm:renovate",

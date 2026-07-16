@@ -10,6 +10,8 @@ fixture:
   compose:
     files: ["docker-compose.yml", "docker-compose.override.yml"]
     env: ["OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318"]
+    app_service: rolldice
+    app_port: 8080
 
 input:
   - path: /rolldice?rolls=3
