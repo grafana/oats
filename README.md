@@ -19,7 +19,7 @@
 <!-- markdownlint-enable MD033 MD041 -->
 
 OATs is a declarative acceptance-test framework for OpenTelemetry. You describe,
-in yaml, the telemetry an instrumented app *should* produce — traces, logs,
+in YAML, the telemetry an instrumented app *should* produce — traces, logs,
 metrics, profiles — and OATS drives the app (or seeds telemetry directly), then
 asserts against a real observability stack (Grafana, Loki, Tempo, Prometheus,
 Pyroscope) via [`gcx`](https://github.com/grafana/gcx).
@@ -63,12 +63,15 @@ Without mise:
   [gcx](https://github.com/grafana/gcx/releases) release pages.
 - **go install** (oats from source) — `go install github.com/grafana/oats@latest`.
 
-`oats` drives assertions through `gcx`; for fixture-backed runs OATS can
-bootstrap gcx itself, but pinning it explicitly keeps runs reproducible.
+`oats` drives assertions through `gcx`. For a self-contained run without a
+separately installed binary, pass `--gcx-version <version>` and OATS downloads
+and caches the matching release for the current platform. Pinning gcx explicitly
+with mise or a release download remains the best choice when you want the tool
+installation visible in your repository.
 
 ## Getting started
 
-The best starting point is **[`examples/python/`](examples/python/)** — a real,
+The recommended starting point is [`examples/python/`](examples/python/): a real,
 instrumented Flask "rolldice" app tested end to end. With Docker running, copy it
 and run:
 
@@ -95,7 +98,7 @@ fixture:
   compose:
     file: docker-compose.oats.yml   # your app; OATS adds a Grafana LGTM stack by default
     app_service: python             # so OATS can reach the app…
-    app_port: 8082                  # …on its container port
+    app_port: 8082                  # ...on its container port
 input:
   - path: /rolldice                 # drive the app (seed defaults to type: app)
 expected:
@@ -121,20 +124,20 @@ No app of your own yet? A case can seed telemetry directly with
 
 ## Examples
 
-- **[`examples/python/`](examples/python/)** — flagship: a real Flask app +
-  compose fixture, asserting traces, metrics, and logs. **Start here.**
-- **[`examples/smoke/`](examples/smoke/)** — advanced: a remote fixture with
+- [`examples/python/`](examples/python/) — starter: a real Flask app + compose
+  fixture, asserting traces, metrics, and logs.
+- [`examples/smoke/`](examples/smoke/) — advanced: a remote fixture with
   inline-otlp / app / profile / custom-check cases.
-- **[`examples/fixtures/`](examples/fixtures/)** — advanced: compose and k3d
+- [`examples/fixtures/`](examples/fixtures/) — advanced: compose and k3d
   fixtures side by side.
 
 ## Documentation
 
-- **[docs/cli.md](docs/cli.md)** — every command and flag
-- **[docs/case-reference.md](docs/case-reference.md)** — test case syntax: the
+- [docs/cli.md](docs/cli.md) — every command and flag
+- [docs/case-reference.md](docs/case-reference.md) — test case syntax: the
   full config + case shape (fixtures, seed modes, assertion vocabulary, custom checks)
-- **[docs/ci.md](docs/ci.md)** — installing and running OATS in CI, plus result
+- [docs/ci.md](docs/ci.md) — installing and running OATS in CI, plus result
   caching and its caveats
-- **[UPGRADING.md](UPGRADING.md)** — migrating older (schema-2) repos to v3
-- **[AGENTS.md](AGENTS.md)** — for contributors and coding agents working *on*
+- [UPGRADING.md](UPGRADING.md) — migrating older (schema-2) repos to v3
+- [AGENTS.md](AGENTS.md) — for contributors and coding agents working *on*
   OATS (build, layout, conventions)

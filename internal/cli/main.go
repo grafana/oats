@@ -20,6 +20,7 @@
 //
 //	--config       Path to oats-config.yaml (default: found from cwd upward)
 //	--gcx          Path to gcx binary (default "gcx" on PATH)
+//	--gcx-version  Download and use a specific gcx release
 //	--format       Output format: "text" (default) or "ndjson"
 //	--tags         Comma-separated tag any-match filter (on case tags)
 //	--fail-fast    Stop scheduling further cases after the first failure
@@ -120,6 +121,7 @@ func newRootCmd(exit *int) *cobra.Command {
 func addRunFlags(fs *pflag.FlagSet) {
 	fs.String("config", "oats-config.yaml", "path to oats-config.yaml")
 	fs.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
+	fs.String("gcx-version", "", "download and use this gcx release (for example, 0.4.3)")
 	fs.String("format", "text", "output format: text | ndjson")
 	fs.String("tags", "", "comma-separated tag any-match")
 	fs.Duration("timeout", 30*time.Second, "per-assertion timeout")
@@ -354,9 +356,20 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 	ctx, cancel := signalAwareContext()
 	defer cancel()
 
+	gcxBin := flagStr(fs, "gcx")
+	if version := flagStr(fs, "gcx-version"); version != "" {
+		if fs.Changed("gcx") {
+			return fmt.Errorf("--gcx and --gcx-version cannot be used together")
+		}
+		gcxBin, err = bootstrapGCX(version, flagStr(fs, "cache-dir"))
+		if err != nil {
+			return err
+		}
+	}
+
 	runStart := time.Now()
 	opts := runOptions{
-		gcxBin:             flagStr(fs, "gcx"),
+		gcxBin:             gcxBin,
 		gcxContextOverride: flagStr(fs, "gcx-context"),
 		appHost:            flagStr(fs, "app-host"),
 		appPort:            flagInt(fs, "app-port"),

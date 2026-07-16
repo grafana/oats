@@ -45,9 +45,9 @@ result cache.
 go install github.com/grafana/oats@latest
 ```
 
-`oats` can bootstrap `gcx` itself for fixture-backed runs, but pinning gcx
-explicitly (mise/release) is recommended so runs are reproducible and the cache
-stays valid.
+`oats --gcx-version 0.4.3` can download and cache gcx itself for fixture-backed
+runs. Pinning gcx explicitly with mise or a release download is still useful when
+you want the tool installation visible in your repository.
 
 ## The workflow shape
 
@@ -66,8 +66,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2   # installs pinned oats + gcx from mise.toml
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4   # installs pinned oats + gcx from mise.toml
       - run: oats   # finds oats-config.yaml in the repo root
 ```
 
@@ -85,7 +85,7 @@ the cases a PR didn't actually affect.
 To persist it across CI runs:
 
 ```yaml
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/oats
           key: oats-${{ hashFiles('mise.toml') }}
@@ -98,7 +98,7 @@ so a version bump starts a fresh cache — no stale skips from version drift.
 ### Correctness caveat — floating image tags
 
 The cache key hashes the fixture **config** (the `compose`/`k3d`/`remote` block —
-compose file paths, image tags, env, endpoint …), **not** the fixture's
+compose file paths, image tags, env, endpoint ...), **not** the fixture's
 **contents**. If the app
 under test is baked into an image with a floating tag (`:latest`), rebuilding
 that image under the same tag produces an identical key — so a case can be
@@ -109,7 +109,7 @@ You are safe when either holds:
 - the app is **built fresh from source in the same PR** and the case yaml lives
   in the changed directory (the path gate + case hash already cover it — this is
   the java-examples case), or
-- the image is **pinned by digest** (`image@sha256:…`), so a new image changes
+- the image is **pinned by digest** (`image@sha256:...`), so a new image changes
   the fixture config and therefore the key.
 
 If neither holds, don't persist the cache in CI until the image digest is folded

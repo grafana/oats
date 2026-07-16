@@ -48,8 +48,8 @@ the fixture boots once and those cases run serially against it — while cases w
 different fixtures form independent groups that can run in parallel (where
 fixture isolation allows; see [Running in parallel](#running-in-parallel)).
 There is no grouping to declare. This is why, for example,
-docker-otel-lgtm's per-language cases — each its own `compose` fixture — auto-
-group into independent parallel boots with no grouping config.
+docker-otel-lgtm's per-language cases — each its own `compose` fixture — auto-group
+into independent parallel boots with no grouping config.
 
 For a `compose`/`k3d` fixture that shared boot is the real win, since the
 (often expensive) backend is stood up once. A `remote` fixture boots nothing, so
@@ -78,7 +78,8 @@ fixture:
     template: lgtm
     file: docker-compose.oats.yml
 
-input:                       # drive the app (seed defaults to type: app)
+# Drive the app (seed defaults to type: app).
+input:
   - path: /rolldice?rolls=5
 
 expected:
@@ -107,9 +108,8 @@ grouped](#how-cases-are-grouped)). For a `compose` fixture the builtin `lgtm`
 template supplies the backend and the case's `file:` supplies the app.
 
 Because cases that share a fixture share one boot, they run against the same
-app+backend, stood up once. (Not yet: sharing one backend across cases that run
-*different* apps — the shared-LGTM parallel model — is a deliberately deferred
-follow-up.)
+app and backend, stood up once. Give cases different fixture identities when
+they need separate app deployments.
 
 Set exactly one of three nested blocks; the block you set selects how the stack
 is stood up (there is no separate `type` field):
@@ -153,8 +153,8 @@ the `compose` block. OATS then discovers the host port docker published for that
 service, so the app can bind an **ephemeral** host port (`127.0.0.1::<app_port>`)
 rather than a fixed one — which is what lets app-seed groups run under `--parallel`
 without colliding.
-Omit them and the app is driven on the fixed `--app-port` (default 8080), which
-forces the group to run serially.
+Omit them and the app is driven on the fixed `--app-port` (default `8080`), which
+keeps the group serial.
 
 ## Seed
 
@@ -196,6 +196,7 @@ seed:
       value: 42
 ```
 
+> [!NOTE]
 > Inline-OTLP can seed traces, logs, and metrics. **Profiles cannot be
 > inline-seeded** — assert profiles against an app-backed fixture that produces
 > them (e.g. an eBPF profiler or a pyroscope-instrumented app).
@@ -286,9 +287,13 @@ expected:
 ```
 
 `script` may be a path (relative to the case dir, or absolute) or an inline
-script beginning with a `#!` shebang. The process runs with its working
-directory set to the case dir and inherits the parent environment plus these
-OATS-provided variables:
+script beginning with a `#!` shebang. Scripts are executed by their shebang
+interpreter; OATS does not translate shell syntax between operating systems.
+For a cross-platform check, use a script language/runtime available on every
+target (for example, a checked-in Python or PowerShell script) rather than
+assuming `/bin/sh` exists. The process runs with its working directory set to
+the case dir and inherits the parent environment plus these OATS-provided
+variables:
 
 | Variable | Fixtures | Meaning |
 |----------|----------|---------|

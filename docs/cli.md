@@ -22,9 +22,9 @@ they scope *which* cases run, they do not change where the config loads from.
 ```sh
 oats                              # run every case
 oats payments/                    # only cases under payments/
-oats payments/checkout/oats-case.yaml   # a single case
-oats --suite smoke --tags traces # filter by suite name and tag
-oats --parallel 4                # run parallel-safe suites concurrently
+oats payments/checkout/           # only cases under payments/checkout/
+oats --suite smoke --tags traces  # filter by suite name and tag
+oats --parallel 4                 # run parallel-safe suites concurrently
 ```
 
 A run boots each suite's fixture, seeds it, then polls every assertion until it
@@ -34,7 +34,7 @@ Flags:
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `--config` | `oats-config.yaml`, searched from cwd upward | config file to load |
+| `--config` | `oats-config.yaml`, searched from current working directory upward | config file to load |
 | `--suite` | all | comma-separated suite names to run |
 | `--tags` | all | comma-separated tags; a case runs if it matches any |
 | `--parallel` | `1` | suites to run concurrently, where fixture isolation allows |
@@ -44,9 +44,10 @@ Flags:
 | `--absent-timeout` | `10s` | window an `absent` assertion must stay empty to pass |
 | `--seed-settle` | `2s` | wait after seeding before the first assertion |
 | `--no-cache` | `false` | ignore the skip-when-unchanged cache for this run |
-| `--cache-dir` | `$XDG_STATE_HOME/oats` | directory for the skip-when-unchanged cache |
+| `--cache-dir` | platform user cache/state directory + `/oats` | directory for the skip-when-unchanged cache |
 | `--format` | `text` | output format: `text` or `ndjson` |
-| `--gcx` | `gcx` | path to the gcx binary (PATH-resolved if a bare name) |
+| `--gcx` | `gcx` | path to the gcx binary (`PATH`-resolved if a bare name) |
+| `--gcx-version` | — | download and use this gcx release (for example, `0.4.3`) |
 | `--gcx-context` | derived | gcx context to query (otherwise derived from the fixture endpoint) |
 | `--app-host` / `--app-port` | `localhost` / `8080` | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself |
 | `--otlp-http` | `http://localhost:4318` | OTLP/HTTP base URL for the `inline-otlp` seed |
@@ -80,7 +81,8 @@ Migration is best-effort: review the warnings (e.g. multi-entry matrices and
 
 ### `oats cache clear`
 
-Delete all cached results under `--cache-dir` (default `$XDG_STATE_HOME/oats`).
+Delete all cached results under `--cache-dir` (default: the platform user
+cache/state directory plus `/oats`; `XDG_STATE_HOME` wins on Unix).
 The cache lets a re-run skip cases whose `(case, fixture, gcx version, oats
 version)` are unchanged and previously passed; clear it to force a full run.
 

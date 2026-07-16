@@ -9,7 +9,7 @@ fixture:
     # (template: lgtm) — set `template: none` to bring your own.
     file: docker-compose.oats.yml
     app_service: python   # the app service in the compose file…
-    app_port: 8082        # …and its container port, so OATS can drive it
+    app_port: 8082        # ...and its container port, so OATS can drive it
 
 # Drive the app so it emits telemetry (seed defaults to type: app).
 input:

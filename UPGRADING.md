@@ -7,7 +7,8 @@ modify your existing YAML test files.
 
 ## Unreleased / next major
 
-⚠️ Breaking Changes — legacy root runner removed
+> [!WARNING]
+> **Breaking change:** the legacy root runner has been removed.
 
 The root `oats` binary now runs the gcx-driven current CLI only.
 
@@ -16,7 +17,7 @@ That means upgrades now require migrating to the current:
 - `oats-config.yaml` suite/discovery file
 - current case yaml shape documented in [docs/case-reference.md](docs/case-reference.md)
 
-The legacy “pass one or more old yaml files directly to `oats`” runner has been
+The legacy "pass one or more old yaml files directly to `oats`" runner has been
 removed. For one-off help migrating old cases, use:
 
 ```sh
