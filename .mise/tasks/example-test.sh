@@ -32,17 +32,14 @@ run_example() {
 	)
 }
 
-run_examples_in_parallel() {
+run_python_and_k3d_in_parallel() {
 	local status=0
 	local -a pids=()
 
-	for args in \
-		"examples/python" \
-		"examples/fixtures --tags compose"; do
-		# shellcheck disable=SC2086 # args intentionally contains the optional tag flag.
-		run_example $args &
-		pids+=("$!")
-	done
+	run_example examples/python &
+	pids+=("$!")
+	run_example examples/fixtures --tags k3d &
+	pids+=("$!")
 
 	for pid in "${pids[@]}"; do
 		if ! wait "$pid"; then
@@ -58,22 +55,14 @@ list_example examples/python
 list_example examples/smoke
 list_example examples/fixtures
 
-# These examples own all of their runtime dependencies. Compose stacks can run
-# alongside each other because their host ports are ephemeral. Keep k3d
-# serial: it uses a shared kubectl context and localhost port-forwards.
-if ! command -v docker >/dev/null 2>&1; then
-	echo "docker is required for the runtime examples" >&2
+# These examples own all of their runtime dependencies. The Python Compose
+# example and the k3d example can run together; only one Compose stack runs at
+# a time because fixture startup prunes Docker networks.
+if ! command -v docker >/dev/null 2>&1 || ! command -v k3d >/dev/null 2>&1 || ! command -v kubectl >/dev/null 2>&1; then
+	echo "docker, k3d, and kubectl are required for the runtime examples" >&2
 	exit 1
 fi
 
 docker pull docker.io/grafana/otel-lgtm:latest
-run_examples_in_parallel
-
-if ! command -v k3d >/dev/null 2>&1 || ! command -v kubectl >/dev/null 2>&1; then
-	echo "docker, k3d, and kubectl are required for the k3d example" >&2
-	exit 1
-fi
-
-# k3d imports the LGTM image into the cluster, which is why it runs after the
-# Compose stacks have finished.
-run_example examples/fixtures --tags k3d
+run_python_and_k3d_in_parallel
+run_example examples/fixtures --tags compose
