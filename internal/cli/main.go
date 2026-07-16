@@ -93,7 +93,9 @@ func newRootCmd(exit *int) *cobra.Command {
 			"cases at or under them, e.g. `oats examples/` or `oats examples/go/oats-case.yaml`.",
 		// Do not print full command usage for runtime failures such as failed
 		// assertions or unreachable backends. Those are not CLI syntax errors.
-		SilenceUsage:  true,
+		SilenceUsage: true,
+		// Let Run() own error printing and exit-code mapping. Without this, Cobra
+		// prints returned errors too, producing duplicate "Error: ..." lines.
 		SilenceErrors: true,
 		// Bare `oats [paths...] [flags]` is an implicit `run`.
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -156,7 +158,9 @@ func newRunCmd(verbose, exit *int) *cobra.Command {
 			"--config). Optional positional paths scope the run to cases at or under those\n" +
 			"files/directories, e.g. `oats run examples/` runs only the cases under examples/.",
 		// Runtime failures should print the concise error/report, not usage.
-		SilenceUsage:  true,
+		SilenceUsage: true,
+		// Let Run() own error printing and exit-code mapping. Without this, Cobra
+		// prints returned errors too, producing duplicate "Error: ..." lines.
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runAction(cmd, args, *verbose, exit)
