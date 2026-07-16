@@ -197,9 +197,9 @@ seed:
 ```
 
 > [!NOTE]
-> Inline-OTLP can seed traces, logs, and metrics. **Profiles cannot be
-> inline-seeded** — assert profiles against an app-backed fixture that produces
-> them (e.g. an eBPF profiler or a pyroscope-instrumented app).
+> Inline-OTLP can seed traces, logs, and metrics. Profiles cannot be inline-seeded.
+> Assert profiles against an app-backed fixture that produces them (e.g. an eBPF
+> profiler or a pyroscope-instrumented app).
 
 ## Assertions
 
@@ -275,8 +275,8 @@ expected:
 
 ## Custom checks
 
-`expected.custom-checks` runs an arbitrary script and treats **exit code 0 as
-pass**, non-zero as fail. Combined stdout+stderr is captured and printed on
+`expected.custom-checks` runs an arbitrary script and treats **exit code 0 as pass**,
+non-zero as fail. Combined stdout+stderr is captured and printed on
 failure. Like every assertion it is retried until it passes or `--timeout`
 elapses.
 
