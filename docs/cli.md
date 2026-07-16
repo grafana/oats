@@ -32,26 +32,26 @@ passes or `--timeout` elapses. Exit code is non-zero if any case fails.
 
 Flags:
 
-| Flag | Default | Meaning |
-|------|---------|---------|
-| `--config` | `oats-config.yaml`, searched from current working directory upward | config file to load |
-| `--suite` | all | comma-separated suite names to run |
-| `--tags` | all | comma-separated tags; a case runs if it matches any |
-| `--parallel` | `1` | suites to run concurrently, where fixture isolation allows |
-| `--fail-fast` | `false` | stop scheduling further cases after the first failure |
-| `--timeout` | `30s` | per-assertion timeout — each assertion is retried until it passes or this elapses |
-| `--interval` | `500ms` | polling interval between assertion retries |
-| `--absent-timeout` | `10s` | window an `absent` assertion must stay empty to pass |
-| `--seed-settle` | `2s` | wait after seeding before the first assertion |
-| `--no-cache` | `false` | ignore the skip-when-unchanged cache for this run |
-| `--cache-dir` | platform user cache/state directory + `/oats` | directory for the skip-when-unchanged cache |
-| `--format` | `text` | output format: `text` or `ndjson` |
-| `--gcx` | `gcx` | path to the gcx binary (`PATH`-resolved if a bare name) |
-| `--gcx-version` | — | download and use this gcx release (for example, `0.4.3`) |
-| `--gcx-context` | derived | gcx context to query (otherwise derived from the fixture endpoint) |
-| `--app-host` / `--app-port` | `localhost` / `8080` | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself |
-| `--otlp-http` | `http://localhost:4318` | OTLP/HTTP base URL for the `inline-otlp` seed |
-| `-v` / `-vv` / `-vvv` | — | increasing verbosity (passes / commands / lifecycle) |
+| Flag                        | Default                                                            | Meaning                                                                                |
+| --------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `--config`                  | `oats-config.yaml`, searched from current working directory upward | config file to load                                                                    |
+| `--suite`                   | all                                                                | comma-separated suite names to run                                                     |
+| `--tags`                    | all                                                                | comma-separated tags; a case runs if it matches any                                    |
+| `--parallel`                | `1`                                                                | suites to run concurrently, where fixture isolation allows                             |
+| `--fail-fast`               | `false`                                                            | stop scheduling further cases after the first failure                                  |
+| `--timeout`                 | `30s`                                                              | per-assertion timeout — each assertion is retried until it passes or this elapses      |
+| `--interval`                | `500ms`                                                            | polling interval between assertion retries                                             |
+| `--absent-timeout`          | `10s`                                                              | window an `absent` assertion must stay empty to pass                                   |
+| `--seed-settle`             | `2s`                                                               | wait after seeding before the first assertion                                          |
+| `--no-cache`                | `false`                                                            | ignore the skip-when-unchanged cache for this run                                      |
+| `--cache-dir`               | platform user cache/state directory + `/oats`                      | directory for the skip-when-unchanged cache                                            |
+| `--format`                  | `text`                                                             | output format: `text` or `ndjson`                                                      |
+| `--gcx`                     | `gcx`                                                              | path to the gcx binary (`PATH`-resolved if a bare name)                                |
+| `--gcx-version`             | —                                                                  | download and use this gcx release (for example, `0.4.3`)                               |
+| `--gcx-context`             | derived                                                            | gcx context to query (otherwise derived from the fixture endpoint)                     |
+| `--app-host` / `--app-port` | `localhost` / `8080`                                               | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself |
+| `--otlp-http`               | `http://localhost:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                          |
+| `-v` / `-vv` / `-vvv`       | —                                                                  | increasing verbosity (passes / commands / lifecycle)                                   |
 
 ### `oats list`
 

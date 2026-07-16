@@ -18,12 +18,12 @@ Run a case from this directory with its path, for example:
 oats inline-seed/
 ```
 
-| Case | Demonstrates | Additional prerequisite |
-| --- | --- | --- |
-| `inline-seed/` | Sending a trace directly with inline OTLP | LGTM only |
-| `rolldice/` | Driving an app and checking traces, metrics, and logs | An app on `localhost:8080` exporting to the local OTLP endpoint |
-| `custom-check/` | Running a repository-local verification script | The script's own prerequisites |
-| `profile/` | Querying CPU profiles | An app that produces the expected profiles |
+| Case            | Demonstrates                                          | Additional prerequisite                                         |
+| --------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
+| `inline-seed/`  | Sending a trace directly with inline OTLP             | LGTM only                                                       |
+| `rolldice/`     | Driving an app and checking traces, metrics, and logs | An app on `localhost:8080` exporting to the local OTLP endpoint |
+| `custom-check/` | Running a repository-local verification script        | The script's own prerequisites                                  |
+| `profile/`      | Querying CPU profiles                                 | An app that produces the expected profiles                      |
 
 Use `oats list` to inspect the complete plan. Tags are also available, for
 example `oats --tags traces` or `oats --tags profiles`.

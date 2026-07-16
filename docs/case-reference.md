@@ -114,11 +114,11 @@ they need separate app deployments.
 Set exactly one of three nested blocks; the block you set selects how the stack
 is stood up (there is no separate `type` field):
 
-| Block | Meaning |
-|-------|---------|
-| `remote` | point at an already-running stack (`endpoint:` / a gcx context) |
+| Block     | Meaning                                                                                                                                                                           |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `remote`  | point at an already-running stack (`endpoint:` / a gcx context)                                                                                                                   |
 | `compose` | OATS boots a docker-compose stack; `template` defaults to `lgtm`, booting a builtin grafana/otel-lgtm alongside your `file`/`files`. Set `template: none` to bring your own stack |
-| `k3d` | OATS boots a k3d (k3s-in-docker) cluster |
+| `k3d`     | OATS boots a k3d (k3s-in-docker) cluster                                                                                                                                          |
 
 A `compose` fixture with no `template` defaults to `template: lgtm`, so OATS
 boots the builtin LGTM stack next to your `file`/`files`. Omit `file`/`files`
@@ -210,14 +210,14 @@ must hold against its result. Every assertion is retried until it passes or
 
 Shared keys (valid on `traces`, `metrics`, `logs`, `profiles`):
 
-| Key | Meaning |
-|-----|---------|
-| `contains` | string (or list) that must appear in the query output |
-| `not_contains` | string (or list) that must **not** appear |
-| `regex` | RE2 pattern (or list) that must match the output |
-| `match` | structural row match — list of `{match_type, name, attributes}` |
-| `count` | comparison against the number of rows, e.g. `'== 1'`, `'>= 2'` |
-| `absent` | the query must return nothing for the whole `--absent-timeout` window |
+| Key            | Meaning                                                               |
+| -------------- | --------------------------------------------------------------------- |
+| `contains`     | string (or list) that must appear in the query output                 |
+| `not_contains` | string (or list) that must **not** appear                             |
+| `regex`        | RE2 pattern (or list) that must match the output                      |
+| `match`        | structural row match — list of `{match_type, name, attributes}`       |
+| `count`        | comparison against the number of rows, e.g. `'== 1'`, `'>= 2'`        |
+| `absent`       | the query must return nothing for the whole `--absent-timeout` window |
 
 `match` (and the trace-only `match_spans`) entries:
 
@@ -295,14 +295,14 @@ assuming `/bin/sh` exists. The process runs with its working directory set to
 the case dir and inherits the parent environment plus these OATS-provided
 variables:
 
-| Variable | Fixtures | Meaning |
-|----------|----------|---------|
-| `OATS_FIXTURE_TYPE` | all | `remote` / `compose` / `k3d` |
-| `OATS_GRAFANA_URL` | all | base URL of the fixture's Grafana |
-| `OATS_APP_URL` | remote, k3d | base URL of the app under test |
-| `OATS_OTLP_HTTP` | compose, k3d | OTLP/HTTP endpoint |
-| `OATS_PYROSCOPE_URL` | compose, k3d | Pyroscope base URL |
-| `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE`, `OATS_COMPOSE_FILE_ARGS` | compose | let the script run its own `docker compose` commands |
+| Variable                                                         | Fixtures     | Meaning                                              |
+| ---------------------------------------------------------------- | ------------ | ---------------------------------------------------- |
+| `OATS_FIXTURE_TYPE`                                              | all          | `remote` / `compose` / `k3d`                         |
+| `OATS_GRAFANA_URL`                                               | all          | base URL of the fixture's Grafana                    |
+| `OATS_APP_URL`                                                   | remote, k3d  | base URL of the app under test                       |
+| `OATS_OTLP_HTTP`                                                 | compose, k3d | OTLP/HTTP endpoint                                   |
+| `OATS_PYROSCOPE_URL`                                             | compose, k3d | Pyroscope base URL                                   |
+| `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE`, `OATS_COMPOSE_FILE_ARGS` | compose      | let the script run its own `docker compose` commands |
 
 A custom check that queries Grafana directly (replacing, for example, a legacy
 `compose-logs` grep with a real LogQL query):
