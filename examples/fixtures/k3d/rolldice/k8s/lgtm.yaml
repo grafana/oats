@@ -32,6 +32,9 @@ spec:
     - name: grafana
       port: 3000
       targetPort: 3000
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
     - name: otlp-http
       port: 4318
       targetPort: 4318
