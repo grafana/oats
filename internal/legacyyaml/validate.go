@@ -1,4 +1,4 @@
-package yaml
+package legacyyaml
 
 import (
 	"github.com/grafana/oats/model"

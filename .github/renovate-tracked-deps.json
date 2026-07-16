@@ -31,6 +31,22 @@
         "mise"
       ]
     },
+    "internal/legacyyaml/testdata/docker-compose-addition.yaml": {
+      "docker-compose": [
+        "mongo"
+      ]
+    },
+    "internal/legacyyaml/testdata/docker-compose-expected.yaml": {
+      "docker-compose": [
+        "grafana/grafana",
+        "mongo"
+      ]
+    },
+    "internal/legacyyaml/testdata/docker-compose-template.yaml": {
+      "docker-compose": [
+        "grafana/grafana"
+      ]
+    },
     "mise.toml": {
       "mise": [
         "actionlint",
@@ -50,22 +66,6 @@
         "shfmt",
         "taplo",
         "typos"
-      ]
-    },
-    "yaml/testdata/docker-compose-addition.yaml": {
-      "docker-compose": [
-        "mongo"
-      ]
-    },
-    "yaml/testdata/docker-compose-expected.yaml": {
-      "docker-compose": [
-        "grafana/grafana",
-        "mongo"
-      ]
-    },
-    "yaml/testdata/docker-compose-template.yaml": {
-      "docker-compose": [
-        "grafana/grafana"
       ]
     }
   }
