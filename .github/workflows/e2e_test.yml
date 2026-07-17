@@ -19,7 +19,7 @@ jobs:
       - name: Build e2e tools
         run: bash ./scripts/build-local-tools.sh "$PWD/.e2e-tools/bin"
       - name: Upload e2e tools
-        uses: actions/upload-artifact@65462800fd7603441b7a4382951275a0abb4808 # v4.6.2
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.6.2
         with:
           name: e2e-tools
           path: .e2e-tools/bin
