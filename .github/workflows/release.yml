@@ -52,6 +52,8 @@ jobs:
         with:
           version: v2026.7.0
           sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
+      - name: Read pinned gcx version
+        run: echo "GCX_VERSION=$(bash scripts/gcx-version.sh)" >> "$GITHUB_ENV"
       - name: Run GoReleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -96,6 +98,8 @@ jobs:
         with:
           version: v2026.7.0
           sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
+      - name: Read pinned gcx version
+        run: echo "GCX_VERSION=$(bash scripts/gcx-version.sh)" >> "$GITHUB_ENV"
       - name: Run GoReleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

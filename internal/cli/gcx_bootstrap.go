@@ -11,15 +11,59 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/spf13/pflag"
 )
 
 const gcxReleaseBaseURL = "https://github.com/grafana/gcx/releases/download"
 
 var gcxHTTPClient = &http.Client{Timeout: 10 * time.Minute}
+
+func defaultGCXDownloadPolicy() string {
+	// A mise-managed environment is expected to install its declared tools and
+	// should not silently reach out to GitHub if that setup is incomplete. The
+	// OATS_GCX_DOWNLOAD/--gcx-download override remains available when desired.
+	if os.Getenv("MISE_CONFIG_ROOT") != "" {
+		return "never"
+	}
+	return "auto"
+}
+
+func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
+	policy, err := fs.GetString("gcx-download")
+	if err != nil {
+		return "", err
+	}
+	policy = strings.ToLower(strings.TrimSpace(policy))
+	if policy != "auto" && policy != "never" {
+		return "", fmt.Errorf("invalid --gcx-download %q (want auto or never)", policy)
+	}
+
+	if _, err := exec.LookPath(gcxBin); err == nil {
+		return gcxBin, nil
+	}
+	if fs.Changed("gcx") {
+		return "", fmt.Errorf("gcx binary %q was not found (set --gcx to its path)", gcxBin)
+	}
+	if policy == "never" {
+		return "", fmt.Errorf("gcx was not found on PATH and automatic download is disabled (install gcx, set --gcx, or use --gcx-download auto)")
+	}
+	if DefaultGCXVersion == "" {
+		return "", fmt.Errorf("gcx was not found on PATH and this oats build has no embedded gcx version (install gcx or pass --gcx-version)")
+	}
+
+	fmt.Fprintf(os.Stderr, "gcx was not found on PATH; downloading pinned gcx %s\n", DefaultGCXVersion)
+	cacheDir, err := fs.GetString("cache-dir")
+	if err != nil {
+		return "", err
+	}
+	return bootstrapGCX(DefaultGCXVersion, cacheDir)
+}
 
 // bootstrapGCX downloads a verified gcx release into the user's cache and
 // returns the executable path. A version is deliberately required here rather

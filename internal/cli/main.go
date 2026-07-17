@@ -58,6 +58,11 @@ import (
 // -ldflags "-X github.com/grafana/oats/internal/cli.Version=vX.Y.Z".
 var Version = "dev"
 
+// DefaultGCXVersion is the gcx version pinned by the build. Release and mise
+// builds inject it with -ldflags so oats can provide a reproducible fallback
+// when gcx is not already available on PATH.
+var DefaultGCXVersion = ""
+
 type suiteResult struct {
 	pass int
 	fail int
@@ -125,6 +130,7 @@ func addRunFlags(fs *pflag.FlagSet) {
 	fs.String("config", "oats-config.yaml", "path to oats-config.yaml")
 	fs.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
 	fs.String("gcx-version", "", "download and use this gcx release (for example, 0.4.3)")
+	fs.String("gcx-download", defaultGCXDownloadPolicy(), "gcx fallback download policy: auto | never")
 	fs.String("format", "text", "output format: text | ndjson")
 	fs.String("tags", "", "comma-separated tag any-match")
 	fs.Duration("timeout", 30*time.Second, "per-assertion timeout")
@@ -365,6 +371,11 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 			return fmt.Errorf("--gcx and --gcx-version cannot be used together")
 		}
 		gcxBin, err = bootstrapGCX(version, flagStr(fs, "cache-dir"))
+		if err != nil {
+			return err
+		}
+	} else {
+		gcxBin, err = resolveDefaultGCX(fs, gcxBin)
 		if err != nil {
 			return err
 		}

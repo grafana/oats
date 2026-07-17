@@ -4,8 +4,9 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 bin_dir="${1:-$root/bin}"
 mkdir -p "$bin_dir"
+gcx_version="$(bash "$root/scripts/gcx-version.sh")"
 
-GOWORK=off go -C "$root" build -buildvcs=false -o "$bin_dir/oats" .
+bash "$root/scripts/build-oats.sh" "$bin_dir/oats"
 
 # CI and mise-based development already have the pinned gcx binary installed.
 # Reuse it instead of downloading and rebuilding a second copy. Direct
@@ -20,12 +21,6 @@ if [[ -n "$gcx_bin" && -x "$gcx_bin" ]]; then
 else
 	# Keep this pin in mise.toml so Renovate updates the tool version rather than
 	# this script.
-	gcx_version=$(awk -F'"' '$2 == "aqua:grafana/gcx" { print $4; exit }' "$root/mise.toml")
-	if [[ -z "$gcx_version" ]]; then
-		echo "aqua:grafana/gcx is missing from $root/mise.toml" >&2
-		exit 1
-	fi
-	gcx_version="${gcx_version#v}"
 	GOBIN="$bin_dir" GOWORK=off go install "github.com/grafana/gcx/cmd/gcx@v${gcx_version}"
 fi
 

@@ -17,7 +17,7 @@ jobs:
           version: v2026.7.0
           sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
       - name: Cache Go modules and build cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/go/pkg/mod
@@ -57,11 +57,13 @@ jobs:
           path: .e2e-tools/bin
       - name: Restore e2e tool permissions
         run: chmod +x .e2e-tools/bin/oats .e2e-tools/bin/gcx
-      - name: Run ${{ matrix.shard }} e2e tests
+      - name: Run e2e tests
         # OATS_E2E_FILTER is not part of the matrix to avoid that it shows up in the gh action (too long)
+        env:
+          OATS_E2E_SHARD: ${{ matrix.shard }}
         run: |
           start_ts="$(date +%s)"
-          case "${{ matrix.shard }}" in
+          case "$OATS_E2E_SHARD" in
             core)
               export OATS_E2E_FILTER="-fixture/"
               ;;
@@ -78,15 +80,15 @@ jobs:
               export OATS_E2E_FILTER="fixture/k3d-smoke"
               ;;
             *)
-              echo "unknown e2e shard: ${{ matrix.shard }}" >&2
+              echo "unknown e2e shard: $OATS_E2E_SHARD" >&2
               exit 1
               ;;
           esac
           export OATS_E2E_BIN_DIR="$PWD/.e2e-tools/bin"
-          echo "e2e timing: shard=${{ matrix.shard }} filter=${OATS_E2E_FILTER} bin_dir=${OATS_E2E_BIN_DIR}"
+          echo "e2e timing: shard=$OATS_E2E_SHARD filter=$OATS_E2E_FILTER bin_dir=$OATS_E2E_BIN_DIR"
           mise run e2e-test
           end_ts="$(date +%s)"
-          echo "e2e timing: shard=${{ matrix.shard }} total=$((end_ts-start_ts))s"
+          echo "e2e timing: shard=$OATS_E2E_SHARD total=$((end_ts-start_ts))s"
 
   # Black-box test of every self-contained example, using the already-built oats
   # and gcx from build-e2e-tools. Run the app and Compose examples on separate
@@ -132,6 +134,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check e2e results
+        env:
+          TEST_E2E_RESULT: ${{ needs.test-e2e.result }}
+          EXAMPLES_RESULT: ${{ needs.examples.result }}
         run: |
-          echo "test-e2e=${{ needs.test-e2e.result }} examples=${{ needs.examples.result }}"
-          [ "${{ needs.test-e2e.result }}" = "success" ] && [ "${{ needs.examples.result }}" = "success" ]
+          echo "test-e2e=$TEST_E2E_RESULT examples=$EXAMPLES_RESULT"
+          [ "$TEST_E2E_RESULT" = "success" ] && [ "$EXAMPLES_RESULT" = "success" ]

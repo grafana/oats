@@ -49,7 +49,7 @@ run = "bash ./.mise/tasks/example-test.sh"
 
 [tasks.build]
 description = "Build the project"
-run = "go build -buildvcs=false ."
+run = "bash ./scripts/build-oats.sh"
 
 [tasks.check]
 description = "Run all checks"

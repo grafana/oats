@@ -35,6 +35,12 @@ replace hyphens with underscores, and prefix it with `OATS_`. Command-line
 flags take precedence over environment variables. For example,
 `--gcx /opt/tools/gcx` is equivalent to `OATS_GCX=/opt/tools/gcx`.
 
+Release and mise-built `oats` binaries contain the gcx version pinned by this
+repository. If the default `gcx` command is not on `PATH`, `oats` downloads and
+caches that verified release automatically. Set `--gcx-download never` (or
+`OATS_GCX_DOWNLOAD=never`) for air-gapped or strict CI environments. The
+default is `never` when `MISE_CONFIG_ROOT` is set, and `auto` otherwise.
+
 Flags:
 
 | Flag                        | Environment variable              | Default                                                            | Meaning                                                                                |
@@ -52,6 +58,7 @@ Flags:
 | `--format`                  | `OATS_FORMAT`                     | `text`                                                             | output format: `text` or `ndjson`                                                      |
 | `--gcx`                     | `OATS_GCX`                        | `gcx`                                                              | path to the gcx binary (`PATH`-resolved if a bare name)                                |
 | `--gcx-version`             | `OATS_GCX_VERSION`                | —                                                                  | download and use this gcx release (for example, `0.4.3`)                               |
+| `--gcx-download`            | `OATS_GCX_DOWNLOAD`               | `auto` (`never` under mise)                                        | fallback policy when the default gcx command is missing: `auto` or `never`             |
 | `--gcx-context`             | `OATS_GCX_CONTEXT`                | derived                                                            | gcx context to query (otherwise derived from the fixture endpoint)                     |
 | `--app-host` / `--app-port` | `OATS_APP_HOST` / `OATS_APP_PORT` | `localhost` / `8080`                                               | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself |
 | `--otlp-http`               | `OATS_OTLP_HTTP`                  | `http://localhost:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                          |

@@ -46,8 +46,12 @@ go install github.com/grafana/oats@latest
 ```
 
 `oats --gcx-version 0.4.3` can download and cache gcx itself for fixture-backed
-runs. Pinning gcx explicitly with mise or a release download is still useful when
-you want the tool installation visible in your repository.
+runs. Release and mise-built oats binaries also embed the repository's pinned
+gcx version and can download it automatically when the default `gcx` command is
+missing. Set `OATS_GCX_DOWNLOAD=never` in strict or air-gapped CI; mise-managed
+environments default to this policy. Pinning gcx explicitly with mise or a
+release download remains useful when you want the tool installation visible in
+your repository.
 
 ## The workflow shape
 

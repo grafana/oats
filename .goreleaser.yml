@@ -10,7 +10,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w
+      - -s -w -X github.com/grafana/oats/internal/cli.Version={{ .Version }} -X github.com/grafana/oats/internal/cli.DefaultGCXVersion={{ .Env.GCX_VERSION }}
     goos:
       - linux
       - darwin
