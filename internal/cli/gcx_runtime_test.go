@@ -15,8 +15,35 @@ func TestDefaultGCXDownloadPolicy(t *testing.T) {
 		t.Fatalf("defaultGCXDownloadPolicy with mise = %q, want never", got)
 	}
 	t.Setenv("MISE_CONFIG_ROOT", "")
+	t.Setenv("MISE_PROJECT_ROOT", "")
+	t.Setenv("PATH", t.TempDir())
 	if got := defaultGCXDownloadPolicy(); got != "auto" {
 		t.Fatalf("defaultGCXDownloadPolicy without mise = %q, want auto", got)
+	}
+
+	miseDir := t.TempDir()
+	miseBin := filepath.Join(miseDir, "mise")
+	if err := os.WriteFile(miseBin, []byte("mise"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", miseDir)
+	if got := defaultGCXDownloadPolicy(); got != "never" {
+		t.Fatalf("defaultGCXDownloadPolicy with mise on PATH = %q, want never", got)
+	}
+}
+
+func TestIsMiseInstallPath(t *testing.T) {
+	for _, path := range []string{
+		"/home/gregor/.local/share/mise/installs/aqua-grafana-gcx/0.4.3/gcx",
+		"/workspace/.mise/installs/aqua-grafana-oats/0.7.0/oats",
+		`C:\Users\gregor\AppData\Local\mise\installs\oats\0.7.0\oats.exe`,
+	} {
+		if !isMiseInstallPath(path) {
+			t.Errorf("isMiseInstallPath(%q) = false, want true", path)
+		}
+	}
+	if isMiseInstallPath("/usr/local/bin/oats") {
+		t.Error("isMiseInstallPath(/usr/local/bin/oats) = true, want false")
 	}
 }
 

@@ -28,10 +28,26 @@ func defaultGCXDownloadPolicy() string {
 	// A mise-managed environment is expected to install its declared tools and
 	// should not silently reach out to GitHub if that setup is incomplete. The
 	// OATS_GCX_DOWNLOAD/--gcx-download override remains available when desired.
-	if os.Getenv("MISE_CONFIG_ROOT") != "" {
+	if isMiseEnvironment() {
 		return "never"
 	}
 	return "auto"
+}
+
+func isMiseEnvironment() bool {
+	if os.Getenv("MISE_CONFIG_ROOT") != "" || os.Getenv("MISE_PROJECT_ROOT") != "" {
+		return true
+	}
+	if executable, err := os.Executable(); err == nil && isMiseInstallPath(executable) {
+		return true
+	}
+	_, err := exec.LookPath("mise")
+	return err == nil
+}
+
+func isMiseInstallPath(path string) bool {
+	path = filepath.ToSlash(strings.ReplaceAll(path, `\`, "/"))
+	return strings.Contains(path, "/mise/installs/") || strings.Contains(path, "/.mise/installs/")
 }
 
 func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {

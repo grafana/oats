@@ -67,7 +67,8 @@ Without mise:
 the pinned gcx version and automatically download and cache that verified
 release when `gcx` is not on `PATH`. Use `--gcx-download never` (or
 `OATS_GCX_DOWNLOAD=never`) to disable this fallback; mise-managed environments
-default to disabled downloads. You can always select a specific release with
+default to disabled downloads when mise is detected, even outside a mise task.
+You can always select a specific release with
 `--gcx-version <version>` or a binary with `--gcx <path>`.
 
 ## Getting started

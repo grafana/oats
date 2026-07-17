@@ -49,7 +49,7 @@ go install github.com/grafana/oats@latest
 runs. Release and mise-built oats binaries also embed the repository's pinned
 gcx version and can download it automatically when the default `gcx` command is
 missing. Set `OATS_GCX_DOWNLOAD=never` in strict or air-gapped CI; mise-managed
-environments default to this policy. Pinning gcx explicitly with mise or a
+environments default to this policy even outside a mise task. Pinning gcx explicitly with mise or a
 release download remains useful when you want the tool installation visible in
 your repository.
 
