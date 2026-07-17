@@ -26,6 +26,44 @@
         "mise"
       ]
     },
+    "examples/fixtures/compose/rolldice/Dockerfile": {
+      "dockerfile": [
+        "python"
+      ],
+      "regex": [
+        "opentelemetry-distro"
+      ]
+    },
+    "examples/fixtures/compose/rolldice/requirements.txt": {
+      "pip_requirements": [
+        "Flask",
+        "Jinja2",
+        "MarkupSafe",
+        "Werkzeug",
+        "blinker",
+        "click",
+        "itsdangerous"
+      ]
+    },
+    "examples/fixtures/k3d/rolldice/Dockerfile": {
+      "dockerfile": [
+        "python"
+      ],
+      "regex": [
+        "opentelemetry-distro"
+      ]
+    },
+    "examples/fixtures/k3d/rolldice/requirements.txt": {
+      "pip_requirements": [
+        "Flask",
+        "Jinja2",
+        "MarkupSafe",
+        "Werkzeug",
+        "blinker",
+        "click",
+        "itsdangerous"
+      ]
+    },
     "examples/python/Dockerfile": {
       "dockerfile": [
         "python"
