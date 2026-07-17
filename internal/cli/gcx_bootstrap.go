@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const gcxReleaseBaseURL = "https://github.com/grafana/gcx/releases/download"
+var gcxReleaseBaseURL = "https://github.com/grafana/gcx/releases/download"
 
 var gcxHTTPClient = &http.Client{Timeout: 10 * time.Minute}
 
