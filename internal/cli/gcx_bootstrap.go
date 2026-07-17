@@ -46,6 +46,9 @@ func isMiseEnvironment() bool {
 }
 
 func isMiseInstallPath(path string) bool {
+	// Handle both separators regardless of the host OS. This keeps paths from
+	// another platform (for example, a Windows path in a Unix-side test) from
+	// being misclassified; filepath.ToSlash only normalizes the host separator.
 	parts := strings.FieldsFunc(path, func(r rune) bool { return r == '/' || r == '\\' })
 	for i := 0; i+1 < len(parts); i++ {
 		if (parts[i] == "mise" || parts[i] == ".mise") && parts[i+1] == "installs" {
