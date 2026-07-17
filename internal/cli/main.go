@@ -104,6 +104,9 @@ func newRootCmd(exit *int) *cobra.Command {
 		// prints returned errors too, producing duplicate "Error: ..." lines.
 		SilenceErrors: true,
 		// Bare `oats [paths...] [flags]` is an implicit `run`.
+		// Cobra otherwise treats the first path as an unknown subcommand when
+		// this command also has named subcommands.
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runAction(cmd, args, verbose, exit)
 		},
