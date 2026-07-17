@@ -102,6 +102,9 @@ func newRootCmd(exit *int) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runAction(cmd, args, verbose, exit)
 		},
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			return applyEnvFlags(cmd.Flags())
+		},
 	}
 	root.PersistentFlags().CountVarP(&verbose, "verbose", "v", "increase verbosity (-v, -vv, -vvv)")
 	addRunFlags(root.Flags())
