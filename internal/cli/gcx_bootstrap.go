@@ -46,8 +46,13 @@ func isMiseEnvironment() bool {
 }
 
 func isMiseInstallPath(path string) bool {
-	path = filepath.ToSlash(strings.ReplaceAll(path, `\`, "/"))
-	return strings.Contains(path, "/mise/installs/") || strings.Contains(path, "/.mise/installs/")
+	parts := strings.FieldsFunc(path, func(r rune) bool { return r == '/' || r == '\\' })
+	for i := 0; i+1 < len(parts); i++ {
+		if (parts[i] == "mise" || parts[i] == ".mise") && parts[i+1] == "installs" {
+			return true
+		}
+	}
+	return false
 }
 
 func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
