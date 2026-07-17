@@ -1,0 +1,187 @@
+package cli
+
+import (
+	"archive/tar"
+	"archive/zip"
+	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+)
+
+const gcxReleaseBaseURL = "https://github.com/grafana/gcx/releases/download"
+
+var gcxHTTPClient = &http.Client{Timeout: 10 * time.Minute}
+
+// bootstrapGCX downloads a verified gcx release into the user's cache and
+// returns the executable path. A version is deliberately required here rather
+// than resolving "latest", so a command remains reproducible when used in CI.
+func bootstrapGCX(version, cacheDir string) (string, error) {
+	version = strings.TrimPrefix(strings.TrimSpace(version), "v")
+	if version == "" || strings.ContainsAny(version, `/\\`) {
+		return "", fmt.Errorf("invalid gcx version %q", version)
+	}
+
+	archiveName, err := gcxArchiveName(version, runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		return "", err
+	}
+	archiveURL := fmt.Sprintf("%s/v%s/%s", gcxReleaseBaseURL, version, archiveName)
+	checksumURL := fmt.Sprintf("%s/v%s/gcx_%s_checksums.txt", gcxReleaseBaseURL, version, version)
+
+	installDir := filepath.Join(cacheDir, "tools", "gcx", version, runtime.GOOS+"_"+runtime.GOARCH)
+	executable := "gcx"
+	if runtime.GOOS == "windows" {
+		executable += ".exe"
+	}
+	target := filepath.Join(installDir, executable)
+	if info, statErr := os.Stat(target); statErr == nil && !info.IsDir() {
+		return target, nil
+	}
+
+	archiveBytes, err := downloadGCXAsset(archiveURL)
+	if err != nil {
+		return "", fmt.Errorf("download gcx %s: %w", version, err)
+	}
+	checksums, err := downloadGCXAsset(checksumURL)
+	if err != nil {
+		return "", fmt.Errorf("download gcx %s checksums: %w", version, err)
+	}
+	if err := verifyGCXChecksum(archiveName, archiveBytes, string(checksums)); err != nil {
+		return "", fmt.Errorf("verify gcx %s: %w", version, err)
+	}
+
+	if err := os.MkdirAll(installDir, 0o755); err != nil {
+		return "", fmt.Errorf("create gcx cache directory: %w", err)
+	}
+	tmp, err := os.CreateTemp(installDir, ".gcx-*")
+	if err != nil {
+		return "", fmt.Errorf("create gcx temporary file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	cleanup := func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+	}
+	defer cleanup()
+
+	if err := extractGCXExecutable(archiveName, archiveBytes, tmp); err != nil {
+		return "", fmt.Errorf("extract gcx %s: %w", version, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return "", fmt.Errorf("close gcx temporary file: %w", err)
+	}
+	if err := os.Chmod(tmpPath, 0o755); err != nil {
+		return "", fmt.Errorf("make gcx executable: %w", err)
+	}
+	if err := os.Rename(tmpPath, target); err != nil {
+		// Another process may have populated the same version while this one
+		// downloaded it. Reuse that complete file if it is now present.
+		if info, statErr := os.Stat(target); statErr == nil && !info.IsDir() {
+			return target, nil
+		}
+		return "", fmt.Errorf("install gcx: %w", err)
+	}
+	return target, nil
+}
+
+func gcxArchiveName(version, goos, goarch string) (string, error) {
+	if goos != "linux" && goos != "darwin" && goos != "windows" {
+		return "", fmt.Errorf("gcx releases do not support %s", goos)
+	}
+	if goarch != "amd64" && goarch != "arm64" {
+		return "", fmt.Errorf("gcx releases do not support %s/%s", goos, goarch)
+	}
+	ext := ".tar.gz"
+	if goos == "windows" {
+		ext = ".zip"
+	}
+	return fmt.Sprintf("gcx_%s_%s_%s%s", version, goos, goarch, ext), nil
+}
+
+func downloadGCXAsset(url string) ([]byte, error) {
+	resp, err := gcxHTTPClient.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("HTTP %s", resp.Status)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 100<<20))
+}
+
+func verifyGCXChecksum(name string, data []byte, checksums string) error {
+	for _, line := range strings.Split(checksums, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[1] == name {
+			digest := sha256.Sum256(data)
+			if !strings.EqualFold(hex.EncodeToString(digest[:]), fields[0]) {
+				return fmt.Errorf("checksum mismatch for %s", name)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("checksum for %s not found", name)
+}
+
+func extractGCXExecutable(archiveName string, data []byte, dst io.Writer) error {
+	if strings.HasSuffix(archiveName, ".zip") {
+		return extractGCXZip(data, dst)
+	}
+	return extractGCXTarGz(data, dst)
+}
+
+func extractGCXTarGz(data []byte, dst io.Writer) error {
+	gz, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = gz.Close() }()
+	tr := tar.NewReader(gz)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if header.Typeflag == tar.TypeReg && (filepath.Base(header.Name) == "gcx" || filepath.Base(header.Name) == "gcx.exe") {
+			_, err = io.Copy(dst, tr)
+			return err
+		}
+	}
+	return fmt.Errorf("gcx executable not found in archive")
+}
+
+func extractGCXZip(data []byte, dst io.Writer) error {
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return err
+	}
+	for _, file := range reader.File {
+		if filepath.Base(file.Name) != "gcx.exe" && filepath.Base(file.Name) != "gcx" {
+			continue
+		}
+		r, err := file.Open()
+		if err != nil {
+			return err
+		}
+		_, copyErr := io.Copy(dst, r)
+		closeErr := r.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		return closeErr
+	}
+	return fmt.Errorf("gcx executable not found in archive")
+}

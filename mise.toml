@@ -1,6 +1,11 @@
 [tools]
+
+# Runtime used by the black-box examples.
+"aqua:grafana/gcx" = "0.4.3"
 go = "1.26.4"
 goreleaser = "2.16.0"
+k3d = "5.8.3"
+kubectl = "1.34.1"
 node = "24.18.0"
 
 # Linters
@@ -38,6 +43,10 @@ run = "go test $(go list ./...)"
 description = "Run integration tests"
 env.INTEGRATION_TESTS = "true"
 run = "go test ./internal/cli"
+
+[tasks.example-test]
+description = "Run the self-contained examples"
+run = "bash ./.mise/tasks/example-test.sh"
 
 [tasks.build]
 description = "Build the project"
