@@ -455,6 +455,9 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 		// (e.g. `gcx login` already ran). We pass the suite name as a
 		// best-effort default; --gcx-context overrides.
 		ep.GCXContext = plan.Name
+		if gcxContextOverride != "" {
+			ep.GCXContext = gcxContextOverride
+		}
 		ep.OTLPHTTP = plan.Fixture.Remote.Endpoint
 		grafana, err := remoteGrafanaURL(ep.GCXContext)
 		if err != nil {

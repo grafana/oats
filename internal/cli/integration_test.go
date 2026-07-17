@@ -64,9 +64,9 @@ contexts:
 	t.Setenv("GCX_CONFIG", config)
 
 	ep, err := resolveEndpoint(discovery.Plan{
-		Name:    "remote",
+		Name:    "remote-basic",
 		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://otlp.example.test:4318"}},
-	}, fixture.Runtime{}, "", "localhost", 8080, "")
+	}, fixture.Runtime{}, "remote", "localhost", 8080, "")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
