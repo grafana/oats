@@ -52,12 +52,10 @@ jobs:
         with:
           version: v2026.7.0
           sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
-      - name: Read pinned gcx version
-        run: echo "GCX_VERSION=$(bash scripts/gcx-version.sh)" >> "$GITHUB_ENV"
       - name: Run GoReleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: goreleaser release --clean
+        run: GCX_VERSION="$(bash scripts/gcx-version.sh)" goreleaser release --clean
       - name: Attest release assets
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
@@ -98,12 +96,10 @@ jobs:
         with:
           version: v2026.7.0
           sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
-      - name: Read pinned gcx version
-        run: echo "GCX_VERSION=$(bash scripts/gcx-version.sh)" >> "$GITHUB_ENV"
       - name: Run GoReleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: goreleaser release --clean
+        run: GCX_VERSION="$(bash scripts/gcx-version.sh)" goreleaser release --clean
       - name: Attest release assets
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:

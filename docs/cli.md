@@ -23,7 +23,7 @@ they scope *which* cases run, they do not change where the config loads from.
 oats                              # run every case
 oats payments/                    # only cases under payments/
 oats payments/checkout/           # only cases under payments/checkout/
-oats --tags traces               # filter by tag
+oats --tags traces                # filter by tag
 oats --parallel 4                 # run parallel-safe suites concurrently
 ```
 
