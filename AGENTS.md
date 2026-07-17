@@ -2,6 +2,8 @@
 
 This file provides guidance to AI coding agents when working with code in this repository.
 
+For a broader contributor orientation, see [docs/repository-guide.md](docs/repository-guide.md).
+
 ## Project Overview
 
 OATs (OpenTelemetry Acceptance Tests) is a declarative test framework for
