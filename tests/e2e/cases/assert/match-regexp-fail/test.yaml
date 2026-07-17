@@ -1,0 +1,14 @@
+name: match-regexp-fail
+tags: [assert, match, regexp, fail]
+
+run:
+  args:
+    - --timeout
+    - 10s
+    - --interval
+    - 2s
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL

@@ -1,8 +1,6 @@
 [settings]
 exclude = [
   "CHANGELOG.md",
-  "yaml/testdata/**",
-  "yaml/docker-compose-docker-lgtm-template.yml",
   "internal/legacyyaml/testdata/**",
   "internal/legacyyaml/docker-compose-docker-lgtm-template.yml",
 ]

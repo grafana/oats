@@ -63,11 +63,13 @@ Without mise:
   [gcx](https://github.com/grafana/gcx/releases) release pages.
 - **go install** (oats from source) — `go install github.com/grafana/oats@latest`.
 
-`oats` drives assertions through `gcx`. For a self-contained run without a
-separately installed binary, pass `--gcx-version <version>` and OATS downloads
-and caches the matching release for the current platform. Pinning gcx explicitly
-with mise or a release download remains the best choice when you want the tool
-installation visible in your repository.
+`oats` drives assertions through `gcx`. Release and mise-built binaries contain
+the pinned gcx version and automatically download and cache that verified
+release when `gcx` is not on `PATH`. Use `--gcx-download never` (or
+`OATS_GCX_DOWNLOAD=never`) to disable this fallback; mise-managed environments
+default to disabled downloads when mise is detected, even outside a mise task.
+You can always select a specific release with
+`--gcx-version <version>` or a binary with `--gcx <path>`.
 
 ## Getting started
 

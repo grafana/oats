@@ -1,0 +1,6 @@
+name: match-regexp
+tags: [assert, match, regexp]
+
+expect:
+  stdout_contains:
+    - PASS 1/1

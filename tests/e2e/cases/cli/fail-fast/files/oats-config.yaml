@@ -1,0 +1,6 @@
+meta:
+  version: 3
+# Both cases declare the same remote fixture, so they form one boot-group and
+# run serially in order — which is what --fail-fast needs to stop after the
+# first (failing) case.
+cases: ["01-fail.yaml", "02-pass.yaml"]

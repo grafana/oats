@@ -1,0 +1,17 @@
+name: remote-basic
+fixture:
+  remote:
+    endpoint: http://localhost:4319
+seed:
+  type: inline-otlp
+  logs:
+    - service: remote-basic
+      body: seed-log-line
+expected:
+  logs:
+    - logql: '{service_name="remote-basic"}'
+      match:
+        - name: seed-log-line
+          attributes:
+            - key: service_name
+              value: remote-basic

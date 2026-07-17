@@ -1,0 +1,13 @@
+name: cache-clear-case
+fixture:
+  remote:
+    endpoint: "{{REMOTE_OTLP_HTTP}}"
+seed:
+  type: inline-otlp
+  logs:
+    - service: cache-clear-case
+      body: cache-clear-seed-line
+expected:
+  logs:
+    - logql: '{service_name="cache-clear-case"}'
+      contains: cache-clear-seed-line

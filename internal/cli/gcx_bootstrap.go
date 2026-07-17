@@ -11,15 +11,83 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/spf13/pflag"
 )
 
-const gcxReleaseBaseURL = "https://github.com/grafana/gcx/releases/download"
+var gcxReleaseBaseURL = "https://github.com/grafana/gcx/releases/download"
 
 var gcxHTTPClient = &http.Client{Timeout: 10 * time.Minute}
+
+func defaultGCXDownloadPolicy() string {
+	// A mise-managed environment is expected to install its declared tools and
+	// should not silently reach out to GitHub if that setup is incomplete. The
+	// OATS_GCX_DOWNLOAD/--gcx-download override remains available when desired.
+	if isMiseEnvironment() {
+		return "never"
+	}
+	return "auto"
+}
+
+func isMiseEnvironment() bool {
+	if os.Getenv("MISE_CONFIG_ROOT") != "" || os.Getenv("MISE_PROJECT_ROOT") != "" {
+		return true
+	}
+	if executable, err := os.Executable(); err == nil && isMiseInstallPath(executable) {
+		return true
+	}
+	_, err := exec.LookPath("mise")
+	return err == nil
+}
+
+func isMiseInstallPath(path string) bool {
+	// Handle both separators regardless of the host OS. This keeps paths from
+	// another platform (for example, a Windows path in a Unix-side test) from
+	// being misclassified; filepath.ToSlash only normalizes the host separator.
+	parts := strings.FieldsFunc(path, func(r rune) bool { return r == '/' || r == '\\' })
+	for i := 0; i+1 < len(parts); i++ {
+		if (parts[i] == "mise" || parts[i] == ".mise") && parts[i+1] == "installs" {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
+	policy, err := fs.GetString("gcx-download")
+	if err != nil {
+		return "", err
+	}
+	policy = strings.ToLower(strings.TrimSpace(policy))
+	if policy != "auto" && policy != "never" {
+		return "", fmt.Errorf("invalid --gcx-download %q (want auto or never)", policy)
+	}
+
+	if _, err := exec.LookPath(gcxBin); err == nil {
+		return gcxBin, nil
+	}
+	if fs.Changed("gcx") {
+		return "", fmt.Errorf("gcx binary %q was not found (set --gcx to its path)", gcxBin)
+	}
+	if policy == "never" {
+		return "", fmt.Errorf("gcx was not found on PATH and automatic download is disabled (install gcx, set --gcx, or use --gcx-download auto)")
+	}
+	if DefaultGCXVersion == "" {
+		return "", fmt.Errorf("gcx was not found on PATH and this oats build has no embedded gcx version (install gcx or pass --gcx-version)")
+	}
+
+	fmt.Fprintf(os.Stderr, "gcx was not found on PATH; downloading pinned gcx %s\n", DefaultGCXVersion)
+	cacheDir, err := fs.GetString("cache-dir")
+	if err != nil {
+		return "", err
+	}
+	return bootstrapGCX(DefaultGCXVersion, cacheDir)
+}
 
 // bootstrapGCX downloads a verified gcx release into the user's cache and
 // returns the executable path. A version is deliberately required here rather
