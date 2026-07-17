@@ -262,7 +262,7 @@ func ConvertDefinition(def model.TestCaseDefinition, name string) (*casefile.Cas
 }
 
 // fixtureFor builds the case-local fixture: block from a legacy definition. A
-// single-matrix override (selectedMatrix) takes precedence over the suite-level
+// single-matrix override (selectedMatrix) takes precedence over the config-level
 // blocks. Returns nil when the legacy definition declares no fixture.
 func fixtureFor(def model.TestCaseDefinition, selectedMatrix *model.Matrix) *casefile.FixtureConfig {
 	dc := def.DockerCompose

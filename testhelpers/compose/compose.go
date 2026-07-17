@@ -1,4 +1,4 @@
-// Package docker provides some helpers to manage docker-compose clusters from the test suites
+// Package compose provides helpers to manage Docker Compose stacks used by fixture groups.
 package compose
 
 import (
@@ -52,11 +52,11 @@ func mergeEnv(parent, override []string) []string {
 	return merged
 }
 
-func Suite(composeFile string) (*Compose, error) {
-	return SuiteFiles([]string{composeFile}, nil)
+func Stack(composeFile string) (*Compose, error) {
+	return StackFiles([]string{composeFile}, nil)
 }
 
-func SuiteFiles(composeFiles []string, env []string) (*Compose, error) {
+func StackFiles(composeFiles []string, env []string) (*Compose, error) {
 	defaultArgs := []string{"compose"}
 	for _, file := range composeFiles {
 		defaultArgs = append(defaultArgs, "-f", file)
@@ -207,7 +207,7 @@ func NewEndpoint(host string, composeFilePath string, ports remote.PortsConfig) 
 			return fmt.Errorf("composeFilePath cannot be empty")
 		}
 
-		compose, err = Suite(composeFilePath)
+		compose, err = Stack(composeFilePath)
 		if err != nil {
 			return err
 		}

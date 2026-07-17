@@ -77,14 +77,14 @@ func TestResolveComposeFiles(t *testing.T) {
 }
 
 func TestStart_ComposeLifecycle(t *testing.T) {
-	oldFactory := newComposeSuite
+	oldFactory := newComposeStack
 	oldLookup := lookupComposePort
-	defer func() { newComposeSuite = oldFactory }()
+	defer func() { newComposeStack = oldFactory }()
 	defer func() { lookupComposePort = oldLookup }()
 
 	var gotFiles, gotEnv []string
 	fake := &fakeHandle{}
-	newComposeSuite = func(files []string, env []string) (Handle, error) {
+	newComposeStack = func(files []string, env []string) (Handle, error) {
 		gotFiles = append([]string(nil), files...)
 		gotEnv = append([]string(nil), env...)
 		return fake, nil
@@ -137,10 +137,10 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 }
 
 func TestStart_ComposeStartFailure(t *testing.T) {
-	oldFactory := newComposeSuite
-	defer func() { newComposeSuite = oldFactory }()
+	oldFactory := newComposeStack
+	defer func() { newComposeStack = oldFactory }()
 
-	newComposeSuite = func(files []string, env []string) (Handle, error) {
+	newComposeStack = func(files []string, env []string) (Handle, error) {
 		return &fakeHandle{upErr: fmt.Errorf("boom")}, nil
 	}
 
@@ -350,9 +350,9 @@ expected:
 }
 
 // TestSupportsParallel_AppSeedRequiresAppService checks the gate that makes
-// app-seed compose suites parallel-safe: only when fixture.app_service and
+// app-seed compose groups parallel-safe: only when fixture.app_service and
 // app_port are set (so OATS can publish + discover an ephemeral app port) is the
-// suite safe; otherwise it would share a fixed app port with its peers.
+// group safe; otherwise it would share a fixed app port with its peers.
 func TestSupportsParallel_AppSeedRequiresAppService(t *testing.T) {
 	appCase := &casefile.Case{Seed: casefile.Seed{Type: "app"}}
 

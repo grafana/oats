@@ -11,7 +11,7 @@ tests/e2e/cases/<group>/<case>/
 
 ## Defaults
 
-- `files/oats-config.yaml` is the default OATS config (suite/case list).
+- `files/oats-config.yaml` is the default OATS config (fixture-group/case list).
 - When `files/oats-config.yaml` is absent, the test runner synthesizes one that points
   at `files/oats-case.yaml`.
 - The harness boots a shared local LGTM stack plus real `oats` and real `gcx`.

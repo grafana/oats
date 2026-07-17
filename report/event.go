@@ -20,8 +20,8 @@ type EventType string
 const (
 	EventRunStart        EventType = "run.start"
 	EventRunEnd          EventType = "run.end"
-	EventSuiteStart      EventType = "suite.start"
-	EventSuiteEnd        EventType = "suite.end"
+	EventGroupStart      EventType = "group.start"
+	EventGroupEnd        EventType = "group.end"
 	EventFixtureStart    EventType = "fixture.start"
 	EventFixtureReady    EventType = "fixture.ready"
 	EventFixtureTeardown EventType = "fixture.teardown"
@@ -36,7 +36,7 @@ const (
 // SchemaVersion travels with each run.start event. Consumers pin to a
 // version; we bump on any breaking change (key removed, key semantics
 // changed). Additive changes are not breaking.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // Event is the single payload type that crosses the Reporter boundary.
 // Fields are sparse on purpose — each event type populates only what it
@@ -54,13 +54,13 @@ type Event struct {
 	SchemaVersion int    `json:"schema_version,omitempty"`
 
 	// Identifying context.
-	Suite       string `json:"suite,omitempty"`
+	Group       string `json:"group,omitempty"`
 	FixtureType string `json:"fixture_type,omitempty"`
 	Case        string `json:"case,omitempty"`
 	Source      string `json:"source,omitempty"`
 
 	// Per-assertion / per-failure detail.
-	Msg           string `json:"msg,omitempty"`
+	Message       string `json:"msg,omitempty"`
 	Cmd           string `json:"cmd,omitempty"`
 	StdoutExcerpt string `json:"stdout_excerpt,omitempty"`
 

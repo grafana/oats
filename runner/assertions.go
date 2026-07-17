@@ -56,11 +56,11 @@ func (r *Runner) runTraceStructured(ctx context.Context, c *casefile.Case, a *ca
 	cmdStr := signalcmd.Render(signalcmd.Traces(*a, 0))
 	for _, f := range result.LastFailures {
 		r.reporter.Emit(report.Event{
-			Type:   report.EventAssertFail,
-			Case:   c.Name,
-			Source: c.SourcePath,
-			Msg:    f.Error(),
-			Cmd:    cmdStr,
+			Type:    report.EventAssertFail,
+			Case:    c.Name,
+			Source:  c.SourcePath,
+			Message: f.Error(),
+			Cmd:     cmdStr,
 		})
 	}
 	return false

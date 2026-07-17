@@ -6,7 +6,7 @@
 meta:
   version: 3
 
-# Just list the cases — there is no suite/grouping to declare. Each case carries
+# Just list the cases — there is no explicit grouping to declare. Each case carries
 # its own fixture (see the `fixture:` block in each oats-case.yaml), and OATS
 # groups cases by fixture: the compose case and the k3d case declare different
 # fixtures, so they become two independent boot-groups (each fixture booted once,
