@@ -644,6 +644,7 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 
 	gcxExec := &engine.GCX{Binary: opts.gcxBin, Context: ep.GCXContext, Config: ep.GCXConfig, Env: ep.GCXEnv}
 	r := runner.New(gcxExec, rep, ep, runner.Options{
+		OatsVersion:     Version,
 		Timeout:         opts.timeout,
 		Interval:        opts.interval,
 		AbsentTimeout:   opts.absentTimeout,
@@ -658,7 +659,6 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 			fixtureBytes, _ := json.Marshal(plan.Fixture)
 			r = r.WithCache(store, runner.CacheContext{
 				GCXVersion:   gcxVersion(opts.gcxBin),
-				OatsVersion:  Version,
 				FixtureBytes: fixtureBytes,
 			})
 		}

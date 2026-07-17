@@ -49,6 +49,13 @@ func newRunner(t *testing.T, exec engine.Executor, opts Options) (*Runner, *byte
 	return New(exec, rep, Endpoint{GCXContext: "test"}, opts), &buf
 }
 
+func TestNew_PropagatesOatsVersionToSeeder(t *testing.T) {
+	r, _ := newRunner(t, &stubExec{}, Options{OatsVersion: "0.7.0"})
+	if got := r.seeder.Version; got != "0.7.0" {
+		t.Fatalf("seed version = %q, want 0.7.0", got)
+	}
+}
+
 func mustParse(t *testing.T, src string) *casefile.Case {
 	t.Helper()
 	c, err := casefile.Parse([]byte(src))
