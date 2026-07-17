@@ -16,6 +16,15 @@ jobs:
         with:
           version: v2026.7.0
           sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
+      - name: Cache Go modules and build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: oats-go-e2e-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: |
+            oats-go-e2e-${{ runner.os }}-${{ runner.arch }}-
       - name: Build e2e tools
         run: bash ./scripts/build-local-tools.sh "$PWD/.e2e-tools/bin"
       - name: Upload e2e tools
