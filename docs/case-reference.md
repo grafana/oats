@@ -292,7 +292,7 @@ interpreter; OATS does not translate shell syntax between operating systems.
 For a cross-platform check, use a script language/runtime available on every
 target (for example, a checked-in Python or PowerShell script) rather than
 assuming `/bin/sh` exists. The process runs with its working directory set to
-the case dir and inherits the parent environment plus these OATS-provided
+the case directory and inherits the parent environment plus these OATS-provided
 variables:
 
 | Variable                                                         | Fixtures     | Meaning                                              |
