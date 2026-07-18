@@ -8,6 +8,8 @@ seed:
     - service: gcx-min-version
       body: gcx-min-version
 expected:
+  # This assertion is only a validation sentinel: gcx resolution fails before
+  # the fixture, seed, or assertion can run.
   logs:
     - logql: '{service_name="gcx-min-version"}'
       contains: gcx-min-version
