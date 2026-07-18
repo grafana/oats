@@ -58,10 +58,10 @@ import (
 // -ldflags "-X github.com/grafana/oats/internal/cli.Version=vX.Y.Z".
 var Version = "dev"
 
-// DefaultGCXVersion is the gcx version pinned by the build. Release and mise
-// builds inject it with -ldflags so oats can provide a reproducible fallback
-// when gcx is not already available on PATH.
-var DefaultGCXVersion = ""
+// MinimumGCXVersion is the minimum gcx version accepted from PATH by the
+// build. Release and mise builds inject it with -ldflags so oats can provide a
+// reproducible fallback when gcx is missing or older than this version.
+var MinimumGCXVersion = ""
 
 type suiteResult struct {
 	pass int

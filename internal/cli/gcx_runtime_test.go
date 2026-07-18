@@ -57,9 +57,9 @@ func TestResolveDefaultGCXUsesEmbeddedVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oldVersion := DefaultGCXVersion
-	DefaultGCXVersion = "0.4.3"
-	t.Cleanup(func() { DefaultGCXVersion = oldVersion })
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = "0.4.3"
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
 
 	fs := gcxRuntimeFlags(cacheDir, "auto")
 	got, err := resolveDefaultGCX(fs, "oats-gcx-test-not-on-path")
@@ -79,9 +79,9 @@ func TestResolveDefaultGCXRejectsDisabledDownload(t *testing.T) {
 }
 
 func TestResolveDefaultGCXRequiresEmbeddedVersion(t *testing.T) {
-	oldVersion := DefaultGCXVersion
-	DefaultGCXVersion = ""
-	t.Cleanup(func() { DefaultGCXVersion = oldVersion })
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = ""
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
 
 	fs := gcxRuntimeFlags(t.TempDir(), "auto")
 	if _, err := resolveDefaultGCX(fs, "oats-gcx-test-not-on-path"); err == nil {
@@ -96,9 +96,120 @@ func TestResolveDefaultGCXRejectsInvalidPolicy(t *testing.T) {
 	}
 }
 
+func TestGCXVersionAtLeast(t *testing.T) {
+	tests := []struct {
+		installed string
+		minimum   string
+		want      bool
+	}{
+		{installed: "gcx version 0.4.4 built from abc", minimum: "0.4.3", want: true},
+		{installed: "v0.4.3", minimum: "0.4.3", want: true},
+		{installed: "gcx version 0.4.2", minimum: "0.4.3", want: false},
+		{installed: "gcx version 0.5.0", minimum: "0.4.3", want: true},
+		{installed: "gcx version 0.4.3-rc.1", minimum: "0.4.3", want: false},
+		{installed: "SNAPSHOT", minimum: "0.4.3", want: false},
+	}
+	for _, tt := range tests {
+		if got := gcxVersionAtLeast(tt.installed, tt.minimum); got != tt.want {
+			t.Errorf("gcxVersionAtLeast(%q, %q) = %v, want %v", tt.installed, tt.minimum, got, tt.want)
+		}
+	}
+}
+
+func TestResolveDefaultGCXUsesSufficientPathVersion(t *testing.T) {
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = "0.4.3"
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
+
+	gcxBin := fakeGCXOnPath(t, "0.4.3")
+	fs := gcxRuntimeFlags(t.TempDir(), "auto")
+	got, err := resolveDefaultGCX(fs, gcxBin)
+	if err != nil {
+		t.Fatalf("resolveDefaultGCX: %v", err)
+	}
+	if got != gcxBin {
+		t.Fatalf("resolveDefaultGCX = %q, want %q", got, gcxBin)
+	}
+}
+
+func TestResolveDefaultGCXFallsBackForOlderPathVersion(t *testing.T) {
+	cacheDir := t.TempDir()
+	target := filepath.Join(cacheDir, "tools", "gcx", "0.4.3", runtime.GOOS+"_"+runtime.GOARCH, "gcx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte("cached gcx"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = "0.4.3"
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
+
+	gcxBin := fakeGCXOnPath(t, "0.4.2")
+	fs := gcxRuntimeFlags(cacheDir, "auto")
+	got, err := resolveDefaultGCX(fs, gcxBin)
+	if err != nil {
+		t.Fatalf("resolveDefaultGCX: %v", err)
+	}
+	if got != target {
+		t.Fatalf("resolveDefaultGCX = %q, want cached minimum %q", got, target)
+	}
+}
+
+func TestResolveDefaultGCXRejectsOlderPathVersionWhenDownloadsDisabled(t *testing.T) {
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = "0.4.3"
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
+
+	gcxBin := fakeGCXOnPath(t, "0.4.2")
+	fs := gcxRuntimeFlags(t.TempDir(), "never")
+	if _, err := resolveDefaultGCX(fs, gcxBin); err == nil {
+		t.Fatal("expected minimum version error")
+	}
+}
+
+func TestResolveDefaultGCXExplicitPathOverridesMinimum(t *testing.T) {
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = "0.4.3"
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
+
+	gcxBin := fakeGCXOnPath(t, "0.4.2")
+	fs := gcxRuntimeFlags(t.TempDir(), "never")
+	if err := fs.Set("gcx", gcxBin); err != nil {
+		t.Fatal(err)
+	}
+	got, err := resolveDefaultGCX(fs, gcxBin)
+	if err != nil {
+		t.Fatalf("resolveDefaultGCX: %v", err)
+	}
+	if got != gcxBin {
+		t.Fatalf("resolveDefaultGCX = %q, want %q", got, gcxBin)
+	}
+}
+
 func gcxRuntimeFlags(cacheDir, downloadPolicy string) *pflag.FlagSet {
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	fs.String("gcx", "gcx", "")
 	fs.String("gcx-download", downloadPolicy, "")
 	fs.String("cache-dir", cacheDir, "")
 	return fs
+}
+
+func fakeGCXOnPath(t *testing.T, version string) string {
+	t.Helper()
+	dir := t.TempDir()
+	name := "gcx"
+	contents := "#!/bin/sh\nprintf 'gcx version " + version + " built from test\\n'\n"
+	permissions := 0o755
+	if runtime.GOOS == "windows" {
+		name += ".cmd"
+		contents = "@echo off\r\necho gcx version " + version + " built from test\r\n"
+		permissions = 0o644
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), os.FileMode(permissions)); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	return "gcx"
 }

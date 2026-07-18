@@ -64,12 +64,14 @@ Without mise:
 - **go install** (oats from source) — `go install github.com/grafana/oats@latest`.
 
 `oats` drives assertions through `gcx`. Release and mise-built binaries contain
-the pinned gcx version and automatically download and cache that verified
-release when `gcx` is not on `PATH`. Use `--gcx-download never` (or
-`OATS_GCX_DOWNLOAD=never`) to disable this fallback; mise-managed environments
-default to disabled downloads when mise is detected, even outside a mise task.
-You can always select a specific release with
-`--gcx-version <version>` or a binary with `--gcx <path>`.
+the minimum compatible gcx version. They use `gcx` from `PATH` when it meets
+that minimum, and automatically download and cache the verified minimum release
+when gcx is missing, too old, or does not report a parsable version. Use
+`--gcx-download never` (or `OATS_GCX_DOWNLOAD=never`) to disable this fallback;
+in that mode an absent or too-old PATH binary is an error. Mise-managed
+environments default to disabled downloads when mise is detected, even outside
+a mise task. You can explicitly trust a binary with `--gcx <path>` or select an
+exact release with `--gcx-version <version>`.
 
 ## Getting started
 

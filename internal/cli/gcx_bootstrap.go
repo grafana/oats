@@ -13,7 +13,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -69,24 +71,137 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 	}
 
 	if _, err := exec.LookPath(gcxBin); err == nil {
-		return gcxBin, nil
+		// An explicit --gcx is an intentional override, so do not second-guess
+		// its version. The embedded minimum protects only the implicit PATH lookup
+		// from accidentally selecting an older local installation.
+		if fs.Changed("gcx") || MinimumGCXVersion == "" {
+			return gcxBin, nil
+		}
+
+		installedVersion := gcxVersion(gcxBin)
+		if gcxVersionAtLeast(installedVersion, MinimumGCXVersion) {
+			return gcxBin, nil
+		}
+		if policy == "never" {
+			if installedVersion == "" {
+				return "", fmt.Errorf("gcx on PATH did not report a version (minimum %s; automatic download is disabled)", MinimumGCXVersion)
+			}
+			return "", fmt.Errorf("gcx on PATH is %s, but oats requires at least %s (automatic download is disabled; install a newer gcx or set --gcx to override)", installedVersion, MinimumGCXVersion)
+		}
+
+		if installedVersion == "" {
+			fmt.Fprintf(os.Stderr, "gcx on PATH did not report a parseable version; downloading minimum gcx %s\n", MinimumGCXVersion)
+		} else {
+			fmt.Fprintf(os.Stderr, "gcx on PATH is %s; downloading minimum gcx %s\n", installedVersion, MinimumGCXVersion)
+		}
+		cacheDir, err := fs.GetString("cache-dir")
+		if err != nil {
+			return "", err
+		}
+		return bootstrapGCX(MinimumGCXVersion, cacheDir)
 	}
+
 	if fs.Changed("gcx") {
 		return "", fmt.Errorf("gcx binary %q was not found (set --gcx to its path)", gcxBin)
 	}
 	if policy == "never" {
 		return "", fmt.Errorf("gcx was not found on PATH and automatic download is disabled (install gcx, set --gcx, or use --gcx-download auto)")
 	}
-	if DefaultGCXVersion == "" {
-		return "", fmt.Errorf("gcx was not found on PATH and this oats build has no embedded gcx version (install gcx or pass --gcx-version)")
+	if MinimumGCXVersion == "" {
+		return "", fmt.Errorf("gcx was not found on PATH and this oats build has no embedded minimum gcx version (install gcx or pass --gcx-version)")
 	}
 
-	fmt.Fprintf(os.Stderr, "gcx was not found on PATH; downloading pinned gcx %s\n", DefaultGCXVersion)
+	fmt.Fprintf(os.Stderr, "gcx was not found on PATH; downloading minimum gcx %s\n", MinimumGCXVersion)
 	cacheDir, err := fs.GetString("cache-dir")
 	if err != nil {
 		return "", err
 	}
-	return bootstrapGCX(DefaultGCXVersion, cacheDir)
+	return bootstrapGCX(MinimumGCXVersion, cacheDir)
+}
+
+var gcxVersionPattern = regexp.MustCompile(`(?:^|[^0-9])v?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z.-]+))?`)
+
+type parsedGCXVersion struct {
+	major      int
+	minor      int
+	patch      int
+	prerelease string
+}
+
+func parseGCXVersion(value string) (parsedGCXVersion, bool) {
+	match := gcxVersionPattern.FindStringSubmatch(value)
+	if len(match) == 0 {
+		return parsedGCXVersion{}, false
+	}
+	major, errMajor := strconv.Atoi(match[1])
+	minor, errMinor := strconv.Atoi(match[2])
+	patch, errPatch := strconv.Atoi(match[3])
+	if errMajor != nil || errMinor != nil || errPatch != nil {
+		return parsedGCXVersion{}, false
+	}
+	return parsedGCXVersion{
+		major:      major,
+		minor:      minor,
+		patch:      patch,
+		prerelease: match[4],
+	}, true
+}
+
+func gcxVersionAtLeast(installed, minimum string) bool {
+	got, gotOK := parseGCXVersion(installed)
+	want, wantOK := parseGCXVersion(minimum)
+	if !gotOK || !wantOK {
+		return false
+	}
+	if got.major != want.major {
+		return got.major > want.major
+	}
+	if got.minor != want.minor {
+		return got.minor > want.minor
+	}
+	if got.patch != want.patch {
+		return got.patch > want.patch
+	}
+	return compareGCXPrerelease(got.prerelease, want.prerelease) >= 0
+}
+
+func compareGCXPrerelease(a, b string) int {
+	if a == b {
+		return 0
+	}
+	if a == "" {
+		return 1
+	}
+	if b == "" {
+		return -1
+	}
+
+	aParts := strings.Split(a, ".")
+	bParts := strings.Split(b, ".")
+	for i := 0; i < len(aParts) && i < len(bParts); i++ {
+		aNumber, aErr := strconv.Atoi(aParts[i])
+		bNumber, bErr := strconv.Atoi(bParts[i])
+		switch {
+		case aErr == nil && bErr == nil && aNumber != bNumber:
+			if aNumber < bNumber {
+				return -1
+			}
+			return 1
+		case aErr == nil && bErr != nil:
+			return -1
+		case aErr != nil && bErr == nil:
+			return 1
+		case aParts[i] != bParts[i]:
+			if aParts[i] < bParts[i] {
+				return -1
+			}
+			return 1
+		}
+	}
+	if len(aParts) < len(bParts) {
+		return -1
+	}
+	return 1
 }
 
 // bootstrapGCX downloads a verified gcx release into the user's cache and
