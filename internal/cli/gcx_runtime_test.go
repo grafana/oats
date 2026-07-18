@@ -11,14 +11,14 @@ import (
 
 func TestDefaultGCXDownloadPolicy(t *testing.T) {
 	t.Setenv("MISE_CONFIG_ROOT", "/tmp/mise")
-	if got := defaultGCXDownloadPolicy(); got != "never" {
-		t.Fatalf("defaultGCXDownloadPolicy with mise = %q, want never", got)
+	if got := defaultGCXDownloadPolicy(); got != gcxDownloadPolicyNever {
+		t.Fatalf("defaultGCXDownloadPolicy with mise = %q, want %s", got, gcxDownloadPolicyNever)
 	}
 	t.Setenv("MISE_CONFIG_ROOT", "")
 	t.Setenv("MISE_PROJECT_ROOT", "")
 	t.Setenv("PATH", t.TempDir())
-	if got := defaultGCXDownloadPolicy(); got != "auto" {
-		t.Fatalf("defaultGCXDownloadPolicy without mise = %q, want auto", got)
+	if got := defaultGCXDownloadPolicy(); got != gcxDownloadPolicyAuto {
+		t.Fatalf("defaultGCXDownloadPolicy without mise = %q, want %s", got, gcxDownloadPolicyAuto)
 	}
 
 	miseDir := t.TempDir()
@@ -27,8 +27,8 @@ func TestDefaultGCXDownloadPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", miseDir)
-	if got := defaultGCXDownloadPolicy(); got != "never" {
-		t.Fatalf("defaultGCXDownloadPolicy with mise on PATH = %q, want never", got)
+	if got := defaultGCXDownloadPolicy(); got != gcxDownloadPolicyNever {
+		t.Fatalf("defaultGCXDownloadPolicy with mise on PATH = %q, want %s", got, gcxDownloadPolicyNever)
 	}
 }
 
@@ -61,7 +61,7 @@ func TestResolveDefaultGCXUsesEmbeddedVersion(t *testing.T) {
 	MinimumGCXVersion = "0.4.3"
 	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
 
-	fs := gcxRuntimeFlags(cacheDir, "auto")
+	fs := gcxRuntimeFlags(cacheDir, gcxDownloadPolicyAuto)
 	got, err := resolveDefaultGCX(fs, "oats-gcx-test-not-on-path")
 	if err != nil {
 		t.Fatalf("resolveDefaultGCX: %v", err)
@@ -72,7 +72,7 @@ func TestResolveDefaultGCXUsesEmbeddedVersion(t *testing.T) {
 }
 
 func TestResolveDefaultGCXRejectsDisabledDownload(t *testing.T) {
-	fs := gcxRuntimeFlags(t.TempDir(), "never")
+	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyNever)
 	if _, err := resolveDefaultGCX(fs, "oats-gcx-test-not-on-path"); err == nil {
 		t.Fatal("expected disabled download error")
 	}
@@ -83,7 +83,7 @@ func TestResolveDefaultGCXRequiresEmbeddedVersion(t *testing.T) {
 	MinimumGCXVersion = ""
 	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
 
-	fs := gcxRuntimeFlags(t.TempDir(), "auto")
+	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyAuto)
 	if _, err := resolveDefaultGCX(fs, "oats-gcx-test-not-on-path"); err == nil {
 		t.Fatal("expected missing embedded version error")
 	}
@@ -122,7 +122,7 @@ func TestResolveDefaultGCXUsesSufficientPathVersion(t *testing.T) {
 	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
 
 	gcxBin := fakeGCXOnPath(t, "0.4.3")
-	fs := gcxRuntimeFlags(t.TempDir(), "auto")
+	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyAuto)
 	got, err := resolveDefaultGCX(fs, gcxBin)
 	if err != nil {
 		t.Fatalf("resolveDefaultGCX: %v", err)
@@ -147,7 +147,7 @@ func TestResolveDefaultGCXFallsBackForOlderPathVersion(t *testing.T) {
 	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
 
 	gcxBin := fakeGCXOnPath(t, "0.4.2")
-	fs := gcxRuntimeFlags(cacheDir, "auto")
+	fs := gcxRuntimeFlags(cacheDir, gcxDownloadPolicyAuto)
 	got, err := resolveDefaultGCX(fs, gcxBin)
 	if err != nil {
 		t.Fatalf("resolveDefaultGCX: %v", err)
@@ -163,7 +163,7 @@ func TestResolveDefaultGCXRejectsOlderPathVersionWhenDownloadsDisabled(t *testin
 	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
 
 	gcxBin := fakeGCXOnPath(t, "0.4.2")
-	fs := gcxRuntimeFlags(t.TempDir(), "never")
+	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyNever)
 	if _, err := resolveDefaultGCX(fs, gcxBin); err == nil {
 		t.Fatal("expected minimum version error")
 	}
@@ -175,7 +175,7 @@ func TestResolveDefaultGCXExplicitPathOverridesMinimum(t *testing.T) {
 	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
 
 	gcxBin := fakeGCXOnPath(t, "0.4.2")
-	fs := gcxRuntimeFlags(t.TempDir(), "never")
+	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyNever)
 	if err := fs.Set("gcx", gcxBin); err != nil {
 		t.Fatal(err)
 	}

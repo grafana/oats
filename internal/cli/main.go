@@ -130,7 +130,7 @@ func addRunFlags(fs *pflag.FlagSet) {
 	fs.String("config", "oats-config.yaml", "path to oats-config.yaml")
 	fs.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
 	fs.String("gcx-version", "", "download and use this gcx release (for example, 0.4.3)")
-	fs.String("gcx-download", defaultGCXDownloadPolicy(), "gcx fallback download policy: auto | never")
+	fs.String("gcx-download", defaultGCXDownloadPolicy(), fmt.Sprintf("gcx fallback download policy: %s | %s", gcxDownloadPolicyAuto, gcxDownloadPolicyNever))
 	fs.String("format", "text", "output format: text | ndjson")
 	fs.String("tags", "", "comma-separated tag any-match")
 	fs.Duration("timeout", 30*time.Second, "per-assertion timeout")

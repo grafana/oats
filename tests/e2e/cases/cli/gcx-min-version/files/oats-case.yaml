@@ -1,0 +1,13 @@
+name: gcx-min-version
+fixture:
+  remote:
+    endpoint: http://127.0.0.1:4318
+seed:
+  type: inline-otlp
+  logs:
+    - service: gcx-min-version
+      body: gcx-min-version
+expected:
+  logs:
+    - logql: '{service_name="gcx-min-version"}'
+      contains: gcx-min-version

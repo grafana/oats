@@ -15,10 +15,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
+	hashicorpversion "github.com/hashicorp/go-version"
 	"github.com/spf13/pflag"
 )
 
@@ -26,14 +26,19 @@ var gcxReleaseBaseURL = "https://github.com/grafana/gcx/releases/download"
 
 var gcxHTTPClient = &http.Client{Timeout: 10 * time.Minute}
 
+const (
+	gcxDownloadPolicyAuto  = "auto"
+	gcxDownloadPolicyNever = "never"
+)
+
 func defaultGCXDownloadPolicy() string {
 	// A mise-managed environment is expected to install its declared tools and
 	// should not silently reach out to GitHub if that setup is incomplete. The
 	// OATS_GCX_DOWNLOAD/--gcx-download override remains available when desired.
 	if isMiseEnvironment() {
-		return "never"
+		return gcxDownloadPolicyNever
 	}
-	return "auto"
+	return gcxDownloadPolicyAuto
 }
 
 func isMiseEnvironment() bool {
@@ -66,8 +71,8 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 		return "", err
 	}
 	policy = strings.ToLower(strings.TrimSpace(policy))
-	if policy != "auto" && policy != "never" {
-		return "", fmt.Errorf("invalid --gcx-download %q (want auto or never)", policy)
+	if policy != gcxDownloadPolicyAuto && policy != gcxDownloadPolicyNever {
+		return "", fmt.Errorf("invalid --gcx-download %q (want %s or %s)", policy, gcxDownloadPolicyAuto, gcxDownloadPolicyNever)
 	}
 
 	if _, err := exec.LookPath(gcxBin); err == nil {
@@ -82,7 +87,7 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 		if gcxVersionAtLeast(installedVersion, MinimumGCXVersion) {
 			return gcxBin, nil
 		}
-		if policy == "never" {
+		if policy == gcxDownloadPolicyNever {
 			if installedVersion == "" {
 				return "", fmt.Errorf("gcx on PATH did not report a version (minimum %s; automatic download is disabled)", MinimumGCXVersion)
 			}
@@ -104,8 +109,8 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 	if fs.Changed("gcx") {
 		return "", fmt.Errorf("gcx binary %q was not found (set --gcx to its path)", gcxBin)
 	}
-	if policy == "never" {
-		return "", fmt.Errorf("gcx was not found on PATH and automatic download is disabled (install gcx, set --gcx, or use --gcx-download auto)")
+	if policy == gcxDownloadPolicyNever {
+		return "", fmt.Errorf("gcx was not found on PATH and automatic download is disabled (install gcx, set --gcx, or use --gcx-download %s)", gcxDownloadPolicyAuto)
 	}
 	if MinimumGCXVersion == "" {
 		return "", fmt.Errorf("gcx was not found on PATH and this oats build has no embedded minimum gcx version (install gcx or pass --gcx-version)")
@@ -119,89 +124,28 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 	return bootstrapGCX(MinimumGCXVersion, cacheDir)
 }
 
-var gcxVersionPattern = regexp.MustCompile(`(?:^|[^0-9])v?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9A-Za-z.-]+))?`)
+var gcxVersionPattern = regexp.MustCompile(`(?:^|[^0-9A-Za-z])(v?[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)`)
 
-type parsedGCXVersion struct {
-	major      int
-	minor      int
-	patch      int
-	prerelease string
-}
-
-func parseGCXVersion(value string) (parsedGCXVersion, bool) {
+func parseGCXVersion(value string) (string, bool) {
 	match := gcxVersionPattern.FindStringSubmatch(value)
 	if len(match) == 0 {
-		return parsedGCXVersion{}, false
+		return "", false
 	}
-	major, errMajor := strconv.Atoi(match[1])
-	minor, errMinor := strconv.Atoi(match[2])
-	patch, errPatch := strconv.Atoi(match[3])
-	if errMajor != nil || errMinor != nil || errPatch != nil {
-		return parsedGCXVersion{}, false
-	}
-	return parsedGCXVersion{
-		major:      major,
-		minor:      minor,
-		patch:      patch,
-		prerelease: match[4],
-	}, true
+	return strings.TrimPrefix(match[1], "v"), true
 }
 
 func gcxVersionAtLeast(installed, minimum string) bool {
-	got, gotOK := parseGCXVersion(installed)
-	want, wantOK := parseGCXVersion(minimum)
-	if !gotOK || !wantOK {
+	installedVersion, installedOK := parseGCXVersion(installed)
+	minimumVersion, minimumOK := parseGCXVersion(minimum)
+	if !installedOK || !minimumOK {
 		return false
 	}
-	if got.major != want.major {
-		return got.major > want.major
+	got, gotErr := hashicorpversion.NewSemver(installedVersion)
+	want, wantErr := hashicorpversion.NewSemver(minimumVersion)
+	if gotErr != nil || wantErr != nil {
+		return false
 	}
-	if got.minor != want.minor {
-		return got.minor > want.minor
-	}
-	if got.patch != want.patch {
-		return got.patch > want.patch
-	}
-	return compareGCXPrerelease(got.prerelease, want.prerelease) >= 0
-}
-
-func compareGCXPrerelease(a, b string) int {
-	if a == b {
-		return 0
-	}
-	if a == "" {
-		return 1
-	}
-	if b == "" {
-		return -1
-	}
-
-	aParts := strings.Split(a, ".")
-	bParts := strings.Split(b, ".")
-	for i := 0; i < len(aParts) && i < len(bParts); i++ {
-		aNumber, aErr := strconv.Atoi(aParts[i])
-		bNumber, bErr := strconv.Atoi(bParts[i])
-		switch {
-		case aErr == nil && bErr == nil && aNumber != bNumber:
-			if aNumber < bNumber {
-				return -1
-			}
-			return 1
-		case aErr == nil && bErr != nil:
-			return -1
-		case aErr != nil && bErr == nil:
-			return 1
-		case aParts[i] != bParts[i]:
-			if aParts[i] < bParts[i] {
-				return -1
-			}
-			return 1
-		}
-	}
-	if len(aParts) < len(bParts) {
-		return -1
-	}
-	return 1
+	return got.GreaterThanOrEqual(want)
 }
 
 // bootstrapGCX downloads a verified gcx release into the user's cache and
