@@ -295,14 +295,15 @@ assuming `/bin/sh` exists. The process runs with its working directory set to
 the case directory and inherits the parent environment plus these OATS-provided
 variables:
 
-| Variable                                                         | Fixtures     | Meaning                                              |
-| ---------------------------------------------------------------- | ------------ | ---------------------------------------------------- |
-| `OATS_FIXTURE_TYPE`                                              | all          | `remote` / `compose` / `k3d`                         |
-| `OATS_GRAFANA_URL`                                               | all          | base URL of the fixture's Grafana                    |
-| `OATS_APP_URL`                                                   | remote, k3d  | base URL of the app under test                       |
-| `OATS_OTLP_HTTP`                                                 | compose, k3d | OTLP/HTTP endpoint                                   |
-| `OATS_PYROSCOPE_URL`                                             | compose, k3d | Pyroscope base URL                                   |
-| `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE`, `OATS_COMPOSE_FILE_ARGS` | compose      | let the script run its own `docker compose` commands |
+| Variable                                                         | Fixtures     | Meaning                                                     |
+| ---------------------------------------------------------------- | ------------ | ----------------------------------------------------------- |
+| `OATS_FIXTURE_TYPE`                                              | all          | `remote` / `compose` / `k3d`                                |
+| `OATS_GRAFANA_URL`                                               | all          | base URL of the fixture's Grafana                           |
+| `OATS_APP_URL`                                                   | remote, k3d  | base URL of the app under test                              |
+| `OATS_OTLP_HTTP`                                                 | compose, k3d | OTLP/HTTP endpoint                                          |
+| `OATS_PYROSCOPE_URL`                                             | compose, k3d | Pyroscope base URL                                          |
+| `OATS_CONTAINER_RUNTIME`                                         | compose      | resolved engine (`docker` or `podman`) for Compose commands |
+| `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE`, `OATS_COMPOSE_FILE_ARGS` | compose      | let the script run its own `<runtime> compose` commands     |
 
 A custom check that queries Grafana directly (replacing, for example, a legacy
 `compose-logs` grep with a real LogQL query):

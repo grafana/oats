@@ -17,14 +17,15 @@ import (
 
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/testhelpers/compose"
+	"github.com/grafana/oats/testhelpers/container"
 	"github.com/grafana/oats/testhelpers/kubernetes"
 	"github.com/grafana/oats/testhelpers/remote"
 )
 
 // Seams overridable in tests.
 var (
-	newComposeSuite = func(files []string, env []string) (Handle, error) {
-		return compose.SuiteFiles(files, env)
+	newComposeSuite = func(files []string, env []string, engine container.Engine) (Handle, error) {
+		return compose.SuiteFilesWithRuntime(files, env, engine)
 	}
 	newKubernetesEndpoint = func(plan discovery.Plan, ports remote.PortsConfig) *remote.Endpoint {
 		sourceDir := plan.FixtureSourceDir
@@ -44,8 +45,15 @@ var (
 		return kubernetes.NewEndpoint("localhost", model, ports, plan.Name, sourceDir)
 	}
 	waitForGrafanaToken = waitForGrafanaTokenImpl
-	lookupComposePort   = dockerComposePort
+	lookupComposePort   = composePort
 )
+
+// Options controls host-side fixture behavior. It intentionally does not
+// appear in the case schema: the same test should run against the user's
+// selected container engine without changing the test definition.
+type Options struct {
+	ContainerRuntime string
+}
 
 // Runtime carries the resolved coordinates of a booted fixture back to the
 // caller: where the backends live, the gcx config to talk to them, the compose
@@ -61,6 +69,7 @@ type Runtime struct {
 	GCXConfig        string
 	ParallelSafe     bool
 	ParallelDisabled string
+	ContainerRuntime string
 }
 
 // Handle is a booted fixture that can be torn down.
@@ -77,11 +86,42 @@ type startableHandle interface {
 // teardown plus the resolved Runtime. Remote/empty fixtures need no boot and
 // return a nil Handle.
 func Start(ctx context.Context, plan discovery.Plan) (Handle, Runtime, error) {
+	return startWithEngine(ctx, plan, container.Docker)
+}
+
+// StartWithOptions boots a fixture using host-side options supplied by the
+// CLI. An empty runtime keeps the Docker compatibility default for library
+// callers; the CLI passes auto so local runs prefer Podman when available.
+func StartWithOptions(ctx context.Context, plan discovery.Plan, opts Options) (Handle, Runtime, error) {
+	engine := opts.ContainerRuntime
+	if engine == "" {
+		engine = string(container.Docker)
+	}
+
+	if plan.Fixture.Kind() == "compose" {
+		resolved, err := container.Resolve(engine)
+		if err != nil {
+			return nil, Runtime{}, err
+		}
+		return startWithEngine(ctx, plan, resolved)
+	}
+
+	requested, err := container.Parse(engine)
+	if err != nil {
+		return nil, Runtime{}, err
+	}
+	if requested == container.Podman {
+		return nil, Runtime{}, fmt.Errorf("k3d fixtures require Docker; Podman is currently supported for Compose fixtures")
+	}
+	return startWithEngine(ctx, plan, container.Docker)
+}
+
+func startWithEngine(ctx context.Context, plan discovery.Plan, engine container.Engine) (Handle, Runtime, error) {
 	switch plan.Fixture.Kind() {
 	case "", "remote":
 		return nil, Runtime{ParallelSafe: true}, nil
 	case "compose":
-		return startCompose(plan)
+		return startCompose(plan, engine)
 	case "k3d":
 		return startK3D(ctx, plan)
 	default:

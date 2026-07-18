@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/oats/testhelpers/container"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -54,15 +55,16 @@ type placeholders struct {
 }
 
 type sharedEnv struct {
-	RepoRoot       string
-	TempDir        string
-	ComposeFile    string
-	Project        string
-	GrafanaURL     string
-	RemoteOTLPHTTP string
-	GCX            string
-	GCXConfig      string
-	OATS           string
+	RepoRoot         string
+	TempDir          string
+	ComposeFile      string
+	Project          string
+	GrafanaURL       string
+	RemoteOTLPHTTP   string
+	GCX              string
+	GCXConfig        string
+	OATS             string
+	ContainerRuntime string
 }
 
 var (
@@ -121,8 +123,12 @@ func TestCases(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("e2e cases rely on POSIX shell helpers")
 	}
-	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skip("docker is required for e2e")
+	engine, err := container.Resolve(os.Getenv("OATS_CONTAINER_RUNTIME"))
+	if err != nil {
+		t.Skipf("container runtime is required for e2e: %v", err)
+	}
+	if engine == container.Podman && strings.Contains(os.Getenv("OATS_E2E_FILTER"), "k3d") {
+		t.Skip("k3d e2e cases require Docker; run the Compose shard for Podman")
 	}
 
 	root := repoRoot(t)
@@ -166,13 +172,15 @@ func TestCases(t *testing.T) {
 func setupSharedEnv(env *sharedEnv) error {
 	start := time.Now()
 	fmt.Fprintln(os.Stderr, "e2e timing: setting up shared remote LGTM env")
-	if _, err := exec.LookPath("docker"); err != nil {
+	engine, err := container.Resolve(os.Getenv("OATS_CONTAINER_RUNTIME"))
+	if err != nil {
 		return err
 	}
 	if err := prepareLocalTools(env); err != nil {
 		return err
 	}
 	env.Project = fmt.Sprintf("oatse2e%d", os.Getpid())
+	env.ContainerRuntime = string(engine)
 	env.ComposeFile = filepath.Join(env.TempDir, "docker-compose.yml")
 	const composeBody = `services:
   lgtm:
@@ -184,19 +192,20 @@ func setupSharedEnv(env *sharedEnv) error {
 	if err := os.WriteFile(env.ComposeFile, []byte(composeBody), 0o644); err != nil {
 		return err
 	}
-	up := exec.Command("docker", "compose", "-p", env.Project, "-f", env.ComposeFile, "up", "-d")
+	upArgs := append(engine.ComposeArgs(), "-p", env.Project, "-f", env.ComposeFile, "up", "-d")
+	up := exec.Command(engine.Binary(), upArgs...)
 	up.Stdout = os.Stdout
 	up.Stderr = os.Stderr
 	upStart := time.Now()
 	if err := up.Run(); err != nil {
 		return fmt.Errorf("start shared lgtm: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "e2e timing: docker compose up for shared LGTM finished in %s\n", time.Since(upStart).Round(time.Millisecond))
-	grafanaPort, err := dockerComposePort(env.Project, env.ComposeFile, "lgtm", "3000")
+	fmt.Fprintf(os.Stderr, "e2e timing: %s compose up for shared LGTM finished in %s\n", engine, time.Since(upStart).Round(time.Millisecond))
+	grafanaPort, err := dockerComposePort(engine, env.Project, env.ComposeFile, "lgtm", "3000")
 	if err != nil {
 		return err
 	}
-	otlpPort, err := dockerComposePort(env.Project, env.ComposeFile, "lgtm", "4318")
+	otlpPort, err := dockerComposePort(engine, env.Project, env.ComposeFile, "lgtm", "4318")
 	if err != nil {
 		return err
 	}
@@ -320,24 +329,25 @@ func writeGCXConfig(path, grafanaURL string) error {
 	return os.WriteFile(path, data, 0o600)
 }
 
-func dockerComposePort(project, composeFile, service, containerPort string) (string, error) {
-	cmd := exec.Command("docker", "compose", "-p", project, "-f", composeFile, "port", service, containerPort)
+func dockerComposePort(engine container.Engine, project, composeFile, service, containerPort string) (string, error) {
+	args := append(engine.ComposeArgs(), "-p", project, "-f", composeFile, "port", service, containerPort)
+	cmd := exec.Command(engine.Binary(), args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("docker compose port %s %s: %w\n%s", service, containerPort, err, stderr.String())
+		return "", fmt.Errorf("%s compose port %s %s: %w\n%s", engine, service, containerPort, err, stderr.String())
 	}
 	out := strings.TrimSpace(stdout.String())
 	if out == "" {
-		return "", fmt.Errorf("docker compose port %s %s: empty output", service, containerPort)
+		return "", fmt.Errorf("%s compose port %s %s: empty output", engine, service, containerPort)
 	}
 	host, port, err := splitHostPort(out)
 	if err != nil {
-		return "", fmt.Errorf("docker compose port %s %s: %w", service, containerPort, err)
+		return "", fmt.Errorf("%s compose port %s %s: %w", engine, service, containerPort, err)
 	}
 	if host == "" {
-		return "", fmt.Errorf("docker compose port %s %s: missing host in %q", service, containerPort, out)
+		return "", fmt.Errorf("%s compose port %s %s: missing host in %q", engine, service, containerPort, out)
 	}
 	return port, nil
 }
@@ -361,7 +371,9 @@ func splitHostPort(addr string) (string, string, error) {
 func teardownSharedEnv(env *sharedEnv) error {
 	var errs []string
 	if env.ComposeFile != "" {
-		cmd := exec.Command("docker", "compose", "-p", env.Project, "-f", env.ComposeFile, "down", "-v", "--remove-orphans")
+		engine := container.Engine(env.ContainerRuntime)
+		args := append(engine.ComposeArgs(), "-p", env.Project, "-f", env.ComposeFile, "down", "-v", "--remove-orphans")
+		cmd := exec.Command(engine.Binary(), args...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
