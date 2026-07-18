@@ -291,18 +291,18 @@ func fixedShortPortMapping(value string) bool {
 	return false
 }
 
-func readComposeGrafanaToken(plan discovery.Plan) (string, error) {
+func readComposeGrafanaToken(plan discovery.Plan, engine container.Engine) (string, error) {
 	compose := plan.Fixture.Compose
 	files, _, err := resolveComposeFiles(plan.FixtureSourceDir, compose)
 	if err != nil {
 		return "", err
 	}
-	args := []string{"compose"}
+	args := engine.ComposeArgs()
 	for _, f := range files {
 		args = append(args, "-f", f)
 	}
 	args = append(args, "exec", "-T", lgtmComposeService, "sh", "-c", "cat /tmp/grafana-sa-token 2>/dev/null || true")
-	cmd := exec.Command("docker", args...)
+	cmd := exec.Command(engine.Binary(), args...)
 	cmd.Env = append(cmd.Environ(), compose.Env...)
 	out, err := cmd.Output()
 	if err != nil {
@@ -328,7 +328,7 @@ func composePort(engine container.Engine, files []string, env []string, service,
 		return "", err
 	}
 	if host == "" || port == "" {
-		return "", fmt.Errorf("invalid docker compose port output %q", strings.TrimSpace(string(out)))
+		return "", fmt.Errorf("invalid compose port output %q", strings.TrimSpace(string(out)))
 	}
 	return port, nil
 }

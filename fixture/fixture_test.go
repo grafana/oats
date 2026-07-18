@@ -435,7 +435,7 @@ func TestSupportsParallel_AppSeedRequiresAppService(t *testing.T) {
 func TestWaitForGrafanaToken_DefaultFixtureReturnsEmpty(t *testing.T) {
 	token, err := waitForGrafanaToken(discovery.Plan{
 		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}},
-	})
+	}, container.Docker)
 	if err != nil {
 		t.Fatalf("waitForGrafanaToken: %v", err)
 	}

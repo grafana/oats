@@ -280,14 +280,14 @@ contexts:
 	return path, nil
 }
 
-func waitForGrafanaTokenImpl(plan discovery.Plan) (string, error) {
+func waitForGrafanaTokenImpl(plan discovery.Plan, engine container.Engine) (string, error) {
 	deadline := time.Now().Add(3 * time.Minute)
 	for time.Now().Before(deadline) {
 		var token string
 		var err error
 		switch plan.Fixture.Kind() {
 		case "compose":
-			token, err = readComposeGrafanaToken(plan)
+			token, err = readComposeGrafanaToken(plan, engine)
 		case "k3d":
 			token, err = readK3DGrafanaToken()
 		default:

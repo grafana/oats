@@ -62,10 +62,26 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes podman podman-compose
+      - name: Start rootless Podman service
+        if: matrix.shard == 'compose-podman'
+        run: |
+          socket="$XDG_RUNTIME_DIR/podman/podman.sock"
+          mkdir -p "$(dirname "$socket")"
+          podman system service --time=0 "unix://$socket" >"$RUNNER_TEMP/podman-service.log" 2>&1 &
+          echo "DOCKER_HOST=unix://$socket" >> "$GITHUB_ENV"
+          for _ in {1..30}; do
+            if [[ -S "$socket" ]]; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/podman-service.log"
+          exit 1
       - name: Run e2e tests
         # OATS_E2E_FILTER is not part of the matrix to avoid that it shows up in the gh action (too long)
         env:
           OATS_E2E_SHARD: ${{ matrix.shard }}
+          OATS_CONTAINER_RUNTIME: ${{ matrix.shard == 'compose-podman' && 'podman' || 'docker' }}
         run: |
           start_ts="$(date +%s)"
           case "$OATS_E2E_SHARD" in
@@ -130,6 +146,7 @@ jobs:
         env:
           OATS_BIN: ${{ github.workspace }}/.e2e-tools/bin/oats
           GCX_BIN: ${{ github.workspace }}/.e2e-tools/bin/gcx
+          OATS_CONTAINER_RUNTIME: docker
           OATS_EXAMPLE_MODE: ${{ matrix.mode }}
         run: mise run example-test
 
@@ -152,6 +169,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes podman podman-compose
+      - name: Start rootless Podman service
+        run: |
+          socket="$XDG_RUNTIME_DIR/podman/podman.sock"
+          mkdir -p "$(dirname "$socket")"
+          podman system service --time=0 "unix://$socket" >"$RUNNER_TEMP/podman-service.log" 2>&1 &
+          echo "DOCKER_HOST=unix://$socket" >> "$GITHUB_ENV"
+          for _ in {1..30}; do
+            if [[ -S "$socket" ]]; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/podman-service.log"
+          exit 1
       - name: Download e2e tools
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
