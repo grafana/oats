@@ -81,6 +81,8 @@ jobs:
         # OATS_E2E_FILTER is not part of the matrix to avoid that it shows up in the gh action (too long)
         env:
           OATS_E2E_SHARD: ${{ matrix.shard }}
+          # Keep the CI matrix explicit: hosted runners may have both engines
+          # installed, while auto mode intentionally prefers Podman locally.
           OATS_CONTAINER_RUNTIME: ${{ matrix.shard == 'compose-podman' && 'podman' || 'docker' }}
         run: |
           start_ts="$(date +%s)"
@@ -93,7 +95,6 @@ jobs:
               ;;
             compose-podman)
               export OATS_E2E_FILTER="fixture/compose"
-              export OATS_CONTAINER_RUNTIME=podman
               ;;
             remote)
               export OATS_E2E_FILTER="fixture/remote"
