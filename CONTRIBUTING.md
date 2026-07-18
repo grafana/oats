@@ -1,7 +1,8 @@
-# Repository guide
+# Contributing to OATs
 
-This is the orientation page for contributors. It links to the detailed
-references without duplicating the case schema or CLI reference.
+This is the starting point for contributing to OATs. It covers the development
+workflow and repository architecture, then links to detailed references without
+duplicating the case schema or CLI reference.
 
 ## Start here
 
@@ -13,9 +14,9 @@ mise run lint        # Flint's aggregate lint/check command
 mise run check       # lint + test
 ```
 
-For the user-facing surface, read [CLI](cli.md), [case reference](case-reference.md),
-[CI guidance](ci.md), and [upgrading](../UPGRADING.md). The root
-[AGENTS.md](../AGENTS.md) contains the concise coding-agent instructions.
+For the user-facing surface, read [CLI](docs/cli.md), [case reference](docs/case-reference.md),
+[CI guidance](docs/ci.md), and [upgrading](UPGRADING.md). The root
+[AGENTS.md](AGENTS.md) contains the concise coding-agent instructions.
 
 ## Architecture at a glance
 
@@ -59,7 +60,7 @@ fixture safety gate allows it.
 ## CLI, environment, and gcx
 
 - Every run flag has an `OATS_` environment equivalent; command-line values win.
-  The complete table is in [cli.md](cli.md).
+  The complete table is in [CLI reference](docs/cli.md).
 - `gcx` is a separate executable. OATS does not bundle it into the oats binary.
   Release and mise builds embed the pinned gcx version so a missing default gcx
   can be downloaded, checksum-verified, and cached. `--gcx-version` explicitly
@@ -70,7 +71,7 @@ fixture safety gate allows it.
   GoReleaser receives the same value through `GCX_VERSION` in the release
   workflow. Do not hard-code a second gcx version in a script or workflow.
 - `OATS_GHA_ANNOTATIONS` controls the optional GitHub Actions error annotations
-  emitted by the text reporter. See [ci.md](ci.md).
+  emitted by the text reporter. See [CI guidance](docs/ci.md).
 
 ## Test and CI map
 

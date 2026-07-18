@@ -2,7 +2,7 @@
 
 This file provides guidance to AI coding agents when working with code in this repository.
 
-For a broader contributor orientation, see [docs/repository-guide.md](docs/repository-guide.md).
+For a broader contributor orientation, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project Overview
 
