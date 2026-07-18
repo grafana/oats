@@ -16,7 +16,9 @@ mise run check       # lint + test
 
 For the user-facing surface, read [CLI](docs/cli.md), [case reference](docs/case-reference.md),
 [CI guidance](docs/ci.md), and [upgrading](UPGRADING.md). The root
-[AGENTS.md](AGENTS.md) contains the concise coding-agent instructions.
+[AGENTS.md](AGENTS.md) contains the concise coding-agent instructions. Durable
+architecture and product decisions are recorded in the
+[architecture decision records](https://github.com/grafana/oats/pull/393).
 
 ## Architecture at a glance
 
