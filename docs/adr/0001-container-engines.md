@@ -1,6 +1,6 @@
 # ADR-0001: Container engines for fixture-backed tests
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-18
 
 ## Context
@@ -49,8 +49,12 @@ consumer needs it.
   `auto` mode can prefer a rootless Podman installation.
 - No case-file migration or schema change is required.
 
+## Implementation
+
+The Docker and rootless-Podman Compose paths are covered by the e2e matrix in
+[PR #394](https://github.com/grafana/oats/pull/394).
+
 ## Revisit
 
-Promote this ADR to **Accepted** after the Docker and rootless-Podman Compose
-paths pass the same representative e2e suite. Add k3d/Podman or Apple Container
-adapters only with a concrete implementation and CI coverage.
+Add k3d/Podman or Apple Container adapters only with a concrete implementation
+and CI coverage.
