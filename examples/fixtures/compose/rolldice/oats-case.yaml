@@ -1,0 +1,29 @@
+# Boots a compose fixture: OATS runs `docker compose up` on these files, waits
+# for readiness, then tears them down. A compose fixture defaults to
+# `template: lgtm`, so OATS boots a grafana/otel-lgtm stack alongside these files
+# — that's the `lgtm` service the env below points at. Set `template: none` to
+# bring your own stack. Every case in a fixture group must declare the same fixture.
+name: compose fixture app smoke
+tags: [compose, app]   # filter with `oats --tags compose`
+
+fixture:
+  compose:
+    files: ["docker-compose.yml", "docker-compose.override.yml"]
+    env: ["OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318"]
+    app_service: rolldice
+    app_port: 8080
+
+input:
+  - path: /rolldice?rolls=3
+
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "rolldice" }'
+      match_spans:
+        - match_type: regexp
+          name: '^GET /rolldice.*$'
+  logs:
+    - logql: '{service_name="rolldice"}'
+      match:
+        - match_type: regexp
+          name: '.*roll.*'

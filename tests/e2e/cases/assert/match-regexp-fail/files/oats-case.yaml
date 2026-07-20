@@ -1,0 +1,16 @@
+name: match-regexp-fail
+fixture:
+  remote:
+    endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  logs:
+    - service: {{CASE_NAME}}
+      body: seed-log-line
+expected:
+  logs:
+    # The seeded body is "seed-log-line", which never matches "nomatch-.*".
+    - logql: '{service_name="{{CASE_NAME}}"}'
+      match:
+        - match_type: regexp
+          name: 'nomatch-.*'
