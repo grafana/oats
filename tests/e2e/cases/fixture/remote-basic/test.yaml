@@ -7,10 +7,35 @@ run:
     set -euo pipefail
     workdir="$PWD"
     project="oats-remote-basic-$$"
-    trap 'docker compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" down -v --remove-orphans >/dev/null 2>&1 || true' EXIT
-    docker compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" up -d >/dev/null
-    grafana_port="$(docker compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" port lgtm 3000 | awk -F: '{print $NF}')"
-    otlp_port="$(docker compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" port lgtm 4318 | awk -F: '{print $NF}')"
+    container_runtime="${OATS_CONTAINER_RUNTIME:-auto}"
+    case "$container_runtime" in
+      auto)
+        if command -v podman >/dev/null 2>&1 && podman compose version >/dev/null 2>&1; then
+          container_engine=podman
+        elif command -v docker >/dev/null 2>&1; then
+          container_engine=docker
+        else
+          echo "podman or docker is required for the remote fixture" >&2
+          exit 1
+        fi
+        ;;
+      docker|podman)
+        container_engine="$container_runtime"
+        if ! command -v "$container_engine" >/dev/null 2>&1; then
+          echo "$container_engine is required by OATS_CONTAINER_RUNTIME=$container_runtime" >&2
+          exit 1
+        fi
+        ;;
+      *)
+        echo "unknown OATS_CONTAINER_RUNTIME: $container_runtime (want auto, docker, or podman)" >&2
+        exit 1
+        ;;
+    esac
+    compose() { "$container_engine" compose "$@"; }
+    trap 'compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" down -v --remove-orphans >/dev/null 2>&1 || true' EXIT
+    compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" up -d >/dev/null
+    grafana_port="$(compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" port lgtm 3000 | awk -F: '{print $NF}')"
+    otlp_port="$(compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" port lgtm 4318 | awk -F: '{print $NF}')"
     healthy=false
     for i in $(seq 1 60); do
       if curl -fsS "http://127.0.0.1:${grafana_port}/api/health" >/dev/null; then

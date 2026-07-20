@@ -18,7 +18,7 @@ all | apps | compose)
 esac
 
 if [[ ! -x "$oats_bin" ]]; then
-	go build -o "$oats_bin" "$root/."
+	go build -buildvcs=false -o "$oats_bin" "$root/."
 fi
 
 if ! command -v "$gcx_bin" >/dev/null 2>&1; then
