@@ -5,6 +5,161 @@ The changelog is available in the [releases section](https://github.com/grafana/
 This file only contains upgrade notes for breaking changes that require you to
 modify your existing YAML test files.
 
+## Unreleased / next major
+
+> [!WARNING]
+> **Breaking change:** the legacy root runner has been removed.
+
+The root `oats` binary now runs the gcx-driven current CLI only.
+
+That means upgrades now require migrating to the current:
+
+- `oats-config.yaml` case-discovery file
+- current case yaml shape documented in [docs/case-reference.md](docs/case-reference.md)
+
+The legacy "pass one or more old yaml files directly to `oats`" runner has been
+removed. For one-off help migrating old cases, use:
+
+```sh
+oats migrate path/to/legacy.yaml
+```
+
+### Case schema: version 2 → 3
+
+The case-yaml assertion shape changed with the gcx-driven runner, and the schema
+version moved. A v3 case no longer carries an `oats-schema-version` field: cases
+are only ever loaded through `oats-config.yaml`, whose `meta.version: 3` is the
+single schema version. Drop the per-case `oats-schema-version` tag and update
+assertions. The `0.5.0` / `0.6.0` notes further down describe the **version-2**
+shape (`equals`, `attribute-regexp`, `flamebearers`, `regexp`); the mappings
+below take you from that shape to version 3.
+
+**Logs — regex.** Version 2's `regexp:` becomes `regex:` (scalar or list).
+`contains` / `not_contains` are also first-class again:
+
+```diff
+ logs:
+   - logql: '{job="app"}'
+-    regexp: "error"
++    regex: "error"
+```
+
+**Traces — span matching.** Version 2's flat `equals` / `attributes` /
+`attribute-regexp` become structured `match_spans` entries with an explicit
+`match_type` and a list-of-`{key, value}` attribute form:
+
+```diff
+ traces:
+   - traceql: '{}'
+-    equals: "GET /api"
+-    attributes:
+-      http.method: "GET"
+-    attribute-regexp:
+-      http.route: "/api/.*"
++    match_spans:
++      - match_type: strict
++        name: "GET /api"
++        attributes:
++          - key: http.method
++            value: "GET"
++      - match_type: regexp
++        attributes:
++          - key: http.route
++            value: "/api/.*"
+```
+
+A span name matched by regex:
+
+```diff
+ traces:
+   - traceql: '{}'
+-    regexp: "GET /api.*"
++    match_spans:
++      - match_type: regexp
++        name: "GET /api.*"
+```
+
+**Profiles.** Version 2's `flamebearers:` block becomes the shared assertion
+vocabulary keyed off `query`:
+
+```diff
+ profiles:
+   - query: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds'
+-    flamebearers:
+-      equals: "my-function"
++    match:
++      - match_type: strict
++        name: "my-function"
+```
+
+**`compose-logs`.** Still supported natively for `compose` fixtures
+(`expected.compose-logs: [ ... ]`). `oats migrate` does **not** convert it (it
+emits a warning); either keep it as-is on a compose fixture, or replace it with
+a `custom-checks` script that queries the backend directly — see the
+[custom checks](docs/case-reference.md#custom-checks) contract.
+
+**`matrix`.** Not migrated automatically. `oats migrate` flattens a single-entry
+matrix and otherwise emits a hint; multi-entry matrices must be split into
+separate cases by hand.
+
+### Worked example: a full legacy case → v3
+
+A legacy (schema-version 2) case plus its `docker-compose`:
+
+```yaml
+# oats.yaml (v2)
+oats-schema-version: 2
+docker-compose:
+  files:
+    - ./docker-compose.yaml
+input:
+  - path: /rolldice
+expected:
+  traces:
+    - traceql: '{}'
+      spans:
+        - name: "GET /rolldice"
+          attributes:
+            http.request.method: "GET"
+  logs:
+    - logql: '{service_name="rolldice"}'
+      contains: ["rolling the dice"]
+```
+
+Run `oats migrate ./oats.yaml`. Split the result into an `oats-config.yaml` and a v3
+case (the migrator prints both the case yaml and a suggested `fixture:` block):
+
+```yaml
+# oats-config.yaml
+meta:
+  version: 3
+cases:
+  - cases/rolldice.yaml
+```
+
+```yaml
+# cases/rolldice.yaml (v3)
+name: rolldice
+seed:
+  type: app
+input:
+  - path: /rolldice
+expected:
+  traces:
+    - traceql: '{}'
+      match_spans:
+        - match_type: strict
+          name: "GET /rolldice"
+          attributes:
+            - key: http.request.method
+              value: "GET"
+  logs:
+    - logql: '{service_name="rolldice"}'
+      contains: "rolling the dice"
+```
+
+See [docs/case-reference.md](docs/case-reference.md) for the full version-3 assertion reference.
+
 ## 0.6.0
 
 ⚠️ Breaking Changes - Migration Required: File Version Tag
@@ -17,7 +172,7 @@ Full release notes: <https://github.com/grafana/oats/releases/tag/v0.6.0>
 ### Add `oats-schema-version: 2` to all test files
 
 All OATS test files must now include the `oats-schema-version` field at the
-top level. The current version is `2`.
+top level. In `v0.6.0` the required version was `2`.
 
 ```yaml
 # ✅ Required in all test files

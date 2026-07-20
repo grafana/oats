@@ -1,0 +1,4 @@
+# A single-project OATS config: one case, in this directory.
+meta:
+  version: 3
+cases: ["oats-case.yaml"]

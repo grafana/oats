@@ -1,0 +1,7 @@
+name: inline-otlp-invalid
+tags: [seed, inline-otlp, fail]
+
+expect:
+  exit_code: 2
+  stderr_contains:
+    - "seed: inline-otlp must declare at least one trace, log, or metric"

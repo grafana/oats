@@ -1,0 +1,16 @@
+name: inline-otlp
+tags: [seed, inline-otlp, traces, logs, metrics]
+
+execution:
+  mode: serial
+
+run:
+  args:
+    - --timeout
+    - 30s
+    - --interval
+    - 1s
+
+expect:
+  stdout_contains:
+    - PASS 1/1

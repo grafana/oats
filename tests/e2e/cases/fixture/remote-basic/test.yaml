@@ -1,0 +1,93 @@
+name: remote-basic
+tags: [fixture, remote]
+execution:
+  mode: serial
+run:
+  shell: |
+    set -euo pipefail
+    workdir="$PWD"
+    project="oats-remote-basic-$$"
+    container_runtime="${OATS_CONTAINER_RUNTIME:-auto}"
+    case "$container_runtime" in
+      auto)
+        if command -v podman >/dev/null 2>&1 && podman compose version >/dev/null 2>&1; then
+          container_engine=podman
+        elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+          container_engine=docker
+        else
+          echo "podman compose or docker compose is required for the remote fixture" >&2
+          exit 1
+        fi
+        ;;
+      docker|podman)
+        container_engine="$container_runtime"
+        if ! command -v "$container_engine" >/dev/null 2>&1; then
+          echo "$container_engine is required by OATS_CONTAINER_RUNTIME=$container_runtime" >&2
+          exit 1
+        fi
+        if ! "$container_engine" compose version >/dev/null 2>&1; then
+          echo "$container_engine compose is required by OATS_CONTAINER_RUNTIME=$container_runtime" >&2
+          exit 1
+        fi
+        ;;
+      *)
+        echo "unknown OATS_CONTAINER_RUNTIME: $container_runtime (want auto, docker, or podman)" >&2
+        exit 1
+        ;;
+    esac
+    compose() { "$container_engine" compose "$@"; }
+    trap 'compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" down -v --remove-orphans >/dev/null 2>&1 || true' EXIT
+    compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" up -d >/dev/null
+    grafana_port="$(compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" port lgtm 3000 | awk -F: '{print $NF}')"
+    otlp_port="$(compose -p "$project" -f "$workdir/files/docker-compose.remote.yml" port lgtm 4318 | awk -F: '{print $NF}')"
+    healthy=false
+    for i in $(seq 1 60); do
+      if curl -fsS "http://127.0.0.1:${grafana_port}/api/health" >/dev/null; then
+        healthy=true
+        break
+      fi
+      sleep 2
+    done
+    if [ "$healthy" != true ]; then
+      echo "grafana never became healthy on port ${grafana_port} after 120s" >&2
+      exit 1
+    fi
+    cat > "$workdir/files/gcx.remote.yaml" <<CFG
+    current-context: remote
+    contexts:
+      remote:
+        grafana:
+          server: http://127.0.0.1:${grafana_port}
+          user: admin
+          password: admin
+          org-id: 1
+          auth-method: basic
+        datasources:
+          prometheus: prometheus
+          loki: loki
+          tempo: tempo
+          pyroscope: pyroscope
+    CFG
+    cat > "$workdir/files/oats-case.yaml" <<CFG
+    name: remote-basic
+    fixture:
+      remote:
+        endpoint: http://127.0.0.1:${otlp_port}
+    seed:
+      type: inline-otlp
+      logs:
+        - service: remote-basic
+          body: seed-log-line
+    expected:
+      logs:
+        - logql: '{service_name="remote-basic"}'
+          match:
+            - name: seed-log-line
+              attributes:
+                - key: service_name
+                  value: remote-basic
+    CFG
+    GCX_CONFIG="$workdir/files/gcx.remote.yaml" "{{OATS}}" --config "$workdir/.generated-oats.yaml" --gcx "{{GCX}}" --gcx-context remote --no-cache
+expect:
+  stdout_contains:
+    - PASS 1/1

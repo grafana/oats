@@ -1,0 +1,19 @@
+name: gcx-min-version
+tags: [cli, gcx]
+
+# An implicit PATH lookup must reject a gcx older than the build-time minimum.
+# The fake binary is prepended to PATH by the e2e harness; --gcx-download never
+# keeps this check offline and makes the expected error deterministic.
+run:
+  command: "{{OATS}}"
+  args:
+    - --config
+    - "{{CASE_DIR}}/files/oats-config.yaml"
+    - --gcx-download
+    - never
+
+expect:
+  exit_code: 2
+  stderr_contains:
+    - "gcx on PATH is"
+    - "automatic download is disabled"
