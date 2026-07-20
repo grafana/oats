@@ -73,6 +73,23 @@ func TestResolveExplicitDoesNotFallback(t *testing.T) {
 	}
 }
 
+func TestResolveDockerRequiresCompose(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a POSIX executable")
+	}
+
+	dir := t.TempDir()
+	docker := filepath.Join(dir, "docker")
+	if err := os.WriteFile(docker, []byte("#!/bin/sh\nexit 1\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	if _, err := Resolve("docker"); err == nil {
+		t.Fatal("Resolve(docker) unexpectedly succeeded without Docker Compose")
+	}
+}
+
 func TestResolveAutoPrefersPodman(t *testing.T) {
 	dir := t.TempDir()
 	if runtime.GOOS == "windows" {

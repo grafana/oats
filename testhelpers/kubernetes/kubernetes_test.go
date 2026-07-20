@@ -74,6 +74,7 @@ func TestStart_DefaultDockerContextAndCommandSequence(t *testing.T) {
 		"fg: k3d image import -c smoke-group busybox:latest",
 		"fg: kubectl apply -f k8s",
 		"fg: kubectl wait --timeout=5m --for=condition=available deployment/lgtm",
+		"fg: kubectl wait --timeout=5m --for=jsonpath={.subsets[0].addresses[0].ip} endpoints/dice",
 		"bg: kubectl port-forward service/dice 18080:8080",
 		"bg: kubectl port-forward service/lgtm 13100:3100",
 		"bg: kubectl port-forward service/lgtm 13000:3000",
@@ -122,6 +123,13 @@ func TestStartWaitsForLgtmDeploymentAvailability(t *testing.T) {
 		"--timeout=5m",
 		"--for=condition=available",
 		"deployment/lgtm",
+	})
+	require.Contains(t, commands, []string{
+		"kubectl",
+		"wait",
+		"--timeout=5m",
+		"--for=jsonpath={.subsets[0].addresses[0].ip}",
+		"endpoints/dice",
 	})
 }
 

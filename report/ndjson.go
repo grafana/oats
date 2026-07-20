@@ -10,7 +10,6 @@ import (
 // events are filtered by Verbosity in the same spirit as TextReporter so the
 // token cost of "everything went fine" remains zero.
 type NDJSONReporter struct {
-	w   io.Writer
 	enc *json.Encoder
 	v   Verbosity
 }
@@ -20,7 +19,7 @@ func NewNDJSONReporter(w io.Writer, v Verbosity) *NDJSONReporter {
 	// Compact form: no HTML escaping, no extra whitespace beyond the
 	// trailing newline json.Encoder emits per Encode.
 	enc.SetEscapeHTML(false)
-	return &NDJSONReporter{w: w, enc: enc, v: v}
+	return &NDJSONReporter{enc: enc, v: v}
 }
 
 func (r *NDJSONReporter) Emit(e Event) {

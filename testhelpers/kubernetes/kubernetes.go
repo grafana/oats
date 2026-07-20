@@ -129,6 +129,22 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 	if err != nil {
 		return err
 	}
+	// A Service can exist before its backing pod is ready. Wait for an endpoint
+	// before starting the app port-forward, otherwise kubectl may start and
+	// immediately exit while the pod is still Pending.
+	err = run(
+		exec.Command(
+			kubernetesCLIBinary,
+			"wait",
+			"--timeout=5m",
+			"--for=jsonpath={.subsets[0].addresses[0].ip}",
+			"endpoints/"+model.AppService,
+		),
+		false,
+	)
+	if err != nil {
+		return err
+	}
 	err = run(exec.Command(kubernetesCLIBinary, "port-forward", "service/"+model.AppService, fmt.Sprintf("%d:%d", model.AppDockerPort, defaultAppRemotePort)), true)
 	if err != nil {
 		return err

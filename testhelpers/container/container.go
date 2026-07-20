@@ -60,13 +60,12 @@ func available(engine Engine) error {
 	if _, err := exec.LookPath(engine.Binary()); err != nil {
 		return err
 	}
-	if engine == Podman {
-		// podman compose delegates to an external provider. Probe it during
-		// auto-selection so an installed Podman without podman-compose (or a
-		// configured provider) falls back to Docker instead of failing later.
-		if err := exec.Command(engine.Binary(), "compose", "version").Run(); err != nil {
-			return fmt.Errorf("compose provider unavailable: %w", err)
-		}
+	// Podman compose delegates to an external provider, while Docker compose
+	// may be an optional CLI plugin. Probe both during selection so an engine
+	// without a usable Compose implementation fails with an actionable error
+	// instead of failing later during fixture startup.
+	if err := exec.Command(engine.Binary(), "compose", "version").Run(); err != nil {
+		return fmt.Errorf("compose unavailable: %w", err)
 	}
 	return nil
 }
