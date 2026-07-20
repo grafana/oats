@@ -1,7 +1,7 @@
 name: cache-skip
 tags: [cli, cache]
 
-# Run the same suite twice against one cache dir; the second run must skip the
+# Run the same fixture group twice against one cache dir; the second run must skip the
 # unchanged case instead of re-running it. -v surfaces the SKIP line.
 run:
   shell: |

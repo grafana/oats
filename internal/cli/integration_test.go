@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -52,6 +53,31 @@ func TestResolveEndpoint_UsesRuntimeAppHostPort(t *testing.T) {
 	}
 }
 
+func TestResolveEndpoint_RemoteUsesGCXGrafanaURL(t *testing.T) {
+	config := filepath.Join(t.TempDir(), "gcx.yaml")
+	writeFile(t, filepath.Dir(config), filepath.Base(config), `current-context: remote
+contexts:
+  remote:
+    grafana:
+      server: http://grafana.example.test:3000/
+`)
+	t.Setenv("GCX_CONFIG", config)
+
+	ep, err := resolveEndpoint(discovery.Plan{
+		Name:    "remote-basic",
+		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://otlp.example.test:4318"}},
+	}, fixture.Runtime{}, "remote", "localhost", 8080, "")
+	if err != nil {
+		t.Fatalf("resolveEndpoint: %v", err)
+	}
+	if ep.GCXContext != "remote" || ep.OTLPHTTP != "http://otlp.example.test:4318" {
+		t.Fatalf("unexpected remote endpoint: %+v", ep)
+	}
+	if !slices.Contains(ep.CustomCheckEnv, "OATS_GRAFANA_URL=http://grafana.example.test:3000") {
+		t.Fatalf("remote custom-check env missing Grafana URL: %v", ep.CustomCheckEnv)
+	}
+}
+
 func TestCloseFixture_EmitsTeardownEvent(t *testing.T) {
 	rep := &recordingReporter{}
 	fix := &fakeSuiteFixture{}
@@ -68,7 +94,7 @@ func TestCloseFixture_EmitsTeardownEvent(t *testing.T) {
 	if len(rep.events) != 1 || rep.events[0].Type != report.EventFixtureTeardown {
 		t.Fatalf("expected one teardown event, got %+v", rep.events)
 	}
-	if rep.events[0].Suite != "smoke" || rep.events[0].FixtureType != "compose" {
+	if rep.events[0].Group != "smoke" || rep.events[0].FixtureType != "compose" {
 		t.Fatalf("unexpected teardown event: %+v", rep.events[0])
 	}
 }
@@ -104,7 +130,7 @@ func TestEmitFixtureStartAndReady(t *testing.T) {
 	if len(rep.events) != 1 || rep.events[0].Type != report.EventFixtureStart {
 		t.Fatalf("expected one fixture.start event, got %+v", rep.events)
 	}
-	if rep.events[0].Suite != "smoke" || rep.events[0].FixtureType != "compose" {
+	if rep.events[0].Group != "smoke" || rep.events[0].FixtureType != "compose" {
 		t.Fatalf("unexpected fixture.start event: %+v", rep.events[0])
 	}
 

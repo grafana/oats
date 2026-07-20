@@ -52,6 +52,7 @@ import (
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
 	"github.com/grafana/oats/testhelpers"
+	"github.com/grafana/oats/testhelpers/container"
 )
 
 // Version is the oats CLI version. Release builds can override this with
@@ -63,7 +64,7 @@ var Version = "dev"
 // reproducible fallback when gcx is missing or older than this version.
 var MinimumGCXVersion = ""
 
-type suiteResult struct {
+type groupResult struct {
 	pass int
 	fail int
 	err  error
@@ -104,6 +105,9 @@ func newRootCmd(exit *int) *cobra.Command {
 		// prints returned errors too, producing duplicate "Error: ..." lines.
 		SilenceErrors: true,
 		// Bare `oats [paths...] [flags]` is an implicit `run`.
+		// Cobra otherwise treats the first path as an unknown subcommand when
+		// this command also has named subcommands.
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runAction(cmd, args, verbose, exit)
 		},
@@ -142,6 +146,7 @@ func addRunFlags(fs *pflag.FlagSet) {
 	fs.Duration("absent-timeout", 10*time.Second, "how long an absent assertion must stay absent")
 	fs.Duration("seed-settle", 2*time.Second, "post-seed wait before first assertion")
 	fs.String("gcx-context", "", "override the gcx --context value (otherwise derived from fixture endpoint)")
+	fs.String("container-runtime", "auto", "container engine for Compose fixtures: auto | docker | podman")
 	fs.String("app-host", "localhost", "application host for driving case input requests")
 	fs.Int("app-port", 8080, "application port for driving case input requests")
 	fs.String("otlp-http", defaultOTLPHTTP(), "OTLP/HTTP base URL for inline-otlp seed mode")
@@ -370,6 +375,10 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 	defer cancel()
 
 	gcxBin := flagStr(fs, "gcx")
+	containerRuntime := flagStr(fs, "container-runtime")
+	if _, err := container.Parse(containerRuntime); err != nil {
+		return err
+	}
 	if version := flagStr(fs, "gcx-version"); version != "" {
 		if fs.Changed("gcx") {
 			return fmt.Errorf("--gcx and --gcx-version cannot be used together")
@@ -389,6 +398,7 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 	opts := runOptions{
 		gcxBin:             gcxBin,
 		gcxContextOverride: flagStr(fs, "gcx-context"),
+		containerRuntime:   containerRuntime,
 		appHost:            flagStr(fs, "app-host"),
 		appPort:            flagInt(fs, "app-port"),
 		otlpHTTP:           flagStr(fs, "otlp-http"),
@@ -456,15 +466,22 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 	switch plan.Fixture.Kind() {
 	case "remote":
 		// For a remote fixture, the gcx context is configured externally
-		// (e.g. `gcx login` already ran). We pass the suite name as a
+		// (e.g. `gcx login` already ran). We pass the fixture-group name as a
 		// best-effort default; --gcx-context overrides.
 		ep.GCXContext = plan.Name
+		if gcxContextOverride != "" {
+			ep.GCXContext = gcxContextOverride
+		}
 		ep.OTLPHTTP = plan.Fixture.Remote.Endpoint
-		ep.CustomCheckEnv = append(ep.CustomCheckEnv,
-			"OATS_FIXTURE_TYPE=remote",
-			"OATS_GRAFANA_URL="+grafanaURL(),
-			"OATS_APP_URL="+fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
-		)
+		grafana, err := remoteGrafanaURL(ep.GCXContext)
+		if err != nil {
+			return runner.Endpoint{}, fmt.Errorf("resolve remote Grafana URL: %w", err)
+		}
+		ep.CustomCheckEnv = append(ep.CustomCheckEnv, "OATS_FIXTURE_TYPE=remote")
+		if grafana != "" {
+			ep.CustomCheckEnv = append(ep.CustomCheckEnv, "OATS_GRAFANA_URL="+grafana)
+		}
+		ep.CustomCheckEnv = append(ep.CustomCheckEnv, "OATS_APP_URL="+fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort))
 	case "compose":
 		if rt.GCXConfig != "" {
 			ep.GCXConfig = rt.GCXConfig
@@ -503,6 +520,7 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 type runOptions struct {
 	gcxBin             string
 	gcxContextOverride string
+	containerRuntime   string
 	appHost            string
 	appPort            int
 	otlpHTTP           string
@@ -569,7 +587,7 @@ func runPlansParallel(parent context.Context, rep report.Reporter, plans []disco
 	defer cancel()
 
 	workCh := make(chan discovery.Plan)
-	resultCh := make(chan suiteResult, len(plans))
+	resultCh := make(chan groupResult, len(plans))
 	workers := parallel
 	if workers > len(plans) {
 		workers = len(plans)
@@ -618,17 +636,17 @@ func runPlansParallel(parent context.Context, rep report.Reporter, plans []disco
 	return totalPass, totalFail, firstErr
 }
 
-func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts runOptions) suiteResult {
+func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts runOptions) groupResult {
 	fixtureStart := emitFixtureStart(rep, plan)
-	fix, rt, err := fixture.Start(ctx, plan)
+	fix, rt, err := fixture.StartWithOptions(ctx, plan, fixture.Options{ContainerRuntime: opts.containerRuntime})
 	if err != nil {
-		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Name, err)}
+		return groupResult{err: fmt.Errorf("fixture group %q: %w", plan.Name, err)}
 	}
 	if err := fixture.WaitForReady(plan, rt); err != nil {
 		if fix != nil {
 			_ = closeFixture(rep, plan, fix)
 		}
-		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Name, err)}
+		return groupResult{err: fmt.Errorf("fixture group %q: %w", plan.Name, err)}
 	}
 	emitFixtureReady(rep, plan, fixtureStart)
 	ep, err := resolveEndpoint(plan, rt, opts.gcxContextOverride, opts.appHost, opts.appPort, opts.otlpHTTP)
@@ -636,18 +654,19 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 		if fix != nil {
 			_ = closeFixture(rep, plan, fix)
 		}
-		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Name, err)}
+		return groupResult{err: fmt.Errorf("fixture group %q: %w", plan.Name, err)}
 	}
 
 	rep.Emit(report.Event{
-		Type:        report.EventSuiteStart,
-		Suite:       plan.Name,
+		Type:        report.EventGroupStart,
+		Group:       plan.Name,
 		FixtureType: plan.Fixture.Kind(),
 		CaseCount:   len(plan.Cases),
 	})
 
 	gcxExec := &engine.GCX{Binary: opts.gcxBin, Context: ep.GCXContext, Config: ep.GCXConfig, Env: ep.GCXEnv}
 	r := runner.New(gcxExec, rep, ep, runner.Options{
+		OatsVersion:     Version,
 		Timeout:         opts.timeout,
 		Interval:        opts.interval,
 		AbsentTimeout:   opts.absentTimeout,
@@ -662,21 +681,20 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 			fixtureBytes, _ := json.Marshal(plan.Fixture)
 			r = r.WithCache(store, runner.CacheContext{
 				GCXVersion:   gcxVersion(opts.gcxBin),
-				OatsVersion:  Version,
 				FixtureBytes: fixtureBytes,
 			})
 		}
 	}
 
-	var suitePass, suiteFail int
+	var groupPass, groupFail int
 	for _, c := range plan.Cases {
 		if ctx.Err() != nil {
 			break
 		}
 		if r.RunCase(ctx, c) {
-			suitePass++
+			groupPass++
 		} else {
-			suiteFail++
+			groupFail++
 			if opts.failFast {
 				break
 			}
@@ -684,17 +702,17 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 	}
 
 	rep.Emit(report.Event{
-		Type:  report.EventSuiteEnd,
-		Suite: plan.Name,
-		Pass:  suitePass,
-		Fail:  suiteFail,
+		Type:  report.EventGroupEnd,
+		Group: plan.Name,
+		Pass:  groupPass,
+		Fail:  groupFail,
 	})
 	if fix != nil {
 		if closeErr := closeFixture(rep, plan, fix); closeErr != nil {
-			return suiteResult{pass: suitePass, fail: suiteFail, err: fmt.Errorf("suite %q: fixture shutdown: %w", plan.Name, closeErr)}
+			return groupResult{pass: groupPass, fail: groupFail, err: fmt.Errorf("fixture group %q: fixture shutdown: %w", plan.Name, closeErr)}
 		}
 	}
-	return suiteResult{pass: suitePass, fail: suiteFail}
+	return groupResult{pass: groupPass, fail: groupFail}
 }
 
 func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {
@@ -702,7 +720,7 @@ func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {
 	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureStart,
-			Suite:       plan.Name,
+			Group:       plan.Name,
 			FixtureType: plan.Fixture.Kind(),
 			Ts:          start,
 		})
@@ -714,7 +732,7 @@ func emitFixtureReady(rep report.Reporter, plan discovery.Plan, start time.Time)
 	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureReady,
-			Suite:       plan.Name,
+			Group:       plan.Name,
 			FixtureType: plan.Fixture.Kind(),
 			DurationMs:  time.Since(start).Milliseconds(),
 		})
@@ -729,16 +747,12 @@ func closeFixture(rep report.Reporter, plan discovery.Plan, fix fixture.Handle) 
 	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureTeardown,
-			Suite:       plan.Name,
+			Group:       plan.Name,
 			FixtureType: plan.Fixture.Kind(),
 			DurationMs:  time.Since(start).Milliseconds(),
 		})
 	}
 	return nil
-}
-
-func grafanaURL() string {
-	return fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, testhelpers.GrafanaHTTPPort)
 }
 
 func defaultOTLPHTTP() string {

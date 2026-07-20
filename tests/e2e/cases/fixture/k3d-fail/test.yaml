@@ -8,4 +8,4 @@ expect:
   exit_code: 2
   stderr_contains:
     - 'error when creating "k8s/invalid.yaml"'
-    - 'suite "k3d-fail": exit status 1'
+    - 'fixture group "k3d-fail": exit status 1'

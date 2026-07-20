@@ -35,6 +35,11 @@ replace hyphens with underscores, and prefix it with `OATS_`. Command-line
 flags take precedence over environment variables. For example,
 `--gcx /opt/tools/gcx` is equivalent to `OATS_GCX=/opt/tools/gcx`.
 
+Compose fixtures use the host container engine selected by
+`--container-runtime` (or `OATS_CONTAINER_RUNTIME`). `auto` prefers Podman and
+falls back to Docker; selecting `podman` or `docker` explicitly never silently
+falls back. k3d fixtures currently require Docker.
+
 Release and mise-built `oats` binaries contain the minimum gcx version pinned
 by this repository. If the default `gcx` command is missing, older than that
 minimum, or does not report a parsable version, `oats` downloads and caches
@@ -65,6 +70,7 @@ Flags:
 | `--gcx-version`             | `OATS_GCX_VERSION`                | —                                                                  | download and use this gcx release (for example, `0.4.3`)                                           |
 | `--gcx-download`            | `OATS_GCX_DOWNLOAD`               | `auto` (`never` when mise is detected)                             | fallback policy when the default gcx command is missing, too old, or unparsable: `auto` or `never` |
 | `--gcx-context`             | `OATS_GCX_CONTEXT`                | derived                                                            | gcx context to query (otherwise derived from the fixture endpoint)                                 |
+| `--container-runtime`       | `OATS_CONTAINER_RUNTIME`          | `auto`                                                             | Compose engine: prefer Podman, or explicitly use `docker` / `podman`                               |
 | `--app-host` / `--app-port` | `OATS_APP_HOST` / `OATS_APP_PORT` | `localhost` / `8080`                                               | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself             |
 | `--otlp-http`               | `OATS_OTLP_HTTP`                  | `http://localhost:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                                      |
 | `--verbose`                 | `OATS_VERBOSE`                    | `0`                                                                | increase verbosity (`1`–`3` are the useful levels)                                                 |

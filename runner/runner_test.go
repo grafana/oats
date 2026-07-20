@@ -49,6 +49,13 @@ func newRunner(t *testing.T, exec engine.Executor, opts Options) (*Runner, *byte
 	return New(exec, rep, Endpoint{GCXContext: "test"}, opts), &buf
 }
 
+func TestNew_PropagatesOatsVersionToSeeder(t *testing.T) {
+	r, _ := newRunner(t, &stubExec{}, Options{OatsVersion: "0.7.0"})
+	if got := r.seeder.Version; got != "0.7.0" {
+		t.Fatalf("seed version = %q, want 0.7.0", got)
+	}
+}
+
 func mustParse(t *testing.T, src string) *casefile.Case {
 	t.Helper()
 	c, err := casefile.Parse([]byte(src))
@@ -421,6 +428,26 @@ expected:
 	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
 	if !ok {
 		t.Fatalf("expected compose-logs case to pass:\n%s", buf.String())
+	}
+}
+
+func TestSearchComposeLogs_UsesPodman(t *testing.T) {
+	dir := t.TempDir()
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\"; echo 'podman service started'\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	ok, err := searchComposeLogs(context.Background(), []string{
+		"OATS_FIXTURE_TYPE=compose",
+		"OATS_CONTAINER_RUNTIME=podman",
+	}, "podman service started")
+	if err != nil {
+		t.Fatalf("searchComposeLogs: %v", err)
+	}
+	if !ok {
+		t.Fatal("searchComposeLogs returned false")
 	}
 }
 

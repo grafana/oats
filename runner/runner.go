@@ -63,6 +63,10 @@ type Endpoint struct {
 // Options configures the polling cadence and per-case deadline. Sensible
 // zero-value defaults apply.
 type Options struct {
+	// OatsVersion identifies the OATS binary in cache keys and inline-OTLP
+	// User-Agent headers. It is set by the CLI even when caching is disabled.
+	OatsVersion string
+
 	// Timeout caps how long the runner waits for any one assertion to pass.
 	// Default 30s.
 	Timeout time.Duration
@@ -117,7 +121,6 @@ type Runner struct {
 // per case is wasted work.
 type CacheContext struct {
 	GCXVersion   string
-	OatsVersion  string
 	FixtureBytes []byte
 	Extra        map[string]string
 }
@@ -126,12 +129,13 @@ type CacheContext struct {
 // rep is typically a report.TextReporter or NDJSONReporter; ep names the
 // gcx context and (optionally) the OTLP endpoint for inline seeding.
 func New(exec engine.Executor, rep report.Reporter, ep Endpoint, opts Options) *Runner {
+	opts = opts.withDefaults()
 	return &Runner{
 		exec:     exec,
 		reporter: rep,
 		endpoint: ep,
-		opts:     opts.withDefaults(),
-		seeder:   &seed.Sender{OTLPEndpoint: ep.OTLPHTTP},
+		opts:     opts,
+		seeder:   &seed.Sender{OTLPEndpoint: ep.OTLPHTTP, Version: opts.OatsVersion},
 	}
 }
 
@@ -160,7 +164,7 @@ func (r *Runner) cacheKey(c *casefile.Case) cache.Key {
 		CaseYAML:     yamlBytes,
 		FixtureBytes: r.cacheCtx.FixtureBytes,
 		GCXVersion:   r.cacheCtx.GCXVersion,
-		OatsVersion:  r.cacheCtx.OatsVersion,
+		OatsVersion:  r.opts.OatsVersion,
 		Extra:        r.cacheCtx.Extra,
 	}
 }
@@ -187,10 +191,10 @@ func (r *Runner) RunCase(ctx context.Context, c *casefile.Case) bool {
 		key := r.cacheKey(c)
 		if hit, _ := r.cacheStore.Lookup(key); hit {
 			r.reporter.Emit(report.Event{
-				Type:   report.EventCaseSkip,
-				Case:   c.Name,
-				Source: c.SourcePath,
-				Msg:    "cache hit (last green run within TTL)",
+				Type:    report.EventCaseSkip,
+				Case:    c.Name,
+				Source:  c.SourcePath,
+				Message: "cache hit (last green run within TTL)",
 			})
 			return true
 		}
@@ -378,21 +382,21 @@ func (r *Runner) pollAssert(
 	}
 	if len(result.LastFailures) == 0 {
 		r.reporter.Emit(report.Event{
-			Type:   report.EventAssertFail,
-			Case:   c.Name,
-			Source: c.SourcePath,
-			Msg:    "assertion polling stopped before any failure details were captured",
-			Cmd:    cmdStr,
+			Type:    report.EventAssertFail,
+			Case:    c.Name,
+			Source:  c.SourcePath,
+			Message: "assertion polling stopped before any failure details were captured",
+			Cmd:     cmdStr,
 		})
 		return false
 	}
 	for _, f := range result.LastFailures {
 		r.reporter.Emit(report.Event{
-			Type:   report.EventAssertFail,
-			Case:   c.Name,
-			Source: c.SourcePath,
-			Msg:    f.Error(),
-			Cmd:    cmdStr,
+			Type:    report.EventAssertFail,
+			Case:    c.Name,
+			Source:  c.SourcePath,
+			Message: f.Error(),
+			Cmd:     cmdStr,
 		})
 	}
 	return false
@@ -407,11 +411,11 @@ func (r *Runner) caseInterval(c *casefile.Case) time.Duration {
 
 func (r *Runner) failCase(c *casefile.Case, msg, cmd string) {
 	r.reporter.Emit(report.Event{
-		Type:   report.EventAssertFail,
-		Case:   c.Name,
-		Source: c.SourcePath,
-		Msg:    msg,
-		Cmd:    cmd,
+		Type:    report.EventAssertFail,
+		Case:    c.Name,
+		Source:  c.SourcePath,
+		Message: msg,
+		Cmd:     cmd,
 	})
 }
 

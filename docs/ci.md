@@ -81,6 +81,19 @@ The `paths` filter is the cheapest and most important optimization: if a PR
 touches nothing the tests depend on, the job never runs. This alone covers most
 of the saving.
 
+## GitHub Actions annotations
+
+When `GITHUB_ACTIONS=true`, the default text reporter emits assertion failures
+as GitHub Actions `::error` annotations in addition to the normal failure
+blocks. OATS uses the case source path and line when available, deduplicates
+annotations at the same source position, and converts absolute workspace paths
+to paths GitHub can attach to the PR diff.
+
+Annotations are enabled by default in GitHub Actions. Set
+`OATS_GHA_ANNOTATIONS=false` (also `0`, `no`, or `off`) to keep the plain text
+output only. The setting affects text output; `--format ndjson` remains a
+machine-readable event stream without workflow commands.
+
 ## Result caching (optional)
 
 `oats` keeps a skip-when-unchanged cache under `--cache-dir`. A case is skipped
