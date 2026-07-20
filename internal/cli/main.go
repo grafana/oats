@@ -105,6 +105,9 @@ func newRootCmd(exit *int) *cobra.Command {
 		// prints returned errors too, producing duplicate "Error: ..." lines.
 		SilenceErrors: true,
 		// Bare `oats [paths...] [flags]` is an implicit `run`.
+		// Cobra otherwise treats the first path as an unknown subcommand when
+		// this command also has named subcommands.
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runAction(cmd, args, verbose, exit)
 		},
@@ -462,12 +465,19 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 		// (e.g. `gcx login` already ran). We pass the suite name as a
 		// best-effort default; --gcx-context overrides.
 		ep.GCXContext = plan.Name
+		if gcxContextOverride != "" {
+			ep.GCXContext = gcxContextOverride
+		}
 		ep.OTLPHTTP = plan.Fixture.Remote.Endpoint
-		ep.CustomCheckEnv = append(ep.CustomCheckEnv,
-			"OATS_FIXTURE_TYPE=remote",
-			"OATS_GRAFANA_URL="+grafanaURL(),
-			"OATS_APP_URL="+fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
-		)
+		grafana, err := remoteGrafanaURL(ep.GCXContext)
+		if err != nil {
+			return runner.Endpoint{}, fmt.Errorf("resolve remote Grafana URL: %w", err)
+		}
+		ep.CustomCheckEnv = append(ep.CustomCheckEnv, "OATS_FIXTURE_TYPE=remote")
+		if grafana != "" {
+			ep.CustomCheckEnv = append(ep.CustomCheckEnv, "OATS_GRAFANA_URL="+grafana)
+		}
+		ep.CustomCheckEnv = append(ep.CustomCheckEnv, "OATS_APP_URL="+fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort))
 	case "compose":
 		if rt.GCXConfig != "" {
 			ep.GCXConfig = rt.GCXConfig
@@ -652,6 +662,7 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 
 	gcxExec := &engine.GCX{Binary: opts.gcxBin, Context: ep.GCXContext, Config: ep.GCXConfig, Env: ep.GCXEnv}
 	r := runner.New(gcxExec, rep, ep, runner.Options{
+		OatsVersion:     Version,
 		Timeout:         opts.timeout,
 		Interval:        opts.interval,
 		AbsentTimeout:   opts.absentTimeout,
@@ -666,7 +677,6 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 			fixtureBytes, _ := json.Marshal(plan.Fixture)
 			r = r.WithCache(store, runner.CacheContext{
 				GCXVersion:   gcxVersion(opts.gcxBin),
-				OatsVersion:  Version,
 				FixtureBytes: fixtureBytes,
 			})
 		}
@@ -739,10 +749,6 @@ func closeFixture(rep report.Reporter, plan discovery.Plan, fix fixture.Handle) 
 		})
 	}
 	return nil
-}
-
-func grafanaURL() string {
-	return fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, testhelpers.GrafanaHTTPPort)
 }
 
 func defaultOTLPHTTP() string {

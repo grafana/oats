@@ -44,13 +44,14 @@ func TestCache_HitShortCircuits(t *testing.T) {
 	var buf bytes.Buffer
 	rep := report.NewTextReporter(&buf, report.VerbosePasses)
 	r := New(exec, rep, Endpoint{GCXContext: "test"}, Options{
+		OatsVersion:     "v2",
 		Timeout:         100 * time.Millisecond,
 		Interval:        5 * time.Millisecond,
 		SeedSettleDelay: time.Nanosecond,
 	})
 
 	store, _ := cache.New(t.TempDir(), 0, nil)
-	r = r.WithCache(store, CacheContext{GCXVersion: "v1", OatsVersion: "v2"})
+	r = r.WithCache(store, CacheContext{GCXVersion: "v1"})
 
 	// First run: cache miss → runs the case → records on pass.
 	rep.Emit(report.Event{Type: report.EventRunStart})
@@ -67,10 +68,11 @@ func TestCache_HitShortCircuits(t *testing.T) {
 	buf.Reset()
 	rep = report.NewTextReporter(&buf, report.VerbosePasses)
 	r2 := New(exec, rep, Endpoint{GCXContext: "test"}, Options{
+		OatsVersion:     "v2",
 		Timeout:         100 * time.Millisecond,
 		Interval:        5 * time.Millisecond,
 		SeedSettleDelay: time.Nanosecond,
-	}).WithCache(store, CacheContext{GCXVersion: "v1", OatsVersion: "v2"})
+	}).WithCache(store, CacheContext{GCXVersion: "v1"})
 
 	rep.Emit(report.Event{Type: report.EventRunStart})
 	if !r2.RunCase(context.Background(), c) {
@@ -110,10 +112,11 @@ func TestCache_FailingRunLeavesNoGreenRecord(t *testing.T) {
 	var buf bytes.Buffer
 	rep := report.NewTextReporter(&buf, report.VerboseDefault)
 	r := New(exec, rep, Endpoint{GCXContext: "test"}, Options{
+		OatsVersion:     "v2",
 		Timeout:         30 * time.Millisecond,
 		Interval:        5 * time.Millisecond,
 		SeedSettleDelay: time.Nanosecond,
-	}).WithCache(store, CacheContext{GCXVersion: "v1", OatsVersion: "v2"})
+	}).WithCache(store, CacheContext{GCXVersion: "v1"})
 
 	rep.Emit(report.Event{Type: report.EventRunStart})
 	// First, ensure cache hit short-circuits before our patched stdout matters.
