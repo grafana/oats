@@ -95,8 +95,8 @@ func (r *TextReporter) recordFailure(e Event) {
 		src = "(unknown source)"
 	}
 	fmt.Fprintf(&b, "FAIL %s  %s\n", e.Case, src)
-	if e.Msg != "" {
-		fmt.Fprintf(&b, "  %s\n", e.Msg)
+	if e.Message != "" {
+		fmt.Fprintf(&b, "  %s\n", e.Message)
 	}
 	if e.Cmd != "" {
 		fmt.Fprintf(&b, "  $ %s\n", e.Cmd)
@@ -119,7 +119,7 @@ func (r *TextReporter) emitGHAAnnotation(e Event) {
 		}
 		r.knownErrAt[key] = struct{}{}
 
-		msg := e.Msg
+		msg := e.Message
 		if msg == "" {
 			msg = "OATS assertion failed"
 		}
@@ -136,7 +136,7 @@ func (r *TextReporter) emitGHAAnnotation(e Event) {
 	}
 	r.knownErrAt[key] = struct{}{}
 
-	msg := e.Msg
+	msg := e.Message
 	if msg == "" {
 		msg = "OATS assertion failed"
 	}

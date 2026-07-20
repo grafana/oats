@@ -30,38 +30,38 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 		return nil, Runtime{}, err
 	}
 	project := composeProjectName(plan)
-	suiteEnv := append([]string(nil), compose.Env...)
-	suiteEnv = append(suiteEnv, "COMPOSE_PROJECT_NAME="+project)
-	suite, err := newComposeSuite(composeFiles, suiteEnv)
+	composeEnv := append([]string(nil), compose.Env...)
+	composeEnv = append(composeEnv, "COMPOSE_PROJECT_NAME="+project)
+	stack, err := newComposeStack(composeFiles, composeEnv)
 	if err != nil {
 		if cleanup != nil {
 			_ = cleanup()
 		}
 		return nil, Runtime{}, err
 	}
-	if err := startSuiteFixture(suite); err != nil {
+	if err := startFixture(stack); err != nil {
 		if cleanup != nil {
 			_ = cleanup()
 		}
 		return nil, Runtime{}, err
 	}
-	// fail tears the started suite (and any file cleanup) down before returning.
+	// fail tears the started stack (and any file cleanup) down before returning.
 	fail := func(err error) (Handle, Runtime, error) {
-		_ = suite.Close()
+		_ = stack.Close()
 		if cleanup != nil {
 			_ = cleanup()
 		}
 		return nil, Runtime{}, err
 	}
-	grafanaPort, err := lookupComposePort(composeFiles, suiteEnv, lgtmComposeService, portString(testhelpers.GrafanaHTTPPort))
+	grafanaPort, err := lookupComposePort(composeFiles, composeEnv, lgtmComposeService, portString(testhelpers.GrafanaHTTPPort))
 	if err != nil {
 		return fail(err)
 	}
-	otlpPort, err := lookupComposePort(composeFiles, suiteEnv, lgtmComposeService, portString(testhelpers.OTLPHTTPPort))
+	otlpPort, err := lookupComposePort(composeFiles, composeEnv, lgtmComposeService, portString(testhelpers.OTLPHTTPPort))
 	if err != nil {
 		return fail(err)
 	}
-	pyroscopePort, err := lookupComposePort(composeFiles, suiteEnv, lgtmComposeService, portString(testhelpers.PyroscopeHTTPPort))
+	pyroscopePort, err := lookupComposePort(composeFiles, composeEnv, lgtmComposeService, portString(testhelpers.PyroscopeHTTPPort))
 	if err != nil {
 		return fail(err)
 	}
@@ -75,9 +75,9 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 	// When the fixture manages the app (app_service + app_port), resolve the host
 	// port docker published for it. This lets the app bind an ephemeral host port
 	// (127.0.0.1::<port>) instead of a fixed one, which is what makes app-seed
-	// suites parallel-safe.
+	// fixture groups parallel-safe.
 	if plan.Fixture.HasManagedApp() {
-		appPort, portErr := lookupComposePort(composeFiles, suiteEnv, compose.AppService, strconv.Itoa(compose.AppPort))
+		appPort, portErr := lookupComposePort(composeFiles, composeEnv, compose.AppService, strconv.Itoa(compose.AppPort))
 		if portErr != nil {
 			return fail(fmt.Errorf("resolve app host port for service %q: %w", compose.AppService, portErr))
 		}
@@ -95,7 +95,7 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 	cleanup = chainCleanup(func() error { return removeIfExists(cfg) }, cleanup)
 	rt.CustomCheckEnv = composeCheckEnv(plan, rt)
 	rt.ParallelSafe, rt.ParallelDisabled = SupportsParallel(plan)
-	return composeFixture{suite: suite, cleanup: cleanup}, rt, nil
+	return composeFixture{stack: stack, cleanup: cleanup}, rt, nil
 }
 
 func resolveComposeFiles(sourceDir string, compose *casefile.ComposeFixture) ([]string, func() error, error) {

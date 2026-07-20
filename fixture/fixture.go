@@ -1,7 +1,7 @@
-// Package fixture owns the lifecycle of the observability backends a suite
+// Package fixture owns the lifecycle of the observability backends a fixture group
 // runs against: booting a docker-compose or k3d stack, waiting for it to be
 // ready, exposing the resolved endpoints as a Runtime, and tearing it down.
-// The CLI orchestrates suites and reporting; this package abstracts "stand up
+// The CLI orchestrates fixture groups and reporting; this package abstracts "stand up
 // the stack the cases need" behind a small, pluggable surface.
 package fixture
 
@@ -23,8 +23,8 @@ import (
 
 // Seams overridable in tests.
 var (
-	newComposeSuite = func(files []string, env []string) (Handle, error) {
-		return compose.SuiteFiles(files, env)
+	newComposeStack = func(files []string, env []string) (Handle, error) {
+		return compose.StackFiles(files, env)
 	}
 	newKubernetesEndpoint = func(plan discovery.Plan, ports remote.PortsConfig) *remote.Endpoint {
 		sourceDir := plan.FixtureSourceDir
@@ -104,8 +104,8 @@ func WaitForReady(plan discovery.Plan, rt Runtime) error {
 	return nil
 }
 
-// SupportsParallel reports whether a suite on this fixture can run alongside
-// other suites, and if not, a human-readable reason.
+// SupportsParallel reports whether a fixture group on this fixture can run
+// alongside other groups, and if not, a human-readable reason.
 func SupportsParallel(plan discovery.Plan) (bool, string) {
 	switch plan.Fixture.Kind() {
 	case "", "remote":
@@ -119,9 +119,9 @@ func SupportsParallel(plan discovery.Plan) (bool, string) {
 			// ephemeral host port instead of a shared fixed one — which requires
 			// fixture.app_service (+ app_port) so the published port can be
 			// discovered. Without it the app falls back to the fixed --app-port
-			// and parallel suites would collide.
+			// and parallel groups would collide.
 			if c.Seed.EffectiveType() == "app" && !plan.Fixture.HasManagedApp() {
-				return false, "compose app-seed suites need fixture.app_service and app_port so OATS can publish an ephemeral app port; otherwise they share a fixed app port"
+				return false, "compose app-seed groups need fixture.app_service and app_port so OATS can publish an ephemeral app port; otherwise they share a fixed app port"
 			}
 		}
 		for _, file := range extraComposeFiles(plan) {
@@ -139,7 +139,7 @@ func SupportsParallel(plan discovery.Plan) (bool, string) {
 	}
 }
 
-func startSuiteFixture(fix Handle) error {
+func startFixture(fix Handle) error {
 	startable, ok := fix.(startableHandle)
 	if !ok {
 		return fmt.Errorf("fixture does not support startup")
@@ -163,12 +163,12 @@ func (e endpointFixture) Close() error {
 }
 
 type composeFixture struct {
-	suite   Handle
+	stack   Handle
 	cleanup func() error
 }
 
 func (c composeFixture) Close() error {
-	err := c.suite.Close()
+	err := c.stack.Close()
 	if c.cleanup != nil {
 		if cleanupErr := c.cleanup(); cleanupErr != nil && err == nil {
 			err = cleanupErr

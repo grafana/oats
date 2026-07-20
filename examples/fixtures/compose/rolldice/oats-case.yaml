@@ -2,7 +2,7 @@
 # for readiness, then tears them down. A compose fixture defaults to
 # `template: lgtm`, so OATS boots a grafana/otel-lgtm stack alongside these files
 # — that's the `lgtm` service the env below points at. Set `template: none` to
-# bring your own stack. Every case in a suite must declare the same fixture.
+# bring your own stack. Every case in a fixture group must declare the same fixture.
 name: compose fixture app smoke
 tags: [compose, app]   # filter with `oats --tags compose`
 

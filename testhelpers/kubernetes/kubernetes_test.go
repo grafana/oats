@@ -11,7 +11,7 @@ import (
 )
 
 func TestClusterName_TruncatesFromEnd(t *testing.T) {
-	in := "this-is-a-very-long-suite-name-that-exceeds-thirty-two-chars"
+	in := "this-is-a-very-long-group-name-that-exceeds-thirty-two-chars"
 	got := clusterName(in)
 	if len(got) != 32 {
 		t.Fatalf("cluster length = %d, want 32 (%q)", len(got), got)
@@ -58,7 +58,7 @@ func TestStart_DefaultDockerContextAndCommandSequence(t *testing.T) {
 		return nil
 	}
 
-	if err := start(model, ports, "smoke-suite", run); err != nil {
+	if err := start(model, ports, "smoke-group", run); err != nil {
 		t.Fatalf("start: %v", err)
 	}
 	if model.AppDockerContext != "." {
@@ -67,11 +67,11 @@ func TestStart_DefaultDockerContextAndCommandSequence(t *testing.T) {
 
 	want := []string{
 		"fg: docker build -f Dockerfile -t dice:test .",
-		"fg: k3d cluster list smoke-suite",
-		"fg: k3d cluster delete smoke-suite",
-		"fg: k3d cluster create smoke-suite",
-		"fg: k3d image import -c smoke-suite dice:test",
-		"fg: k3d image import -c smoke-suite busybox:latest",
+		"fg: k3d cluster list smoke-group",
+		"fg: k3d cluster delete smoke-group",
+		"fg: k3d cluster create smoke-group",
+		"fg: k3d image import -c smoke-group dice:test",
+		"fg: k3d image import -c smoke-group busybox:latest",
 		"fg: kubectl apply -f k8s",
 		"fg: kubectl wait --timeout=5m --for=condition=available deployment/lgtm",
 		"bg: kubectl port-forward service/dice 18080:8080",

@@ -63,7 +63,7 @@ var Version = "dev"
 // when gcx is not already available on PATH.
 var DefaultGCXVersion = ""
 
-type suiteResult struct {
+type groupResult struct {
 	pass int
 	fail int
 	err  error
@@ -455,7 +455,7 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 	switch plan.Fixture.Kind() {
 	case "remote":
 		// For a remote fixture, the gcx context is configured externally
-		// (e.g. `gcx login` already ran). We pass the suite name as a
+		// (e.g. `gcx login` already ran). We pass the fixture-group name as a
 		// best-effort default; --gcx-context overrides.
 		ep.GCXContext = plan.Name
 		if gcxContextOverride != "" {
@@ -575,7 +575,7 @@ func runPlansParallel(parent context.Context, rep report.Reporter, plans []disco
 	defer cancel()
 
 	workCh := make(chan discovery.Plan)
-	resultCh := make(chan suiteResult, len(plans))
+	resultCh := make(chan groupResult, len(plans))
 	workers := parallel
 	if workers > len(plans) {
 		workers = len(plans)
@@ -624,17 +624,17 @@ func runPlansParallel(parent context.Context, rep report.Reporter, plans []disco
 	return totalPass, totalFail, firstErr
 }
 
-func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts runOptions) suiteResult {
+func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts runOptions) groupResult {
 	fixtureStart := emitFixtureStart(rep, plan)
 	fix, rt, err := fixture.Start(ctx, plan)
 	if err != nil {
-		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Name, err)}
+		return groupResult{err: fmt.Errorf("fixture group %q: %w", plan.Name, err)}
 	}
 	if err := fixture.WaitForReady(plan, rt); err != nil {
 		if fix != nil {
 			_ = closeFixture(rep, plan, fix)
 		}
-		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Name, err)}
+		return groupResult{err: fmt.Errorf("fixture group %q: %w", plan.Name, err)}
 	}
 	emitFixtureReady(rep, plan, fixtureStart)
 	ep, err := resolveEndpoint(plan, rt, opts.gcxContextOverride, opts.appHost, opts.appPort, opts.otlpHTTP)
@@ -642,12 +642,12 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 		if fix != nil {
 			_ = closeFixture(rep, plan, fix)
 		}
-		return suiteResult{err: fmt.Errorf("suite %q: %w", plan.Name, err)}
+		return groupResult{err: fmt.Errorf("fixture group %q: %w", plan.Name, err)}
 	}
 
 	rep.Emit(report.Event{
-		Type:        report.EventSuiteStart,
-		Suite:       plan.Name,
+		Type:        report.EventGroupStart,
+		Group:       plan.Name,
 		FixtureType: plan.Fixture.Kind(),
 		CaseCount:   len(plan.Cases),
 	})
@@ -674,15 +674,15 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 		}
 	}
 
-	var suitePass, suiteFail int
+	var groupPass, groupFail int
 	for _, c := range plan.Cases {
 		if ctx.Err() != nil {
 			break
 		}
 		if r.RunCase(ctx, c) {
-			suitePass++
+			groupPass++
 		} else {
-			suiteFail++
+			groupFail++
 			if opts.failFast {
 				break
 			}
@@ -690,17 +690,17 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 	}
 
 	rep.Emit(report.Event{
-		Type:  report.EventSuiteEnd,
-		Suite: plan.Name,
-		Pass:  suitePass,
-		Fail:  suiteFail,
+		Type:  report.EventGroupEnd,
+		Group: plan.Name,
+		Pass:  groupPass,
+		Fail:  groupFail,
 	})
 	if fix != nil {
 		if closeErr := closeFixture(rep, plan, fix); closeErr != nil {
-			return suiteResult{pass: suitePass, fail: suiteFail, err: fmt.Errorf("suite %q: fixture shutdown: %w", plan.Name, closeErr)}
+			return groupResult{pass: groupPass, fail: groupFail, err: fmt.Errorf("fixture group %q: fixture shutdown: %w", plan.Name, closeErr)}
 		}
 	}
-	return suiteResult{pass: suitePass, fail: suiteFail}
+	return groupResult{pass: groupPass, fail: groupFail}
 }
 
 func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {
@@ -708,7 +708,7 @@ func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {
 	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureStart,
-			Suite:       plan.Name,
+			Group:       plan.Name,
 			FixtureType: plan.Fixture.Kind(),
 			Ts:          start,
 		})
@@ -720,7 +720,7 @@ func emitFixtureReady(rep report.Reporter, plan discovery.Plan, start time.Time)
 	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureReady,
-			Suite:       plan.Name,
+			Group:       plan.Name,
 			FixtureType: plan.Fixture.Kind(),
 			DurationMs:  time.Since(start).Milliseconds(),
 		})
@@ -735,7 +735,7 @@ func closeFixture(rep report.Reporter, plan discovery.Plan, fix fixture.Handle) 
 	if plan.Fixture.Kind() != "" && plan.Fixture.Kind() != "remote" {
 		rep.Emit(report.Event{
 			Type:        report.EventFixtureTeardown,
-			Suite:       plan.Name,
+			Group:       plan.Name,
 			FixtureType: plan.Fixture.Kind(),
 			DurationMs:  time.Since(start).Milliseconds(),
 		})

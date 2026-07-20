@@ -40,7 +40,7 @@ description = "Run tests"
 run = 'GOFLAGS=-buildvcs=false go test $(GOFLAGS=-buildvcs=false go list ./... | grep -v "github.com/grafana/oats/tests/e2e")'
 
 [tasks.e2e-test]
-description = "Run e2e case suite"
+description = "Run e2e cases"
 run = "go test -v -buildvcs=false ./tests/e2e -run TestCases"
 
 [tasks.example-test]
