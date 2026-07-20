@@ -150,8 +150,8 @@ func (r *Runner) StartEndpoint() (end func(), err error) {
 	ports := remote.PortsConfig{
 		PrometheusHTTPPort: c.PortConfig.PrometheusHTTPPort,
 		TempoHTTPPort:      c.PortConfig.TempoHTTPPort,
-		LokiHttpPort:       c.PortConfig.LokiHTTPPort,
-		PyroscopeHttpPort:  c.PortConfig.PyroscopeHttpPort,
+		LokiHTTPPort:       c.PortConfig.LokiHTTPPort,
+		PyroscopeHTTPPort:  c.PortConfig.PyroscopeHttpPort,
 	}
 
 	if c.Definition.Kubernetes != nil {

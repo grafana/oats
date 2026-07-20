@@ -150,7 +150,7 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 		return err
 	}
 
-	err = portForward(ports.LokiHttpPort, testhelpers.LokiHTTPPort)
+	err = portForward(ports.LokiHTTPPort, testhelpers.LokiHTTPPort)
 	if err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 	if err != nil {
 		return err
 	}
-	err = portForward(ports.PyroscopeHttpPort, testhelpers.PyroscopeHTTPPort)
+	err = portForward(ports.PyroscopeHTTPPort, testhelpers.PyroscopeHTTPPort)
 	if err != nil {
 		return err
 	}

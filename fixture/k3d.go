@@ -25,11 +25,11 @@ func startK3D(ctx context.Context, plan discovery.Plan) (Handle, Runtime, error)
 	rt := Runtime{
 		GrafanaURL:       fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, ports.GrafanaHTTPPort),
 		OTLPHTTP:         fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, ports.OTLPHTTPPort),
-		PyroscopeURL:     fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, ports.PyroscopeHttpPort),
+		PyroscopeURL:     fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, ports.PyroscopeHTTPPort),
 		AppHostPort:      appPort,
 		CustomCheckEnv:   k3dCheckEnv(runner.Endpoint{AppHost: testhelpers.LocalhostIPv4, AppPort: appPort}, ports),
 		ParallelSafe:     false,
-		ParallelDisabled: "k3d fixtures currently use shared clusters and kubectl port-forwards",
+		ParallelDisabled: "k3d fixtures use a shared kubectl context and local port-forwards/app ports",
 	}
 	cfg, cfgErr := writeLocalGCXConfig(rt.GrafanaURL)
 	if cfgErr != nil {
@@ -46,7 +46,7 @@ func k3dCheckEnv(ep runner.Endpoint, ports remote.PortsConfig) []string {
 		"OATS_APP_URL=" + fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
 		"OATS_GRAFANA_URL=" + fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, ports.GrafanaHTTPPort),
 		"OATS_OTLP_HTTP=" + fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, ports.OTLPHTTPPort),
-		"OATS_PYROSCOPE_URL=" + fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, ports.PyroscopeHttpPort),
+		"OATS_PYROSCOPE_URL=" + fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, ports.PyroscopeHTTPPort),
 	}
 }
 
@@ -78,10 +78,10 @@ func allocateK3DPorts() (remote.PortsConfig, error) {
 	return remote.PortsConfig{
 		GrafanaHTTPPort:    grafanaPort,
 		OTLPHTTPPort:       otlpHTTPPort,
-		LokiHttpPort:       lokiPort,
+		LokiHTTPPort:       lokiPort,
 		PrometheusHTTPPort: promPort,
 		TempoHTTPPort:      tempoPort,
-		PyroscopeHttpPort:  pyroscopePort,
+		PyroscopeHTTPPort:  pyroscopePort,
 	}, nil
 }
 

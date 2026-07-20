@@ -43,9 +43,9 @@ func TestStart_DefaultDockerContextAndCommandSequence(t *testing.T) {
 		GrafanaHTTPPort:    13000,
 		OTLPHTTPPort:       14318,
 		PrometheusHTTPPort: 19090,
-		LokiHttpPort:       13100,
+		LokiHTTPPort:       13100,
 		TempoHTTPPort:      13200,
-		PyroscopeHttpPort:  14040,
+		PyroscopeHTTPPort:  14040,
 	}
 
 	var calls []string
@@ -102,10 +102,10 @@ func TestStartWaitsForLgtmDeploymentAvailability(t *testing.T) {
 	ports := remote.PortsConfig{
 		GrafanaHTTPPort:    3000,
 		OTLPHTTPPort:       4318,
-		LokiHttpPort:       3100,
+		LokiHTTPPort:       3100,
 		PrometheusHTTPPort: 9090,
 		TempoHTTPPort:      3200,
-		PyroscopeHttpPort:  4040,
+		PyroscopeHTTPPort:  4040,
 	}
 
 	var commands [][]string
@@ -145,10 +145,10 @@ func TestStart_SkipsGrafanaAndOTLPPortsWhenUnset(t *testing.T) {
 		AppDockerPort:    18080,
 	}
 	ports := remote.PortsConfig{
-		LokiHttpPort:       3100,
+		LokiHTTPPort:       3100,
 		PrometheusHTTPPort: 9090,
 		TempoHTTPPort:      3200,
-		PyroscopeHttpPort:  4040,
+		PyroscopeHTTPPort:  4040,
 	}
 
 	var calls []string

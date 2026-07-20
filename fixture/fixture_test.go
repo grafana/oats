@@ -255,7 +255,7 @@ func TestStart_K3DLifecycle(t *testing.T) {
 	if capturedPlan.FixtureSourceDir != sourceDir || capturedPlan.Name != "cluster-smoke" || capturedPlan.Fixture.K3D.AppPort != 18080 {
 		t.Fatalf("unexpected endpoint factory args: plan=%+v", capturedPlan)
 	}
-	if capturedPorts.GrafanaHTTPPort == 0 || capturedPorts.OTLPHTTPPort == 0 || capturedPorts.LokiHttpPort == 0 || capturedPorts.PrometheusHTTPPort == 0 || capturedPorts.TempoHTTPPort == 0 || capturedPorts.PyroscopeHttpPort == 0 {
+	if capturedPorts.GrafanaHTTPPort == 0 || capturedPorts.OTLPHTTPPort == 0 || capturedPorts.LokiHTTPPort == 0 || capturedPorts.PrometheusHTTPPort == 0 || capturedPorts.TempoHTTPPort == 0 || capturedPorts.PyroscopeHTTPPort == 0 {
 		t.Fatalf("expected allocated k3d ports, got %+v", capturedPorts)
 	}
 	if err := fix.Close(); err != nil {
@@ -301,7 +301,7 @@ func TestK3DCheckEnv_UsesConfiguredPorts(t *testing.T) {
 	got := k3dCheckEnv(runner.Endpoint{AppHost: testhelpers.LocalhostIPv4, AppPort: 18080}, remote.PortsConfig{
 		GrafanaHTTPPort:   13000,
 		OTLPHTTPPort:      14318,
-		PyroscopeHttpPort: 14040,
+		PyroscopeHTTPPort: 14040,
 	})
 	for _, want := range []string{
 		"OATS_APP_URL=http://127.0.0.1:18080",
