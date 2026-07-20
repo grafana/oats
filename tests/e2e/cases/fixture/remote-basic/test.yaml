@@ -12,10 +12,10 @@ run:
       auto)
         if command -v podman >/dev/null 2>&1 && podman compose version >/dev/null 2>&1; then
           container_engine=podman
-        elif command -v docker >/dev/null 2>&1; then
+        elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
           container_engine=docker
         else
-          echo "podman or docker is required for the remote fixture" >&2
+          echo "podman compose or docker compose is required for the remote fixture" >&2
           exit 1
         fi
         ;;
