@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/runner"
 	"github.com/grafana/oats/testhelpers"
+	"github.com/grafana/oats/testhelpers/container"
 	"github.com/grafana/oats/testhelpers/remote"
 )
 
@@ -83,13 +84,15 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 	defer func() { lookupComposePort = oldLookup }()
 
 	var gotFiles, gotEnv []string
+	var gotEngine container.Engine
 	fake := &fakeHandle{}
-	newComposeStack = func(files []string, env []string) (Handle, error) {
+	newComposeStack = func(files []string, env []string, engine container.Engine) (Handle, error) {
 		gotFiles = append([]string(nil), files...)
 		gotEnv = append([]string(nil), env...)
+		gotEngine = engine
 		return fake, nil
 	}
-	lookupComposePort = func(files []string, env []string, service, containerPort string) (string, error) {
+	lookupComposePort = func(engine container.Engine, files []string, env []string, service, containerPort string) (string, error) {
 		switch containerPort {
 		case "3000":
 			return "43000", nil
@@ -128,6 +131,9 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 	if len(gotEnv) != 2 || gotEnv[0] != "FOO=bar" || !strings.HasPrefix(gotEnv[1], "COMPOSE_PROJECT_NAME=oats-smoke-") {
 		t.Fatalf("compose env: got %v", gotEnv)
 	}
+	if gotEngine != container.Docker {
+		t.Fatalf("container engine: got %q want %q", gotEngine, container.Docker)
+	}
 	if err := fix.Close(); err != nil {
 		t.Fatalf("fixture close: %v", err)
 	}
@@ -136,11 +142,59 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 	}
 }
 
+func TestStartWithOptions_ComposePodman(t *testing.T) {
+	oldFactory := newComposeStack
+	oldLookup := lookupComposePort
+	defer func() { newComposeStack = oldFactory }()
+	defer func() { lookupComposePort = oldLookup }()
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "podman"), []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	var gotEngine container.Engine
+	fake := &fakeHandle{}
+	newComposeStack = func(_ []string, _ []string, engine container.Engine) (Handle, error) {
+		gotEngine = engine
+		return fake, nil
+	}
+	lookupComposePort = func(_ container.Engine, _ []string, _ []string, _ string, port string) (string, error) {
+		switch port {
+		case "3000":
+			return "43000", nil
+		case "4318":
+			return "44318", nil
+		case "4040":
+			return "44040", nil
+		default:
+			return "", fmt.Errorf("unexpected port %s", port)
+		}
+	}
+
+	fix, rt, err := StartWithOptions(context.Background(), discovery.Plan{
+		Name:             "podman-smoke",
+		Fixture:          casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "none", File: "compose.yml"}},
+		FixtureSourceDir: t.TempDir(),
+	}, Options{ContainerRuntime: "podman"})
+	if err != nil {
+		t.Fatalf("StartWithOptions: %v", err)
+	}
+	defer func() { _ = fix.Close() }()
+	if gotEngine != container.Podman || rt.ContainerRuntime != string(container.Podman) {
+		t.Fatalf("engine: factory=%q runtime=%q", gotEngine, rt.ContainerRuntime)
+	}
+	if !containsString(rt.CustomCheckEnv, "OATS_CONTAINER_RUNTIME=podman") {
+		t.Fatalf("custom check env missing Podman runtime: %v", rt.CustomCheckEnv)
+	}
+}
+
 func TestStart_ComposeStartFailure(t *testing.T) {
 	oldFactory := newComposeStack
 	defer func() { newComposeStack = oldFactory }()
 
-	newComposeStack = func(files []string, env []string) (Handle, error) {
+	newComposeStack = func(files []string, env []string, engine container.Engine) (Handle, error) {
 		return &fakeHandle{upErr: fmt.Errorf("boom")}, nil
 	}
 
@@ -350,9 +404,9 @@ expected:
 }
 
 // TestSupportsParallel_AppSeedRequiresAppService checks the gate that makes
-// app-seed compose groups parallel-safe: only when fixture.app_service and
+// app-seed compose suites parallel-safe: only when fixture.app_service and
 // app_port are set (so OATS can publish + discover an ephemeral app port) is the
-// group safe; otherwise it would share a fixed app port with its peers.
+// suite safe; otherwise it would share a fixed app port with its peers.
 func TestSupportsParallel_AppSeedRequiresAppService(t *testing.T) {
 	appCase := &casefile.Case{Seed: casefile.Seed{Type: "app"}}
 
@@ -381,7 +435,7 @@ func TestSupportsParallel_AppSeedRequiresAppService(t *testing.T) {
 func TestWaitForGrafanaToken_DefaultFixtureReturnsEmpty(t *testing.T) {
 	token, err := waitForGrafanaToken(discovery.Plan{
 		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}},
-	})
+	}, container.Docker)
 	if err != nil {
 		t.Fatalf("waitForGrafanaToken: %v", err)
 	}

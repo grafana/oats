@@ -12,10 +12,10 @@ import (
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/testhelpers"
+	"github.com/grafana/oats/testhelpers/container"
 )
 
 const (
-	composeCLIBinary   = "docker"
 	lgtmComposeService = "lgtm"
 )
 
@@ -23,7 +23,7 @@ func portString(port int) string {
 	return strconv.Itoa(port)
 }
 
-func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
+func startCompose(plan discovery.Plan, engine container.Engine) (Handle, Runtime, error) {
 	compose := plan.Fixture.Compose
 	composeFiles, cleanup, err := resolveComposeFiles(plan.FixtureSourceDir, compose)
 	if err != nil {
@@ -32,7 +32,7 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 	project := composeProjectName(plan)
 	composeEnv := append([]string(nil), compose.Env...)
 	composeEnv = append(composeEnv, "COMPOSE_PROJECT_NAME="+project)
-	stack, err := newComposeStack(composeFiles, composeEnv)
+	stack, err := newComposeStack(composeFiles, composeEnv, engine)
 	if err != nil {
 		if cleanup != nil {
 			_ = cleanup()
@@ -45,7 +45,7 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 		}
 		return nil, Runtime{}, err
 	}
-	// fail tears the started stack (and any file cleanup) down before returning.
+	// fail tears the started suite (and any file cleanup) down before returning.
 	fail := func(err error) (Handle, Runtime, error) {
 		_ = stack.Close()
 		if cleanup != nil {
@@ -53,31 +53,32 @@ func startCompose(plan discovery.Plan) (Handle, Runtime, error) {
 		}
 		return nil, Runtime{}, err
 	}
-	grafanaPort, err := lookupComposePort(composeFiles, composeEnv, lgtmComposeService, portString(testhelpers.GrafanaHTTPPort))
+	grafanaPort, err := lookupComposePort(engine, composeFiles, composeEnv, lgtmComposeService, portString(testhelpers.GrafanaHTTPPort))
 	if err != nil {
 		return fail(err)
 	}
-	otlpPort, err := lookupComposePort(composeFiles, composeEnv, lgtmComposeService, portString(testhelpers.OTLPHTTPPort))
+	otlpPort, err := lookupComposePort(engine, composeFiles, composeEnv, lgtmComposeService, portString(testhelpers.OTLPHTTPPort))
 	if err != nil {
 		return fail(err)
 	}
-	pyroscopePort, err := lookupComposePort(composeFiles, composeEnv, lgtmComposeService, portString(testhelpers.PyroscopeHTTPPort))
+	pyroscopePort, err := lookupComposePort(engine, composeFiles, composeEnv, lgtmComposeService, portString(testhelpers.PyroscopeHTTPPort))
 	if err != nil {
 		return fail(err)
 	}
 	rt := Runtime{
-		GrafanaURL:     "http://" + testhelpers.LocalhostIPv4 + ":" + grafanaPort,
-		OTLPHTTP:       "http://" + testhelpers.LocalhostIPv4 + ":" + otlpPort,
-		PyroscopeURL:   "http://" + testhelpers.LocalhostIPv4 + ":" + pyroscopePort,
-		ComposeFiles:   composeFiles,
-		ComposeProject: project,
+		GrafanaURL:       "http://" + testhelpers.LocalhostIPv4 + ":" + grafanaPort,
+		OTLPHTTP:         "http://" + testhelpers.LocalhostIPv4 + ":" + otlpPort,
+		PyroscopeURL:     "http://" + testhelpers.LocalhostIPv4 + ":" + pyroscopePort,
+		ComposeFiles:     composeFiles,
+		ComposeProject:   project,
+		ContainerRuntime: string(engine),
 	}
 	// When the fixture manages the app (app_service + app_port), resolve the host
 	// port docker published for it. This lets the app bind an ephemeral host port
 	// (127.0.0.1::<port>) instead of a fixed one, which is what makes app-seed
-	// fixture groups parallel-safe.
+	// suites parallel-safe.
 	if plan.Fixture.HasManagedApp() {
-		appPort, portErr := lookupComposePort(composeFiles, composeEnv, compose.AppService, strconv.Itoa(compose.AppPort))
+		appPort, portErr := lookupComposePort(engine, composeFiles, composeEnv, compose.AppService, strconv.Itoa(compose.AppPort))
 		if portErr != nil {
 			return fail(fmt.Errorf("resolve app host port for service %q: %w", compose.AppService, portErr))
 		}
@@ -167,6 +168,7 @@ func composeCheckEnv(plan discovery.Plan, rt Runtime) []string {
 	}
 	return []string{
 		"OATS_FIXTURE_TYPE=compose",
+		"OATS_CONTAINER_RUNTIME=" + rt.ContainerRuntime,
 		"COMPOSE_PROJECT_NAME=" + rt.ComposeProject,
 		"COMPOSE_FILE=" + strings.Join(files, string(os.PathListSeparator)),
 		"OATS_COMPOSE_FILE_ARGS=" + composeFileArgs(files),
@@ -289,18 +291,18 @@ func fixedShortPortMapping(value string) bool {
 	return false
 }
 
-func readComposeGrafanaToken(plan discovery.Plan) (string, error) {
+func readComposeGrafanaToken(plan discovery.Plan, engine container.Engine) (string, error) {
 	compose := plan.Fixture.Compose
 	files, _, err := resolveComposeFiles(plan.FixtureSourceDir, compose)
 	if err != nil {
 		return "", err
 	}
-	args := []string{"compose"}
+	args := engine.ComposeArgs()
 	for _, f := range files {
 		args = append(args, "-f", f)
 	}
 	args = append(args, "exec", "-T", lgtmComposeService, "sh", "-c", "cat /tmp/grafana-sa-token 2>/dev/null || true")
-	cmd := exec.Command(composeCLIBinary, args...)
+	cmd := exec.Command(engine.Binary(), args...)
 	cmd.Env = append(cmd.Environ(), compose.Env...)
 	out, err := cmd.Output()
 	if err != nil {
@@ -309,29 +311,29 @@ func readComposeGrafanaToken(plan discovery.Plan) (string, error) {
 	return string(out), nil
 }
 
-func dockerComposePort(files []string, env []string, service, containerPort string) (string, error) {
-	args := []string{"compose"}
+func composePort(engine container.Engine, files []string, env []string, service, containerPort string) (string, error) {
+	args := engine.ComposeArgs()
 	for _, f := range files {
 		args = append(args, "-f", f)
 	}
 	args = append(args, "port", service, containerPort)
-	cmd := exec.Command(composeCLIBinary, args...)
+	cmd := exec.Command(engine.Binary(), args...)
 	cmd.Env = append(cmd.Environ(), env...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
-	host, port, err := splitDockerHostPort(strings.TrimSpace(string(out)))
+	host, port, err := splitComposeHostPort(strings.TrimSpace(string(out)))
 	if err != nil {
 		return "", err
 	}
 	if host == "" || port == "" {
-		return "", fmt.Errorf("invalid docker compose port output %q", strings.TrimSpace(string(out)))
+		return "", fmt.Errorf("invalid compose port output %q", strings.TrimSpace(string(out)))
 	}
 	return port, nil
 }
 
-func splitDockerHostPort(addr string) (string, string, error) {
+func splitComposeHostPort(addr string) (string, string, error) {
 	addr = strings.TrimSpace(addr)
 	if strings.HasPrefix(addr, "[") {
 		end := strings.Index(addr, "]")

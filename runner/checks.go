@@ -14,6 +14,7 @@ import (
 	"github.com/grafana/oats/assert"
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/report"
+	"github.com/grafana/oats/testhelpers/container"
 	"github.com/grafana/oats/wait"
 )
 
@@ -130,13 +131,27 @@ func searchComposeLogs(ctx context.Context, extraEnv []string, needle string) (b
 	if envValue(extraEnv, "OATS_FIXTURE_TYPE") != "compose" {
 		return false, fmt.Errorf("compose-logs requires a compose fixture")
 	}
-	cmd := exec.CommandContext(ctx, "docker", "compose", "logs", "--no-color")
+	engine := container.Docker
+	if raw := envValue(extraEnv, "OATS_CONTAINER_RUNTIME"); raw != "" {
+		parsed, err := container.Parse(raw)
+		if err != nil {
+			return false, err
+		}
+		if parsed == container.Auto {
+			parsed, err = container.Resolve(raw)
+			if err != nil {
+				return false, err
+			}
+		}
+		engine = parsed
+	}
+	cmd := exec.CommandContext(ctx, engine.Binary(), engine.ComposeArgs("logs", "--no-color")...)
 	cmd.Env = append(cmd.Environ(), extraEnv...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 	if err := cmd.Run(); err != nil {
-		return false, fmt.Errorf("docker compose logs: %w\n%s", err, trimOutput(out.String()))
+		return false, fmt.Errorf("%s compose logs: %w\n%s", engine, err, trimOutput(out.String()))
 	}
 	return strings.Contains(out.String(), needle), nil
 }

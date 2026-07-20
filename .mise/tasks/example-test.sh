@@ -69,16 +69,40 @@ list_example examples/fixtures
 
 # These examples own all of their runtime dependencies. The Python Compose
 # example and the k3d example can run together; only one Compose stack runs at
-# a time because fixture startup prunes Docker networks.
-if ! command -v docker >/dev/null 2>&1; then
-	echo "docker is required for the runtime examples" >&2
+# a time because fixture startup prunes container-engine networks.
+container_runtime="${OATS_CONTAINER_RUNTIME:-auto}"
+case "$container_runtime" in
+auto)
+	if command -v podman >/dev/null 2>&1; then
+		container_engine=podman
+	elif command -v docker >/dev/null 2>&1; then
+		container_engine=docker
+	else
+		echo "podman or docker is required for the runtime examples" >&2
+		exit 1
+	fi
+	;;
+docker | podman)
+	container_engine="$container_runtime"
+	if ! command -v "$container_engine" >/dev/null 2>&1; then
+		echo "$container_engine is required by OATS_CONTAINER_RUNTIME=$container_runtime" >&2
+		exit 1
+	fi
+	;;
+*)
+	echo "unknown OATS_CONTAINER_RUNTIME: $container_runtime (want auto, docker, or podman)" >&2
 	exit 1
-fi
+	;;
+esac
 
-docker pull docker.io/grafana/otel-lgtm:latest
+"$container_engine" pull docker.io/grafana/otel-lgtm:latest
 if [[ "$mode" == compose ]]; then
 	run_example examples/fixtures --tags compose
 else
+	if [[ "$container_engine" != docker ]]; then
+		echo "the k3d example currently requires Docker; use OATS_EXAMPLE_MODE=compose with Podman" >&2
+		exit 1
+	fi
 	if ! command -v k3d >/dev/null 2>&1 || ! command -v kubectl >/dev/null 2>&1; then
 		echo "k3d and kubectl are required for the app examples" >&2
 		exit 1

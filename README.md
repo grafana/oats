@@ -72,6 +72,11 @@ default to disabled downloads when mise is detected, even outside a mise task.
 You can always select a specific release with
 `--gcx-version <version>` or a binary with `--gcx <path>`.
 
+For Compose fixtures, OATS prefers Podman when it is available and falls back
+to Docker. Use `--container-runtime docker` (or
+`OATS_CONTAINER_RUNTIME=docker`) to make the engine explicit. k3d fixtures
+currently require Docker.
+
 ## Getting started
 
 The recommended starting point is [`examples/python/`](examples/python/): a real,

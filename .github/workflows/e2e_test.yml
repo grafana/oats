@@ -40,7 +40,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, compose, remote, k3d-fail, k3d-smoke]
+        shard: [core, compose, compose-podman, remote, k3d-fail, k3d-smoke]
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -57,10 +57,33 @@ jobs:
           path: .e2e-tools/bin
       - name: Restore e2e tool permissions
         run: chmod +x .e2e-tools/bin/oats .e2e-tools/bin/gcx
+      - name: Install Podman Compose provider
+        if: matrix.shard == 'compose-podman'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes podman podman-compose
+      - name: Start rootless Podman service
+        if: matrix.shard == 'compose-podman'
+        run: |
+          socket="$XDG_RUNTIME_DIR/podman/podman.sock"
+          mkdir -p "$(dirname "$socket")"
+          podman system service --time=0 "unix://$socket" >"$RUNNER_TEMP/podman-service.log" 2>&1 &
+          echo "DOCKER_HOST=unix://$socket" >> "$GITHUB_ENV"
+          for _ in {1..30}; do
+            if [[ -S "$socket" ]]; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/podman-service.log"
+          exit 1
       - name: Run e2e tests
         # OATS_E2E_FILTER is not part of the matrix to avoid that it shows up in the gh action (too long)
         env:
           OATS_E2E_SHARD: ${{ matrix.shard }}
+          # Keep the CI matrix explicit: hosted runners may have both engines
+          # installed, while auto mode intentionally prefers Podman locally.
+          OATS_CONTAINER_RUNTIME: ${{ matrix.shard == 'compose-podman' && 'podman' || 'docker' }}
         run: |
           start_ts="$(date +%s)"
           case "$OATS_E2E_SHARD" in
@@ -68,6 +91,9 @@ jobs:
               export OATS_E2E_FILTER="-fixture/"
               ;;
             compose)
+              export OATS_E2E_FILTER="fixture/compose"
+              ;;
+            compose-podman)
               export OATS_E2E_FILTER="fixture/compose"
               ;;
             remote)
@@ -121,7 +147,56 @@ jobs:
         env:
           OATS_BIN: ${{ github.workspace }}/.e2e-tools/bin/oats
           GCX_BIN: ${{ github.workspace }}/.e2e-tools/bin/gcx
+          OATS_CONTAINER_RUNTIME: docker
           OATS_EXAMPLE_MODE: ${{ matrix.mode }}
+        run: mise run example-test
+
+  # Exercise the Compose adapter with rootless Podman as well as Docker. The
+  # k3d examples stay in the Docker-backed matrix because k3d is a separate
+  # Kubernetes-in-Docker workflow.
+  examples-podman:
+    needs: build-e2e-tools
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: v2026.7.0
+          sha256: 0744cb3c303baf0d308ff7b112ed41f22abb6029cb5644fd3a8ce74b29f16a68
+      - name: Install Podman Compose provider
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes podman podman-compose
+      - name: Start rootless Podman service
+        run: |
+          socket="$XDG_RUNTIME_DIR/podman/podman.sock"
+          mkdir -p "$(dirname "$socket")"
+          podman system service --time=0 "unix://$socket" >"$RUNNER_TEMP/podman-service.log" 2>&1 &
+          echo "DOCKER_HOST=unix://$socket" >> "$GITHUB_ENV"
+          for _ in {1..30}; do
+            if [[ -S "$socket" ]]; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/podman-service.log"
+          exit 1
+      - name: Download e2e tools
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: e2e-tools
+          path: .e2e-tools/bin
+      - name: Restore e2e tool permissions
+        run: chmod +x .e2e-tools/bin/oats .e2e-tools/bin/gcx
+      - name: Run Compose examples with Podman
+        env:
+          OATS_BIN: ${{ github.workspace }}/.e2e-tools/bin/oats
+          GCX_BIN: ${{ github.workspace }}/.e2e-tools/bin/gcx
+          OATS_CONTAINER_RUNTIME: podman
+          OATS_EXAMPLE_MODE: compose
         run: mise run example-test
 
   # Single required check. Branch protection can require just `e2e` instead of
@@ -129,7 +204,7 @@ jobs:
   # `needs` on the matrix job succeeds only if all its legs did; if: always()
   # makes this run (and go red) even when a dependency fails or is skipped.
   e2e:
-    needs: [test-e2e, examples]
+    needs: [test-e2e, examples, examples-podman]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -137,6 +212,7 @@ jobs:
         env:
           TEST_E2E_RESULT: ${{ needs.test-e2e.result }}
           EXAMPLES_RESULT: ${{ needs.examples.result }}
+          EXAMPLES_PODMAN_RESULT: ${{ needs.examples-podman.result }}
         run: |
-          echo "test-e2e=$TEST_E2E_RESULT examples=$EXAMPLES_RESULT"
-          [ "$TEST_E2E_RESULT" = "success" ] && [ "$EXAMPLES_RESULT" = "success" ]
+          echo "test-e2e=$TEST_E2E_RESULT examples=$EXAMPLES_RESULT examples-podman=$EXAMPLES_PODMAN_RESULT"
+          [ "$TEST_E2E_RESULT" = "success" ] && [ "$EXAMPLES_RESULT" = "success" ] && [ "$EXAMPLES_PODMAN_RESULT" = "success" ]

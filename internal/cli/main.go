@@ -52,6 +52,7 @@ import (
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
 	"github.com/grafana/oats/testhelpers"
+	"github.com/grafana/oats/testhelpers/container"
 )
 
 // Version is the oats CLI version. Release builds can override this with
@@ -141,6 +142,7 @@ func addRunFlags(fs *pflag.FlagSet) {
 	fs.Duration("absent-timeout", 10*time.Second, "how long an absent assertion must stay absent")
 	fs.Duration("seed-settle", 2*time.Second, "post-seed wait before first assertion")
 	fs.String("gcx-context", "", "override the gcx --context value (otherwise derived from fixture endpoint)")
+	fs.String("container-runtime", "auto", "container engine for Compose fixtures: auto | docker | podman")
 	fs.String("app-host", "localhost", "application host for driving case input requests")
 	fs.Int("app-port", 8080, "application port for driving case input requests")
 	fs.String("otlp-http", defaultOTLPHTTP(), "OTLP/HTTP base URL for inline-otlp seed mode")
@@ -369,6 +371,10 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 	defer cancel()
 
 	gcxBin := flagStr(fs, "gcx")
+	containerRuntime := flagStr(fs, "container-runtime")
+	if _, err := container.Parse(containerRuntime); err != nil {
+		return err
+	}
 	if version := flagStr(fs, "gcx-version"); version != "" {
 		if fs.Changed("gcx") {
 			return fmt.Errorf("--gcx and --gcx-version cannot be used together")
@@ -388,6 +394,7 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 	opts := runOptions{
 		gcxBin:             gcxBin,
 		gcxContextOverride: flagStr(fs, "gcx-context"),
+		containerRuntime:   containerRuntime,
 		appHost:            flagStr(fs, "app-host"),
 		appPort:            flagInt(fs, "app-port"),
 		otlpHTTP:           flagStr(fs, "otlp-http"),
@@ -509,6 +516,7 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 type runOptions struct {
 	gcxBin             string
 	gcxContextOverride string
+	containerRuntime   string
 	appHost            string
 	appPort            int
 	otlpHTTP           string
@@ -626,7 +634,7 @@ func runPlansParallel(parent context.Context, rep report.Reporter, plans []disco
 
 func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts runOptions) groupResult {
 	fixtureStart := emitFixtureStart(rep, plan)
-	fix, rt, err := fixture.Start(ctx, plan)
+	fix, rt, err := fixture.StartWithOptions(ctx, plan, fixture.Options{ContainerRuntime: opts.containerRuntime})
 	if err != nil {
 		return groupResult{err: fmt.Errorf("fixture group %q: %w", plan.Name, err)}
 	}

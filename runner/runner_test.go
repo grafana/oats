@@ -431,6 +431,26 @@ expected:
 	}
 }
 
+func TestSearchComposeLogs_UsesPodman(t *testing.T) {
+	dir := t.TempDir()
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\"; echo 'podman service started'\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	ok, err := searchComposeLogs(context.Background(), []string{
+		"OATS_FIXTURE_TYPE=compose",
+		"OATS_CONTAINER_RUNTIME=podman",
+	}, "podman service started")
+	if err != nil {
+		t.Fatalf("searchComposeLogs: %v", err)
+	}
+	if !ok {
+		t.Fatal("searchComposeLogs returned false")
+	}
+}
+
 func TestRunCase_ComposeLogsMissingSurfaced(t *testing.T) {
 	dir := t.TempDir()
 	binDir := filepath.Join(dir, "bin")
