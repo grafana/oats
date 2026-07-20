@@ -17,6 +17,13 @@ func applyEnvFlags(fs *pflag.FlagSet) error {
 	var applyErr error
 	gcxExplicit := fs.Changed("gcx")
 	gcxVersionExplicit := fs.Changed("gcx-version")
+	if !gcxExplicit && !gcxVersionExplicit {
+		if _, hasGCX := os.LookupEnv(flagEnvName("gcx")); hasGCX {
+			if _, hasGCXVersion := os.LookupEnv(flagEnvName("gcx-version")); hasGCXVersion {
+				return fmt.Errorf("cannot set both %s and %s; choose one", flagEnvName("gcx"), flagEnvName("gcx-version"))
+			}
+		}
+	}
 	fs.VisitAll(func(flag *pflag.Flag) {
 		if applyErr != nil || flag.Changed {
 			return
