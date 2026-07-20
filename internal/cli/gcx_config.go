@@ -42,14 +42,14 @@ func remoteGrafanaURL(contextName string) (string, error) {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			if explicit {
-				return "", fmt.Errorf("read gcx config %s: %w", path, err)
+				return "", fmt.Errorf("read gcx config %q: %w", path, err)
 			}
 			continue
 		}
 		var cfg gcxConfig
 		if err := yaml.Unmarshal(data, &cfg); err != nil {
 			if explicit {
-				return "", fmt.Errorf("parse gcx config %s: %w", path, err)
+				return "", fmt.Errorf("parse gcx config %q: %w", path, err)
 			}
 			continue
 		}
