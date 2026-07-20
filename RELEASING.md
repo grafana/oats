@@ -26,6 +26,9 @@ Releases are automated with `release-please` and GoReleaser.
    - create GitHub artifact attestations for the assets
    - publish the draft release
 
+Linux release artifacts are built with `CGO_ENABLED=0`, so the same archives
+work on both glibc- and musl-based distributions.
+
 ## Republish an existing tag
 
 Use `workflow_dispatch` with an existing `tag_name` to rebuild assets and

@@ -20,6 +20,10 @@ OpenTelemetry Acceptance Tests (OATs), or OATs for short, is a test framework fo
 go install github.com/grafana/oats@latest
 ```
 
+Prebuilt binaries are also available from the [GitHub Releases](https://github.com/grafana/oats/releases)
+page. The Linux release archives are statically linked and work on both glibc-
+and musl-based distributions, such as Alpine Linux.
+
 1. You can confirm it was installed with:
 
 ```sh
