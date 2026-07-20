@@ -1,0 +1,15 @@
+name: custom-check-fail
+tags: [custom, check, fail]
+
+run:
+  args:
+    - --timeout
+    - 200ms
+    - --interval
+    - 20ms
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL
+    - custom-check

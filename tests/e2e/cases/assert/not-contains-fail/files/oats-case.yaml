@@ -1,0 +1,14 @@
+name: not-contains-fail
+fixture:
+  remote:
+    endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  logs:
+    - service: {{CASE_NAME}}
+      body: seed-log-line
+expected:
+  logs:
+    # The seeded body IS present, so not_contains must fail.
+    - logql: '{service_name="{{CASE_NAME}}"}'
+      not_contains: seed-log-line

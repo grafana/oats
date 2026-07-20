@@ -1,0 +1,25 @@
+# inline-otlp seeds telemetry directly — no app, no SDK. Use it to exercise the
+# pipeline/backend in isolation or to pin an exact payload. Here we push one span
+# and assert it comes back.
+name: inline seed smoke
+tags: [traces]
+
+fixture:
+  remote:
+    endpoint: http://localhost:4318   # already-running grafana/otel-lgtm (not booted by OATS)
+
+seed:
+  type: inline-otlp
+  traces:
+    - service: gcx-e2e-seed        # becomes resource.service.name
+      spans:
+        - name: seed-operation     # kind defaults to INTERNAL, duration to 200ms
+
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "gcx-e2e-seed" }'
+      match_spans:
+        - name: seed-operation
+          attributes:              # optional attribute assertions on the matched span
+            - key: service.name
+              value: gcx-e2e-seed

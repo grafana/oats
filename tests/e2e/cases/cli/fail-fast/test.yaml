@@ -1,0 +1,19 @@
+name: fail-fast
+tags: [cli, fail-fast]
+
+run:
+  args:
+    - --fail-fast
+    - --timeout
+    - 5s
+    - --interval
+    - 1s
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL
+  # With --fail-fast the runner stops after the first failing case, so the
+  # second case must never run and its name must not appear in the report.
+  stdout_not_contains:
+    - ff-second-should-not-run

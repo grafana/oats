@@ -1,0 +1,15 @@
+name: cache-skip
+tags: [cli, cache]
+
+# Run the same fixture group twice against one cache dir; the second run must skip the
+# unchanged case instead of re-running it. -v surfaces the SKIP line.
+run:
+  shell: |
+    set -e
+    {{OATS}} --config files/oats-config.yaml --gcx {{GCX}} --gcx-context local --cache-dir "$PWD/cache" --timeout 30s --interval 2s -v
+    echo "=== second run ==="
+    {{OATS}} --config files/oats-config.yaml --gcx {{GCX}} --gcx-context local --cache-dir "$PWD/cache" --timeout 30s --interval 2s -v
+
+expect:
+  stdout_contains:
+    - "SKIP"

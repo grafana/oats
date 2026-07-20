@@ -1,0 +1,9 @@
+name: compose-logs
+tags: [fixture, compose, compose-logs]
+
+execution:
+  mode: serial
+
+expect:
+  stdout_contains:
+    - PASS 1/1

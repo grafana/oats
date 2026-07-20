@@ -1,0 +1,18 @@
+name: compose-logs-fail
+tags: [fixture, compose, compose-logs, fail]
+
+execution:
+  mode: serial
+
+run:
+  args:
+    - --timeout
+    - 200ms
+    - --interval
+    - 20ms
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL
+    - 'compose-logs: missing "missing log line"'

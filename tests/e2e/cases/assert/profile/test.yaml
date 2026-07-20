@@ -1,0 +1,19 @@
+name: profile
+tags: [assert, profile, profiles]
+
+# Run serially (after the parallel batch) so Pyroscope has been up long enough
+# to have self-profiled a CPU flamegraph, and isn't starved by concurrent
+# CPU-heavy cases. A cold Pyroscope needs ~30s to accumulate runtime frames.
+execution:
+  mode: serial
+
+run:
+  args:
+    - --timeout
+    - 45s
+    - --interval
+    - 2s
+
+expect:
+  stdout_contains:
+    - PASS 1/1

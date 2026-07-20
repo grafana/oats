@@ -1,0 +1,18 @@
+name: compose-app-seed
+tags: [fixture, compose, seed, app]
+
+# Compose fixture boots LGTM + a real app (telemetrygen) that exports OTLP.
+# Serial so it isn't starved while the compose stack builds and starts.
+execution:
+  mode: serial
+
+run:
+  args:
+    - --timeout
+    - 90s
+    - --interval
+    - 3s
+
+expect:
+  stdout_contains:
+    - PASS 1/1
