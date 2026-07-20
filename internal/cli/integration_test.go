@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -49,6 +50,31 @@ func TestResolveEndpoint_UsesRuntimeAppHostPort(t *testing.T) {
 	}
 	if ep.GCXContext != "" || ep.AppPort != 18080 {
 		t.Fatalf("unexpected endpoint: %+v", ep)
+	}
+}
+
+func TestResolveEndpoint_RemoteUsesGCXGrafanaURL(t *testing.T) {
+	config := filepath.Join(t.TempDir(), "gcx.yaml")
+	writeFile(t, filepath.Dir(config), filepath.Base(config), `current-context: remote
+contexts:
+  remote:
+    grafana:
+      server: http://grafana.example.test:3000/
+`)
+	t.Setenv("GCX_CONFIG", config)
+
+	ep, err := resolveEndpoint(discovery.Plan{
+		Name:    "remote-basic",
+		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://otlp.example.test:4318"}},
+	}, fixture.Runtime{}, "remote", "localhost", 8080, "")
+	if err != nil {
+		t.Fatalf("resolveEndpoint: %v", err)
+	}
+	if ep.GCXContext != "remote" || ep.OTLPHTTP != "http://otlp.example.test:4318" {
+		t.Fatalf("unexpected remote endpoint: %+v", ep)
+	}
+	if !slices.Contains(ep.CustomCheckEnv, "OATS_GRAFANA_URL=http://grafana.example.test:3000") {
+		t.Fatalf("remote custom-check env missing Grafana URL: %v", ep.CustomCheckEnv)
 	}
 }
 

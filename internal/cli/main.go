@@ -455,12 +455,19 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 		// (e.g. `gcx login` already ran). We pass the suite name as a
 		// best-effort default; --gcx-context overrides.
 		ep.GCXContext = plan.Name
+		if gcxContextOverride != "" {
+			ep.GCXContext = gcxContextOverride
+		}
 		ep.OTLPHTTP = plan.Fixture.Remote.Endpoint
-		ep.CustomCheckEnv = append(ep.CustomCheckEnv,
-			"OATS_FIXTURE_TYPE=remote",
-			"OATS_GRAFANA_URL="+grafanaURL(),
-			"OATS_APP_URL="+fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort),
-		)
+		grafana, err := remoteGrafanaURL(ep.GCXContext)
+		if err != nil {
+			return runner.Endpoint{}, fmt.Errorf("resolve remote Grafana URL: %w", err)
+		}
+		ep.CustomCheckEnv = append(ep.CustomCheckEnv, "OATS_FIXTURE_TYPE=remote")
+		if grafana != "" {
+			ep.CustomCheckEnv = append(ep.CustomCheckEnv, "OATS_GRAFANA_URL="+grafana)
+		}
+		ep.CustomCheckEnv = append(ep.CustomCheckEnv, "OATS_APP_URL="+fmt.Sprintf("http://%s:%d", ep.AppHost, ep.AppPort))
 	case "compose":
 		if rt.GCXConfig != "" {
 			ep.GCXConfig = rt.GCXConfig
@@ -731,10 +738,6 @@ func closeFixture(rep report.Reporter, plan discovery.Plan, fix fixture.Handle) 
 		})
 	}
 	return nil
-}
-
-func grafanaURL() string {
-	return fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, testhelpers.GrafanaHTTPPort)
 }
 
 func defaultOTLPHTTP() string {
