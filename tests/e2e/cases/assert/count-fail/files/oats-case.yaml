@@ -1,0 +1,16 @@
+name: count-fail
+fixture:
+  remote:
+    endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  logs:
+    - service: {{CASE_NAME}}
+      body: seed-log-line
+expected:
+  logs:
+    # One line seeded, so "== 5" can never hold — the case must fail.
+    - logql: '{service_name="{{CASE_NAME}}"}'
+      count: '== 5'
+      match:
+        - name: seed-log-line

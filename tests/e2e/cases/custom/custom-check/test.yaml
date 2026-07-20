@@ -1,0 +1,6 @@
+name: custom-check
+tags: [custom, check]
+
+expect:
+  stdout_contains:
+    - PASS 1/1

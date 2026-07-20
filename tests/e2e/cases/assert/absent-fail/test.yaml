@@ -1,0 +1,17 @@
+name: absent-fail
+tags: [assert, absent, fail]
+
+run:
+  args:
+    - --timeout
+    - 3s
+    - --interval
+    - 500ms
+    - --absent-timeout
+    - 1s
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL
+    - "absent: expected zero results, got 1"

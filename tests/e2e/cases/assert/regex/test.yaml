@@ -1,0 +1,6 @@
+name: regex
+tags: [assert, regex]
+
+expect:
+  stdout_contains:
+    - PASS 1/1

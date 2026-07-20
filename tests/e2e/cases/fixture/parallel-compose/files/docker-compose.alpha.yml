@@ -1,0 +1,4 @@
+services:
+  alpha-app:
+    image: alpine:3.22
+    command: ["sh", "-c", "echo app started ok && sleep 3"]

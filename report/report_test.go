@@ -1,0 +1,266 @@
+package report
+
+import (
+	"bytes"
+	"encoding/json"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestTextReporter_SilentOnAllPass(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventRunStart, OatsVersion: "test"})
+	r.Emit(Event{Type: EventCasePass, Case: "a"})
+	r.Emit(Event{Type: EventCasePass, Case: "b"})
+	r.Emit(Event{Type: EventRunEnd, DurationMs: 100})
+
+	out := buf.String()
+	if strings.Contains(out, "FAIL") {
+		t.Errorf("no FAIL block expected on all-pass run:\n%s", out)
+	}
+	if !strings.Contains(out, "PASS 2/2") {
+		t.Errorf("summary line missing:\n%s", out)
+	}
+}
+
+func TestTextReporter_FailureBlockHasSourceAndCmd(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventRunStart})
+	r.Emit(Event{Type: EventCaseStart, Case: "rolldice", Source: "examples/nodejs/oats.yaml:1"})
+	r.Emit(Event{
+		Type:    EventAssertFail,
+		Case:    "rolldice",
+		Source:  "examples/nodejs/oats.yaml:8",
+		Message: "TraceQL returned no results",
+		Cmd:     "gcx traces search '{ span.http.route = \"/rolldice\" }'",
+	})
+	r.Emit(Event{Type: EventCaseFail, Case: "rolldice"})
+	r.Emit(Event{Type: EventRunEnd})
+
+	out := buf.String()
+	if !strings.Contains(out, "FAIL rolldice  examples/nodejs/oats.yaml:8") {
+		t.Errorf("FAIL header missing or wrong:\n%s", out)
+	}
+	if !strings.Contains(out, "TraceQL returned no results") {
+		t.Errorf("failure message missing:\n%s", out)
+	}
+	if !strings.Contains(out, "gcx traces search") {
+		t.Errorf("command missing:\n%s", out)
+	}
+	if !strings.Contains(out, "FAIL 0/1 (1 failed") {
+		t.Errorf("summary line missing or wrong:\n%s", out)
+	}
+}
+
+func TestTextReporter_GHAAnnotationsWhenEnabled(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "true")
+
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventRunStart})
+	r.Emit(Event{
+		Type:    EventAssertFail,
+		Case:    "x",
+		Source:  "examples/nodejs/oats.yaml:8",
+		Message: "oops",
+	})
+	// Same source twice — only one annotation should appear.
+	r.Emit(Event{
+		Type:    EventAssertFail,
+		Case:    "x",
+		Source:  "examples/nodejs/oats.yaml:8",
+		Message: "again",
+	})
+	r.Emit(Event{Type: EventCaseFail, Case: "x"})
+	r.Emit(Event{Type: EventRunEnd})
+
+	out := buf.String()
+	expectedAnnotation := "::error file=examples/nodejs/oats.yaml,line=8::oops"
+	if !strings.Contains(out, expectedAnnotation) {
+		t.Errorf("expected annotation missing:\n%s", out)
+	}
+	if strings.Count(out, "::error file=") != 1 {
+		t.Errorf("duplicate annotations not deduplicated:\n%s", out)
+	}
+}
+
+func TestTextReporter_GHAAnnotationsWithoutSource(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "true")
+
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventRunStart})
+	r.Emit(Event{
+		Type:    EventAssertFail,
+		Case:    "x",
+		Message: "oops",
+	})
+	r.Emit(Event{Type: EventCaseFail, Case: "x"})
+	r.Emit(Event{Type: EventRunEnd})
+
+	out := buf.String()
+	if !strings.Contains(out, "::error::oops") {
+		t.Fatalf("expected source-free gha annotation:\n%s", out)
+	}
+	if strings.Contains(out, "::error file=") {
+		t.Fatalf("did not expect empty file annotation:\n%s", out)
+	}
+}
+
+func TestTextReporter_GHAAnnotationEscaping(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "true")
+
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventRunStart})
+	r.Emit(Event{
+		Type:    EventAssertFail,
+		Case:    "x",
+		Source:  "path/with,comma:x/a.yaml:8",
+		Message: "line one\nline two 50% off",
+	})
+	r.Emit(Event{Type: EventCaseFail, Case: "x"})
+	r.Emit(Event{Type: EventRunEnd})
+
+	out := buf.String()
+	// Message: %, CR and LF encoded so the annotation is not truncated.
+	if !strings.Contains(out, "line one%0Aline two 50%25 off") {
+		t.Errorf("message not escaped:\n%s", out)
+	}
+	// Property: message rules plus : and , so delimiters are not misread.
+	if !strings.Contains(out, "file=path/with%2Ccomma%3Ax/a.yaml,line=8::") {
+		t.Errorf("file property not escaped:\n%s", out)
+	}
+}
+
+func TestTextReporter_VerbosePassPrintsPasses(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerbosePasses)
+	r.Emit(Event{Type: EventRunStart})
+	r.Emit(Event{Type: EventCasePass, Case: "a"})
+	r.Emit(Event{Type: EventRunEnd})
+
+	if !strings.Contains(buf.String(), "PASS a\n") {
+		t.Errorf("expected per-case PASS line:\n%s", buf.String())
+	}
+}
+
+func TestTextReporter_VerboseAllPrintsFixtureLifecycle(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseAll)
+	r.Emit(Event{Type: EventFixtureStart, FixtureType: "compose", DurationMs: 1})
+	r.Emit(Event{Type: EventFixtureReady, FixtureType: "compose", DurationMs: 12})
+	r.Emit(Event{Type: EventFixtureTeardown, FixtureType: "compose", DurationMs: 3})
+
+	out := buf.String()
+	for _, want := range []string{
+		"[fixture compose] fixture.start",
+		"[fixture compose] fixture.ready",
+		"[fixture compose] fixture.teardown",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected fixture lifecycle line %q in:\n%s", want, out)
+		}
+	}
+}
+
+func TestNDJSONReporter_EmitsOneJSONObjectPerLine(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewNDJSONReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventRunStart, OatsVersion: "x", SchemaVersion: SchemaVersion, Ts: time.Now()})
+	r.Emit(Event{Type: EventCaseFail, Case: "rolldice", DurationMs: 1234})
+	r.Emit(Event{Type: EventRunEnd, Pass: 0, Fail: 1})
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d:\n%s", len(lines), buf.String())
+	}
+	for _, line := range lines {
+		var e map[string]any
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			t.Errorf("invalid JSON line %q: %v", line, err)
+		}
+	}
+}
+
+func TestNDJSONReporter_UsesFixtureGroupWireVocabulary(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewNDJSONReporter(&buf, VerboseDefault)
+	r.Emit(Event{
+		Type:    EventGroupStart,
+		Group:   "smoke",
+		Message: "group is ready",
+	})
+
+	var event map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if event["event"] != "group.start" || event["group"] != "smoke" {
+		t.Fatalf("unexpected group event: %#v", event)
+	}
+	if event["msg"] != "group is ready" {
+		t.Fatalf("message must retain the msg wire key: %#v", event)
+	}
+}
+
+func TestNDJSONReporter_FiltersPassByDefault(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewNDJSONReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventCasePass, Case: "a"})
+	r.Emit(Event{Type: EventCaseFail, Case: "b"})
+
+	if strings.Contains(buf.String(), `"case.pass"`) {
+		t.Errorf("pass event leaked through default verbosity:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), `"case.fail"`) {
+		t.Errorf("fail event missing:\n%s", buf.String())
+	}
+}
+
+func TestNDJSONReporter_EmitsFixtureLifecycleAtVerboseAll(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewNDJSONReporter(&buf, VerboseAll)
+	r.Emit(Event{Type: EventFixtureStart, FixtureType: "compose"})
+	r.Emit(Event{Type: EventFixtureReady, FixtureType: "compose"})
+	r.Emit(Event{Type: EventFixtureTeardown, FixtureType: "compose"})
+
+	out := buf.String()
+	for _, want := range []string{`"fixture.start"`, `"fixture.ready"`, `"fixture.teardown"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %s in NDJSON output:\n%s", want, out)
+		}
+	}
+}
+
+func TestNDJSONReporter_EmitsGCXExecAtVerboseCmd(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewNDJSONReporter(&buf, VerboseCmd)
+	r.Emit(Event{Type: EventGCXExec, Cmd: "gcx logs --query x"})
+	if !strings.Contains(buf.String(), `"gcx.exec"`) {
+		t.Fatalf("expected gcx.exec in NDJSON output:\n%s", buf.String())
+	}
+}
+
+func TestSplitSource(t *testing.T) {
+	cases := []struct {
+		in       string
+		wantFile string
+		wantLine int
+	}{
+		{"a.yaml:42", "a.yaml", 42},
+		{"a.yaml", "a.yaml", 0},
+		{"path/with/colon:x/a.yaml:7", "path/with/colon:x/a.yaml", 7},
+		{"a.yaml:notanint", "a.yaml:notanint", 0},
+		{"", "", 0},
+	}
+	for _, tc := range cases {
+		f, n := splitSource(tc.in)
+		if f != tc.wantFile || n != tc.wantLine {
+			t.Errorf("splitSource(%q): got (%q, %d), want (%q, %d)", tc.in, f, n, tc.wantFile, tc.wantLine)
+		}
+	}
+}

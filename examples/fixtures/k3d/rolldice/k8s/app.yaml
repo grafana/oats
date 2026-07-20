@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rolldice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rolldice
+  template:
+    metadata:
+      labels:
+        app: rolldice
+    spec:
+      containers:
+        - name: rolldice
+          image: rolldice:test
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: rolldice
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://lgtm:4317
+            - name: OTEL_METRIC_EXPORT_INTERVAL
+              value: "5000"
+          ports:
+            - name: http
+              containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rolldice
+spec:
+  selector:
+    app: rolldice
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

@@ -1,0 +1,13 @@
+# The application under test. OATS adds the Grafana LGTM stack as the `lgtm`
+# service because the case uses the default compose template.
+services:
+  rolldice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      OTEL_SERVICE_NAME: "rolldice"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4317
+    ports:
+      # OATS discovers the ephemeral host port via app_service + app_port.
+      - "127.0.0.1::8080"
