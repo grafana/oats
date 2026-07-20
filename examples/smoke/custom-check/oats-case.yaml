@@ -1,0 +1,14 @@
+# A custom-check runs a script when the built-in assertions aren't enough: exit 0
+# = pass, non-zero = fail (retried like any assertion). The script runs with its
+# cwd set to this case's directory and gets OATS_* environment variables such as
+# OATS_GRAFANA_URL and OATS_OTLP_HTTP — see docs/case-reference.md.
+name: custom check smoke
+tags: [custom]
+
+fixture:
+  remote:
+    endpoint: http://localhost:4318   # already-running grafana/otel-lgtm (not booted by OATS)
+
+expected:
+  custom-checks:
+    - script: ./verify.sh   # path relative to this case dir (verify.sh sits next to it)

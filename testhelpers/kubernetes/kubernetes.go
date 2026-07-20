@@ -2,13 +2,17 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
+	"unicode"
 
+	"github.com/grafana/oats/testhelpers"
 	"github.com/grafana/oats/testhelpers/remote"
 )
 
@@ -22,8 +26,17 @@ type Kubernetes struct {
 	ImportImages     []string `yaml:"import-images"`
 }
 
+const (
+	kubernetesCLIBinary = "kubectl"
+	k3dCLIBinary        = "k3d"
+	dockerCLIBinary     = "docker"
+
+	defaultAppRemotePort = 8080
+)
+
 func NewEndpoint(host string, model *Kubernetes, ports remote.PortsConfig, testName string, dir string) *remote.Endpoint {
 	var killList []*os.Process
+	cluster := clusterName(testName)
 	run := func(cmd *exec.Cmd, background bool) error {
 		slog.Info("running", "command", cmd.String(), "dir", dir)
 		cmd.Stdout = os.Stdout
@@ -42,16 +55,21 @@ func NewEndpoint(host string, model *Kubernetes, ports remote.PortsConfig, testN
 	return remote.NewEndpoint(host, ports, func(ctx context.Context) error {
 		return start(model, ports, testName, run)
 	}, func(ctx context.Context) error {
+		var errs []error
 		for _, p := range killList {
-			err := p.Kill()
-			if err != nil {
-				return err
+			// A port-forward that already exited returns os.ErrProcessDone;
+			// that means cleanup is already done, not a teardown failure.
+			if err := p.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+				errs = append(errs, err)
 			}
 		}
-		return run(exec.Command("k3d", "cluster", "delete", testName), false)
+		if err := run(exec.Command(k3dCLIBinary, "cluster", "delete", cluster), false); err != nil {
+			errs = append(errs, err)
+		}
+		return errors.Join(errs...)
 	},
 		func(f func(io.ReadCloser, *sync.WaitGroup)) error {
-			panic("not implemented for kubernetes")
+			return fmt.Errorf("compose log reading is not implemented for kubernetes fixtures")
 		},
 	)
 }
@@ -66,44 +84,41 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 		model.AppDockerContext = "."
 	}
 
-	err := run(exec.Command("docker", "build", "-f", model.AppDockerFile, "-t", model.AppDockerTag, model.AppDockerContext), false)
+	err := run(exec.Command(dockerCLIBinary, "build", "-f", model.AppDockerFile, "-t", model.AppDockerTag, model.AppDockerContext), false)
 	if err != nil {
 		return err
 	}
 
-	cluster := testName
-	if len(cluster) > 32 {
-		cluster = cluster[(len(cluster))-32:]
-	}
+	cluster := clusterName(testName)
 
-	err = run(exec.Command("k3d", "cluster", "list", cluster), false)
+	err = run(exec.Command(k3dCLIBinary, "cluster", "list", cluster), false)
 	if err == nil {
 		slog.Info("cluster already exists - deleting", "name", cluster)
-		err = run(exec.Command("k3d", "cluster", "delete", cluster), false)
+		err = run(exec.Command(k3dCLIBinary, "cluster", "delete", cluster), false)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = run(exec.Command("k3d", "cluster", "create", cluster), false)
+	err = run(exec.Command(k3dCLIBinary, "cluster", "create", cluster), false)
 	if err != nil {
 		return err
 	}
 	importImages := []string{model.AppDockerTag}
 	importImages = append(importImages, model.ImportImages...)
 	for _, image := range importImages {
-		err = run(exec.Command("k3d", "image", "import", "-c", cluster, image), false)
+		err = run(exec.Command(k3dCLIBinary, "image", "import", "-c", cluster, image), false)
 		if err != nil {
 			return err
 		}
 	}
-	err = run(exec.Command("kubectl", "apply", "-f", model.Dir), false)
+	err = run(exec.Command(kubernetesCLIBinary, "apply", "-f", model.Dir), false)
 	if err != nil {
 		return err
 	}
 	err = run(
 		exec.Command(
-			"kubectl",
+			kubernetesCLIBinary,
 			"wait",
 			"--timeout=5m",
 			"--for=condition=available",
@@ -114,26 +129,87 @@ func start(model *Kubernetes, ports remote.PortsConfig, testName string, run fun
 	if err != nil {
 		return err
 	}
-	err = run(exec.Command("kubectl", "port-forward", "service/"+model.AppService, fmt.Sprintf("%d:8080", model.AppDockerPort)), true)
+	// A Service can exist before its backing pod is ready. Wait for an endpoint
+	// before starting the app port-forward, otherwise kubectl may start and
+	// immediately exit while the pod is still Pending.
+	err = run(
+		exec.Command(
+			kubernetesCLIBinary,
+			"wait",
+			"--timeout=5m",
+			"--for=jsonpath={.subsets[0].addresses[0].ip}",
+			"endpoints/"+model.AppService,
+		),
+		false,
+	)
+	if err != nil {
+		return err
+	}
+	err = run(exec.Command(kubernetesCLIBinary, "port-forward", "service/"+model.AppService, fmt.Sprintf("%d:%d", model.AppDockerPort, defaultAppRemotePort)), true)
 	if err != nil {
 		return err
 	}
 
-	err = portForward(ports.LokiHttpPort, 3100)
+	err = portForward(ports.LokiHTTPPort, testhelpers.LokiHTTPPort)
 	if err != nil {
 		return err
 	}
-	err = portForward(ports.PrometheusHTTPPort, 9090)
+	if ports.GrafanaHTTPPort != 0 {
+		err = portForward(ports.GrafanaHTTPPort, testhelpers.GrafanaHTTPPort)
+		if err != nil {
+			return err
+		}
+	}
+	if ports.OTLPHTTPPort != 0 {
+		err = portForward(ports.OTLPHTTPPort, testhelpers.OTLPHTTPPort)
+		if err != nil {
+			return err
+		}
+	}
+	err = portForward(ports.PrometheusHTTPPort, testhelpers.PrometheusHTTPPort)
 	if err != nil {
 		return err
 	}
-	err = portForward(ports.TempoHTTPPort, 3200)
+	err = portForward(ports.TempoHTTPPort, testhelpers.TempoHTTPPort)
 	if err != nil {
 		return err
 	}
-	err = portForward(ports.PyroscopeHttpPort, 4040)
+	err = portForward(ports.PyroscopeHTTPPort, testhelpers.PyroscopeHTTPPort)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func clusterName(testName string) string {
+	var b strings.Builder
+	lastDash := false
+	for _, r := range strings.ToLower(testName) {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
+			b.WriteRune(r)
+			lastDash = false
+		case r == '-' || r == '_' || unicode.IsSpace(r):
+			if !lastDash && b.Len() > 0 {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		default:
+			if !lastDash && b.Len() > 0 {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	cluster := strings.Trim(b.String(), "-")
+	if cluster == "" {
+		cluster = "oats"
+	}
+	if len(cluster) > 32 {
+		cluster = strings.Trim(cluster[len(cluster)-32:], "-")
+		if cluster == "" {
+			cluster = "oats"
+		}
+	}
+	return cluster
 }

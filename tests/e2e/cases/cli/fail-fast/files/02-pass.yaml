@@ -1,0 +1,15 @@
+name: ff-second-should-not-run
+fixture:
+  remote:
+    endpoint: "{{REMOTE_OTLP_HTTP}}"
+seed:
+  type: inline-otlp
+  logs:
+    - service: ff-second-should-not-run
+      body: ff-second-line
+expected:
+  logs:
+    # Would pass on its own, but --fail-fast should prevent it from running
+    # at all after the first case fails.
+    - logql: '{service_name="ff-second-should-not-run"}'
+      contains: ff-second-line

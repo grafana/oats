@@ -1,4 +1,4 @@
-// Package docker provides some helpers to manage docker-compose clusters from the test suites
+// Package compose provides helpers to manage Docker Compose stacks used by fixture groups.
 package compose
 
 import (
@@ -10,39 +10,100 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path"
 	"strings"
 	"sync"
 
+	"github.com/grafana/oats/testhelpers/container"
 	"github.com/grafana/oats/testhelpers/remote"
 )
 
 type Compose struct {
 	Command     string
 	DefaultArgs []string
-	Path        string
+	Paths       []string
 	Env         []string
 }
+
+var dockerPruneMutex sync.Mutex
 
 func defaultEnv() []string {
 	return os.Environ()
 }
 
-func Suite(composeFile string) (*Compose, error) {
-	command := "docker"
-	defaultArgs := []string{"compose"}
+// mergeEnv combines the parent environment with explicitly provided vars,
+// ensuring the provided vars deterministically override any parent duplicates
+// (e.g. COMPOSE_PROJECT_NAME) regardless of platform-specific exec behavior.
+func mergeEnv(parent, override []string) []string {
+	merged := make([]string, 0, len(parent)+len(override))
+	index := make(map[string]int, len(parent)+len(override))
+	for _, kv := range append(append([]string{}, parent...), override...) {
+		key := kv
+		if i := strings.IndexByte(kv, '='); i >= 0 {
+			key = kv[:i]
+		}
+		if pos, ok := index[key]; ok {
+			merged[pos] = kv
+			continue
+		}
+		index[key] = len(merged)
+		merged = append(merged, kv)
+	}
+	return merged
+}
 
+func Suite(composeFile string) (*Compose, error) {
+	return SuiteFiles([]string{composeFile}, nil)
+}
+
+func SuiteFiles(composeFiles []string, env []string) (*Compose, error) {
+	return StackFilesWithRuntime(composeFiles, env, container.Docker)
+}
+
+// Stack creates a Docker Compose lifecycle for one file.
+func Stack(composeFile string) (*Compose, error) {
+	return StackFiles([]string{composeFile}, nil)
+}
+
+// StackFiles creates a Docker Compose lifecycle for the supplied files.
+func StackFiles(composeFiles []string, env []string) (*Compose, error) {
+	return StackFilesWithRuntime(composeFiles, env, container.Docker)
+}
+
+// StackFilesWithRuntime creates a Compose lifecycle using the selected host
+// container engine. Docker remains the compatibility default for callers that
+// use StackFiles or the older SuiteFiles helper.
+func StackFilesWithRuntime(composeFiles []string, env []string, engine container.Engine) (*Compose, error) {
+	if engine != container.Docker && engine != container.Podman {
+		return nil, fmt.Errorf("unsupported container runtime %q for Compose", engine)
+	}
+	defaultArgs := engine.ComposeArgs()
+	for _, file := range composeFiles {
+		defaultArgs = append(defaultArgs, "-f", file)
+	}
+
+	if len(composeFiles) == 0 {
+		return nil, fmt.Errorf("at least one compose file is required")
+	}
+	mergedEnv := mergeEnv(defaultEnv(), env)
 	return &Compose{
-		Command:     command,
+		Command:     engine.Binary(),
 		DefaultArgs: defaultArgs,
-		Path:        path.Join(composeFile),
-		Env:         defaultEnv(),
+		Paths:       composeFiles,
+		Env:         mergedEnv,
 	}, nil
+}
+
+// SuiteFilesWithRuntime is retained as a compatibility alias for callers using
+// the pre-fixture-group naming.
+func SuiteFilesWithRuntime(composeFiles []string, env []string, engine container.Engine) (*Compose, error) {
+	return StackFilesWithRuntime(composeFiles, env, engine)
 }
 
 func (c *Compose) Up() error {
 	// networks accumulate over time and can cause issues with the tests
+	dockerPruneMutex.Lock()
 	err := c.runDocker(newCommand("network", "prune", "-f", "--filter", "until=5m").withCompose(false))
+	dockerPruneMutex.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to prune docker networks: %w", err)
 	}
@@ -69,48 +130,77 @@ func (c *Compose) Remove() error {
 func (c *Compose) runDocker(cc command) error {
 	var cmdArgs []string
 	if cc.compose {
-		cmdArgs = c.DefaultArgs
-		cmdArgs = append(cmdArgs, "-f", c.Path)
+		cmdArgs = append([]string(nil), c.DefaultArgs...)
 	}
 	cmdArgs = append(cmdArgs, cc.args...)
 	cmd := exec.Command(c.Command, cmdArgs...)
 	cmd.Env = c.Env
 	if cc.logConsumer != nil {
-		stdout, _ := cmd.StdoutPipe()
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return fmt.Errorf("failed to open compose stdout pipe: %w", err)
+		}
 		cmd.Stderr = cmd.Stdout
+		// Start before spawning the consumer: if Start fails the write end of
+		// the pipe never opens, so a consumer started earlier would block on
+		// the read forever and leak.
+		if err := cmd.Start(); err != nil {
+			_ = stdout.Close()
+			return fmt.Errorf("failed to start compose command: %w", err)
+		}
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go cc.logConsumer(stdout, &wg)
-
-		err := cmd.Start()
-		if err != nil {
-			return fmt.Errorf("failed to start docker command: %w", err)
-		}
 		wg.Wait()
+		if err := cmd.Wait(); err != nil {
+			return fmt.Errorf("failed to run compose command: %w", err)
+		}
 	} else if cc.background {
-		slog.Info("Running", "command", cmd.String(), "dir", c.Path)
-		stdout, _ := cmd.StdoutPipe()
+		slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return fmt.Errorf("failed to open compose stdout pipe: %w", err)
+		}
 		cmd.Stderr = cmd.Stdout
+		// Start the command before spawning the reader: if Start fails the
+		// write end of the pipe never opens, and a reader started earlier would
+		// block forever on ReadString and leak.
+		if err := cmd.Start(); err != nil {
+			_ = stdout.Close()
+			return fmt.Errorf("failed to start compose command: %w", err)
+		}
+		wg := sync.WaitGroup{}
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			reader := bufio.NewReader(stdout)
-			line, err := reader.ReadString('\n')
-			for err == nil {
-				slog.Info(line)
-				line, err = reader.ReadString('\n')
+			for {
+				// ReadString returns any final data together with io.EOF, so
+				// log the chunk before checking err to avoid dropping a
+				// trailing line without a newline. Reading to EOF also fully
+				// drains the pipe so the child never blocks on a full pipe.
+				line, err := reader.ReadString('\n')
+				if line != "" {
+					slog.Info(line)
+				}
+				if err != nil {
+					return
+				}
 			}
 		}()
 
-		err := cmd.Start()
+		err = cmd.Wait()
+		wg.Wait()
 		if err != nil {
-			return fmt.Errorf("failed to start docker command: %w", err)
+			return fmt.Errorf("failed to run compose command: %w", err)
 		}
 	} else {
-		slog.Info("Running", "command", cmd.String(), "dir", c.Path)
+		slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		err := cmd.Run()
 		if err != nil {
-			return fmt.Errorf("failed to run docker command: %w", err)
+			return fmt.Errorf("failed to run compose command: %w", err)
 		}
 	}
 	return nil
@@ -134,6 +224,13 @@ func (c *Compose) Close() error {
 }
 
 func NewEndpoint(host string, composeFilePath string, ports remote.PortsConfig) *remote.Endpoint {
+	return NewEndpointWithRuntime(host, composeFilePath, ports, container.Docker)
+}
+
+// NewEndpointWithRuntime creates the legacy remote endpoint wrapper using a
+// selected Compose engine. New fixture code should prefer StackFilesWithRuntime
+// directly.
+func NewEndpointWithRuntime(host string, composeFilePath string, ports remote.PortsConfig, engine container.Engine) *remote.Endpoint {
 	var compose *Compose
 	return remote.NewEndpoint(host, ports, func(ctx context.Context) error {
 		var err error
@@ -142,7 +239,7 @@ func NewEndpoint(host string, composeFilePath string, ports remote.PortsConfig) 
 			return fmt.Errorf("composeFilePath cannot be empty")
 		}
 
-		compose, err = Suite(composeFilePath)
+		compose, err = StackFilesWithRuntime([]string{composeFilePath}, nil, engine)
 		if err != nil {
 			return err
 		}
