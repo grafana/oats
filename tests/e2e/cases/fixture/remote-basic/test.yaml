@@ -25,6 +25,10 @@ run:
           echo "$container_engine is required by OATS_CONTAINER_RUNTIME=$container_runtime" >&2
           exit 1
         fi
+        if ! "$container_engine" compose version >/dev/null 2>&1; then
+          echo "$container_engine compose is required by OATS_CONTAINER_RUNTIME=$container_runtime" >&2
+          exit 1
+        fi
         ;;
       *)
         echo "unknown OATS_CONTAINER_RUNTIME: $container_runtime (want auto, docker, or podman)" >&2
