@@ -59,10 +59,10 @@ import (
 // -ldflags "-X github.com/grafana/oats/internal/cli.Version=vX.Y.Z".
 var Version = "dev"
 
-// DefaultGCXVersion is the gcx version pinned by the build. Release and mise
-// builds inject it with -ldflags so oats can provide a reproducible fallback
-// when gcx is not already available on PATH.
-var DefaultGCXVersion = ""
+// MinimumGCXVersion is the minimum gcx version accepted from PATH by the
+// build. Release and mise builds inject it with -ldflags so oats can provide a
+// reproducible fallback when gcx is missing or older than this version.
+var MinimumGCXVersion = ""
 
 type groupResult struct {
 	pass int
@@ -133,8 +133,12 @@ func newRootCmd(exit *int) *cobra.Command {
 func addRunFlags(fs *pflag.FlagSet) {
 	fs.String("config", "oats-config.yaml", "path to oats-config.yaml")
 	fs.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
-	fs.String("gcx-version", "", "download and use this gcx release (for example, 0.4.3)")
-	fs.String("gcx-download", defaultGCXDownloadPolicy(), "gcx fallback download policy: auto | never")
+	gcxVersionHelp := "download and use this gcx release"
+	if MinimumGCXVersion != "" {
+		gcxVersionHelp = fmt.Sprintf("%s (for example, %s)", gcxVersionHelp, MinimumGCXVersion)
+	}
+	fs.String("gcx-version", "", gcxVersionHelp)
+	fs.String("gcx-download", defaultGCXDownloadPolicy(), fmt.Sprintf("gcx fallback download policy: %s | %s", gcxDownloadPolicyAuto, gcxDownloadPolicyNever))
 	fs.String("format", "text", "output format: text | ndjson")
 	fs.String("tags", "", "comma-separated tag any-match")
 	fs.Duration("timeout", 30*time.Second, "per-assertion timeout")

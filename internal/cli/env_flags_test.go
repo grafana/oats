@@ -12,12 +12,12 @@ func TestApplyEnvFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
 	fs.Duration("timeout", 30*time.Second, "timeout")
 	fs.String("gcx", "gcx", "gcx binary")
-	fs.String("gcx-download", "auto", "gcx download policy")
+	fs.String("gcx-download", gcxDownloadPolicyAuto, "gcx download policy")
 	fs.Bool("no-cache", false, "disable cache")
 
 	t.Setenv("OATS_TIMEOUT", "2s")
 	t.Setenv("OATS_GCX", "/opt/tools/gcx")
-	t.Setenv("OATS_GCX_DOWNLOAD", "never")
+	t.Setenv("OATS_GCX_DOWNLOAD", gcxDownloadPolicyNever)
 	t.Setenv("OATS_NO_CACHE", "true")
 
 	if err := applyEnvFlags(fs); err != nil {
@@ -30,8 +30,8 @@ func TestApplyEnvFlags(t *testing.T) {
 	if got := flagStr(fs, "gcx"); got != "/opt/tools/gcx" {
 		t.Fatalf("gcx = %q, want /opt/tools/gcx", got)
 	}
-	if got := flagStr(fs, "gcx-download"); got != "never" {
-		t.Fatalf("gcx-download = %q, want never", got)
+	if got := flagStr(fs, "gcx-download"); got != gcxDownloadPolicyNever {
+		t.Fatalf("gcx-download = %q, want %s", got, gcxDownloadPolicyNever)
 	}
 	if !flagBool(fs, "no-cache") {
 		t.Fatal("no-cache = false, want true")

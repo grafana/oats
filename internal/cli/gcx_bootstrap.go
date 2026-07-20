@@ -13,10 +13,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
 
+	semver "github.com/hashicorp/go-version"
 	"github.com/spf13/pflag"
 )
 
@@ -24,14 +26,19 @@ var gcxReleaseBaseURL = "https://github.com/grafana/gcx/releases/download"
 
 var gcxHTTPClient = &http.Client{Timeout: 10 * time.Minute}
 
+const (
+	gcxDownloadPolicyAuto  = "auto"
+	gcxDownloadPolicyNever = "never"
+)
+
 func defaultGCXDownloadPolicy() string {
 	// A mise-managed environment is expected to install its declared tools and
 	// should not silently reach out to GitHub if that setup is incomplete. The
 	// OATS_GCX_DOWNLOAD/--gcx-download override remains available when desired.
 	if isMiseEnvironment() {
-		return "never"
+		return gcxDownloadPolicyNever
 	}
-	return "auto"
+	return gcxDownloadPolicyAuto
 }
 
 func isMiseEnvironment() bool {
@@ -64,29 +71,81 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 		return "", err
 	}
 	policy = strings.ToLower(strings.TrimSpace(policy))
-	if policy != "auto" && policy != "never" {
-		return "", fmt.Errorf("invalid --gcx-download %q (want auto or never)", policy)
+	if policy != gcxDownloadPolicyAuto && policy != gcxDownloadPolicyNever {
+		return "", fmt.Errorf("invalid --gcx-download %q (want %s or %s)", policy, gcxDownloadPolicyAuto, gcxDownloadPolicyNever)
 	}
 
 	if _, err := exec.LookPath(gcxBin); err == nil {
-		return gcxBin, nil
+		// An explicit --gcx is an intentional override, so do not second-guess
+		// its version. The embedded minimum protects only the implicit PATH lookup
+		// from accidentally selecting an older local installation.
+		if fs.Changed("gcx") || MinimumGCXVersion == "" {
+			return gcxBin, nil
+		}
+
+		installedVersion := gcxVersion(gcxBin)
+		if gcxVersionAtLeast(installedVersion, MinimumGCXVersion) {
+			return gcxBin, nil
+		}
+		if policy == gcxDownloadPolicyNever {
+			if installedVersion == "" {
+				return "", fmt.Errorf("gcx on PATH did not report a version (minimum %s; automatic download is disabled)", MinimumGCXVersion)
+			}
+			return "", fmt.Errorf("gcx on PATH is %s, but oats requires at least %s (automatic download is disabled; install a newer gcx or set --gcx to override)", installedVersion, MinimumGCXVersion)
+		}
+
+		if installedVersion == "" {
+			fmt.Fprintf(os.Stderr, "gcx on PATH did not report a parseable version; downloading minimum gcx %s\n", MinimumGCXVersion)
+		} else {
+			fmt.Fprintf(os.Stderr, "gcx on PATH is %s; downloading minimum gcx %s\n", installedVersion, MinimumGCXVersion)
+		}
+		cacheDir, err := fs.GetString("cache-dir")
+		if err != nil {
+			return "", err
+		}
+		return bootstrapGCX(MinimumGCXVersion, cacheDir)
 	}
+
 	if fs.Changed("gcx") {
 		return "", fmt.Errorf("gcx binary %q was not found (set --gcx to its path)", gcxBin)
 	}
-	if policy == "never" {
-		return "", fmt.Errorf("gcx was not found on PATH and automatic download is disabled (install gcx, set --gcx, or use --gcx-download auto)")
+	if policy == gcxDownloadPolicyNever {
+		return "", fmt.Errorf("gcx was not found on PATH and automatic download is disabled (install gcx, set --gcx, or use --gcx-download %s)", gcxDownloadPolicyAuto)
 	}
-	if DefaultGCXVersion == "" {
-		return "", fmt.Errorf("gcx was not found on PATH and this oats build has no embedded gcx version (install gcx or pass --gcx-version)")
+	if MinimumGCXVersion == "" {
+		return "", fmt.Errorf("gcx was not found on PATH and this oats build has no embedded minimum gcx version (install gcx or pass --gcx-version)")
 	}
 
-	fmt.Fprintf(os.Stderr, "gcx was not found on PATH; downloading pinned gcx %s\n", DefaultGCXVersion)
+	fmt.Fprintf(os.Stderr, "gcx was not found on PATH; downloading minimum gcx %s\n", MinimumGCXVersion)
 	cacheDir, err := fs.GetString("cache-dir")
 	if err != nil {
 		return "", err
 	}
-	return bootstrapGCX(DefaultGCXVersion, cacheDir)
+	return bootstrapGCX(MinimumGCXVersion, cacheDir)
+}
+
+var gcxVersionPattern = regexp.MustCompile(`(?:^|[^0-9A-Za-z])(v?[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)`)
+
+func parseGCXVersion(value string) (string, bool) {
+	match := gcxVersionPattern.FindStringSubmatch(value)
+	if len(match) == 0 {
+		return "", false
+	}
+	return strings.TrimPrefix(match[1], "v"), true
+}
+
+func gcxVersionAtLeast(installed, minimum string) bool {
+	installedVersion, installedOK := parseGCXVersion(installed)
+	minimumVersion, minimumOK := parseGCXVersion(minimum)
+	if !installedOK || !minimumOK {
+		return false
+	}
+	got, gotErr := semver.NewSemver(installedVersion)
+	want, wantErr := semver.NewSemver(minimumVersion)
+	if gotErr != nil || wantErr != nil {
+		return false
+	}
+	return got.GreaterThanOrEqual(want)
 }
 
 // bootstrapGCX downloads a verified gcx release into the user's cache and

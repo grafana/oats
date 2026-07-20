@@ -8,5 +8,5 @@ gcx_version="$(bash "$root/scripts/gcx-version.sh")"
 mkdir -p "$(dirname "$output")"
 GOWORK=off go -C "$root" build \
 	-buildvcs=false \
-	-ldflags "-X github.com/grafana/oats/internal/cli.DefaultGCXVersion=$gcx_version" \
+	-ldflags "-X github.com/grafana/oats/internal/cli.MinimumGCXVersion=$gcx_version" \
 	-o "$output" .

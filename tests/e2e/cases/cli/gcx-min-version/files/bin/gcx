@@ -1,0 +1,2 @@
+#!/bin/sh
+printf 'gcx version 0.0.1 built from e2e\n'
