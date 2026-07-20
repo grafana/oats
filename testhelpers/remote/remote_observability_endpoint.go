@@ -197,12 +197,12 @@ func readQueryResponse(resp *http.Response, service string) ([]byte, error) {
 		_ = Body.Close()
 	}(resp.Body)
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("can't read response body: %w", err)
-	}
 	if resp.StatusCode != http.StatusOK {
 		const maxErrorBody = 256
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody+1))
+		if err != nil {
+			return nil, fmt.Errorf("can't read response body: %w", err)
+		}
 		detail := strings.TrimSpace(string(body))
 		if len(detail) > maxErrorBody {
 			detail = detail[:maxErrorBody] + "..."
@@ -211,6 +211,11 @@ func readQueryResponse(resp *http.Response, service string) ([]byte, error) {
 			return nil, fmt.Errorf("querying %s: unexpected HTTP status %s", service, resp.Status)
 		}
 		return nil, fmt.Errorf("querying %s: unexpected HTTP status %s: %s", service, resp.Status, detail)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("can't read response body: %w", err)
 	}
 
 	return body, nil
