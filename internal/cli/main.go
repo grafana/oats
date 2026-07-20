@@ -129,7 +129,11 @@ func newRootCmd(exit *int) *cobra.Command {
 func addRunFlags(fs *pflag.FlagSet) {
 	fs.String("config", "oats-config.yaml", "path to oats-config.yaml")
 	fs.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
-	fs.String("gcx-version", "", "download and use this gcx release (for example, 0.4.3)")
+	gcxVersionHelp := "download and use this gcx release"
+	if MinimumGCXVersion != "" {
+		gcxVersionHelp = fmt.Sprintf("%s (for example, %s)", gcxVersionHelp, MinimumGCXVersion)
+	}
+	fs.String("gcx-version", "", gcxVersionHelp)
 	fs.String("gcx-download", defaultGCXDownloadPolicy(), fmt.Sprintf("gcx fallback download policy: %s | %s", gcxDownloadPolicyAuto, gcxDownloadPolicyNever))
 	fs.String("format", "text", "output format: text | ndjson")
 	fs.String("tags", "", "comma-separated tag any-match")

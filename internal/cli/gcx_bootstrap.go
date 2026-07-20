@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	hashicorpversion "github.com/hashicorp/go-version"
+	semver "github.com/hashicorp/go-version"
 	"github.com/spf13/pflag"
 )
 
@@ -140,8 +140,8 @@ func gcxVersionAtLeast(installed, minimum string) bool {
 	if !installedOK || !minimumOK {
 		return false
 	}
-	got, gotErr := hashicorpversion.NewSemver(installedVersion)
-	want, wantErr := hashicorpversion.NewSemver(minimumVersion)
+	got, gotErr := semver.NewSemver(installedVersion)
+	want, wantErr := semver.NewSemver(minimumVersion)
 	if gotErr != nil || wantErr != nil {
 		return false
 	}
