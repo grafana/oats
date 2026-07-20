@@ -11,6 +11,8 @@ follow-up issues in the owning repository.
 - **Accepted** — this is the current decision and should guide implementation.
 - **Deferred** — we deliberately chose not to build this now; the ADR records
   the trigger for revisiting it.
+- **Declined** — the proposal was considered and declined; no implementation
+  is planned unless a new proposal supersedes this decision.
 - **Superseded** — a later ADR replaces this decision.
 
 When a decision changes, keep the old ADR and link the replacement rather than

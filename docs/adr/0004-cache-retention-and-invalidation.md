@@ -8,11 +8,16 @@
 OATS has a skip-when-unchanged cache for green cases. A long-lived cache could
 also be bounded by entry count or size, and a consumer could include built
 image digests in the key. Both add configuration or integration work, while
-most CI users already have short-lived caches and pinned tool versions.
+we do not currently have measurements from long-lived consumer cache
+directories showing that either feature is needed.
 
 The cache currently hashes the case, fixture configuration, gcx version, and
 OATS version. It uses TTL-based expiry, lazy removal of expired entries, and an
 explicit `oats cache clear` command.
+
+The existing unit tests cover TTL expiry and manual clearing. This ADR is a
+scope decision based on the current implementation and lack of observed demand,
+not a claim that TTL provides a hard bound on cache size.
 
 ## Decision
 

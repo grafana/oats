@@ -8,7 +8,8 @@
 OATS currently shells out to Docker, Docker Compose, k3d, and kubectl from its
 fixture lifecycle. That makes the fixture package look pluggable while still
 coupling it to one container engine. It also forces users who prefer rootless
-Podman to change their environment or maintain wrappers.
+Podman, or other similar technologies, to change their environment or maintain
+wrappers.
 
 The case schema should describe the test and its fixture, not the host's
 container-engine choice. Compose and k3d also have different capabilities:
@@ -34,9 +35,12 @@ Docker; an explicit engine must not silently fall back to another engine.
 
 The first alternative-engine target is Compose with rootless Podman. k3d and
 its Docker image-import path remain a separate adapter until reliable Podman
-coverage exists for that workflow. Apple Container is not treated as a
-Docker-compatible binary replacement; it would require its own adapter if a
-consumer needs it.
+coverage exists for that workflow. Environments such as
+[WSL Containers](https://devblogs.microsoft.com/commandline/wsl-container-is-now-available-for-public-preview/)
+provide a distinct `wslc`/`container` CLI and are therefore outside this
+decision; supporting them would require a separate adapter. Apple Container is
+likewise not treated as a Docker-compatible binary replacement; it would
+require its own adapter if a consumer needs it.
 
 ## Consequences
 

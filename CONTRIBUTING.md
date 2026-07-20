@@ -1,15 +1,16 @@
 # Contributing to OATs
 
-This is the starting point for contributing to OATs. It covers the development
-workflow and repository architecture, then links to detailed references without
-duplicating the case schema or CLI reference.
+This is the starting point for contributing to OATs. It covers how to choose and
+prepare a change, the development workflow, and the repository architecture,
+then links to detailed references without duplicating the case schema or CLI
+reference.
 
 ## Start here
 
 ```sh
 mise run build       # build oats with the gcx version from mise.toml
 mise run test        # unit and integration tests (excludes tests/e2e)
-mise run e2e-test    # real-stack e2e cases; requires Docker
+mise run e2e-test    # real-stack e2e cases; requires Docker or Podman
 mise run lint        # Flint's aggregate lint/check command
 mise run check       # lint + test
 ```
@@ -20,25 +21,43 @@ For the user-facing surface, read [CLI](docs/cli.md), [case reference](docs/case
 architecture and product decisions are recorded in the
 [architecture decision records](docs/adr/README.md).
 
+## Choosing a change
+
+- Look for an existing issue or discussion before starting a non-trivial
+  change. If there is no suitable issue, open one first so the scope and
+  expected behavior can be agreed on.
+- Claim the work in the issue or discussion, then keep the pull request focused
+  on that change. Avoid bundling unrelated cleanup with a feature or fix.
+- For architectural or product changes, read the relevant
+  [architecture decision records](docs/adr/README.md) and add or update an ADR
+  when the decision should remain durable.
+
+## Submitting a pull request
+
+Before opening or updating a pull request:
+
+1. Run the relevant tests and `mise run lint` locally.
+2. Use signed commits; do not bypass hooks with `--no-verify`.
+3. Include a concise summary, the validation performed, and any follow-up work
+   in the pull request description.
+4. Keep review updates additive where possible. Avoid force-pushing review
+   changes unless repairing or restacking history requires it.
+
+Grafana's CLA bot will report whether the contributor agreement is complete.
+Address its request before the pull request can be merged.
+
 ## Architecture at a glance
 
 The normal run flows left to right:
 
-```text
-oats-config.yaml + case YAML
-        │
-        ▼
-discovery.PlanRun ── groups cases by fixture identity
-        │
-        ▼
-fixture.Start / WaitForReady
-        │
-        ▼
-runner ── seed ──> OTLP endpoint
-        │
-        ├──────────> gcx ──> Grafana datasources
-        │
-        └──────────> cache + report (text or NDJSON)
+```mermaid
+flowchart LR
+    A[Config and case YAML] --> B[discovery.PlanRun]
+    B --> C[fixture.Start / WaitForReady]
+    C --> D[runner]
+    D --> E[seed to OTLP]
+    D --> F[gcx queries and assertions]
+    D --> G[cache and report]
 ```
 
 | Area                                | Responsibility                                                         | Start with               |
