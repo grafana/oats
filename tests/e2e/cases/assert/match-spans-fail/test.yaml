@@ -1,0 +1,15 @@
+name: match-spans-fail
+tags: [assert, match-spans, fail]
+
+run:
+  args:
+    - --timeout
+    - 3s
+    - --interval
+    - 500ms
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL
+    - 'match_spans: no row matched name="wrong-operation"'

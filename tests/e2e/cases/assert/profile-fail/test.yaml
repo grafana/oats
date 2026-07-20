@@ -1,0 +1,14 @@
+name: profile-fail
+tags: [assert, profile, profiles, fail]
+
+run:
+  args:
+    - --timeout
+    - 10s
+    - --interval
+    - 2s
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL

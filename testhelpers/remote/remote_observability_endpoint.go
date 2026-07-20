@@ -19,13 +19,14 @@ import (
 )
 
 type PortsConfig struct {
-	TracesGRPCPort     int
-	TracesHTTPPort     int
+	OTLPGRPCPort       int
+	GrafanaHTTPPort    int
+	OTLPHTTPPort       int
 	TempoHTTPPort      int
 	MimirHTTPPort      int
 	PrometheusHTTPPort int
-	LokiHttpPort       int
-	PyroscopeHttpPort  int
+	LokiHTTPPort       int
+	PyroscopeHTTPPort  int
 }
 
 type Endpoint struct {
@@ -50,13 +51,13 @@ func (e *Endpoint) TracerProvider(ctx context.Context, r *resource.Resource) (*t
 	var exporter *otlptrace.Exporter
 	var err error
 
-	if e.ports.TracesGRPCPort != 0 {
-		exporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure(), otlptracegrpc.WithEndpoint(fmt.Sprintf("%s:%d", e.host, e.ports.TracesGRPCPort)))
+	if e.ports.OTLPGRPCPort != 0 {
+		exporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure(), otlptracegrpc.WithEndpoint(fmt.Sprintf("%s:%d", e.host, e.ports.OTLPGRPCPort)))
 		if err != nil {
 			return nil, err
 		}
-	} else if e.ports.TracesHTTPPort != 0 {
-		exporter, err = otlptracehttp.New(ctx, otlptracehttp.WithInsecure(), otlptracehttp.WithEndpoint(fmt.Sprintf("%s:%d/v1/traces", e.host, e.ports.TracesHTTPPort)))
+	} else if e.ports.OTLPHTTPPort != 0 {
+		exporter, err = otlptracehttp.New(ctx, otlptracehttp.WithInsecure(), otlptracehttp.WithEndpoint(fmt.Sprintf("%s:%d/v1/traces", e.host, e.ports.OTLPHTTPPort)))
 		if err != nil {
 			return nil, err
 		}
@@ -162,44 +163,55 @@ func (e *Endpoint) RunPromQL(promQL string) ([]byte, error) {
 }
 
 func (e *Endpoint) SearchLoki(query string) ([]byte, error) {
-	if e.ports.LokiHttpPort == 0 {
-		return nil, fmt.Errorf("to search Loki you must configure a LokiHttpPort")
+	if e.ports.LokiHTTPPort == 0 {
+		return nil, fmt.Errorf("to search Loki you must configure a LokiHTTPPort")
 	}
 
-	u := fmt.Sprintf("http://%s:%d/loki/api/v1/query_range?since=5m&limit=1&query=%s", e.host, e.ports.LokiHttpPort, url.PathEscape(query))
+	u := fmt.Sprintf("http://%s:%d/loki/api/v1/query_range?since=5m&limit=1&query=%s", e.host, e.ports.LokiHTTPPort, url.QueryEscape(query))
 
 	resp, err := http.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("querying loki: %w", err)
 	}
 
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("can't read response body: %w", err)
-	}
-
-	return body, nil
+	return readQueryResponse(resp, "Loki")
 }
 
 func (e *Endpoint) SearchPyroscope(query string) ([]byte, error) {
-	if e.ports.PyroscopeHttpPort == 0 {
-		return nil, fmt.Errorf("to search Pyroscope you must configure a PyroscopeHttpPort")
+	if e.ports.PyroscopeHTTPPort == 0 {
+		return nil, fmt.Errorf("to search Pyroscope you must configure a PyroscopeHTTPPort")
 	}
 
-	u := fmt.Sprintf("http://%s:%d/pyroscope/render?from=from=now-1m&query=%s", e.host, e.ports.PyroscopeHttpPort, url.PathEscape(query))
+	u := fmt.Sprintf("http://%s:%d/pyroscope/render?from=now-1m&query=%s", e.host, e.ports.PyroscopeHTTPPort, url.QueryEscape(query))
 
 	resp, err := http.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("querying pyroscope: %w", err)
 	}
 
+	return readQueryResponse(resp, "Pyroscope")
+}
+
+func readQueryResponse(resp *http.Response, service string) ([]byte, error) {
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		const maxErrorBody = 256
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody+1))
+		if err != nil {
+			return nil, fmt.Errorf("can't read response body: %w", err)
+		}
+		detail := strings.TrimSpace(string(body))
+		if len(detail) > maxErrorBody {
+			detail = detail[:maxErrorBody] + "..."
+		}
+		if detail == "" {
+			return nil, fmt.Errorf("querying %s: unexpected HTTP status %s", service, resp.Status)
+		}
+		return nil, fmt.Errorf("querying %s: unexpected HTTP status %s: %s", service, resp.Status, detail)
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

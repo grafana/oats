@@ -1,0 +1,11 @@
+name: k3d-fail
+tags: [fixture, k3d, fail]
+
+execution:
+  mode: serial
+
+expect:
+  exit_code: 2
+  stderr_contains:
+    - 'error when creating "k8s/invalid.yaml"'
+    - 'fixture group "k3d-fail": exit status 1'

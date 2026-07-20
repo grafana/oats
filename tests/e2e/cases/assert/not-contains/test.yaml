@@ -1,0 +1,6 @@
+name: not-contains
+tags: [assert, not-contains]
+
+expect:
+  stdout_contains:
+    - PASS 1/1

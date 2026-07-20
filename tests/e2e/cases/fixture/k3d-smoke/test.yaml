@@ -1,0 +1,9 @@
+name: k3d-smoke
+tags: [fixture, k3d]
+
+execution:
+  mode: serial
+
+expect:
+  stdout_contains:
+    - PASS 1/1

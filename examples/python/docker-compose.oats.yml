@@ -1,0 +1,16 @@
+---
+# The app under test. OATS boots this alongside a Grafana LGTM stack (the default
+# fixture template) and points the app's OTLP exporter at it via the `lgtm` host.
+services:
+  python:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      OTEL_SERVICE_NAME: "rolldice"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4317
+      OTEL_METRIC_EXPORT_INTERVAL: "5000" # so we don't wait 60s for metrics
+    ports:
+      # Ephemeral host port so parallel fixture groups don't collide; OATS discovers it
+      # via fixture.app_service + app_port.
+      - "127.0.0.1::8082"
