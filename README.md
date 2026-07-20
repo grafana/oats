@@ -14,6 +14,7 @@
   <a href="docs/cli.md">CLI</a> ·
   <a href="docs/case-reference.md">Test Case Syntax</a> ·
   <a href="docs/ci.md">CI</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="UPGRADING.md">Upgrading</a>
 </p>
 <!-- markdownlint-enable MD033 MD041 -->
@@ -145,6 +146,8 @@ No app of your own yet? A case can seed telemetry directly with
   full config + case shape (fixtures, seed modes, assertion vocabulary, custom checks)
 - [docs/ci.md](docs/ci.md) — installing and running OATS in CI, plus result
   caching and its caveats
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contributor orientation:
+  architecture, CLI/env/tooling map, CI/e2e flow, and common gotchas
 - [UPGRADING.md](UPGRADING.md) — migrating older (schema-2) repos to v3
 - [AGENTS.md](AGENTS.md) — for contributors and coding agents working *on*
   OATS (build, layout, conventions)

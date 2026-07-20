@@ -31,11 +31,11 @@ func TestTextReporter_FailureBlockHasSourceAndCmd(t *testing.T) {
 	r.Emit(Event{Type: EventRunStart})
 	r.Emit(Event{Type: EventCaseStart, Case: "rolldice", Source: "examples/nodejs/oats.yaml:1"})
 	r.Emit(Event{
-		Type:   EventAssertFail,
-		Case:   "rolldice",
-		Source: "examples/nodejs/oats.yaml:8",
-		Msg:    "TraceQL returned no results",
-		Cmd:    "gcx traces search '{ span.http.route = \"/rolldice\" }'",
+		Type:    EventAssertFail,
+		Case:    "rolldice",
+		Source:  "examples/nodejs/oats.yaml:8",
+		Message: "TraceQL returned no results",
+		Cmd:     "gcx traces search '{ span.http.route = \"/rolldice\" }'",
 	})
 	r.Emit(Event{Type: EventCaseFail, Case: "rolldice"})
 	r.Emit(Event{Type: EventRunEnd})
@@ -62,17 +62,17 @@ func TestTextReporter_GHAAnnotationsWhenEnabled(t *testing.T) {
 	r := NewTextReporter(&buf, VerboseDefault)
 	r.Emit(Event{Type: EventRunStart})
 	r.Emit(Event{
-		Type:   EventAssertFail,
-		Case:   "x",
-		Source: "examples/nodejs/oats.yaml:8",
-		Msg:    "oops",
+		Type:    EventAssertFail,
+		Case:    "x",
+		Source:  "examples/nodejs/oats.yaml:8",
+		Message: "oops",
 	})
 	// Same source twice — only one annotation should appear.
 	r.Emit(Event{
-		Type:   EventAssertFail,
-		Case:   "x",
-		Source: "examples/nodejs/oats.yaml:8",
-		Msg:    "again",
+		Type:    EventAssertFail,
+		Case:    "x",
+		Source:  "examples/nodejs/oats.yaml:8",
+		Message: "again",
 	})
 	r.Emit(Event{Type: EventCaseFail, Case: "x"})
 	r.Emit(Event{Type: EventRunEnd})
@@ -94,9 +94,9 @@ func TestTextReporter_GHAAnnotationsWithoutSource(t *testing.T) {
 	r := NewTextReporter(&buf, VerboseDefault)
 	r.Emit(Event{Type: EventRunStart})
 	r.Emit(Event{
-		Type: EventAssertFail,
-		Case: "x",
-		Msg:  "oops",
+		Type:    EventAssertFail,
+		Case:    "x",
+		Message: "oops",
 	})
 	r.Emit(Event{Type: EventCaseFail, Case: "x"})
 	r.Emit(Event{Type: EventRunEnd})
@@ -117,10 +117,10 @@ func TestTextReporter_GHAAnnotationEscaping(t *testing.T) {
 	r := NewTextReporter(&buf, VerboseDefault)
 	r.Emit(Event{Type: EventRunStart})
 	r.Emit(Event{
-		Type:   EventAssertFail,
-		Case:   "x",
-		Source: "path/with,comma:x/a.yaml:8",
-		Msg:    "line one\nline two 50% off",
+		Type:    EventAssertFail,
+		Case:    "x",
+		Source:  "path/with,comma:x/a.yaml:8",
+		Message: "line one\nline two 50% off",
 	})
 	r.Emit(Event{Type: EventCaseFail, Case: "x"})
 	r.Emit(Event{Type: EventRunEnd})
@@ -170,7 +170,7 @@ func TestTextReporter_VerboseAllPrintsFixtureLifecycle(t *testing.T) {
 func TestNDJSONReporter_EmitsOneJSONObjectPerLine(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewNDJSONReporter(&buf, VerboseDefault)
-	r.Emit(Event{Type: EventRunStart, OatsVersion: "x", SchemaVersion: 1, Ts: time.Now()})
+	r.Emit(Event{Type: EventRunStart, OatsVersion: "x", SchemaVersion: SchemaVersion, Ts: time.Now()})
 	r.Emit(Event{Type: EventCaseFail, Case: "rolldice", DurationMs: 1234})
 	r.Emit(Event{Type: EventRunEnd, Pass: 0, Fail: 1})
 
@@ -183,6 +183,27 @@ func TestNDJSONReporter_EmitsOneJSONObjectPerLine(t *testing.T) {
 		if err := json.Unmarshal([]byte(line), &e); err != nil {
 			t.Errorf("invalid JSON line %q: %v", line, err)
 		}
+	}
+}
+
+func TestNDJSONReporter_UsesFixtureGroupWireVocabulary(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewNDJSONReporter(&buf, VerboseDefault)
+	r.Emit(Event{
+		Type:    EventGroupStart,
+		Group:   "smoke",
+		Message: "group is ready",
+	})
+
+	var event map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if event["event"] != "group.start" || event["group"] != "smoke" {
+		t.Fatalf("unexpected group event: %#v", event)
+	}
+	if event["msg"] != "group is ready" {
+		t.Fatalf("message must retain the msg wire key: %#v", event)
 	}
 }
 

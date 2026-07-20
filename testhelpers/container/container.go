@@ -47,6 +47,7 @@ func Resolve(value string) (Engine, error) {
 		}
 		return requested, nil
 	}
+	// Try engines in preference order: Podman first, then Docker.
 	for _, candidate := range []Engine{Podman, Docker} {
 		if available(candidate) == nil {
 			return candidate, nil

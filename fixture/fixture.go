@@ -24,8 +24,8 @@ import (
 
 // Seams overridable in tests.
 var (
-	newComposeSuite = func(files []string, env []string, engine container.Engine) (Handle, error) {
-		return compose.SuiteFilesWithRuntime(files, env, engine)
+	newComposeStack = func(files []string, env []string, engine container.Engine) (Handle, error) {
+		return compose.StackFilesWithRuntime(files, env, engine)
 	}
 	newKubernetesEndpoint = func(plan discovery.Plan, ports remote.PortsConfig) *remote.Endpoint {
 		sourceDir := plan.FixtureSourceDir
@@ -111,7 +111,7 @@ func StartWithOptions(ctx context.Context, plan discovery.Plan, opts Options) (H
 		return nil, Runtime{}, err
 	}
 	if requested == container.Podman {
-		return nil, Runtime{}, fmt.Errorf("k3d fixtures require Docker; Podman is currently supported for Compose fixtures")
+		return nil, Runtime{}, fmt.Errorf("k3d fixtures require Docker; Podman is currently only supported for Compose fixtures")
 	}
 	return startWithEngine(ctx, plan, container.Docker)
 }
@@ -179,7 +179,7 @@ func SupportsParallel(plan discovery.Plan) (bool, string) {
 	}
 }
 
-func startSuiteFixture(fix Handle) error {
+func startFixture(fix Handle) error {
 	startable, ok := fix.(startableHandle)
 	if !ok {
 		return fmt.Errorf("fixture does not support startup")
@@ -203,12 +203,12 @@ func (e endpointFixture) Close() error {
 }
 
 type composeFixture struct {
-	suite   Handle
+	stack   Handle
 	cleanup func() error
 }
 
 func (c composeFixture) Close() error {
-	err := c.suite.Close()
+	err := c.stack.Close()
 	if c.cleanup != nil {
 		if cleanupErr := c.cleanup(); cleanupErr != nil && err == nil {
 			err = cleanupErr

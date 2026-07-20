@@ -1,7 +1,7 @@
 # oats-config.yaml is the entry point of an OATS project. `oats` finds it in the
 # current directory or any parent, and lists the case files to run.
 #
-# There is no suite/grouping to declare: each case carries its own fixture, and
+# There is no explicit grouping to declare: each case carries its own fixture, and
 # OATS boots each distinct fixture once and runs the cases that share it against
 # it (distinct fixtures can run in parallel). Every case here points at the same
 # remote grafana/otel-lgtm, so they form one group — but a remote fixture boots

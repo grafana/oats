@@ -191,10 +191,10 @@ func (r *Runner) RunCase(ctx context.Context, c *casefile.Case) bool {
 		key := r.cacheKey(c)
 		if hit, _ := r.cacheStore.Lookup(key); hit {
 			r.reporter.Emit(report.Event{
-				Type:   report.EventCaseSkip,
-				Case:   c.Name,
-				Source: c.SourcePath,
-				Msg:    "cache hit (last green run within TTL)",
+				Type:    report.EventCaseSkip,
+				Case:    c.Name,
+				Source:  c.SourcePath,
+				Message: "cache hit (last green run within TTL)",
 			})
 			return true
 		}
@@ -382,21 +382,21 @@ func (r *Runner) pollAssert(
 	}
 	if len(result.LastFailures) == 0 {
 		r.reporter.Emit(report.Event{
-			Type:   report.EventAssertFail,
-			Case:   c.Name,
-			Source: c.SourcePath,
-			Msg:    "assertion polling stopped before any failure details were captured",
-			Cmd:    cmdStr,
+			Type:    report.EventAssertFail,
+			Case:    c.Name,
+			Source:  c.SourcePath,
+			Message: "assertion polling stopped before any failure details were captured",
+			Cmd:     cmdStr,
 		})
 		return false
 	}
 	for _, f := range result.LastFailures {
 		r.reporter.Emit(report.Event{
-			Type:   report.EventAssertFail,
-			Case:   c.Name,
-			Source: c.SourcePath,
-			Msg:    f.Error(),
-			Cmd:    cmdStr,
+			Type:    report.EventAssertFail,
+			Case:    c.Name,
+			Source:  c.SourcePath,
+			Message: f.Error(),
+			Cmd:     cmdStr,
 		})
 	}
 	return false
@@ -411,11 +411,11 @@ func (r *Runner) caseInterval(c *casefile.Case) time.Duration {
 
 func (r *Runner) failCase(c *casefile.Case, msg, cmd string) {
 	r.reporter.Emit(report.Event{
-		Type:   report.EventAssertFail,
-		Case:   c.Name,
-		Source: c.SourcePath,
-		Msg:    msg,
-		Cmd:    cmd,
+		Type:    report.EventAssertFail,
+		Case:    c.Name,
+		Source:  c.SourcePath,
+		Message: msg,
+		Cmd:     cmd,
 	})
 }
 

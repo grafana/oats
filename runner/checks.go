@@ -39,11 +39,11 @@ func (r *Runner) runComposeLogCheck(ctx context.Context, c *casefile.Case, msg s
 	}
 	for _, f := range result.LastFailures {
 		r.reporter.Emit(report.Event{
-			Type:   report.EventAssertFail,
-			Case:   c.Name,
-			Source: c.SourcePath,
-			Msg:    f.Error(),
-			Cmd:    "compose-logs",
+			Type:    report.EventAssertFail,
+			Case:    c.Name,
+			Source:  c.SourcePath,
+			Message: f.Error(),
+			Cmd:     "compose-logs",
 		})
 	}
 	return false
@@ -82,11 +82,11 @@ func (r *Runner) runCustomCheck(ctx context.Context, c *casefile.Case, chk *case
 	}
 	for _, f := range result.LastFailures {
 		r.reporter.Emit(report.Event{
-			Type:   report.EventAssertFail,
-			Case:   c.Name,
-			Source: c.SourcePath,
-			Msg:    f.Error(),
-			Cmd:    "custom-check",
+			Type:    report.EventAssertFail,
+			Case:    c.Name,
+			Source:  c.SourcePath,
+			Message: f.Error(),
+			Cmd:     "custom-check",
 		})
 	}
 	return false

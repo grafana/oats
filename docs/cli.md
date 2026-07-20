@@ -24,7 +24,7 @@ oats                              # run every case
 oats payments/                    # only cases under payments/
 oats payments/checkout/           # only cases under payments/checkout/
 oats --tags traces                # filter by tag
-oats --parallel 4                 # run parallel-safe suites concurrently
+oats --parallel 4                 # run parallel-safe fixture groups concurrently
 ```
 
 A run boots each derived fixture group, seeds it, then polls every assertion

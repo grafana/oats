@@ -78,15 +78,15 @@ func TestResolveComposeFiles(t *testing.T) {
 }
 
 func TestStart_ComposeLifecycle(t *testing.T) {
-	oldFactory := newComposeSuite
+	oldFactory := newComposeStack
 	oldLookup := lookupComposePort
-	defer func() { newComposeSuite = oldFactory }()
+	defer func() { newComposeStack = oldFactory }()
 	defer func() { lookupComposePort = oldLookup }()
 
 	var gotFiles, gotEnv []string
 	var gotEngine container.Engine
 	fake := &fakeHandle{}
-	newComposeSuite = func(files []string, env []string, engine container.Engine) (Handle, error) {
+	newComposeStack = func(files []string, env []string, engine container.Engine) (Handle, error) {
 		gotFiles = append([]string(nil), files...)
 		gotEnv = append([]string(nil), env...)
 		gotEngine = engine
@@ -143,9 +143,9 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 }
 
 func TestStartWithOptions_ComposePodman(t *testing.T) {
-	oldFactory := newComposeSuite
+	oldFactory := newComposeStack
 	oldLookup := lookupComposePort
-	defer func() { newComposeSuite = oldFactory }()
+	defer func() { newComposeStack = oldFactory }()
 	defer func() { lookupComposePort = oldLookup }()
 
 	dir := t.TempDir()
@@ -156,7 +156,7 @@ func TestStartWithOptions_ComposePodman(t *testing.T) {
 
 	var gotEngine container.Engine
 	fake := &fakeHandle{}
-	newComposeSuite = func(_ []string, _ []string, engine container.Engine) (Handle, error) {
+	newComposeStack = func(_ []string, _ []string, engine container.Engine) (Handle, error) {
 		gotEngine = engine
 		return fake, nil
 	}
@@ -191,10 +191,10 @@ func TestStartWithOptions_ComposePodman(t *testing.T) {
 }
 
 func TestStart_ComposeStartFailure(t *testing.T) {
-	oldFactory := newComposeSuite
-	defer func() { newComposeSuite = oldFactory }()
+	oldFactory := newComposeStack
+	defer func() { newComposeStack = oldFactory }()
 
-	newComposeSuite = func(files []string, env []string, engine container.Engine) (Handle, error) {
+	newComposeStack = func(files []string, env []string, engine container.Engine) (Handle, error) {
 		return &fakeHandle{upErr: fmt.Errorf("boom")}, nil
 	}
 

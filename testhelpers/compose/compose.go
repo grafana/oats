@@ -1,4 +1,4 @@
-// Package compose provides helpers to manage Compose clusters from test suites.
+// Package compose provides helpers to manage Docker Compose stacks used by fixture groups.
 package compose
 
 import (
@@ -56,13 +56,23 @@ func Suite(composeFile string) (*Compose, error) {
 }
 
 func SuiteFiles(composeFiles []string, env []string) (*Compose, error) {
-	return SuiteFilesWithRuntime(composeFiles, env, container.Docker)
+	return StackFilesWithRuntime(composeFiles, env, container.Docker)
 }
 
-// SuiteFilesWithRuntime creates a Compose lifecycle using the selected host
+// Stack creates a Docker Compose lifecycle for one file.
+func Stack(composeFile string) (*Compose, error) {
+	return StackFiles([]string{composeFile}, nil)
+}
+
+// StackFiles creates a Docker Compose lifecycle for the supplied files.
+func StackFiles(composeFiles []string, env []string) (*Compose, error) {
+	return StackFilesWithRuntime(composeFiles, env, container.Docker)
+}
+
+// StackFilesWithRuntime creates a Compose lifecycle using the selected host
 // container engine. Docker remains the compatibility default for callers that
-// use the older SuiteFiles helper.
-func SuiteFilesWithRuntime(composeFiles []string, env []string, engine container.Engine) (*Compose, error) {
+// use StackFiles or the older SuiteFiles helper.
+func StackFilesWithRuntime(composeFiles []string, env []string, engine container.Engine) (*Compose, error) {
 	if engine != container.Docker && engine != container.Podman {
 		return nil, fmt.Errorf("unsupported container runtime %q for Compose", engine)
 	}
@@ -81,6 +91,12 @@ func SuiteFilesWithRuntime(composeFiles []string, env []string, engine container
 		Paths:       composeFiles,
 		Env:         mergedEnv,
 	}, nil
+}
+
+// SuiteFilesWithRuntime is retained as a compatibility alias for callers using
+// the pre-fixture-group naming.
+func SuiteFilesWithRuntime(composeFiles []string, env []string, engine container.Engine) (*Compose, error) {
+	return StackFilesWithRuntime(composeFiles, env, engine)
 }
 
 func (c *Compose) Up() error {
@@ -212,7 +228,7 @@ func NewEndpoint(host string, composeFilePath string, ports remote.PortsConfig) 
 }
 
 // NewEndpointWithRuntime creates the legacy remote endpoint wrapper using a
-// selected Compose engine. New fixture code should prefer SuiteFilesWithRuntime
+// selected Compose engine. New fixture code should prefer StackFilesWithRuntime
 // directly.
 func NewEndpointWithRuntime(host string, composeFilePath string, ports remote.PortsConfig, engine container.Engine) *remote.Endpoint {
 	var compose *Compose
@@ -223,7 +239,7 @@ func NewEndpointWithRuntime(host string, composeFilePath string, ports remote.Po
 			return fmt.Errorf("composeFilePath cannot be empty")
 		}
 
-		compose, err = SuiteFilesWithRuntime([]string{composeFilePath}, nil, engine)
+		compose, err = StackFilesWithRuntime([]string{composeFilePath}, nil, engine)
 		if err != nil {
 			return err
 		}

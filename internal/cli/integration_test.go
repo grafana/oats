@@ -94,7 +94,7 @@ func TestCloseFixture_EmitsTeardownEvent(t *testing.T) {
 	if len(rep.events) != 1 || rep.events[0].Type != report.EventFixtureTeardown {
 		t.Fatalf("expected one teardown event, got %+v", rep.events)
 	}
-	if rep.events[0].Suite != "smoke" || rep.events[0].FixtureType != "compose" {
+	if rep.events[0].Group != "smoke" || rep.events[0].FixtureType != "compose" {
 		t.Fatalf("unexpected teardown event: %+v", rep.events[0])
 	}
 }
@@ -130,7 +130,7 @@ func TestEmitFixtureStartAndReady(t *testing.T) {
 	if len(rep.events) != 1 || rep.events[0].Type != report.EventFixtureStart {
 		t.Fatalf("expected one fixture.start event, got %+v", rep.events)
 	}
-	if rep.events[0].Suite != "smoke" || rep.events[0].FixtureType != "compose" {
+	if rep.events[0].Group != "smoke" || rep.events[0].FixtureType != "compose" {
 		t.Fatalf("unexpected fixture.start event: %+v", rep.events[0])
 	}
 
