@@ -1,0 +1,7 @@
+name: parallel-compose
+tags: [fixture, compose, parallel]
+run:
+  args: ["--parallel", "2"]
+expect:
+  stdout_contains:
+    - PASS 2/2

@@ -1,0 +1,25 @@
+# Boots a k3d fixture: OATS spins up a k3d (k3s-in-docker) cluster, builds +
+# imports the app image, applies the manifests in k8s_dir, and port-forwards to
+# reach it. Every case in a fixture group must declare the same fixture.
+name: k3d fixture app smoke
+tags: [k3d, app]   # filter with `oats --tags k3d`
+
+fixture:
+  k3d:
+    k8s_dir: k8s                 # directory of k8s manifests to apply
+    app_service: rolldice        # service exposing the app
+    app_docker_file: Dockerfile  # build the app image from this Dockerfile…
+    app_docker_context: .        # …with this build context
+    app_docker_tag: rolldice:test
+    app_port: 18080              # local port to reach the app on (forwarded to the container's 8080)
+    import_images: ["grafana/otel-lgtm:latest"]  # images to load into the cluster
+
+input:
+  - path: /rolldice?rolls=2
+
+expected:
+  metrics:
+    - promql: 'http_server_active_requests{service_name="rolldice"}'
+      value: '>= 0'
+  custom-checks:
+    - script: ./verify.sh   # colocated next to this case
