@@ -1,0 +1,28 @@
+name: inline-otlp
+fixture:
+  remote:
+    endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  traces:
+    - service: {{CASE_NAME}}
+      spans:
+        - name: seed-operation
+  logs:
+    - service: {{CASE_NAME}}
+      body: seed-log-line
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "{{CASE_NAME}}" }'
+      match_spans:
+        - name: seed-operation
+          attributes:
+            - key: service.name
+              value: '{{CASE_NAME}}'
+  logs:
+    - logql: '{service_name="{{CASE_NAME}}"}'
+      match:
+        - name: seed-log-line
+          attributes:
+            - key: service_name
+              value: '{{CASE_NAME}}'

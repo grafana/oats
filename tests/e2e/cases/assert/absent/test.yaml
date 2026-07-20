@@ -1,0 +1,6 @@
+name: absent
+tags: [assert, absent]
+
+expect:
+  stdout_contains:
+    - PASS 1/1

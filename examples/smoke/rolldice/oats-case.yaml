@@ -1,0 +1,33 @@
+# A case: drive an app, then assert on the telemetry it produced. This one
+# exercises all three main signals (traces, metrics, logs).
+name: rolldice smoke
+tags: [traces, metrics, logs]
+
+# A "remote" fixture points at an already-running stack — here a local
+# grafana/otel-lgtm on the default OTLP port. OATS does not boot or tear it down;
+# start it yourself, e.g.
+#   docker run -p 3000:3000 -p 4317:4317 -p 4318:4318 grafana/otel-lgtm
+fixture:
+  remote:
+    endpoint: http://localhost:4318
+
+# `input` HTTP requests drive the app so it emits telemetry (method defaults to GET).
+input:
+  - path: /rolldice?rolls=5
+
+# Each assertion names a query, then what must hold for its result. OATS retries
+# every assertion until it passes or --timeout elapses.
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "rolldice" }'   # TraceQL
+      match_spans:                                         # a matching span must exist
+        - match_type: regexp
+          name: '^GET /rolldice.*$'
+  metrics:
+    - promql: 'http_server_active_requests{service_name="rolldice"}'  # PromQL
+      value: '>= 0'                                                   # compare the sample value
+  logs:
+    - logql: '{service_name="rolldice"} |~ `rolling the dice`'        # LogQL
+      match:
+        - match_type: regexp
+          name: '.*rolling the dice.*'
