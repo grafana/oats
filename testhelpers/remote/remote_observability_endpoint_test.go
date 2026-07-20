@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -46,5 +47,47 @@ func TestEndpointSearchQueryEscaping(t *testing.T) {
 	}
 	if _, err := endpoint.SearchPyroscope(query); err != nil {
 		t.Fatalf("SearchPyroscope: %v", err)
+	}
+}
+
+func TestEndpointSearchQueryHTTPStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = fmt.Fprint(w, "backend unavailable")
+	}))
+	defer server.Close()
+
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(parsed.Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint := &Endpoint{
+		host: parsed.Hostname(),
+		ports: PortsConfig{
+			LokiHTTPPort:      port,
+			PyroscopeHTTPPort: port,
+		},
+	}
+
+	for name, search := range map[string]func(string) ([]byte, error){
+		"Loki":      endpoint.SearchLoki,
+		"Pyroscope": endpoint.SearchPyroscope,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := search("query")
+			if err == nil {
+				t.Fatal("expected HTTP status error")
+			}
+			if !strings.Contains(err.Error(), "503 Service Unavailable") {
+				t.Fatalf("error = %q, want status", err)
+			}
+			if !strings.Contains(err.Error(), "backend unavailable") {
+				t.Fatalf("error = %q, want response body", err)
+			}
+		})
 	}
 }

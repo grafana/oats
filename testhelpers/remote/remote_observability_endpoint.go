@@ -175,16 +175,7 @@ func (e *Endpoint) SearchLoki(query string) ([]byte, error) {
 		return nil, fmt.Errorf("querying loki: %w", err)
 	}
 
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("can't read response body: %w", err)
-	}
-
-	return body, nil
+	return readQueryResponse(resp, "Loki")
 }
 
 func (e *Endpoint) SearchPyroscope(query string) ([]byte, error) {
@@ -199,6 +190,10 @@ func (e *Endpoint) SearchPyroscope(query string) ([]byte, error) {
 		return nil, fmt.Errorf("querying pyroscope: %w", err)
 	}
 
+	return readQueryResponse(resp, "Pyroscope")
+}
+
+func readQueryResponse(resp *http.Response, service string) ([]byte, error) {
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
@@ -206,6 +201,17 @@ func (e *Endpoint) SearchPyroscope(query string) ([]byte, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("can't read response body: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		const maxErrorBody = 256
+		detail := strings.TrimSpace(string(body))
+		if len(detail) > maxErrorBody {
+			detail = detail[:maxErrorBody] + "..."
+		}
+		if detail == "" {
+			return nil, fmt.Errorf("querying %s: unexpected HTTP status %s", service, resp.Status)
+		}
+		return nil, fmt.Errorf("querying %s: unexpected HTTP status %s: %s", service, resp.Status, detail)
 	}
 
 	return body, nil
