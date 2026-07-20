@@ -172,7 +172,7 @@ func TestRunCase_MetricsValueFail(t *testing.T) {
 }
 
 func TestRunCase_LogsStructuredMatchPass(t *testing.T) {
-	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"streams","result":[{"stream":{"service_name":"svc","trace_id":"abc123"},"values":[["1700000000","seed-log-line"]]}]}}`}
+	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"streams","result":[{"stream":{"service_name":"svc"},"values":[{"timestamp":"1700000000","line":"seed-log-line","structuredMetadata":{"trace_id":"abc123"}}]}]}}`}
 	r, buf := newRunner(t, exec, Options{Timeout: 100 * time.Millisecond, Interval: 5 * time.Millisecond, SeedSettleDelay: 1})
 
 	c := mustParse(t, `

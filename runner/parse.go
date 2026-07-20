@@ -109,11 +109,17 @@ func extractLogRows(stdout string) ([]assert.Row, int, error) {
 	if strings.TrimSpace(stdout) == "" {
 		return nil, 0, nil
 	}
+	// gcx 0.4.4 represents each log value as an object so structured metadata
+	// and parsed labels can stay attached to the individual line.
 	var generic struct {
 		Data struct {
 			Result []struct {
 				Stream map[string]any `json:"stream"`
-				Values [][]any        `json:"values"`
+				Values []struct {
+					Line               string            `json:"line"`
+					StructuredMetadata map[string]string `json:"structuredMetadata"`
+					Parsed             map[string]string `json:"parsed"`
+				} `json:"values"`
 			} `json:"result"`
 		} `json:"data"`
 	}
@@ -122,13 +128,15 @@ func extractLogRows(stdout string) ([]assert.Row, int, error) {
 	}
 	var rows []assert.Row
 	for _, stream := range generic.Data.Result {
-		attrs := stringifyMap(stream.Stream)
-		for _, pair := range stream.Values {
-			body := ""
-			if len(pair) > 1 {
-				body = fmt.Sprint(pair[1])
+		for _, entry := range stream.Values {
+			attrs := stringifyMap(stream.Stream)
+			for k, v := range entry.StructuredMetadata {
+				attrs[k] = v
 			}
-			rows = append(rows, assert.Row{Name: body, Attributes: attrs})
+			for k, v := range entry.Parsed {
+				attrs[k] = v
+			}
+			rows = append(rows, assert.Row{Name: entry.Line, Attributes: attrs})
 		}
 	}
 	return rows, len(rows), nil
