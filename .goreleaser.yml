@@ -6,7 +6,7 @@ builds:
   - binary: oats
     main: .
     env:
-      # Keep Linux archives libc-independent so they run on glibc and musl.
+      # CGO is disabled for all builds (primarily to keep Linux archives libc-independent: glibc/musl compatible).
       - CGO_ENABLED=0
     flags:
       - -trimpath
