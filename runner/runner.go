@@ -462,5 +462,5 @@ func (r *Runner) doInput(in casefile.Input) error {
 		headers["Accept"] = "application/json"
 	}
 	url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.endpoint.AppPort, in.Path)
-	return requests.DoHTTPRequest(url, method, headers, in.Body, status)
+	return requests.DoHTTPRequestWithTimeout(url, method, headers, in.Body, status, r.opts.Timeout)
 }

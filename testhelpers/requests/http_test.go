@@ -1,9 +1,12 @@
 package requests
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestDoHTTPRequest_ReusesClientAcrossManyCalls(t *testing.T) {
@@ -23,5 +26,17 @@ func TestDoHTTPRequest_ReusesClientAcrossManyCalls(t *testing.T) {
 
 	if hits != 32 {
 		t.Fatalf("expected 32 hits, got %d", hits)
+	}
+}
+
+func TestDoHTTPRequestWithTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	err := DoHTTPRequestWithTimeout(server.URL, http.MethodGet, nil, "", http.StatusOK, 10*time.Millisecond)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("error = %v, want context deadline exceeded", err)
 	}
 }

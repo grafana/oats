@@ -19,8 +19,7 @@ import (
 )
 
 type PortsConfig struct {
-	TracesGRPCPort     int
-	TracesHTTPPort     int
+	OTLPGRPCPort       int
 	GrafanaHTTPPort    int
 	OTLPHTTPPort       int
 	TempoHTTPPort      int
@@ -52,13 +51,13 @@ func (e *Endpoint) TracerProvider(ctx context.Context, r *resource.Resource) (*t
 	var exporter *otlptrace.Exporter
 	var err error
 
-	if e.ports.TracesGRPCPort != 0 {
-		exporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure(), otlptracegrpc.WithEndpoint(fmt.Sprintf("%s:%d", e.host, e.ports.TracesGRPCPort)))
+	if e.ports.OTLPGRPCPort != 0 {
+		exporter, err = otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure(), otlptracegrpc.WithEndpoint(fmt.Sprintf("%s:%d", e.host, e.ports.OTLPGRPCPort)))
 		if err != nil {
 			return nil, err
 		}
-	} else if e.ports.TracesHTTPPort != 0 {
-		exporter, err = otlptracehttp.New(ctx, otlptracehttp.WithInsecure(), otlptracehttp.WithEndpoint(fmt.Sprintf("%s:%d/v1/traces", e.host, e.ports.TracesHTTPPort)))
+	} else if e.ports.OTLPHTTPPort != 0 {
+		exporter, err = otlptracehttp.New(ctx, otlptracehttp.WithInsecure(), otlptracehttp.WithEndpoint(fmt.Sprintf("%s:%d/v1/traces", e.host, e.ports.OTLPHTTPPort)))
 		if err != nil {
 			return nil, err
 		}
