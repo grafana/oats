@@ -10,7 +10,7 @@ then links to detailed references for further information.
 mise run build       # build oats with the gcx version from mise.toml
 mise run test        # unit and integration tests (excludes tests/e2e)
 mise run e2e-test    # real-stack e2e cases; requires Docker or Podman
-mise run lint        # Flint's aggregate lint/check command
+mise run lint:fix    # Auto-fix Flint issues
 mise run check       # lint + test
 ```
 
@@ -37,14 +37,15 @@ architecture and product decisions are recorded in the
 
 Before opening or updating a pull request:
 
-1. Run the relevant tests and `mise run lint` locally.
+1. Run the relevant tests and `mise run lint:fix` locally. CI uses `mise run lint`
+   to verify the result.
 2. Use [signed commits](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-signed-commits).
    See GitHub's [commit signature setup](https://docs.github.com/authentication/managing-commit-signature-verification/about-commit-signature-verification)
    and [verification guidance](https://docs.github.com/authentication/troubleshooting-commit-signature-verification/checking-your-commit-and-tag-signature-verification-status).
-   Do not bypass hooks with `--no-verify`.
-3. Include a concise summary, the validation performed, and any follow-up work
+3. Use a semantic pull request title, such as `docs: improve contributor guidance`.
+4. Include a concise summary, the validation performed, and any follow-up work
    in the pull request description.
-4. Keep review updates additive where possible. Avoid force-pushing review
+5. Keep review updates additive where possible. Avoid force-pushing review
    changes unless repairing or restacking history requires it.
 
 Sign Grafana's [Contributor License Agreement (CLA)](https://cla-assistant.io/grafana/oats)
