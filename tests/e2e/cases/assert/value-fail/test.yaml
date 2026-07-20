@@ -1,0 +1,14 @@
+name: value-fail
+tags: [assert, value, metrics, fail]
+
+run:
+  args:
+    - --timeout
+    - 15s
+    - --interval
+    - 1s
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL

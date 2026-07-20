@@ -1,0 +1,13 @@
+name: ndjson
+fixture:
+  remote:
+    endpoint: {{REMOTE_OTLP_HTTP}}
+seed:
+  type: inline-otlp
+  logs:
+    - service: {{CASE_NAME}}
+      body: seed-log-line
+expected:
+  logs:
+    - logql: '{service_name="{{CASE_NAME}}"}'
+      contains: seed-log-line

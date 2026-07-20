@@ -1,0 +1,15 @@
+name: match-fail
+tags: [assert, match, fail]
+
+run:
+  args:
+    - --timeout
+    - 3s
+    - --interval
+    - 500ms
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL
+    - 'match: no row matched name="seed-log-line", attribute service_name="other-service"'

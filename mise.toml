@@ -1,6 +1,11 @@
 [tools]
+
+# Runtime used by the black-box examples.
+"aqua:grafana/gcx" = "0.4.3"
 go = "1.26.5"
 goreleaser = "2.17.0"
+k3d = "5.8.3"
+kubectl = "1.34.1"
 node = "24.18.0"
 
 # Linters
@@ -32,21 +37,20 @@ run = "flint run --fix"
 
 [tasks.test]
 description = "Run tests"
-run = "go test $(go list ./...)"
+run = 'GOFLAGS=-buildvcs=false go test $(GOFLAGS=-buildvcs=false go list ./... | grep -v "github.com/grafana/oats/tests/e2e")'
 
-[tasks.integration-test]
-description = "Run integration tests"
-env.INTEGRATION_TESTS = "true"
-run = "go test github.com/grafana/oats/tests"
+[tasks.e2e-test]
+description = "Run e2e cases"
+run = "go test -v -buildvcs=false ./tests/e2e -run TestCases"
+
+[tasks.example-test]
+description = "Run the self-contained examples"
+run = "bash ./.mise/tasks/example-test.sh"
 
 [tasks.build]
 description = "Build the project"
-run = "go build"
+run = "bash ./scripts/build-oats.sh"
 
 [tasks.check]
 description = "Run all checks"
 depends = ["lint", "test"]
-
-[tasks.deps]
-description = "Update dependencies"
-run = "go mod tidy"

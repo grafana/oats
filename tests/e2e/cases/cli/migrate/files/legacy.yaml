@@ -1,0 +1,10 @@
+oats-schema-version: 2
+docker-compose:
+  files:
+    - ./docker-compose.yaml
+input:
+  - path: /rolldice
+expected:
+  logs:
+    - logql: '{service_name="rolldice"}'
+      regexp: "rolling the dice"

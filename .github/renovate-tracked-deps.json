@@ -16,11 +16,6 @@
         "mise"
       ]
     },
-    ".github/workflows/integration_test.yml": {
-      "regex": [
-        "mise"
-      ]
-    },
     ".github/workflows/lint.yml": {
       "regex": [
         "mise"
@@ -31,51 +26,84 @@
         "mise"
       ]
     },
-    "go.mod": {
-      "gomod": [
-        "github.com/cenkalti/backoff/v5",
-        "github.com/cespare/xxhash/v2",
-        "github.com/davecgh/go-spew",
-        "github.com/go-logr/logr",
-        "github.com/go-logr/stdr",
-        "github.com/google/go-cmp",
-        "github.com/google/uuid",
-        "github.com/grpc-ecosystem/grpc-gateway/v2",
-        "github.com/hashicorp/go-version",
-        "github.com/json-iterator/go",
-        "github.com/modern-go/concurrent",
-        "github.com/modern-go/reflect2",
-        "github.com/onsi/gomega",
-        "github.com/pmezard/go-difflib",
-        "github.com/stretchr/testify",
-        "go",
-        "go.opentelemetry.io/auto/sdk",
-        "go.opentelemetry.io/collector/featuregate",
-        "go.opentelemetry.io/collector/pdata",
-        "go.opentelemetry.io/otel",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp",
-        "go.opentelemetry.io/otel/metric",
-        "go.opentelemetry.io/otel/sdk",
-        "go.opentelemetry.io/otel/trace",
-        "go.opentelemetry.io/proto/otlp",
-        "go.uber.org/multierr",
-        "go.yaml.in/yaml/v3",
-        "golang.org/x/net",
-        "golang.org/x/sys",
-        "golang.org/x/text",
-        "google.golang.org/genproto/googleapis/api",
-        "google.golang.org/genproto/googleapis/rpc",
-        "google.golang.org/grpc",
-        "google.golang.org/protobuf",
-        "gopkg.in/yaml.v3"
+    "examples/fixtures/compose/rolldice/Dockerfile": {
+      "dockerfile": [
+        "python"
+      ],
+      "regex": [
+        "opentelemetry-distro"
+      ]
+    },
+    "examples/fixtures/compose/rolldice/requirements.txt": {
+      "pip_requirements": [
+        "Flask",
+        "Jinja2",
+        "MarkupSafe",
+        "Werkzeug",
+        "blinker",
+        "click",
+        "itsdangerous"
+      ]
+    },
+    "examples/fixtures/k3d/rolldice/Dockerfile": {
+      "dockerfile": [
+        "python"
+      ],
+      "regex": [
+        "opentelemetry-distro"
+      ]
+    },
+    "examples/fixtures/k3d/rolldice/requirements.txt": {
+      "pip_requirements": [
+        "Flask",
+        "Jinja2",
+        "MarkupSafe",
+        "Werkzeug",
+        "blinker",
+        "click",
+        "itsdangerous"
+      ]
+    },
+    "examples/python/Dockerfile": {
+      "dockerfile": [
+        "python"
+      ],
+      "regex": [
+        "opentelemetry-distro"
+      ]
+    },
+    "examples/python/requirements.txt": {
+      "pip_requirements": [
+        "Flask",
+        "Jinja2",
+        "MarkupSafe",
+        "Werkzeug",
+        "blinker",
+        "click",
+        "itsdangerous"
+      ]
+    },
+    "internal/legacyyaml/testdata/docker-compose-addition.yaml": {
+      "docker-compose": [
+        "mongo"
+      ]
+    },
+    "internal/legacyyaml/testdata/docker-compose-expected.yaml": {
+      "docker-compose": [
+        "grafana/grafana",
+        "mongo"
+      ]
+    },
+    "internal/legacyyaml/testdata/docker-compose-template.yaml": {
+      "docker-compose": [
+        "grafana/grafana"
       ]
     },
     "mise.toml": {
       "mise": [
         "actionlint",
         "aqua:grafana/flint",
+        "aqua:grafana/gcx",
         "aqua:owenlamont/ryl",
         "biome",
         "editorconfig-checker",
@@ -83,6 +111,8 @@
         "golangci-lint",
         "goreleaser",
         "hadolint",
+        "k3d",
+        "kubectl",
         "lychee",
         "node",
         "npm:renovate",
@@ -93,20 +123,50 @@
         "typos"
       ]
     },
-    "yaml/testdata/docker-compose-addition.yaml": {
-      "docker-compose": [
-        "mongo"
+    "tests/e2e/Dockerfile": {
+      "dockerfile": [
+        "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java",
+        "springio/petclinic"
       ]
     },
-    "yaml/testdata/docker-compose-expected.yaml": {
+    "tests/e2e/cases/fixture/compose-app-seed/files/docker-compose.oats.yml": {
       "docker-compose": [
-        "grafana/grafana",
-        "mongo"
+        "ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen"
       ]
     },
-    "yaml/testdata/docker-compose-template.yaml": {
+    "tests/e2e/cases/fixture/compose-logs-fail/files/docker-compose.oats.yml": {
       "docker-compose": [
-        "grafana/grafana"
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/compose-logs/files/docker-compose.oats.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/k3d-fail/files/Dockerfile": {
+      "dockerfile": [
+        "docker.io/library/alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/k3d-smoke/files/Dockerfile": {
+      "dockerfile": [
+        "docker.io/library/alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/parallel-compose/files/docker-compose.alpha.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/parallel-compose/files/docker-compose.beta.yml": {
+      "docker-compose": [
+        "alpine"
+      ]
+    },
+    "tests/e2e/cases/fixture/remote-basic/files/docker-compose.remote.yml": {
+      "docker-compose": [
+        "docker.io/grafana/otel-lgtm"
       ]
     }
   }
