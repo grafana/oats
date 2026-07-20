@@ -1,0 +1,15 @@
+name: contains-fail
+tags: [assert, contains, fail]
+
+run:
+  args:
+    - --timeout
+    - 3s
+    - --interval
+    - 500ms
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL
+    - 'contains: substring "needle" not found in stdout'

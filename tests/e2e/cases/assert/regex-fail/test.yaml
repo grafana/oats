@@ -1,0 +1,15 @@
+name: regex-fail
+tags: [assert, regex, fail]
+
+run:
+  args:
+    - --timeout
+    - 3s
+    - --interval
+    - 500ms
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - FAIL
+    - 'regex: pattern "needle.*" did not match stdout'
