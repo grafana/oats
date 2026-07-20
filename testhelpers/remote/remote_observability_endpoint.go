@@ -30,23 +30,6 @@ type PortsConfig struct {
 	PyroscopeHttpPort  int
 }
 
-func (p PortsConfig) EffectiveGrafanaHTTPPort() int {
-	if p.GrafanaHTTPPort != 0 {
-		return p.GrafanaHTTPPort
-	}
-	return 3000
-}
-
-func (p PortsConfig) EffectiveOTLPHTTPPort() int {
-	if p.OTLPHTTPPort != 0 {
-		return p.OTLPHTTPPort
-	}
-	if p.TracesHTTPPort != 0 {
-		return p.TracesHTTPPort
-	}
-	return 4318
-}
-
 type Endpoint struct {
 	host      string
 	ports     PortsConfig
