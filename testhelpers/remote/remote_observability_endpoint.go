@@ -168,7 +168,7 @@ func (e *Endpoint) SearchLoki(query string) ([]byte, error) {
 		return nil, fmt.Errorf("to search Loki you must configure a LokiHTTPPort")
 	}
 
-	u := fmt.Sprintf("http://%s:%d/loki/api/v1/query_range?since=5m&limit=1&query=%s", e.host, e.ports.LokiHTTPPort, url.PathEscape(query))
+	u := fmt.Sprintf("http://%s:%d/loki/api/v1/query_range?since=5m&limit=1&query=%s", e.host, e.ports.LokiHTTPPort, url.QueryEscape(query))
 
 	resp, err := http.Get(u)
 	if err != nil {
@@ -192,7 +192,7 @@ func (e *Endpoint) SearchPyroscope(query string) ([]byte, error) {
 		return nil, fmt.Errorf("to search Pyroscope you must configure a PyroscopeHTTPPort")
 	}
 
-	u := fmt.Sprintf("http://%s:%d/pyroscope/render?from=from=now-1m&query=%s", e.host, e.ports.PyroscopeHTTPPort, url.PathEscape(query))
+	u := fmt.Sprintf("http://%s:%d/pyroscope/render?from=now-1m&query=%s", e.host, e.ports.PyroscopeHTTPPort, url.QueryEscape(query))
 
 	resp, err := http.Get(u)
 	if err != nil {
