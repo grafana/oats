@@ -42,7 +42,8 @@ Before opening or updating a pull request:
 2. Use [signed commits](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-signed-commits).
    See GitHub's [commit signature setup](https://docs.github.com/authentication/managing-commit-signature-verification/about-commit-signature-verification)
    and [verification guidance](https://docs.github.com/authentication/troubleshooting-commit-signature-verification/checking-your-commit-and-tag-signature-verification-status).
-3. Use a semantic pull request title, such as `docs: improve contributor guidance`.
+3. Use a [semantic pull request title](https://www.conventionalcommits.org/en/v1.0.0/#summary),
+   such as `docs: improve contributor guidance`.
 4. Include a concise summary, the validation performed, and any follow-up work
    in the pull request description.
 5. Keep review updates additive where possible. Avoid force-pushing review
