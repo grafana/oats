@@ -28,7 +28,7 @@ jobs:
       - name: Build e2e tools
         run: bash ./scripts/build-local-tools.sh "$PWD/.e2e-tools/bin"
       - name: Upload e2e tools
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e2e-tools
           path: .e2e-tools/bin
@@ -51,7 +51,7 @@ jobs:
           version: v2026.7.7
           sha256: 429f71e7e989908bf975aafac9066329c16e2d8fc7cd8e74fdf21dd6300ffe7c
       - name: Download e2e tools
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: e2e-tools
           path: .e2e-tools/bin
@@ -137,7 +137,7 @@ jobs:
           version: v2026.7.7
           sha256: 429f71e7e989908bf975aafac9066329c16e2d8fc7cd8e74fdf21dd6300ffe7c
       - name: Download e2e tools
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: e2e-tools
           path: .e2e-tools/bin
@@ -185,7 +185,7 @@ jobs:
           cat "$RUNNER_TEMP/podman-service.log"
           exit 1
       - name: Download e2e tools
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: e2e-tools
           path: .e2e-tools/bin
