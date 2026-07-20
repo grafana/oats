@@ -99,8 +99,9 @@ fixture safety gate allows it.
 - `mise run test` runs all Go packages except `tests/e2e`.
 - `tests/e2e` is a data-driven harness. Each case directory has a `test.yaml`
   plus its generated/config/fixture files; use `OATS_E2E_FILTER` to narrow a
-  local run. The harness builds the real oats and gcx tools and uses Docker for
-  compose/k3d fixtures.
+  local run. The harness builds the real oats and gcx tools and uses the
+  selected Docker or Podman engine for Compose fixtures; k3d remains
+  Docker-backed.
 - `.github/workflows/lint.yml`, `build.yml`, and `test.yml` provide fast PR
   feedback. `.github/workflows/e2e_test.yml` runs the real-stack matrix and ends
   in one `e2e` gate job. Release builds use `.github/workflows/release.yml` and
