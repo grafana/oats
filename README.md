@@ -62,6 +62,8 @@ Without mise:
 - **GitHub releases** — download for your OS/arch from the
   [oats](https://github.com/grafana/oats/releases) and
   [gcx](https://github.com/grafana/gcx/releases) release pages.
+  Linux release archives are libc-independent (built with CGO disabled) and work on both glibc- and
+  musl-based distributions, such as Alpine Linux.
 - **go install** (oats from source) — `go install github.com/grafana/oats@latest`.
 
 `oats` drives assertions through `gcx`. Release and mise-built binaries contain
