@@ -120,6 +120,79 @@ func TestConvertFile_RendersYAML(t *testing.T) {
 	}
 }
 
+func TestConvertFileRejectsMissingLegacyFile(t *testing.T) {
+	if _, _, err := ConvertFile(filepath.Join(t.TempDir(), "missing.oats.yaml")); err == nil {
+		t.Fatal("expected missing legacy file error")
+	}
+}
+
+func TestMigrateSignalConversionBranches(t *testing.T) {
+	tests := []struct {
+		name      string
+		signal    model.ExpectedSignal
+		wantCount string
+		absent    bool
+		wantMatch int
+	}{
+		{name: "absent", signal: model.ExpectedSignal{Count: &model.ExpectedRange{}}, absent: true},
+		{name: "exact", signal: model.ExpectedSignal{Count: &model.ExpectedRange{Min: 2, Max: 2}}, wantCount: "== 2"},
+		{name: "minimum", signal: model.ExpectedSignal{Count: &model.ExpectedRange{Min: 2}}, wantCount: ">= 2"},
+		{name: "maximum", signal: model.ExpectedSignal{Count: &model.ExpectedRange{Max: 2}}, wantCount: "<= 2"},
+		{name: "strict match", signal: model.ExpectedSignal{NameEquals: "span", Attributes: map[string]string{"service": "api"}}, wantMatch: 1},
+		{name: "regexp match", signal: model.ExpectedSignal{NameRegexp: "span.*", AttributeRegexp: map[string]string{"level": "warn|error", "trace_id": ".*"}}, wantMatch: 1},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, _ := convertSignal(tc.name, tc.signal)
+			if got.Count != tc.wantCount || got.Absent != tc.absent || len(got.Match) != tc.wantMatch {
+				t.Fatalf("convertSignal = %+v, want count=%q absent=%v matches=%d", got, tc.wantCount, tc.absent, tc.wantMatch)
+			}
+		})
+	}
+
+	_, warnings := convertSignal("lossy", model.ExpectedSignal{
+		Count:             &model.ExpectedRange{Min: 1, Max: 3},
+		NoExtraAttributes: true,
+		MatrixCondition:   "linux",
+	})
+	if len(warnings) != 3 {
+		t.Fatalf("lossy conversion warnings = %v", warnings)
+	}
+	if _, warnings := convertSignal("empty", model.ExpectedSignal{}); len(warnings) != 1 {
+		t.Fatalf("empty conversion warnings = %v", warnings)
+	}
+}
+
+func TestMigrateHelpers(t *testing.T) {
+	if got := deriveName("/tmp/my_legacy-case.oats.yaml"); got != "my legacy case.oats" {
+		t.Fatalf("deriveName = %q", got)
+	}
+	for _, tc := range []struct {
+		condition string
+		selected  *model.Matrix
+		want      bool
+	}{
+		{condition: "", selected: nil, want: true},
+		{condition: "linux", selected: nil, want: true},
+		{condition: "linux", selected: &model.Matrix{Name: "linux"}, want: true},
+		{condition: "windows", selected: &model.Matrix{Name: "linux"}, want: false},
+		{condition: "[", selected: &model.Matrix{Name: "linux"}, want: true},
+	} {
+		if got := keepForMatrix(tc.condition, tc.selected); got != tc.want {
+			t.Errorf("keepForMatrix(%q, %#v) = %v, want %v", tc.condition, tc.selected, got, tc.want)
+		}
+	}
+
+	def := model.TestCaseDefinition{DockerCompose: &model.DockerCompose{Files: []string{"a.yml", "b.yml"}}}
+	fixture := fixtureFor(def, nil)
+	if fixture == nil || fixture.Compose == nil || len(fixture.Compose.Files) != 2 {
+		t.Fatalf("fixtureFor multiple compose files = %+v", fixture)
+	}
+	if got := withoutMatch(casefile.AssertionCommon{Count: "== 1", Match: []casefile.MatchEntry{{}}}); got.Match != nil || got.Count != "== 1" {
+		t.Fatalf("withoutMatch = %+v", got)
+	}
+}
+
 func TestConvertFile_MatrixSampleIsParseable(t *testing.T) {
 	sample := filepath.Join("..", "internal", "legacyyaml", "testdata", "valid-tests", "matrix-test.oats.yaml")
 	out, warnings, err := ConvertFile(sample)
@@ -378,6 +451,9 @@ expected:
 `), 0o644); err != nil {
 		fatalf(t, "WriteFile minimal: %v", err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "oats-config.yaml"), []byte("meta:\n  version: 3\ncases: []\n"), 0o644); err != nil {
+		fatalf(t, "WriteFile old config: %v", err)
+	}
 
 	res, err := ConvertTree(dir)
 	if err != nil {
@@ -385,6 +461,9 @@ expected:
 	}
 	if len(res.Written) != 2 {
 		fatalf(t, "expected 2 written cases, got %v", res.Written)
+	}
+	if !containsWarning(res.Warnings, "oats-config.yaml already existed") {
+		fatalf(t, "expected existing-config warning, got %v", res.Warnings)
 	}
 
 	// Both legacy files must now be valid v3 cases parseable in place.
@@ -417,6 +496,21 @@ expected:
 			fatalf(t, "expected sorted explicit case %q at %d, got %v", w, i, cfg.Cases)
 		}
 	}
+}
+
+func TestConvertTreeRejectsMissingDirectory(t *testing.T) {
+	if _, err := ConvertTree(filepath.Join(t.TempDir(), "missing")); err == nil {
+		t.Fatal("expected missing directory error")
+	}
+}
+
+func containsWarning(warnings []string, want string) bool {
+	for _, warning := range warnings {
+		if strings.Contains(warning, want) {
+			return true
+		}
+	}
+	return false
 }
 
 func fatalf(t *testing.T, format string, args ...any) {

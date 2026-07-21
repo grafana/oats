@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/grafana/oats/cache"
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/report"
@@ -230,5 +231,162 @@ func TestCLIConfigAndSmallHelpers(t *testing.T) {
 	}
 	if cmd := newCacheCmd(); cmd == nil || len(cmd.Commands()) != 1 {
 		t.Fatal("cache command was not constructed with clear subcommand")
+	}
+}
+
+func TestCLIListMigrateAndCacheCommands(t *testing.T) {
+	dir := t.TempDir()
+	config := filepath.Join(dir, "oats-config.yaml")
+	writeFile(t, dir, "oats-config.yaml", `meta:
+  version: 3
+cases: ["case.yaml"]
+`)
+	writeFile(t, dir, "case.yaml", `name: smoke
+fixture:
+  remote:
+    endpoint: http://localhost:4318
+expected:
+  traces:
+    - traceql: '{}'
+      match_spans:
+        - name: smoke
+`)
+
+	list := newListCmd()
+	list.SetArgs([]string{"--config", config})
+	if err := list.Execute(); err != nil {
+		t.Fatalf("list command: %v", err)
+	}
+
+	legacy := filepath.Join(dir, "legacy.oats.yaml")
+	writeFile(t, dir, filepath.Base(legacy), `oats-schema-version: 2
+expected:
+  custom-checks:
+    - script: true
+`)
+	migrateCmd := newMigrateCmd()
+	migrateCmd.SetArgs([]string{legacy})
+	if err := migrateCmd.Execute(); err != nil {
+		t.Fatalf("migrate file command: %v", err)
+	}
+
+	cacheDir := filepath.Join(dir, "cache")
+	store, err := cache.New(cacheDir, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Record(cache.Key{CaseYAML: []byte("case")}); err != nil {
+		t.Fatal(err)
+	}
+	cacheCmd := newCacheCmd()
+	cacheCmd.SetArgs([]string{"clear", "--cache-dir", cacheDir})
+	if err := cacheCmd.Execute(); err != nil {
+		t.Fatalf("cache clear command: %v", err)
+	}
+}
+
+func TestDeprecatedListAndMigrateFlags(t *testing.T) {
+	dir := t.TempDir()
+	config := filepath.Join(dir, "oats-config.yaml")
+	writeFile(t, dir, "oats-config.yaml", `meta:
+  version: 3
+cases: ["case.yaml"]
+`)
+	writeFile(t, dir, "case.yaml", `name: smoke
+fixture:
+  remote:
+    endpoint: http://localhost:4318
+expected:
+  traces:
+    - traceql: '{}'
+`)
+
+	root := newRootCmd(new(int))
+	root.SetArgs([]string{"--config", config, "--list"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("deprecated --list: %v", err)
+	}
+
+	legacy := filepath.Join(dir, "legacy.oats.yaml")
+	writeFile(t, dir, filepath.Base(legacy), `oats-schema-version: 2
+expected:
+  custom-checks:
+    - script: true
+`)
+	root = newRootCmd(new(int))
+	root.SetArgs([]string{"--migrate", legacy})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("deprecated --migrate: %v", err)
+	}
+}
+
+func TestRunActionRejectsFilterAndRuntimeErrors(t *testing.T) {
+	dir := t.TempDir()
+	config := filepath.Join(dir, "oats-config.yaml")
+	writeFile(t, dir, "oats-config.yaml", `meta:
+  version: 3
+cases: ["case.yaml"]
+`)
+	writeFile(t, dir, "case.yaml", `name: smoke
+tags: [smoke]
+fixture:
+  remote:
+    endpoint: http://localhost:4318
+expected:
+  traces:
+    - traceql: '{}'
+`)
+
+	root := newRootCmd(new(int))
+	root.SetArgs([]string{"--config", config, "--tags", "missing"})
+	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "no cases matched the filter") {
+		t.Fatalf("filter error = %v", err)
+	}
+
+	root = newRootCmd(new(int))
+	root.SetArgs([]string{"--config", config, "--container-runtime", "invalid"})
+	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "unsupported container runtime") {
+		t.Fatalf("runtime error = %v", err)
+	}
+}
+
+func TestCLIReporterAndRunPlanCache(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "report-*.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, format := range []string{"ndjson", "JSON", "text"} {
+		rep := newReporter(file, format, report.VerboseDefault)
+		rep.Emit(report.Event{Type: report.EventRunStart})
+		if err := rep.Close(); err != nil {
+			t.Fatalf("close %s reporter: %v", format, err)
+		}
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	plan := discovery.Plan{
+		Name:    "remote-cache",
+		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}},
+	}
+	rep := report.NewTextReporter(io.Discard, report.VerboseDefault)
+	res := runPlan(context.Background(), rep, plan, runOptions{cacheDir: t.TempDir()})
+	if res.err != nil {
+		t.Fatalf("runPlan with cache: %+v", res)
+	}
+}
+
+func TestRunPlansNormalizesParallelism(t *testing.T) {
+	plans := []discovery.Plan{
+		{Name: "one", Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://one"}}},
+		{Name: "two", Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://two"}}},
+	}
+	rep := report.NewTextReporter(io.Discard, report.VerboseDefault)
+	if pass, fail, err := runPlans(context.Background(), rep, plans, runOptions{}, 0); err != nil || pass != 0 || fail != 0 {
+		t.Fatalf("sequential runPlans = pass:%d fail:%d err:%v", pass, fail, err)
+	}
+	if pass, fail, err := runPlans(context.Background(), rep, plans, runOptions{}, 2); err != nil || pass != 0 || fail != 0 {
+		t.Fatalf("parallel runPlans = pass:%d fail:%d err:%v", pass, fail, err)
 	}
 }

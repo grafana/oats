@@ -190,6 +190,122 @@ func TestStartWithOptions_ComposePodman(t *testing.T) {
 	}
 }
 
+func TestStartWithOptionsRejectsInvalidRuntimeAndUnsupportedFixture(t *testing.T) {
+	plan := discovery.Plan{
+		Name:             "compose",
+		Fixture:          casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "none", File: "compose.yml"}},
+		FixtureSourceDir: t.TempDir(),
+	}
+	if _, _, err := StartWithOptions(context.Background(), plan, Options{ContainerRuntime: "invalid"}); err == nil {
+		t.Fatal("expected invalid container runtime error")
+	}
+
+	if fix, rt, err := startWithEngine(context.Background(), discovery.Plan{}, container.Docker); err != nil || fix != nil || !rt.ParallelSafe {
+		t.Fatalf("empty fixture = fix:%v runtime:%+v err:%v", fix, rt, err)
+	}
+	if _, _, err := startWithEngine(context.Background(), discovery.Plan{Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}}}, container.Docker); err != nil {
+		t.Fatalf("remote startWithEngine: %v", err)
+	}
+}
+
+func TestStartComposeLookupFailuresAndManagedApp(t *testing.T) {
+	oldFactory := newComposeStack
+	oldLookup := lookupComposePort
+	t.Cleanup(func() {
+		newComposeStack = oldFactory
+		lookupComposePort = oldLookup
+	})
+
+	dir := t.TempDir()
+	plan := discovery.Plan{
+		Name:             "managed-app",
+		Fixture:          casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm", AppService: "app", AppPort: 8080}},
+		FixtureSourceDir: dir,
+	}
+	newComposeStack = func(_ []string, _ []string, _ container.Engine) (Handle, error) {
+		return &fakeHandle{}, nil
+	}
+	lookupComposePort = func(_ container.Engine, _ []string, _ []string, _ string, port string) (string, error) {
+		if port == "8080" {
+			return "48080", nil
+		}
+		return "43" + port, nil
+	}
+	fix, rt, err := startCompose(plan, container.Docker)
+	if err != nil {
+		t.Fatalf("managed app startCompose: %v", err)
+	}
+	if rt.AppHostPort != 48080 || !rt.ParallelSafe {
+		t.Fatalf("managed app runtime: %+v", rt)
+	}
+	if err := fix.Close(); err != nil {
+		t.Fatalf("managed app close: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		port string
+		want string
+	}{
+		{name: "factory", port: "", want: "factory failed"},
+		{name: "grafana lookup", port: "3000", want: "grafana lookup failed"},
+		{name: "otlp lookup", port: "4318", want: "otlp lookup failed"},
+		{name: "pyroscope lookup", port: "4040", want: "pyroscope lookup failed"},
+		{name: "app lookup", port: "8080", want: "resolve app host port"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			newComposeStack = func(_ []string, _ []string, _ container.Engine) (Handle, error) {
+				if tc.name == "factory" {
+					return nil, fmt.Errorf("factory failed")
+				}
+				return &fakeHandle{}, nil
+			}
+			lookupComposePort = func(_ container.Engine, _ []string, _ []string, _ string, port string) (string, error) {
+				if port == tc.port {
+					return "", fmt.Errorf("%s failed", tc.name)
+				}
+				return "43" + port, nil
+			}
+			_, _, err := startCompose(plan, container.Docker)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("startCompose error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+
+	lookupComposePort = func(_ container.Engine, _ []string, _ []string, _ string, port string) (string, error) {
+		if port == "8080" {
+			return "not-a-port", nil
+		}
+		return "43" + port, nil
+	}
+	if _, _, err := startCompose(plan, container.Docker); err == nil || !strings.Contains(err.Error(), "invalid app host port") {
+		t.Fatalf("invalid managed app port error = %v", err)
+	}
+}
+
+func TestSupportsParallelFixtureKinds(t *testing.T) {
+	cases := []struct {
+		name   string
+		plan   discovery.Plan
+		safe   bool
+		reason string
+	}{
+		{name: "empty", plan: discovery.Plan{}, safe: true},
+		{name: "remote", plan: discovery.Plan{Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}}}, safe: true},
+		{name: "template none", plan: discovery.Plan{Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "none", File: "compose.yml"}}}, reason: "only parallel-safe"},
+		{name: "k3d", plan: discovery.Plan{Fixture: casefile.FixtureConfig{K3D: &casefile.K3DFixture{}}}, reason: "k3d fixtures"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			safe, reason := SupportsParallel(tc.plan)
+			if safe != tc.safe || (!tc.safe && !strings.Contains(reason, tc.reason)) {
+				t.Fatalf("SupportsParallel = %v, %q", safe, reason)
+			}
+		})
+	}
+}
+
 func TestStart_ComposeStartFailure(t *testing.T) {
 	oldFactory := newComposeStack
 	defer func() { newComposeStack = oldFactory }()

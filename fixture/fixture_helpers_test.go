@@ -197,6 +197,12 @@ esac
 	if got, err := readK3DGrafanaToken(); err != nil || got != "k3d-token\n" {
 		t.Fatalf("readK3DGrafanaToken = %q, %v", got, err)
 	}
+	if got, err := waitForGrafanaTokenImpl(plan, container.Docker); err != nil || got != "grafana-token" {
+		t.Fatalf("waitForGrafanaTokenImpl compose = %q, %v", got, err)
+	}
+	if got, err := waitForGrafanaTokenImpl(discovery.Plan{Fixture: casefile.FixtureConfig{K3D: &casefile.K3DFixture{}}}, container.Docker); err != nil || got != "k3d-token" {
+		t.Fatalf("waitForGrafanaTokenImpl k3d = %q, %v", got, err)
+	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

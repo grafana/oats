@@ -310,6 +310,84 @@ func TestLegacyRunnerPollingHelpers(t *testing.T) {
 	r.assertCustomCheck(model.CustomCheck{Script: "true"})
 }
 
+func TestLegacyRunnerCallAsserterDrivesInputs(t *testing.T) {
+	var requests []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.Method+" "+r.URL.Path+" "+r.Header.Get("Accept"))
+		if r.URL.Path == "/created" {
+			w.WriteHeader(http.StatusCreated)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(parsed.Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := NewRunner(&model.TestCase{
+		Name:       "input requests",
+		PortConfig: &model.PortConfig{ApplicationPort: port},
+		Definition: model.TestCaseDefinition{Input: []model.Input{
+			{Path: "/health"},
+			{Scheme: "http", Host: parsed.Hostname(), Method: "post", Path: "/created", Headers: map[string]string{"Accept": "text/plain"}, Body: "payload", Status: "201"},
+		}},
+	}, model.Settings{Host: parsed.Hostname()})
+	failed := false
+	g := gomega.NewGomega(func(string, ...int) { failed = true })
+	r.callAsserter(g, newAssertCaller(r, time.Second), func() {})
+	if failed {
+		t.Fatal("callAsserter reported an unexpected request failure")
+	}
+	if len(requests) != 2 || requests[0] != "GET /health application/json" || requests[1] != "POST /created text/plain" {
+		t.Fatalf("requests = %#v", requests)
+	}
+}
+
+func TestLegacyRunnerExecuteChecksAndMatrixBranches(t *testing.T) {
+	r := NewRunner(&model.TestCase{
+		Name:               "matrix checks",
+		MatrixTestCaseName: "linux",
+		Definition: model.TestCaseDefinition{
+			Interval: time.Millisecond,
+			Expected: model.Expected{
+				Logs:         []model.ExpectedLogs{{LogQL: "ignored", Signal: model.ExpectedSignal{MatrixCondition: "windows"}}},
+				Traces:       []model.ExpectedTraces{{TraceQL: "ignored", Signal: model.ExpectedSignal{MatrixCondition: "windows"}}},
+				Metrics:      []model.ExpectedMetrics{{PromQL: "ignored", MatrixCondition: "windows"}},
+				Profiles:     []model.ExpectedProfiles{{Query: "ignored", MatrixCondition: "windows"}},
+				CustomChecks: []model.CustomCheck{{Script: "true"}},
+			},
+		},
+	}, model.Settings{Timeout: time.Second, PresentTimeout: 10 * time.Millisecond, AbsentTimeout: 10 * time.Millisecond})
+	r.ExecuteChecks()
+
+	if r.MatchesMatrixCondition("windows", "ignored") {
+		t.Fatal("non-matching matrix condition should be skipped")
+	}
+	if caller := newAssertCaller(NewRunner(&model.TestCase{Definition: model.TestCaseDefinition{}}, model.Settings{}), time.Second); caller.interval != model.DefaultTestCaseInterval {
+		t.Fatalf("default polling interval = %v, want %v", caller.interval, model.DefaultTestCaseInterval)
+	}
+}
+
+func TestPrepareBuildDirRemovesExistingDirectory(t *testing.T) {
+	first := PrepareBuildDir("coverage-existing")
+	if err := os.WriteFile(filepath.Join(first, "stale.txt"), []byte("stale"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	second := PrepareBuildDir("coverage-existing")
+	if first != second {
+		t.Fatalf("PrepareBuildDir paths differ: %q vs %q", first, second)
+	}
+	if _, err := os.Stat(filepath.Join(second, "stale.txt")); !os.IsNotExist(err) {
+		t.Fatalf("stale output still exists: %v", err)
+	}
+}
+
 func TestCreateDockerComposeFileWithFakeDocker(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test uses a POSIX executable")
