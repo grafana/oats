@@ -45,10 +45,20 @@ and shell commands:
 
 ## Filtering
 
+Run the e2e suite through the mise task:
+
+```bash
+mise run e2e-test
+```
+
 Use `OATS_E2E_FILTER` to run a subset of cases by relative path:
 
 ```bash
-OATS_E2E_FILTER=assert/ go test ./tests/e2e -run TestCases
-OATS_E2E_FILTER=fixture/remote go test ./tests/e2e -run TestCases
-OATS_E2E_FILTER=assert/contains,assert/regex go test ./tests/e2e -run TestCases
+OATS_E2E_FILTER=assert/ mise run e2e-test
+OATS_E2E_FILTER=fixture/remote mise run e2e-test
+OATS_E2E_FILTER=assert/contains,assert/regex mise run e2e-test
 ```
+
+For direct `go test` runs, mise must be installed and its tools must be
+available; alternatively, set `OATS_E2E_BIN_DIR` to a directory containing
+prebuilt `oats` and `gcx` binaries.
