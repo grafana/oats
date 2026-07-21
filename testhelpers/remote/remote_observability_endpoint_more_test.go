@@ -145,10 +145,13 @@ func TestEndpointLifecycleAndComposeLogs(t *testing.T) {
 func TestMakeGetRequestRejectsHTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
+		_, _ = fmt.Fprint(w, `{"error":"tempo unavailable"}`)
 	}))
 	defer server.Close()
 
-	if _, err := (&Endpoint{}).makeGetRequest(server.URL); err == nil || !strings.Contains(err.Error(), "502") {
+	if _, err := (&Endpoint{}).makeGetRequest(server.URL); err == nil ||
+		!strings.Contains(err.Error(), "502 Bad Gateway") ||
+		!strings.Contains(err.Error(), "tempo unavailable") {
 		t.Fatalf("makeGetRequest error = %v", err)
 	}
 }

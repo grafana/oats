@@ -89,7 +89,19 @@ func (e *Endpoint) makeGetRequest(url string) ([]byte, error) {
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("expected HTTP status 200, but got: %d", resp.StatusCode)
+		const maxErrorBody = 256
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody+1))
+		if err != nil {
+			return nil, fmt.Errorf("can't read HTTP error response: %w", err)
+		}
+		detail := strings.TrimSpace(string(body))
+		if len(detail) > maxErrorBody {
+			detail = detail[:maxErrorBody] + "..."
+		}
+		if detail == "" {
+			return nil, fmt.Errorf("expected HTTP status 200, but got: %s", resp.Status)
+		}
+		return nil, fmt.Errorf("expected HTTP status 200, but got: %s: %s", resp.Status, detail)
 	}
 
 	respBytes, err := io.ReadAll(resp.Body)
