@@ -124,7 +124,9 @@ func (c *Compose) Stop() error {
 }
 
 func (c *Compose) Remove() error {
-	return c.runDocker(newCommand("rm", "-f"))
+	// `down` is supported by both Docker Compose and podman-compose. The
+	// latter does not implement Compose's `rm` command.
+	return c.runDocker(newCommand("down"))
 }
 
 func (c *Compose) runDocker(cc command) error {
