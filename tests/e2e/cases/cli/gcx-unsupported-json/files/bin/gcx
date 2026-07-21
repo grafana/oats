@@ -5,8 +5,9 @@ if [ "${1:-}" = "--version" ]; then
   exit 0
 fi
 
-# This is the pre-0.4.4 array shape. The parser should reject it with a useful
-# unsupported-format error instead of treating the query as empty.
+# This deliberately changes the values container shape. The parser should
+# reject it with a useful unsupported-format error instead of treating the
+# query as empty.
 cat <<'EOF'
 {
   "status": "success",
@@ -15,7 +16,9 @@ cat <<'EOF'
     "result": [
       {
         "stream": {},
-        "values": [["1700000000", "seed-log-line"]]
+        "values": {
+          "items": [{"line": "seed-log-line"}]
+        }
       }
     ]
   }

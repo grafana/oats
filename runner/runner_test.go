@@ -208,7 +208,7 @@ expected:
 }
 
 func TestRunCase_LogsUnsupportedFormatSuggestsVersion(t *testing.T) {
-	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"streams","result":[{"stream":{},"values":[["1700000000","seed-log-line"]]}]}}`}
+	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"streams","result":[{"stream":{},"values":{"items":[{"line":"seed-log-line"}]}}]}}`}
 	r, buf := newRunner(t, exec, Options{
 		GCXVersion:      "0.4.5",
 		Timeout:         30 * time.Millisecond,

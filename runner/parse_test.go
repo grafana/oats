@@ -34,7 +34,7 @@ func TestExtractLogRowsRejectsMissingResult(t *testing.T) {
 }
 
 func TestExtractLogRowsRejectsChangedValueShape(t *testing.T) {
-	stdout := `{"status":"success","data":{"resultType":"streams","result":[{"stream":{},"values":[["1700000000","first"]]}]}}`
+	stdout := `{"status":"success","data":{"resultType":"streams","result":[{"stream":{},"values":{"items":[{"line":"first"}]}}]}}`
 	_, _, err := extractLogRows(stdout)
 	if err == nil || !strings.Contains(err.Error(), "unsupported format") {
 		t.Fatalf("extractLogRows error = %v, want unsupported-format guidance", err)

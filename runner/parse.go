@@ -130,7 +130,7 @@ func decodeGCXData(stdout, signal string, target any) error {
 		Data   json.RawMessage `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &envelope); err != nil {
-		return parseErrorf("%s response is not valid JSON: %w", signal, err)
+		return parseErrorf("%s JSON parse: %w", signal, err)
 	}
 	if envelope.Status != "" && envelope.Status != "success" {
 		detail := strings.TrimSpace(string(envelope.Error))
@@ -158,8 +158,14 @@ func missingJSON(raw json.RawMessage) bool {
 }
 
 func extractLogRows(stdout string) ([]assert.Row, int, error) {
+	if strings.TrimSpace(stdout) == "" {
+		return nil, 0, nil
+	}
+
 	// gcx 0.4.4 represents each log value as an object so structured metadata
-	// and parsed labels can stay attached to the individual line.
+	// and parsed labels can stay attached to the individual line. Keep accepting
+	// the earlier timestamp/line array shape as well for explicit older gcx
+	// binaries supplied through --gcx.
 	var generic struct {
 		Result json.RawMessage `json:"result"`
 	}
@@ -183,29 +189,55 @@ func extractLogRows(stdout string) ([]assert.Row, int, error) {
 			return rows, len(rows), parseErrorf("log response has unsupported format: data.result[%d].values is missing", streamIndex)
 		}
 
-		var values []struct {
-			Line               *string        `json:"line"`
-			StructuredMetadata map[string]any `json:"structuredMetadata"`
-			Parsed             map[string]any `json:"parsed"`
-		}
-		if err := json.Unmarshal(stream.Values, &values); err != nil {
+		var rawValues []json.RawMessage
+		if err := json.Unmarshal(stream.Values, &rawValues); err != nil {
 			return rows, len(rows), parseErrorf("log response has unsupported format: data.result[%d].values: %w", streamIndex, err)
 		}
-		for valueIndex, entry := range values {
-			if entry.Line == nil {
-				return rows, len(rows), parseErrorf("log response has unsupported format: data.result[%d].values[%d].line is missing", streamIndex, valueIndex)
+		for valueIndex, rawValue := range rawValues {
+			line, structuredMetadata, parsed, err := parseLogValue(rawValue)
+			if err != nil {
+				return rows, len(rows), parseErrorf("log response has unsupported format: data.result[%d].values[%d]: %w", streamIndex, valueIndex, err)
 			}
 			attrs := stringifyMap(stream.Stream)
-			for k, v := range stringifyMapAny(entry.StructuredMetadata) {
+			for k, v := range stringifyMapAny(structuredMetadata) {
 				attrs[k] = v
 			}
-			for k, v := range stringifyMapAny(entry.Parsed) {
+			for k, v := range stringifyMapAny(parsed) {
 				attrs[k] = v
 			}
-			rows = append(rows, assert.Row{Name: *entry.Line, Attributes: attrs})
+			rows = append(rows, assert.Row{Name: line, Attributes: attrs})
 		}
 	}
 	return rows, len(rows), nil
+}
+
+func parseLogValue(raw json.RawMessage) (string, map[string]any, map[string]any, error) {
+	if strings.HasPrefix(strings.TrimSpace(string(raw)), "[") {
+		var pair []json.RawMessage
+		if err := json.Unmarshal(raw, &pair); err != nil {
+			return "", nil, nil, err
+		}
+		var line string
+		if len(pair) > 1 {
+			if err := json.Unmarshal(pair[1], &line); err != nil {
+				return "", nil, nil, fmt.Errorf("array value has non-string line: %w", err)
+			}
+		}
+		return line, nil, nil, nil
+	}
+
+	var entry struct {
+		Line               *string        `json:"line"`
+		StructuredMetadata map[string]any `json:"structuredMetadata"`
+		Parsed             map[string]any `json:"parsed"`
+	}
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		return "", nil, nil, err
+	}
+	if entry.Line == nil {
+		return "", nil, nil, fmt.Errorf("object value is missing line")
+	}
+	return *entry.Line, entry.StructuredMetadata, entry.Parsed, nil
 }
 
 func extractTraceRows(stdout string) ([]assert.Row, int, error) {
