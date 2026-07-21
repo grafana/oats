@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -114,6 +115,18 @@ func TestCloseFixture_RemoteDoesNotEmitTeardownEvent(t *testing.T) {
 	}
 	if len(rep.events) != 0 {
 		t.Fatalf("expected no teardown events for remote fixture, got %+v", rep.events)
+	}
+}
+
+func TestCloseFixtureReturnsShutdownError(t *testing.T) {
+	rep := &recordingReporter{}
+	fix := &fakeSuiteFixture{closeErr: fmt.Errorf("shutdown failed")}
+	plan := discovery.Plan{Name: "smoke", Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}}}
+	if err := closeFixture(rep, plan, fix); err == nil || err.Error() != "shutdown failed" {
+		t.Fatalf("closeFixture error = %v", err)
+	}
+	if len(rep.events) != 0 {
+		t.Fatalf("shutdown failure should not emit teardown event: %+v", rep.events)
 	}
 }
 

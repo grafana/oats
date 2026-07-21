@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.yaml.in/yaml/v3"
 )
 
 func TestParse_AppSeed(t *testing.T) {
@@ -380,5 +382,114 @@ expected:
 `))
 	if err == nil || !strings.Contains(err.Error(), "invalid regexp") {
 		t.Fatalf("expected regexp error, got %v", err)
+	}
+}
+
+func TestCaseYAMLHelperBranches(t *testing.T) {
+	var scalar StringList
+	if err := scalar.UnmarshalYAML(&yaml.Node{Kind: yaml.ScalarNode, Value: "hello"}); err != nil || len(scalar) != 1 || scalar[0] != "hello" {
+		t.Fatalf("scalar StringList = %#v, %v", scalar, err)
+	}
+	var sequence StringList
+	if err := yaml.Unmarshal([]byte("- one\n- two\n"), &sequence); err != nil || len(sequence) != 2 {
+		t.Fatalf("sequence StringList = %#v, %v", sequence, err)
+	}
+	if err := scalar.UnmarshalYAML(&yaml.Node{Kind: yaml.MappingNode}); err == nil {
+		t.Fatal("mapping StringList should fail")
+	}
+	for _, values := range []StringList{nil, {"one"}, {"one", "two"}} {
+		if _, err := values.MarshalYAML(); err != nil {
+			t.Fatalf("StringList MarshalYAML(%#v): %v", values, err)
+		}
+	}
+
+	var attrs AttributeMatchers
+	if err := yaml.Unmarshal([]byte("service: api\ntrace_id:\n  present: true\n"), &attrs); err != nil || len(attrs) != 2 || attrs[1].Value != nil {
+		t.Fatalf("legacy attrs = %#v, %v", attrs, err)
+	}
+	if err := yaml.Unmarshal([]byte("trace_id:\n  present: false\n"), &attrs); err == nil {
+		t.Fatal("present:false should fail")
+	}
+	if err := yaml.Unmarshal([]byte("- key: service\n  value: api\n"), &attrs); err != nil || len(attrs) != 1 {
+		t.Fatalf("sequence attrs = %#v, %v", attrs, err)
+	}
+	if _, err := (AttributeMatchers{}).MarshalYAML(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (AttributeMatchers{{Key: "service"}}).MarshalYAML(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateErrorBranches(t *testing.T) {
+	valid := func() *Case {
+		return &Case{Name: "valid", Seed: Seed{Type: "app"}, Expected: Expected{Traces: []TraceAssertion{{TraceQL: "{}"}}}}
+	}
+	for _, tc := range []struct {
+		name string
+		make func() *Case
+		want string
+	}{
+		{name: "negative interval", make: func() *Case { c := valid(); c.Interval = -time.Second; return c }, want: "interval"},
+		{name: "invalid inline duration", make: func() *Case {
+			c := valid()
+			c.Seed = Seed{Type: "inline-otlp", Traces: []SeedTrace{{Spans: []SeedSpan{{Duration: "nope"}}}}}
+			return c
+		}, want: "invalid duration"},
+		{name: "empty trace query", make: func() *Case { c := valid(); c.Expected.Traces[0].TraceQL = ""; return c }, want: "traceql"},
+		{name: "empty logs query", make: func() *Case { c := valid(); c.Expected.Traces = nil; c.Expected.Logs = []LogAssertion{{}}; return c }, want: "logql"},
+		{name: "empty metrics query", make: func() *Case {
+			c := valid()
+			c.Expected.Traces = nil
+			c.Expected.Metrics = []MetricAssertion{{}}
+			return c
+		}, want: "promql"},
+		{name: "empty profiles query", make: func() *Case {
+			c := valid()
+			c.Expected.Traces = nil
+			c.Expected.Profiles = []ProfileAssertion{{}}
+			return c
+		}, want: "query"},
+		{name: "invalid assertion regex", make: func() *Case { c := valid(); c.Expected.Traces[0].Regex = StringList{"["}; return c }, want: "invalid regexp"},
+		{name: "empty match", make: func() *Case { c := valid(); c.Expected.Traces[0].MatchSpans = []MatchEntry{{}}; return c }, want: "at least one"},
+		{name: "regexp name", make: func() *Case {
+			c := valid()
+			c.Expected.Traces[0].MatchSpans = []MatchEntry{{MatchType: MatchTypeRegexp, Name: stringPtr("[")}}
+			return c
+		}, want: "invalid regexp"},
+		{name: "empty custom check", make: func() *Case {
+			c := valid()
+			c.Expected.Traces = nil
+			c.Expected.Custom = []CustomCheck{{Script: "  "}}
+			return c
+		}, want: "custom-checks"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.make().Validate(); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Validate error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+
+	for _, tc := range []struct {
+		name string
+		f    FixtureConfig
+		want string
+	}{
+		{name: "none", f: FixtureConfig{}, want: "exactly one"},
+		{name: "multiple", f: FixtureConfig{Compose: &ComposeFixture{}, Remote: &RemoteFixture{Endpoint: "x"}}, want: "exactly one"},
+		{name: "compose both", f: FixtureConfig{Compose: &ComposeFixture{File: "a", Files: []string{"b"}}}, want: "file or files"},
+		{name: "k3d incomplete", f: FixtureConfig{K3D: &K3DFixture{}}, want: "k3d requires"},
+		{name: "remote missing endpoint", f: FixtureConfig{Remote: &RemoteFixture{}}, want: "remote requires"},
+	} {
+		t.Run("fixture "+tc.name, func(t *testing.T) {
+			if err := tc.f.Validate("fixture"); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("FixtureConfig.Validate = %v, want %q", err, tc.want)
+			}
+		})
+	}
+
+	if err := (FixtureConfig{Compose: &ComposeFixture{Template: "none"}}).Validate("fixture"); err == nil {
+		t.Fatal("template=none without files should fail")
 	}
 }

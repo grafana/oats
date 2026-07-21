@@ -1,8 +1,12 @@
 package kubernetes
 
 import (
+	"context"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -168,5 +172,42 @@ func TestStart_SkipsGrafanaAndOTLPPortsWhenUnset(t *testing.T) {
 		if strings.Contains(call, ":3000") || strings.Contains(call, ":4318") {
 			t.Fatalf("expected no Grafana/OTLP port-forward when ports are unset, got %#v", calls)
 		}
+	}
+}
+
+func TestNewEndpoint_StartAndStopWithFakeCLIs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses POSIX executables")
+	}
+
+	bin := t.TempDir()
+	for _, name := range []string{"docker", "k3d", "kubectl"} {
+		path := filepath.Join(bin, name)
+		if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	ep := NewEndpoint("localhost", &Kubernetes{
+		Dir:              t.TempDir(),
+		AppService:       "app",
+		AppDockerFile:    "Dockerfile",
+		AppDockerTag:     "app:test",
+		AppDockerPort:    8080,
+		AppDockerContext: ".",
+	}, remote.PortsConfig{
+		GrafanaHTTPPort:    3000,
+		OTLPHTTPPort:       4318,
+		LokiHTTPPort:       3100,
+		PrometheusHTTPPort: 9090,
+		TempoHTTPPort:      3200,
+		PyroscopeHTTPPort:  4040,
+	}, "endpoint-test", t.TempDir())
+	if err := ep.Start(context.Background()); err != nil {
+		t.Fatalf("Endpoint.Start: %v", err)
+	}
+	if err := ep.Stop(context.Background()); err != nil {
+		t.Fatalf("Endpoint.Stop: %v", err)
 	}
 }
