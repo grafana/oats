@@ -94,9 +94,13 @@ func (e *Endpoint) makeGetRequest(url string) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("can't read HTTP error response: %w", err)
 		}
-		detail := strings.TrimSpace(string(body))
-		if len(detail) > maxErrorBody {
-			detail = detail[:maxErrorBody] + "..."
+		if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+			return nil, fmt.Errorf("can't drain HTTP error response: %w", err)
+		}
+		truncated := len(body) > maxErrorBody
+		detail := strings.TrimSpace(string(body[:min(len(body), maxErrorBody)]))
+		if truncated {
+			detail += "..."
 		}
 		if detail == "" {
 			return nil, fmt.Errorf("expected HTTP status 200, but got: %s", resp.Status)

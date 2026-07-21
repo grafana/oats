@@ -238,6 +238,19 @@ func TestMakeGetRequestRejectsHTTPError(t *testing.T) {
 	}
 }
 
+func TestMakeGetRequestTruncatesHTTPErrorDetail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = fmt.Fprint(w, strings.Repeat(" ", 32)+strings.Repeat("x", 256))
+	}))
+	defer server.Close()
+
+	_, err := (&Endpoint{}).makeGetRequest(server.URL)
+	if err == nil || !strings.HasSuffix(err.Error(), "xxx...") {
+		t.Fatalf("makeGetRequest error = %v, want truncated detail", err)
+	}
+}
+
 func TestTracerProviderRequiresConfiguredPort(t *testing.T) {
 	endpoint := &Endpoint{}
 	if _, err := endpoint.TracerProvider(context.Background(), resource.Empty()); err == nil || !strings.Contains(err.Error(), "unknown exporter format") {
