@@ -145,7 +145,12 @@ func searchComposeLogs(ctx context.Context, extraEnv []string, needle string) (b
 		}
 		engine = parsed
 	}
-	cmd := exec.CommandContext(ctx, engine.Binary(), engine.ComposeArgs("logs", "--no-color")...)
+	args := []string{"logs"}
+	if engine != container.Podman {
+		// podman-compose 1.0.6 does not implement Compose's --no-color flag.
+		args = append(args, "--no-color")
+	}
+	cmd := exec.CommandContext(ctx, engine.Binary(), engine.ComposeArgs(args...)...)
 	cmd.Env = append(cmd.Environ(), extraEnv...)
 	var out bytes.Buffer
 	cmd.Stdout = &out

@@ -438,7 +438,7 @@ expected:
 func TestSearchComposeLogs_UsesPodman(t *testing.T) {
 	dir := t.TempDir()
 	podman := filepath.Join(dir, "podman")
-	if err := os.WriteFile(podman, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\"; echo 'podman service started'\n"), 0o755); err != nil {
+	if err := os.WriteFile(podman, []byte("#!/bin/sh\ncase \"$*\" in\n  'compose logs') echo 'podman service started' ;;\n  *) echo \"unexpected args: $*\" >&2; exit 1 ;;\nesac\n"), 0o755); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
