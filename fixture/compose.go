@@ -345,7 +345,8 @@ func composePort(engine container.Engine, files []string, env []string, service,
 
 func podmanPort(env []string, service, containerPort string) (string, error) {
 	project := ""
-	for _, entry := range env {
+	for i := len(env) - 1; i >= 0; i-- {
+		entry := env[i]
 		key, value, ok := strings.Cut(entry, "=")
 		if ok && key == "COMPOSE_PROJECT_NAME" {
 			project = value
