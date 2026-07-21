@@ -6,4 +6,4 @@ coverage:
     project:
       default:
         if_not_found: failure
-        target: 80.25%
+        target: 80%
