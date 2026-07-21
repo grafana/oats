@@ -2,6 +2,7 @@ package fixture
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -303,6 +304,76 @@ func TestSupportsParallelFixtureKinds(t *testing.T) {
 				t.Fatalf("SupportsParallel = %v, %q", safe, reason)
 			}
 		})
+	}
+}
+
+func TestFixtureCleanupAndErrorBranches(t *testing.T) {
+	if _, _, err := StartWithOptions(context.Background(), discovery.Plan{Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}}}, Options{}); err != nil {
+		t.Fatalf("default runtime for remote fixture: %v", err)
+	}
+
+	dir := t.TempDir()
+	fixed := filepath.Join(dir, "fixed.yml")
+	writeFile(t, dir, "fixed.yml", "services:\n  app:\n    ports:\n      - '8080:8080'\n")
+	safe, reason := SupportsParallel(discovery.Plan{
+		FixtureSourceDir: dir,
+		Fixture:          casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm", File: filepath.Base(fixed)}},
+	})
+	if safe || !strings.Contains(reason, "publishes fixed host ports") {
+		t.Fatalf("fixed port SupportsParallel = %v, %q", safe, reason)
+	}
+	safe, reason = SupportsParallel(discovery.Plan{
+		FixtureSourceDir: dir,
+		Fixture:          casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm", File: "missing.yml"}},
+	})
+	if safe || !strings.Contains(reason, "port inspection failed") {
+		t.Fatalf("missing compose SupportsParallel = %v, %q", safe, reason)
+	}
+
+	if err := waitForHTTP("http://127.0.0.1:1", 0); err == nil {
+		t.Fatal("waitForHTTP with zero timeout should fail")
+	}
+	nonempty := filepath.Join(dir, "nonempty")
+	if err := os.Mkdir(nonempty, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nonempty, "file"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := removeIfExists(nonempty); err == nil {
+		t.Fatal("removeIfExists should report a non-empty directory error")
+	}
+
+	firstErr := errors.New("first cleanup error")
+	secondCalled := false
+	cleanup := chainCleanup(func() error { return firstErr }, func() error { secondCalled = true; return errors.New("second") })
+	if err := cleanup(); err != firstErr || !secondCalled {
+		t.Fatalf("chainCleanup first error = %v, secondCalled=%v", err, secondCalled)
+	}
+
+	endpoint := remote.NewEndpoint("localhost", remote.PortsConfig{}, nil, func(context.Context) error { return nil }, nil)
+	if err := (endpointFixture{ep: endpoint, cleanup: func() error { return errors.New("endpoint cleanup") }}).Close(); err == nil || err.Error() != "endpoint cleanup" {
+		t.Fatalf("endpoint cleanup error = %v", err)
+	}
+	if err := (endpointFixture{ep: remote.NewEndpoint("localhost", remote.PortsConfig{}, nil, func(context.Context) error { return errors.New("stop") }, nil), cleanup: func() error { return errors.New("cleanup") }}).Close(); err == nil || err.Error() != "stop" {
+		t.Fatalf("endpoint stop error = %v", err)
+	}
+	if err := (composeFixture{stack: &fakeHandle{}, cleanup: func() error { return errors.New("compose cleanup") }}).Close(); err == nil || err.Error() != "compose cleanup" {
+		t.Fatalf("compose cleanup error = %v", err)
+	}
+	if err := (composeFixture{stack: &fakeHandle{closeErr: errors.New("close")}, cleanup: func() error { return errors.New("cleanup") }}).Close(); err == nil || err.Error() != "close" {
+		t.Fatalf("compose close error = %v", err)
+	}
+}
+
+func TestWriteLocalGCXConfigTempDirectoryError(t *testing.T) {
+	badTemp := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(badTemp, []byte("file"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", badTemp)
+	if _, err := writeLocalGCXConfig("http://grafana"); err == nil {
+		t.Fatal("writeLocalGCXConfig should fail when TMPDIR is a file")
 	}
 }
 

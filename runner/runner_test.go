@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/oats/assert"
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/report"
@@ -940,3 +942,56 @@ expected:
 		t.Fatalf("seedCase error = %v", err)
 	}
 }
+
+func TestEvaluateCommonTextBranches(t *testing.T) {
+	fails := evalCommonText("hello\nworld", casefile.AssertionCommon{
+		Contains:    casefile.StringList{"hello"},
+		NotContains: casefile.StringList{"missing"},
+		Regex:       casefile.StringList{"world"},
+		Count:       "== 2",
+		Absent:      false,
+	})
+	if len(fails) != 0 {
+		t.Fatalf("successful text assertions returned failures: %v", fails)
+	}
+	if fails := evalCommonText("hello", casefile.AssertionCommon{Absent: true}); len(fails) == 0 {
+		t.Fatal("expected absent assertion to fail for non-empty output")
+	}
+}
+
+func TestEvaluateStructuredAssertionBranches(t *testing.T) {
+	trace := casefile.TraceAssertion{
+		AssertionCommon: casefile.AssertionCommon{
+			Contains: casefile.StringList{"trace"},
+			Count:    "== 1",
+		},
+		MatchSpans: []casefile.MatchEntry{{Name: runnerStringPtr("operation")}},
+	}
+	rows := []assert.Row{{Name: "operation"}}
+	if fails := evalTraceStructured("trace", trace, rows, 1, nil); len(fails) != 0 {
+		t.Fatalf("structured trace assertions returned failures: %v", fails)
+	}
+	if fails := evalTraceStructured("trace", trace, nil, 0, fmt.Errorf("bad trace JSON")); len(fails) != 1 || fails[0].Rule != "match_spans" {
+		t.Fatalf("trace parse failures = %v", fails)
+	}
+	trace = casefile.TraceAssertion{AssertionCommon: casefile.AssertionCommon{Absent: true}}
+	if fails := evalTraceStructured("", trace, nil, 0, nil); len(fails) != 0 {
+		t.Fatalf("absent structured trace returned failures: %v", fails)
+	}
+
+	common := casefile.AssertionCommon{Match: []casefile.MatchEntry{{Name: runnerStringPtr("row")}}, Count: "== 1"}
+	if fails := evalCommonStructured("row", common, []assert.Row{{Name: "row"}}, 1, nil); len(fails) != 0 {
+		t.Fatalf("structured assertions returned failures: %v", fails)
+	}
+	if fails := evalCommonStructured("row", common, nil, 0, fmt.Errorf("bad JSON")); len(fails) != 1 || fails[0].Rule != "match" {
+		t.Fatalf("structured parse failures = %v", fails)
+	}
+	common.Absent = true
+	common.Match = nil
+	common.Count = ""
+	if fails := evalCommonStructured("", common, nil, 0, nil); len(fails) != 0 {
+		t.Fatalf("absent structured assertion returned failures: %v", fails)
+	}
+}
+
+func runnerStringPtr(value string) *string { return &value }
