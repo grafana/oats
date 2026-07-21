@@ -6,7 +6,7 @@ bin_dir="${1:-$root/bin}"
 mkdir -p "$bin_dir"
 gcx_version="$(bash "$root/scripts/gcx-version.sh")"
 
-MISE_PROJECT_ROOT="$root" bash "$root/.mise/tasks/build" "$bin_dir/oats"
+mise -C "$root" run build -- "$bin_dir/oats"
 
 # CI and mise-based development already have the pinned gcx binary installed.
 # Reuse it instead of downloading and rebuilding a second copy. Direct

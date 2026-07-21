@@ -27,12 +27,11 @@ func TestBuildScripts(t *testing.T) {
 	}
 
 	output := filepath.Join(t.TempDir(), "oats")
-	buildCmd := exec.Command("bash", filepath.Join(filepath.Dir(root), ".mise", "tasks", "build"), output)
 	projectRoot := filepath.Dir(root)
+	buildCmd := exec.Command("mise", "-C", projectRoot, "run", "build", "--", output)
 	buildCmd.Dir = projectRoot
-	buildCmd.Env = append(os.Environ(), "MISE_PROJECT_ROOT="+projectRoot)
 	if output, err := buildCmd.CombinedOutput(); err != nil {
-		t.Fatalf(".mise/tasks/build: %v\n%s", err, output)
+		t.Fatalf("mise run build: %v\n%s", err, output)
 	}
 	info, err := os.Stat(output)
 	if err != nil {
