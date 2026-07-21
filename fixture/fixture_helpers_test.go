@@ -217,6 +217,72 @@ esac
 	if got, err := composePort(container.Podman, files, []string{"COMPOSE_PROJECT_NAME=oats-test"}, "lgtm", "3000"); err == nil || got != "" || !strings.Contains(err.Error(), "podman port lookup") || !strings.Contains(err.Error(), "compose port lookup") {
 		t.Fatalf("composePort combined error = %q, %v", got, err)
 	}
+	if err := composePortError(nil, errors.New("compose failed")); err == nil || err.Error() != "compose failed" {
+		t.Fatalf("composePortError without Podman error = %v", err)
+	}
+
+	writePodman := func(script string) {
+		t.Helper()
+		if err := os.WriteFile(podman, []byte(script), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	testPodmanPortError := func(name, script, want string) {
+		t.Helper()
+		t.Run(name, func(t *testing.T) {
+			writePodman(script)
+			if got, err := podmanPort([]string{"COMPOSE_PROJECT_NAME=oats-test"}, "lgtm", "3000"); err == nil || got != "" || !strings.Contains(err.Error(), want) {
+				t.Errorf("podmanPort = %q, %v; want error containing %q", got, err, want)
+			}
+		})
+	}
+	testPodmanPortError("ps failure", `#!/bin/sh
+case "$*" in
+ps\ *) exit 1 ;;
+esac
+`, "exit status 1")
+	testPodmanPortError("empty container", `#!/bin/sh
+case "$*" in
+ps\ *) printf '\n' ;;
+esac
+`, "no Podman container found")
+	testPodmanPortError("port failure", `#!/bin/sh
+case "$*" in
+ps\ *) printf 'container-id\n' ;;
+*port*) exit 1 ;;
+esac
+`, "exit status 1")
+	testPodmanPortError("invalid port", `#!/bin/sh
+case "$*" in
+ps\ *) printf 'container-id\n' ;;
+*port*) printf 'invalid-port\n' ;;
+esac
+`, "invalid address")
+	testPodmanPortError("empty published port", `#!/bin/sh
+case "$*" in
+ps\ *) printf 'container-id\n' ;;
+*port*) printf '127.0.0.1:\n' ;;
+esac
+`, "invalid Podman port output")
+
+	writePodman(`#!/bin/sh
+case "$*" in
+ps\ *) exit 1 ;;
+compose*) printf 'invalid-compose-output\n' ;;
+esac
+`)
+	if got, err := composePort(container.Podman, files, []string{"COMPOSE_PROJECT_NAME=oats-test"}, "lgtm", "3000"); err == nil || got != "" || !strings.Contains(err.Error(), "invalid address") {
+		t.Fatalf("composePort invalid fallback = %q, %v", got, err)
+	}
+	writePodman(`#!/bin/sh
+case "$*" in
+ps\ *) exit 1 ;;
+compose*) printf ':55432\n' ;;
+esac
+`)
+	if got, err := composePort(container.Podman, files, []string{"COMPOSE_PROJECT_NAME=oats-test"}, "lgtm", "3000"); err == nil || got != "" || !strings.Contains(err.Error(), "invalid compose port output") {
+		t.Fatalf("composePort empty fallback = %q, %v", got, err)
+	}
 	plan := discovery.Plan{
 		FixtureSourceDir: dir,
 		Fixture:          casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "none", File: "compose.yml"}},
