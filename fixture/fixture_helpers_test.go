@@ -177,6 +177,15 @@ esac
 `), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	podman := filepath.Join(bin, "podman")
+	if err := os.WriteFile(podman, []byte(`#!/bin/sh
+case "$*" in
+ps\ *) printf 'container-id\n' ;;
+*port*) printf '3000/tcp -> 127.0.0.1:55432\n' ;;
+esac
+`), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	kubectl := filepath.Join(bin, "kubectl")
 	if err := os.WriteFile(kubectl, []byte("#!/bin/sh\nprintf 'k3d-token\\n'\n"), 0o700); err != nil {
 		t.Fatal(err)
@@ -186,6 +195,9 @@ esac
 	files := []string{"compose.yml"}
 	if got, err := composePort(container.Docker, files, nil, "lgtm", "3000"); err != nil || got != "5432" {
 		t.Fatalf("composePort = %q, %v", got, err)
+	}
+	if got, err := composePort(container.Podman, files, []string{"COMPOSE_PROJECT_NAME=oats-test"}, "lgtm", "3000"); err != nil || got != "55432" {
+		t.Fatalf("Podman composePort = %q, %v", got, err)
 	}
 	plan := discovery.Plan{
 		FixtureSourceDir: dir,
