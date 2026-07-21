@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #MISE description="Run tests with coverage"
+#USAGE arg "[profile]" env="COVERAGE_PROFILE" default="coverage.out" help="Coverage profile path"
 
 set -euo pipefail
 
-readonly profile="${COVERAGE_PROFILE:-coverage.out}"
+readonly profile="$usage_profile"
 
 if ! package_list="$(
 		GOFLAGS=-buildvcs=false go list ./... |
