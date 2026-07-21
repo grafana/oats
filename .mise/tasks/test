@@ -4,7 +4,6 @@
 
 set -euo pipefail
 
-: "${MISE_PROJECT_ROOT:?MISE_PROJECT_ROOT must be set by mise}"
 readonly profile="$usage_profile"
 
 if ! package_list="$(
