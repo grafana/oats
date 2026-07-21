@@ -4,31 +4,18 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 bin_dir="${1:-$root/bin}"
 mkdir -p "$bin_dir"
-gcx_version="$(bash "$root/scripts/gcx-version.sh")"
 
-if command -v mise >/dev/null 2>&1; then
-	mise -C "$root" run build -- "$bin_dir/oats"
-else
-	GOWORK=off go -C "$root" build \
-		-buildvcs=false \
-		-ldflags "-X github.com/grafana/oats/internal/cli.MinimumGCXVersion=$gcx_version" \
-		-o "$bin_dir/oats" .
-fi
+mise -C "$root" run build -- "$bin_dir/oats"
 
 # CI and mise-based development already have the pinned gcx binary installed.
-# Reuse it instead of downloading and rebuilding a second copy. Direct
-# `go test ./tests/e2e` remains self-contained by falling back to the version
-# pinned in mise.toml when mise is unavailable.
+# Reuse it instead of downloading and rebuilding a second copy.
 gcx_bin=""
-if command -v mise >/dev/null 2>&1; then
-	gcx_bin=$(mise -C "$root" which gcx 2>/dev/null || true)
-fi
+gcx_bin=$(mise -C "$root" which gcx 2>/dev/null || true)
 if [[ -n "$gcx_bin" && -x "$gcx_bin" ]]; then
 	install -m 0755 "$gcx_bin" "$bin_dir/gcx"
 else
-	# Keep this pin in mise.toml so Renovate updates the tool version rather than
-	# this script.
-	GOBIN="$bin_dir" GOWORK=off go install "github.com/grafana/gcx/cmd/gcx@v${gcx_version}"
+	echo "mise-managed gcx is required; run mise install" >&2
+	exit 1
 fi
 
 printf 'built %s/oats and %s/gcx\n' "$bin_dir" "$bin_dir"
