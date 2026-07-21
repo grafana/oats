@@ -316,8 +316,11 @@ func composePort(engine container.Engine, files []string, env []string, service,
 	// (127.0.0.1::3000) in its `port` command. Query Podman directly first so
 	// the fixture lifecycle does not depend on which Compose provider Podman
 	// selected.
+	var podmanErr error
 	if engine == container.Podman {
-		if port, err := podmanPort(env, service, containerPort); err == nil {
+		var port string
+		port, podmanErr = podmanPort(env, service, containerPort)
+		if podmanErr == nil {
 			return port, nil
 		}
 	}
@@ -331,16 +334,23 @@ func composePort(engine container.Engine, files []string, env []string, service,
 	cmd.Env = append(cmd.Environ(), env...)
 	out, err := cmd.Output()
 	if err != nil {
-		return "", err
+		return "", composePortError(podmanErr, err)
 	}
 	host, port, err := splitComposeHostPort(strings.TrimSpace(string(out)))
 	if err != nil {
-		return "", err
+		return "", composePortError(podmanErr, err)
 	}
 	if host == "" || port == "" {
-		return "", fmt.Errorf("invalid compose port output %q", strings.TrimSpace(string(out)))
+		return "", composePortError(podmanErr, fmt.Errorf("invalid compose port output %q", strings.TrimSpace(string(out))))
 	}
 	return port, nil
+}
+
+func composePortError(podmanErr, composeErr error) error {
+	if podmanErr == nil {
+		return composeErr
+	}
+	return fmt.Errorf("podman port lookup: %v; compose port lookup: %w", podmanErr, composeErr)
 }
 
 func podmanPort(env []string, service, containerPort string) (string, error) {
@@ -357,7 +367,7 @@ func podmanPort(env []string, service, containerPort string) (string, error) {
 		return "", fmt.Errorf("COMPOSE_PROJECT_NAME is required for Podman port lookup")
 	}
 
-	ps := exec.Command("podman", "ps", "-a",
+	ps := exec.Command("podman", "ps",
 		"--filter", "label=com.docker.compose.project="+project,
 		"--filter", "label=com.docker.compose.service="+service,
 		"--format", "{{.ID}}")

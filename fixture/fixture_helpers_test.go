@@ -180,6 +180,7 @@ esac
 	podman := filepath.Join(bin, "podman")
 	if err := os.WriteFile(podman, []byte(`#!/bin/sh
 case "$*" in
+ps\ -a*) printf 'stopped-container-lookup\n' >&2; exit 1 ;;
 ps\ *) printf 'container-id\n' ;;
 *port*) printf '3000/tcp -> 127.0.0.1:55432\n' ;;
 esac
@@ -198,6 +199,23 @@ esac
 	}
 	if got, err := composePort(container.Podman, files, []string{"COMPOSE_PROJECT_NAME=oats-test"}, "lgtm", "3000"); err != nil || got != "55432" {
 		t.Fatalf("Podman composePort = %q, %v", got, err)
+	}
+
+	if got, err := podmanPort(nil, "lgtm", "3000"); err == nil || got != "" || !strings.Contains(err.Error(), "COMPOSE_PROJECT_NAME is required") {
+		t.Fatalf("podmanPort without project = %q, %v", got, err)
+	}
+
+	if err := os.WriteFile(podman, []byte(`#!/bin/sh
+case "$*" in
+ps\ *) printf 'container-id\n' ;;
+compose*) exit 1 ;;
+*port*) printf 'invalid-port\n' ;;
+esac
+`), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := composePort(container.Podman, files, []string{"COMPOSE_PROJECT_NAME=oats-test"}, "lgtm", "3000"); err == nil || got != "" || !strings.Contains(err.Error(), "podman port lookup") || !strings.Contains(err.Error(), "compose port lookup") {
+		t.Fatalf("composePort combined error = %q, %v", got, err)
 	}
 	plan := discovery.Plan{
 		FixtureSourceDir: dir,
