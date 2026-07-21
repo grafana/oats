@@ -203,6 +203,42 @@ expected:
 	}
 }
 
+func TestRunCase_LogsUnsupportedFormatSuggestsVersion(t *testing.T) {
+	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"streams","result":[{"stream":{},"values":[["1700000000","seed-log-line"]]}]}}`}
+	r, buf := newRunner(t, exec, Options{
+		GCXVersion:      "0.4.5",
+		Timeout:         30 * time.Millisecond,
+		Interval:        5 * time.Millisecond,
+		SeedSettleDelay: 1,
+	})
+
+	c := mustParse(t, `
+name: logs unsupported format
+seed:
+  type: app
+  compose: x.yml
+expected:
+  logs:
+    - logql: '{service_name="svc"}'
+      match:
+        - name: seed-log-line
+`)
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+
+	if ok {
+		t.Fatal("expected unsupported log format to fail")
+	}
+	if !strings.Contains(buf.String(), "selected GCX reports \"0.4.5\" and may be using a newer unsupported response format") {
+		t.Fatalf("version guidance missing from failure output:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "--gcx-version") {
+		t.Fatalf("version selection guidance missing from failure output:\n%s", buf.String())
+	}
+}
+
 func TestRunCase_MetricsStructuredMatchPass(t *testing.T) {
 	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"up","job":"svc"},"value":[1700000000,"1"]}]}}`}
 	r, _ := newRunner(t, exec, Options{Timeout: 100 * time.Millisecond, Interval: 5 * time.Millisecond, SeedSettleDelay: 1})

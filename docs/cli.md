@@ -10,35 +10,7 @@ current directory and then each parent directory (like `git`), so you can run
 `oats` from anywhere inside a project. Pass `--config <path>` to use a specific
 file instead.
 
-## Commands
-
-### `oats [paths...]` / `oats run [paths...]`
-
-Run the cases. Bare `oats` is an implicit `run`; the explicit `run` subcommand is
-identical. With no positional args every case in the config runs; positional
-**paths** (files or directories) restrict the run to cases at or under them —
-they scope *which* cases run, they do not change where the config loads from.
-
-```sh
-oats                              # run every case
-oats payments/                    # only cases under payments/
-oats payments/checkout/           # only cases under payments/checkout/
-oats --tags traces                # filter by tag
-oats --parallel 4                 # run parallel-safe suites concurrently
-```
-
-A run boots each derived fixture group, seeds it, then polls every assertion
-until it passes or `--timeout` elapses. Exit code is non-zero if any case fails.
-
-Every flag has an environment-variable equivalent: uppercase the flag name,
-replace hyphens with underscores, and prefix it with `OATS_`. Command-line
-flags take precedence over environment variables. For example,
-`--gcx /opt/tools/gcx` is equivalent to `OATS_GCX=/opt/tools/gcx`.
-
-Compose fixtures use the host container engine selected by
-`--container-runtime` (or `OATS_CONTAINER_RUNTIME`). `auto` prefers Podman and
-falls back to Docker; selecting `podman` or `docker` explicitly never silently
-falls back. k3d fixtures currently require Docker.
+## GCX resolution
 
 Release and mise-built `oats` binaries contain the minimum gcx version pinned
 by this repository. If the default `gcx` command is missing, older than that
@@ -98,6 +70,38 @@ The download policy is selected from `--gcx-download` (highest priority), then
 environments and `auto` otherwise. This avoids downloading a second GCX when
 mise is already managing the tool; set the flag or environment variable to
 override the default.
+
+## Commands
+
+### `oats [paths...]` / `oats run [paths...]`
+
+Run the cases. Bare `oats` is an implicit `run`; the explicit `run` subcommand is
+identical. With no positional args every case in the config runs; positional
+**paths** (files or directories) restrict the run to cases at or under them —
+they scope *which* cases run, they do not change where the config loads from.
+
+```sh
+oats                              # run every case
+oats payments/                    # only cases under payments/
+oats payments/checkout/           # only cases under payments/checkout/
+oats --tags traces                # filter by tag
+oats --parallel 4                 # run parallel-safe suites concurrently
+```
+
+A run boots each derived fixture group, seeds it, then polls every assertion
+until it passes or `--timeout` elapses. Exit code is non-zero if any case fails.
+
+Every flag has an environment-variable equivalent: uppercase the flag name,
+replace hyphens with underscores, and prefix it with `OATS_`. Command-line
+flags take precedence over environment variables. For example,
+`--gcx /opt/tools/gcx` is equivalent to `OATS_GCX=/opt/tools/gcx`.
+
+Compose fixtures use the host container engine selected by
+`--container-runtime` (or `OATS_CONTAINER_RUNTIME`). `auto` prefers Podman and
+falls back to Docker; selecting `podman` or `docker` explicitly never silently
+falls back. k3d fixtures currently require Docker.
+
+GCX is resolved according to the [GCX resolution](#gcx-resolution) policy.
 
 Flags:
 
