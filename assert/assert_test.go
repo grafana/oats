@@ -144,3 +144,10 @@ func TestMatchRows(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+func TestFailureError(t *testing.T) {
+	got := (Failure{Rule: "contains", Detail: "missing"}).Error()
+	if got != "contains: missing" {
+		t.Fatalf("Failure.Error() = %q", got)
+	}
+}
