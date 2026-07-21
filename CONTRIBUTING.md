@@ -8,7 +8,7 @@ then links to detailed references for further information.
 
 ```sh
 mise run build       # build oats with the gcx version from mise.toml
-mise run test        # unit and integration tests (excludes tests/e2e)
+mise run test        # unit and integration tests (excludes tests/e2e); enforces 80% coverage
 mise run e2e-test    # real-stack e2e cases; requires Docker or Podman
 mise run lint:fix    # Auto-fix Flint issues
 mise run check       # lint + test
