@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
+#MISE description="Build the project"
+
 set -euo pipefail
 
-root="$(cd "$(dirname "$0")/.." && pwd)"
+root="$(cd "$(dirname "$0")/../.." && pwd)"
 output="${1:-$root/oats}"
 gcx_version="$(bash "$root/scripts/gcx-version.sh")"
 
