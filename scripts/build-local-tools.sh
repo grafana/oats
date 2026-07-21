@@ -6,7 +6,14 @@ bin_dir="${1:-$root/bin}"
 mkdir -p "$bin_dir"
 gcx_version="$(bash "$root/scripts/gcx-version.sh")"
 
-mise run build -- "$bin_dir/oats"
+if command -v mise >/dev/null 2>&1; then
+	mise -C "$root" run build -- "$bin_dir/oats"
+else
+	GOWORK=off go -C "$root" build \
+		-buildvcs=false \
+		-ldflags "-X github.com/grafana/oats/internal/cli.MinimumGCXVersion=$gcx_version" \
+		-o "$bin_dir/oats" .
+fi
 
 # CI and mise-based development already have the pinned gcx binary installed.
 # Reuse it instead of downloading and rebuilding a second copy. Direct

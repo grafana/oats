@@ -13,6 +13,9 @@ func TestBuildScripts(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("build scripts require bash")
 	}
+	if _, err := exec.LookPath("mise"); err != nil {
+		t.Skip("build scripts require mise")
+	}
 	root := filepath.Dir(mustCallerFile(t))
 
 	versionCmd := exec.Command("bash", filepath.Join(root, "gcx-version.sh"))
