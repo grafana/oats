@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/grafana/oats/assert"
+	"github.com/grafana/oats/cache"
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/report"
@@ -995,3 +997,73 @@ func TestEvaluateStructuredAssertionBranches(t *testing.T) {
 }
 
 func runnerStringPtr(value string) *string { return &value }
+
+func TestRunCaseCacheHitAndPassRecordsCache(t *testing.T) {
+	casePath := filepath.Join(t.TempDir(), "case.yaml")
+	if err := os.WriteFile(casePath, []byte(tracesCase), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	c := mustParse(t, tracesCase)
+	c.SourcePath = casePath
+	store, err := cache.New(t.TempDir(), 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, _ := newRunner(t, &stubExec{stdout: "found span service.name=svc"}, Options{Timeout: 50 * time.Millisecond, Interval: time.Millisecond, SeedSettleDelay: -1})
+	r.WithCache(store, CacheContext{GCXVersion: "test", FixtureBytes: []byte("fixture")})
+	if err := store.Record(r.cacheKey(c)); err != nil {
+		t.Fatal(err)
+	}
+	if !r.RunCase(context.Background(), c) {
+		t.Fatal("cache hit should pass")
+	}
+
+	uncached, err := cache.New(t.TempDir(), 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2, _ := newRunner(t, &stubExec{stdout: "found span service.name=svc"}, Options{Timeout: 50 * time.Millisecond, Interval: time.Millisecond, SeedSettleDelay: -1})
+	r2.WithCache(uncached, CacheContext{GCXVersion: "test", FixtureBytes: []byte("fixture")})
+	if !r2.RunCase(context.Background(), c) {
+		t.Fatal("uncached passing case should pass")
+	}
+	if hit, _ := uncached.Lookup(r2.cacheKey(c)); !hit {
+		t.Fatal("passing case was not recorded in cache")
+	}
+}
+
+func TestRunCaseInlineSeedSuccessAndPollErrors(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	c := mustParse(t, `
+name: inline seed success
+seed:
+  type: inline-otlp
+  traces:
+    - service: svc
+      spans:
+        - name: op
+expected:
+  traces:
+    - traceql: '{}'
+      contains: svc
+`)
+	r, buf := newRunner(t, &stubExec{stdout: "svc"}, Options{Timeout: 50 * time.Millisecond, Interval: time.Millisecond, SeedSettleDelay: -1})
+	r.endpoint.OTLPHTTP = server.URL
+	r.seeder.OTLPEndpoint = server.URL
+	if !r.RunCase(context.Background(), c) {
+		t.Fatalf("inline seed case should pass:\n%s", buf.String())
+	}
+
+	failingExec, _ := newRunner(t, &stubExec{err: errors.New("gcx unavailable")}, Options{Timeout: 5 * time.Millisecond, Interval: time.Millisecond, SeedSettleDelay: -1})
+	if failingExec.pollAssert(context.Background(), mustParse(t, tracesCase), []string{"traces", "search"}, false, func(string, string, int) []assert.Failure { return nil }) {
+		t.Fatal("pollAssert should fail when gcx execution errors")
+	}
+	nonZero, _ := newRunner(t, &stubExec{stderr: "gcx failed", exit: 1}, Options{Timeout: 5 * time.Millisecond, Interval: time.Millisecond, SeedSettleDelay: -1})
+	if nonZero.pollAssert(context.Background(), mustParse(t, tracesCase), []string{"traces", "search"}, true, func(string, string, int) []assert.Failure { return nil }) {
+		t.Fatal("pollAssert should fail for a non-zero gcx exit")
+	}
+}

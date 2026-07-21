@@ -263,6 +263,58 @@ func TestLegacySignalAssertionsAgainstHTTP(t *testing.T) {
 	}})
 }
 
+func TestLegacyExecuteChecksRunsEverySignalType(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/loki/api/v1/query_range":
+			_, _ = fmt.Fprint(w, `{"status":"success","data":{"result":[{"stream":{"service":"api"},"values":[["1","ready"]]}]}}`)
+		case "/api/v1/query":
+			_, _ = fmt.Fprint(w, `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"job":"oats"},"value":[1,"2"]}]}}`)
+		case "/pyroscope/render":
+			_, _ = fmt.Fprint(w, `{"flamebearer":{"names":["main","worker"]}}`)
+		case "/api/search":
+			_, _ = fmt.Fprint(w, `{"traces":[]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(parsed.Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := NewRunner(&model.TestCase{
+		Name: "all legacy signals",
+		PortConfig: &model.PortConfig{
+			PrometheusHTTPPort: port,
+			LokiHTTPPort:       port,
+			TempoHTTPPort:      port,
+			PyroscopeHttpPort:  port,
+		},
+		Definition: model.TestCaseDefinition{
+			Interval: time.Millisecond,
+			Expected: model.Expected{
+				Logs:     []model.ExpectedLogs{{LogQL: `{service="api"}`, Signal: model.ExpectedSignal{NameEquals: "ready", Count: &model.ExpectedRange{Min: 1, Max: 1}, Attributes: map[string]string{"service": "api"}}}},
+				Traces:   []model.ExpectedTraces{{TraceQL: `{ .service.name = "missing" }`, Signal: model.ExpectedSignal{Count: &model.ExpectedRange{Min: 0, Max: 0}}}},
+				Metrics:  []model.ExpectedMetrics{{PromQL: "up", Value: ">= 1"}},
+				Profiles: []model.ExpectedProfiles{{Query: "process_cpu", Flamebearers: model.Flamebearers{NameRegexp: "work"}}},
+			},
+		},
+	}, model.Settings{Timeout: 200 * time.Millisecond, PresentTimeout: 20 * time.Millisecond, AbsentTimeout: 20 * time.Millisecond})
+	r.endpoint = remote.NewEndpoint(parsed.Hostname(), remote.PortsConfig{
+		PrometheusHTTPPort: port,
+		LokiHTTPPort:       port,
+		TempoHTTPPort:      port,
+		PyroscopeHTTPPort:  port,
+	}, nil, nil, nil)
+	r.ExecuteChecks()
+}
+
 func TestAssertPyroscopeResponseRejectsMalformedJSON(t *testing.T) {
 	failed := false
 	r := &Runner{gomegaInst: gomega.NewGomega(func(string, ...int) { failed = true })}
