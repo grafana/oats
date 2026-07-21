@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly minimum_coverage="${OATS_MIN_COVERAGE:-80.0}"
-readonly profile="${COVERAGE_PROFILE:-$(mktemp)}"
+readonly profile="${COVERAGE_PROFILE:-$(mktemp "${TMPDIR:-/tmp}/oats-coverage.XXXXXX")}"
 
 cleanup() {
 	if [[ -z "${COVERAGE_PROFILE:-}" ]]; then
@@ -19,7 +19,10 @@ if [[ -z "$packages_output" ]]; then
 	echo "no test packages found" >&2
 	exit 1
 fi
-mapfile -t packages <<<"$packages_output"
+packages=()
+while IFS= read -r package; do
+	packages+=("$package")
+done <<<"$packages_output"
 
 GOFLAGS=-buildvcs=false go test -coverprofile="$profile" "${packages[@]}"
 
