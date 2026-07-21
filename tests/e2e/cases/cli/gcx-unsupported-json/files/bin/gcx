@@ -1,0 +1,10 @@
+#!/bin/sh
+
+if [ "${1:-}" = "--version" ]; then
+  printf '0.4.5\n'
+  exit 0
+fi
+
+# This is the pre-0.4.4 array shape. The parser should reject it with a useful
+# unsupported-format error instead of treating the query as empty.
+printf '%s\n' '{"status":"success","data":{"resultType":"streams","result":[{"stream":{},"values":[["1700000000","seed-log-line"]]}]}}'
