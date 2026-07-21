@@ -79,7 +79,7 @@ esac
 		"-f base.yml -f override.yml up --build --detach --force-recreate",
 		"-f base.yml -f override.yml logs",
 		"-f base.yml -f override.yml stop",
-		"-f base.yml -f override.yml rm -f",
+		"-f base.yml -f override.yml down",
 	} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("command log %q missing %q", data, want)

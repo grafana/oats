@@ -312,25 +312,111 @@ func readComposeGrafanaToken(plan discovery.Plan, engine container.Engine) (stri
 }
 
 func composePort(engine container.Engine, files []string, env []string, service, containerPort string) (string, error) {
+	// podman-compose 1.0.6 cannot parse Compose's ephemeral port syntax
+	// (127.0.0.1::3000) in its `port` command. Query Podman directly first so
+	// the fixture lifecycle does not depend on which Compose provider Podman
+	// selected.
+	var podmanErr error
+	if engine == container.Podman {
+		var port string
+		port, podmanErr = podmanPort(env, service, containerPort)
+		if podmanErr == nil {
+			return port, nil
+		}
+	}
+
 	args := engine.ComposeArgs()
 	for _, f := range files {
 		args = append(args, "-f", f)
 	}
 	args = append(args, "port", service, containerPort)
 	cmd := exec.Command(engine.Binary(), args...)
-	cmd.Env = append(cmd.Environ(), env...)
+	cmd.Env = mergeEnvironment(cmd.Environ(), env)
 	out, err := cmd.Output()
 	if err != nil {
-		return "", err
+		return "", composePortError(podmanErr, err)
 	}
 	host, port, err := splitComposeHostPort(strings.TrimSpace(string(out)))
 	if err != nil {
-		return "", err
+		return "", composePortError(podmanErr, err)
 	}
 	if host == "" || port == "" {
-		return "", fmt.Errorf("invalid compose port output %q", strings.TrimSpace(string(out)))
+		return "", composePortError(podmanErr, fmt.Errorf("invalid compose port output %q", strings.TrimSpace(string(out))))
 	}
 	return port, nil
+}
+
+func composePortError(podmanErr, composeErr error) error {
+	if podmanErr == nil {
+		return composeErr
+	}
+	return fmt.Errorf("podman port lookup: %v; compose port lookup: %w", podmanErr, composeErr)
+}
+
+func mergeEnvironment(parent, override []string) []string {
+	merged := make([]string, 0, len(parent)+len(override))
+	index := make(map[string]int, len(parent)+len(override))
+	for _, entry := range append(append([]string(nil), parent...), override...) {
+		key := entry
+		if separator := strings.IndexByte(entry, '='); separator >= 0 {
+			key = entry[:separator]
+		}
+		if position, ok := index[key]; ok {
+			merged[position] = entry
+			continue
+		}
+		index[key] = len(merged)
+		merged = append(merged, entry)
+	}
+	return merged
+}
+
+func podmanPort(env []string, service, containerPort string) (string, error) {
+	project := ""
+	for i := len(env) - 1; i >= 0; i-- {
+		entry := env[i]
+		key, value, ok := strings.Cut(entry, "=")
+		if ok && key == "COMPOSE_PROJECT_NAME" {
+			project = value
+			break
+		}
+	}
+	if project == "" {
+		return "", fmt.Errorf("COMPOSE_PROJECT_NAME is required for Podman port lookup")
+	}
+
+	ps := exec.Command(container.Podman.Binary(), "ps",
+		"--filter", "label=com.docker.compose.project="+project,
+		"--filter", "label=com.docker.compose.service="+service,
+		"--format", "{{.ID}}")
+	ps.Env = mergeEnvironment(ps.Environ(), env)
+	containers, err := ps.Output()
+	if err != nil {
+		return "", err
+	}
+	containerID := strings.TrimSpace(strings.SplitN(string(containers), "\n", 2)[0])
+	if containerID == "" {
+		return "", fmt.Errorf("no Podman container found for project %q service %q", project, service)
+	}
+
+	port := exec.Command(container.Podman.Binary(), "port", containerID, containerPort)
+	port.Env = mergeEnvironment(port.Environ(), env)
+	out, err := port.Output()
+	if err != nil {
+		return "", err
+	}
+	line := strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
+	if arrow := strings.LastIndex(line, "->"); arrow >= 0 {
+		line = strings.TrimSpace(line[arrow+2:])
+	}
+	host, published, err := splitComposeHostPort(line)
+	if err != nil {
+		return "", err
+	}
+	if host == "" || published == "" {
+		return "", fmt.Errorf("invalid Podman port output %q", line)
+	}
+	return published, nil
 }
 
 func splitComposeHostPort(addr string) (string, string, error) {
