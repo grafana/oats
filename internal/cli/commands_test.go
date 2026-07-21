@@ -270,6 +270,21 @@ expected:
 		t.Fatalf("migrate file command: %v", err)
 	}
 
+	migrateDir := filepath.Join(dir, "legacy-tree")
+	if err := os.MkdirAll(migrateDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, migrateDir, "legacy.oats.yaml", `oats-schema-version: 2
+expected:
+  custom-checks:
+    - script: true
+`)
+	migrateCmd = newMigrateCmd()
+	migrateCmd.SetArgs([]string{migrateDir})
+	if err := migrateCmd.Execute(); err != nil {
+		t.Fatalf("migrate directory command: %v", err)
+	}
+
 	cacheDir := filepath.Join(dir, "cache")
 	store, err := cache.New(cacheDir, 0, nil)
 	if err != nil {
