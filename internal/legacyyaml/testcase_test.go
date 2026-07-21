@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -310,6 +311,10 @@ func TestLegacyRunnerPollingHelpers(t *testing.T) {
 }
 
 func TestCreateDockerComposeFileWithFakeDocker(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a POSIX executable")
+	}
+
 	bin := t.TempDir()
 	docker := filepath.Join(bin, "docker")
 	if err := os.WriteFile(docker, []byte("#!/bin/sh\nprintf 'services: {}\\n'\n"), 0o700); err != nil {

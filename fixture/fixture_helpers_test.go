@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -158,6 +159,10 @@ func TestFixtureUtilityFunctions(t *testing.T) {
 }
 
 func TestComposeAndReadinessHelpers(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses POSIX executables")
+	}
+
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "bin")
 	if err := os.MkdirAll(bin, 0o755); err != nil {

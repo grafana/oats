@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -13,6 +14,10 @@ import (
 )
 
 func TestStackFilesWithRuntimeLifecycle(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a POSIX executable")
+	}
+
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "args")
 	command := filepath.Join(dir, "compose")
@@ -121,6 +126,10 @@ func TestComposeValidationAndEnvironmentMerge(t *testing.T) {
 }
 
 func TestComposeCommandFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a POSIX executable")
+	}
+
 	command := filepath.Join(t.TempDir(), "compose-fail")
 	if err := os.WriteFile(command, []byte("#!/bin/sh\nexit 1\n"), 0o700); err != nil {
 		t.Fatal(err)

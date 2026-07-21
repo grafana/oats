@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -175,6 +176,10 @@ func TestStart_SkipsGrafanaAndOTLPPortsWhenUnset(t *testing.T) {
 }
 
 func TestNewEndpoint_StartAndStopWithFakeCLIs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses POSIX executables")
+	}
+
 	bin := t.TempDir()
 	for _, name := range []string{"docker", "k3d", "kubectl"} {
 		path := filepath.Join(bin, name)
