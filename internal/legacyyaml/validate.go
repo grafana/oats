@@ -1,7 +1,7 @@
 package legacyyaml
 
 import (
-	"github.com/grafana/oats/model"
+	"github.com/grafana/oats/internal/legacyyaml/model"
 	"github.com/onsi/gomega"
 )
 

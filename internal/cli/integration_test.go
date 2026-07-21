@@ -20,7 +20,7 @@ import (
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/fixture"
-	"github.com/grafana/oats/migrate"
+	"github.com/grafana/oats/internal/legacyyaml/migrate"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
 )

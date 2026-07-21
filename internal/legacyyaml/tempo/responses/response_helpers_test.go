@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/grafana/oats/model"
+	"github.com/grafana/oats/internal/legacyyaml/model"
 	"github.com/stretchr/testify/require"
 )
 

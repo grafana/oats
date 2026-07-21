@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/oats/model"
+	"github.com/grafana/oats/internal/legacyyaml/model"
 	"github.com/grafana/oats/testhelpers/remote"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"

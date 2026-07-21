@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/grafana/oats/model"
+	"github.com/grafana/oats/internal/legacyyaml/model"
 	"go.yaml.in/yaml/v3"
 )
 

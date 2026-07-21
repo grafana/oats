@@ -61,12 +61,11 @@ EditorConfig rules live in `.editorconfig`.
 
 - **`main.go`** — Root `oats` CLI entry point
 - **`internal/cli/`** — The gcx-driven CLI implementation used by the root binary
-- **`model/`** — Core data models (`TestCaseDefinition`, expected signals)
-- **`internal/legacyyaml/`** — legacy (v1/v2) test-case parsing, execution, and
-  signal-specific assertions (`runner.go`, `traces.go`, `metrics.go`,
-  `logs.go`, `profiles.go`); used only by `migrate`
-- **`testhelpers/`** — Docker Compose management, Kubernetes (k3d), HTTP request helpers, response parsing
-- **`observability/`** — Observability endpoint interface
+- **`internal/legacyyaml/`** — legacy (v1/v2) test-case parsing, execution,
+  migration, models, response parsing, and signal-specific assertions
+  (`runner.go`, `traces.go`, `metrics.go`, `logs.go`, `profiles.go`); used only
+  by the `migrate` subpackage
+- **`testhelpers/`** — Docker Compose management, Kubernetes (k3d), and HTTP request helpers
 - **`tests/`** — Integration and e2e test fixtures
 
 ### Test Case Schema

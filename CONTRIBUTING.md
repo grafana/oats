@@ -70,18 +70,18 @@ flowchart LR
     D --> G[cache and report]
 ```
 
-| Area                                | Responsibility                                                         | Start with               |
-| ----------------------------------- | ---------------------------------------------------------------------- | ------------------------ |
-| `casefile/`                         | v3 YAML case/config data and validation                                | `casefile/case.go`       |
-| `discovery/`                        | config loading, filtering, and fixture-boot grouping                   | `discovery/discovery.go` |
-| `fixture/`                          | compose/k3d lifecycle, readiness, endpoints, and parallel-safety gates | `fixture/fixture.go`     |
-| `runner/`                           | case execution: seed, poll, assertions, cache, and reporting           | `runner/runner.go`       |
-| `seed/`                             | inline OTLP and application-input seeding                              | `seed/seed.go`           |
-| `engine/` / `signalcmd/`            | gcx invocation and signal-specific command construction                | `engine/gcx.go`          |
-| `report/`                           | text/NDJSON event stream and GitHub annotations                        | `report/event.go`        |
-| `internal/cli/`                     | Cobra commands, flags, env mapping, and orchestration                  | `internal/cli/main.go`   |
-| `internal/legacyyaml/` / `migrate/` | legacy schema parsing and v2→v3 migration only                         | `migrate/migrate.go`     |
-| `tests/e2e/`                        | black-box cases run against real stacks and tools                      | `tests/e2e/e2e_test.go`  |
+| Area                     | Responsibility                                                         | Start with                               |
+| ------------------------ | ---------------------------------------------------------------------- | ---------------------------------------- |
+| `casefile/`              | v3 YAML case/config data and validation                                | `casefile/case.go`                       |
+| `discovery/`             | config loading, filtering, and fixture-boot grouping                   | `discovery/discovery.go`                 |
+| `fixture/`               | compose/k3d lifecycle, readiness, endpoints, and parallel-safety gates | `fixture/fixture.go`                     |
+| `runner/`                | case execution: seed, poll, assertions, cache, and reporting           | `runner/runner.go`                       |
+| `seed/`                  | inline OTLP and application-input seeding                              | `seed/seed.go`                           |
+| `engine/` / `signalcmd/` | gcx invocation and signal-specific command construction                | `engine/gcx.go`                          |
+| `report/`                | text/NDJSON event stream and GitHub annotations                        | `report/event.go`                        |
+| `internal/cli/`          | Cobra commands, flags, env mapping, and orchestration                  | `internal/cli/main.go`                   |
+| `internal/legacyyaml/`   | legacy schema parsing and v2→v3 migration only                         | `internal/legacyyaml/migrate/migrate.go` |
+| `tests/e2e/`             | black-box cases run against real stacks and tools                      | `tests/e2e/e2e_test.go`                  |
 
 The current format has one schema version (`meta.version: 3`). Cases carry their
 own fixture; OATS derives fixture-boot groups, boots each fixture once, and runs

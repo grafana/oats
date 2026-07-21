@@ -3,8 +3,8 @@ package legacyyaml
 import (
 	"context"
 
-	"github.com/grafana/oats/model"
-	"github.com/grafana/oats/testhelpers/tempo/responses"
+	"github.com/grafana/oats/internal/legacyyaml/model"
+	"github.com/grafana/oats/internal/legacyyaml/tempo/responses"
 	"github.com/onsi/gomega"
 )
 

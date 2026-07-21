@@ -611,7 +611,7 @@ func TestApproxRowCount(t *testing.T) {
 }
 
 func TestExtractTraceRows_OTLPShape(t *testing.T) {
-	path := filepath.Join("..", "testhelpers", "tempo", "responses", "testdata", "trace_by_id.json")
+	path := filepath.Join("..", "internal", "legacyyaml", "tempo", "responses", "testdata", "trace_by_id.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
