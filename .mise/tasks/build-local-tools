@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#MISE description="Build local OATs and gcx tools"
+#USAGE arg "[bin_dir]" help="Output directory for local tools"
+set -euo pipefail
+
+root="${MISE_PROJECT_ROOT:?MISE_PROJECT_ROOT must be set by mise}"
+bin_dir="${usage_bin_dir:-${1:-$root/bin}}"
+mkdir -p "$bin_dir"
+
+mise run build -- "$bin_dir/oats"
+
+# CI and mise-based development already have the pinned gcx binary installed.
+# Reuse it instead of downloading and rebuilding a second copy.
+gcx_bin=""
+gcx_bin=$(mise which gcx 2>/dev/null || true)
+if [[ -n "$gcx_bin" && -x "$gcx_bin" ]]; then
+	install -m 0755 "$gcx_bin" "$bin_dir/gcx"
+else
+	echo "mise-managed gcx is required; run mise install" >&2
+	exit 1
+fi
+
+printf 'built %s/oats and %s/gcx\n' "$bin_dir" "$bin_dir"

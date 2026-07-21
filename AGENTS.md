@@ -32,6 +32,11 @@ mise run test
 mise run e2e-test
 ```
 
+Mise task implementations live in `.mise/tasks/` as executable [file tasks](https://mise.jdx.dev/tasks/file-tasks.html).
+Keep task scripts there rather than adding new mise-invoked scripts under
+`scripts/`; shared helpers used directly by CI or release workflows may remain
+in `scripts/`.
+
 ## Linting
 
 ```bash

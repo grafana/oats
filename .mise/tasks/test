@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#MISE description="Run tests with coverage"
+#USAGE arg "[profile]" env="COVERAGE_PROFILE" default="coverage.out" help="Coverage profile path"
+
+set -euo pipefail
+
+readonly profile="$usage_profile"
+
+if ! package_list="$(
+		GOFLAGS=-buildvcs=false go list ./... |
+			awk '$0 != "github.com/grafana/oats/tests/e2e" && index($0, "github.com/grafana/oats/tests/e2e/") != 1'
+)"; then
+	echo "could not discover test packages with go list" >&2
+	exit 1
+fi
+if [[ -z "$package_list" ]]; then
+	echo "could not find packages to test" >&2
+	exit 1
+fi
+packages=()
+while IFS= read -r pkg; do
+	[[ -n "$pkg" ]] && packages+=("$pkg")
+done <<< "$package_list"
+
+GOFLAGS=-buildvcs=false go test -coverprofile="$profile" "${packages[@]}"

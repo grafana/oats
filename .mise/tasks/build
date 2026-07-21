@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
+#MISE description="Build the project"
+#USAGE arg "[output]" help="Output binary path"
+
 set -euo pipefail
 
-root="$(cd "$(dirname "$0")/.." && pwd)"
-output="${1:-$root/oats}"
+root="${MISE_PROJECT_ROOT:?MISE_PROJECT_ROOT must be set by mise}"
+output="${usage_output:-${1:-$root/oats}}"
 gcx_version="$(bash "$root/scripts/gcx-version.sh")"
 
 mkdir -p "$(dirname "$output")"

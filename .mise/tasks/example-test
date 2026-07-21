@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-root=$(git rev-parse --show-toplevel)
+root="${MISE_PROJECT_ROOT:?MISE_PROJECT_ROOT must be set by mise}"
 oats_bin="${OATS_BIN:-$root/oats}"
 gcx_bin="${GCX_BIN:-gcx}"
 mode="${OATS_EXAMPLE_MODE:-all}"
@@ -18,7 +18,7 @@ all | apps | compose)
 esac
 
 if [[ ! -x "$oats_bin" ]]; then
-	bash "$root/scripts/build-oats.sh" "$oats_bin"
+	mise run build -- "$oats_bin"
 fi
 
 if ! command -v "$gcx_bin" >/dev/null 2>&1; then

@@ -251,7 +251,7 @@ func prepareLocalTools(env *sharedEnv) error {
 	}
 	start := time.Now()
 	fmt.Fprintf(os.Stderr, "e2e timing: building local tools into %s\n", binDir)
-	build := exec.Command("bash", "-lc", fmt.Sprintf("./scripts/build-local-tools.sh %q", binDir))
+	build := exec.Command("mise", "run", "build-local-tools", "--", binDir)
 	build.Dir = env.RepoRoot
 	build.Stdout = os.Stdout
 	build.Stderr = os.Stderr
