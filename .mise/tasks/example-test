@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-root=$(git rev-parse --show-toplevel)
+root="${MISE_PROJECT_ROOT:?MISE_PROJECT_ROOT must be set by mise}"
 oats_bin="${OATS_BIN:-$root/oats}"
 gcx_bin="${GCX_BIN:-gcx}"
 mode="${OATS_EXAMPLE_MODE:-all}"
