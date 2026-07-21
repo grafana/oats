@@ -41,7 +41,7 @@ func TestApplyEnvFlags(t *testing.T) {
 	}
 }
 
-func TestApplyEnvFlagsCommandLineWins(t *testing.T) {
+func TestApplyEnvFlagsKeepGCXFlagsIndependent(t *testing.T) {
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
 	fs.Duration("timeout", 30*time.Second, "timeout")
 	fs.String("gcx", "gcx", "gcx binary")
@@ -60,8 +60,8 @@ func TestApplyEnvFlagsCommandLineWins(t *testing.T) {
 	if got := flagDur(fs, "timeout"); got != 3*time.Second {
 		t.Fatalf("timeout = %s, want command-line value 3s", got)
 	}
-	if got := flagStr(fs, "gcx"); got != "gcx" {
-		t.Fatalf("gcx = %q, want default because --gcx-version takes precedence", got)
+	if got := flagStr(fs, "gcx"); got != "/opt/tools/gcx" {
+		t.Fatalf("gcx = %q, want environment value", got)
 	}
 	if got := flagStr(fs, "gcx-version"); got != "0.4.3" {
 		t.Fatalf("gcx-version = %q, want command-line value 0.4.3", got)

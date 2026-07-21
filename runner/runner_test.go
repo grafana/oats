@@ -176,7 +176,7 @@ func TestRunCase_MetricsValueFail(t *testing.T) {
 }
 
 func TestRunCase_LogsStructuredMatchPass(t *testing.T) {
-	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"streams","result":[{"stream":{"service_name":"svc","trace_id":"abc123"},"values":[["1700000000","seed-log-line"]]}]}}`}
+	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"streams","result":[{"stream":{"service_name":"svc"},"values":[{"timestamp":"1700000000","line":"seed-log-line","structuredMetadata":{"trace_id":"abc123"}}]}]}}`}
 	r, buf := newRunner(t, exec, Options{Timeout: 100 * time.Millisecond, Interval: 5 * time.Millisecond, SeedSettleDelay: 1})
 
 	c := mustParse(t, `
@@ -204,6 +204,42 @@ expected:
 	}
 	if !containsSequence(exec.captured[0], "-o", "json") {
 		t.Fatalf("expected logs query to request json: %v", exec.captured[0])
+	}
+}
+
+func TestRunCase_LogsUnsupportedFormatSuggestsVersion(t *testing.T) {
+	exec := &stubExec{stdout: `{"status":"success","data":{"resultType":"streams","result":[{"stream":{},"values":{"items":[{"line":"seed-log-line"}]}}]}}`}
+	r, buf := newRunner(t, exec, Options{
+		GCXVersion:      "0.4.5",
+		Timeout:         30 * time.Millisecond,
+		Interval:        5 * time.Millisecond,
+		SeedSettleDelay: 1,
+	})
+
+	c := mustParse(t, `
+name: logs unsupported format
+seed:
+  type: app
+  compose: x.yml
+expected:
+  logs:
+    - logql: '{service_name="svc"}'
+      match:
+        - name: seed-log-line
+`)
+
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	ok := r.RunCase(context.Background(), c)
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+
+	if ok {
+		t.Fatal("expected unsupported log format to fail")
+	}
+	if !strings.Contains(buf.String(), "selected GCX reports \"0.4.5\" and may be using a newer unsupported response format") {
+		t.Fatalf("version guidance missing from failure output:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "--gcx-version") {
+		t.Fatalf("version selection guidance missing from failure output:\n%s", buf.String())
 	}
 }
 

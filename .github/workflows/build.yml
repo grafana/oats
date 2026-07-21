@@ -1,7 +1,11 @@
 ---
 name: Build and Test
 
-on: [pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
 permissions: {}
 
@@ -29,4 +33,4 @@ jobs:
         with:
           fail_ci_if_error: true
           files: coverage.out
-          use_oidc: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          use_oidc: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}

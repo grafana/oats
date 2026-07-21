@@ -4,6 +4,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -46,7 +47,7 @@ func (r *Runner) runTraceStructured(ctx context.Context, c *casefile.Case, a *ca
 			return []assert.Failure{{Rule: "exec", Detail: detail}}
 		}
 		rows, count, err := r.fetchTraceRows(ctx, c, searchRes.Stdout)
-		return evalTraceStructured(searchRes.Stdout, *a, rows, count, err)
+		return evalTraceStructured(searchRes.Stdout, *a, rows, count, gcxParseHint(err, r.opts.GCXVersion))
 	}
 
 	result := wait.Until[assert.Failure](ctx, wait.Options{Timeout: r.opts.Timeout, Interval: r.caseInterval(c)}, run)
@@ -114,7 +115,7 @@ func (r *Runner) runLog(ctx context.Context, c *casefile.Case, a *casefile.LogAs
 			return evalCommonText(stdout, a.AssertionCommon)
 		}
 		rows, count, err := extractLogRows(stdout)
-		return evalCommonStructured(stdout, a.AssertionCommon, rows, count, err)
+		return evalCommonStructured(stdout, a.AssertionCommon, rows, count, gcxParseHint(err, r.opts.GCXVersion))
 	})
 }
 
@@ -125,6 +126,7 @@ func (r *Runner) runMetric(ctx context.Context, c *casefile.Case, a *casefile.Me
 			return evalCommonText(stdout, a.AssertionCommon)
 		}
 		rows, count, actual, err := extractMetricRows(stdout)
+		err = gcxParseHint(err, r.opts.GCXVersion)
 		fails := evalCommonStructured(stdout, a.AssertionCommon, rows, count, err)
 		if a.Value != "" {
 			if err != nil {
@@ -144,8 +146,22 @@ func (r *Runner) runProfile(ctx context.Context, c *casefile.Case, a *casefile.P
 			return evalCommonText(stdout, a.AssertionCommon)
 		}
 		rows, count, err := extractProfileRows(stdout)
-		return evalCommonStructured(stdout, a.AssertionCommon, rows, count, err)
+		return evalCommonStructured(stdout, a.AssertionCommon, rows, count, gcxParseHint(err, r.opts.GCXVersion))
 	})
+}
+
+func gcxParseHint(err error, version string) error {
+	if err == nil {
+		return nil
+	}
+	var parseErr *gcxParseError
+	if !errors.As(err, &parseErr) {
+		return err
+	}
+	if version == "" {
+		return fmt.Errorf("%w; if this started after a gcx upgrade, try --gcx-version with a known-compatible release or upgrade oats", err)
+	}
+	return fmt.Errorf("%w; selected GCX reports %q and may be using a newer unsupported response format, so try --gcx-version with a known-compatible release or upgrade oats", err, version)
 }
 
 // evalCommonText runs the assertions that every signal type shares when gcx
