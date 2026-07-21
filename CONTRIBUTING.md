@@ -14,9 +14,8 @@ mise run lint:fix    # Auto-fix Flint issues
 mise run check       # lint + test
 ```
 
-`mise run test` enforces a minimum total statement coverage of 80%, excluding
-`tests/e2e`. Set `OATS_MIN_COVERAGE` to change the threshold or
-`COVERAGE_PROFILE` to choose where the coverage profile is written.
+`mise run test` writes `coverage.out` for Codecov. The Codecov project status
+enforces a minimum total statement coverage of 80%, excluding `tests/e2e`.
 
 For the user-facing surface, read [CLI](docs/cli.md), [case reference](docs/case-reference.md),
 [CI guidance](docs/ci.md), and [upgrading](UPGRADING.md). The root
