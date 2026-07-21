@@ -77,6 +77,10 @@ func resolveGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 }
 
 func resolveRequestedGCX(fs *pflag.FlagSet, gcxBin, requested string) (string, error) {
+	policy, err := gcxDownloadPolicy(fs)
+	if err != nil {
+		return "", err
+	}
 	version, err := normalizeGCXVersion(requested)
 	if err != nil {
 		return "", err
@@ -111,10 +115,6 @@ func resolveRequestedGCX(fs *pflag.FlagSet, gcxBin, requested string) (string, e
 		return cached, nil
 	}
 
-	policy, err := gcxDownloadPolicy(fs)
-	if err != nil {
-		return "", err
-	}
 	if policy == gcxDownloadPolicyNever {
 		return "", fmt.Errorf("gcx version %s was not found on PATH or in the cache (automatic download is disabled)", version)
 	}
