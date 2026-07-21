@@ -70,44 +70,34 @@ Let `M` be OATs' embedded minimum GCX version:
 | `--gcx PATH --gcx-version V`                  | Require `PATH` to report exactly `V` and `V >= M`; never download or replace it              |
 | `--gcx-version V` with `--gcx-download never` | Use an exact PATH/cache match or fail                                                        |
 
-The download policy is selected from `--gcx-download` (highest priority), then
-`OATS_GCX_DOWNLOAD`; when neither is set, mise detection defaults it to `never`
-and all other environments default it to `auto`.
-
 ```mermaid
 flowchart TD
-    P{Explicit --gcx-download or OATS_GCX_DOWNLOAD?}
-    P -->|yes| Q[Use explicit policy]
-    P -->|no| M{mise detected?}
-    M -->|yes| N[Policy: never]
-    M -->|no| A[Policy: auto]
+    S{GCX flags} -->|--gcx PATH| P{--gcx-version V also set?}
+    P -->|no| U[Use explicit PATH]
+    P -->|yes| X{V meets M and PATH reports exactly V?}
+    X -->|yes| U
+    X -->|no| E1[Error]
 
-    Q --> S{--gcx-version V?}
-    N --> S
-    A --> S
+    S -->|--gcx-version V| V{V meets embedded minimum M?}
+    V -->|no| E2[Error]
+    V -->|yes| C{Exact V on PATH or cache?}
+    C -->|yes| U2[Use exact V]
+    C -->|no| D{Download policy allows it?}
+    D -->|yes| D2[Download and cache V]
+    D -->|no| E3[Error]
 
-    S -->|yes| V{V >= embedded minimum M?}
-    V -->|no| E[Error]
-    V -->|yes| X{--gcx also supplied?}
-    X -->|yes| Y{Explicit binary reports exactly V?}
-    Y -->|yes| U[Use explicit binary]
-    Y -->|no| E
-    X -->|no| Z{Exact V on PATH?}
-    Z -->|yes| U
-    Z -->|no| C{V cached?}
-    C -->|yes| K[Use cached V]
-    C -->|no| F{Policy: auto?}
-    F -->|yes| D[Download and cache V]
-    F -->|no| E
-
-    S -->|no| G{--gcx explicitly supplied?}
-    G -->|yes| U2[Use explicit binary; bypass M]
-    G -->|no| H{PATH GCX version >= M?}
+    S -->|no flags| H{PATH GCX meets M?}
     H -->|yes| U3[Use PATH GCX]
-    H -->|no / missing / unknown| F2{Policy: auto?}
-    F2 -->|yes| D2[Download and cache minimum M]
-    F2 -->|no| E
+    H -->|no| D3{Download policy allows it?}
+    D3 -->|yes| D4[Download and cache M]
+    D3 -->|no| E4[Error]
 ```
+
+The download policy is selected from `--gcx-download` (highest priority), then
+`OATS_GCX_DOWNLOAD`. When neither is set, it defaults to `never` in mise
+environments and `auto` otherwise. This avoids downloading a second GCX when
+mise is already managing the tool; set the flag or environment variable to
+override the default.
 
 Flags:
 
