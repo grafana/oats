@@ -50,6 +50,10 @@ default is `never` when mise is detected (mise on `PATH`, a mise environment
 variable, or an executable installed under mise), and `auto` otherwise. An
 explicit `--gcx <path>` bypasses the minimum-version check, while
 `--gcx-version` downloads and uses exactly the requested release.
+Only the minimum version is enforced: newer PATH versions are accepted rather
+than imposing a maximum that would force `oats` and `gcx` releases to stay in
+lockstep. The GCX output formats consumed by `oats` still need to be covered by
+the OATs parsers and tests as they evolve.
 
 Flags:
 
