@@ -9,6 +9,6 @@ build/
 *.exe
 dist/
 
-# Locally built binaries (scripts/build-local-tools.sh, mise run example-test)
+# Locally built binaries (mise run build-local-tools, mise run example-test)
 /bin/
 /.e2e-tools/
