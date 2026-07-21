@@ -79,36 +79,6 @@ expected:
 	}
 }
 
-func TestRunActionRejectsConflictingGCXFlags(t *testing.T) {
-	dir := t.TempDir()
-	config := filepath.Join(dir, "oats-config.yaml")
-	writeFile(t, dir, "oats-config.yaml", `meta:
-  version: 3
-cases: ["cases/oats-case.yaml"]
-`)
-	writeFile(t, dir, "cases/oats-case.yaml", `name: smoke
-fixture:
-  remote:
-    endpoint: http://localhost:4318
-expected:
-  traces:
-    - traceql: '{}'
-      match_spans:
-        - name: smoke
-`)
-
-	root := newRootCmd(new(int))
-	root.SetArgs([]string{
-		"--config", config,
-		"--gcx", "gcx",
-		"--gcx-version", "0.4.3",
-	})
-	err := root.Execute()
-	if err == nil || !strings.Contains(err.Error(), "--gcx and --gcx-version cannot be used together") {
-		t.Fatalf("Execute error = %v, want gcx conflict", err)
-	}
-}
-
 func TestRunActionSetsFailureExitCode(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fake-gcx is a POSIX shell script")

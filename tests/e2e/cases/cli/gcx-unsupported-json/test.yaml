@@ -1,0 +1,29 @@
+name: gcx-unsupported-json
+tags: [cli, gcx, logs]
+
+# Use a deliberately incompatible fake GCX response to exercise the complete
+# CLI-to-parser error path without relying on a real future GCX release.
+run:
+  command: "{{OATS}}"
+  args:
+    - --config
+    - "{{CASE_DIR}}/files/oats-config.yaml"
+    - --gcx
+    - "{{CASE_DIR}}/files/bin/gcx"
+    - --gcx-context
+    - local
+    - --gcx-download
+    - never
+    - --no-cache
+    - --timeout
+    - 100ms
+    - --interval
+    - 1ms
+
+expect:
+  exit_code: 1
+  stdout_contains:
+    - "FAIL"
+    - "log response has unsupported format"
+    - 'selected GCX reports "0.4.5"'
+    - "--gcx-version"

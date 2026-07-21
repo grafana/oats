@@ -1,0 +1,9 @@
+name: gcx-unsupported-json
+fixture:
+  remote:
+    endpoint: "{{REMOTE_OTLP_HTTP}}"
+expected:
+  logs:
+    - logql: '{}'
+      match:
+        - name: seed-log-line

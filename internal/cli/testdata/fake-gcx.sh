@@ -7,6 +7,11 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "--version" ]]; then
+	echo "gcx version 0.4.4"
+	exit 0
+fi
+
 # Drop leading global flags so the rest of the args mirror what a case yaml
 # would produce via signalcmd.
 while [[ $# -gt 0 ]]; do
@@ -67,7 +72,7 @@ EOF
 	fi
 	if [[ "$json" == true ]]; then
 		cat <<'EOF'
-{"status":"success","data":{"resultType":"streams","result":[{"stream":{"service_name":"gcx-e2e-seed","trace_id":"abc123def456"},"values":[["1700000000000000000","seed-log-line"]]}]}}
+{"status":"success","data":{"resultType":"streams","result":[{"stream":{"service_name":"gcx-e2e-seed"},"values":[{"timestamp":"1700000000000000000","line":"seed-log-line","structuredMetadata":{"trace_id":"abc123def456"}}]}]}}
 EOF
 	else
 		cat <<'EOF'
