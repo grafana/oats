@@ -28,7 +28,7 @@ func TestBuildScripts(t *testing.T) {
 
 	output := filepath.Join(t.TempDir(), "oats")
 	projectRoot := filepath.Dir(root)
-	buildCmd := exec.Command("mise", "-C", projectRoot, "run", "build", "--", output)
+	buildCmd := exec.Command("mise", "run", "build", "--", output)
 	buildCmd.Dir = projectRoot
 	if output, err := buildCmd.CombinedOutput(); err != nil {
 		t.Fatalf("mise run build: %v\n%s", err, output)
