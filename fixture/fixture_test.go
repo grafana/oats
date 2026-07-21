@@ -308,6 +308,9 @@ func TestSupportsParallelFixtureKinds(t *testing.T) {
 }
 
 func TestFixtureCleanupAndErrorBranches(t *testing.T) {
+	if ep := newKubernetesEndpoint(discovery.Plan{Fixture: casefile.FixtureConfig{K3D: &casefile.K3DFixture{K8sDir: "k8s", AppService: "app", AppPort: 8080}}}, remote.PortsConfig{}); ep == nil {
+		t.Fatal("default Kubernetes endpoint factory returned nil")
+	}
 	if _, _, err := StartWithOptions(context.Background(), discovery.Plan{Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{}}}, Options{}); err != nil {
 		t.Fatalf("default runtime for remote fixture: %v", err)
 	}
