@@ -390,3 +390,39 @@ func TestRunPlansNormalizesParallelism(t *testing.T) {
 		t.Fatalf("parallel runPlans = pass:%d fail:%d err:%v", pass, fail, err)
 	}
 }
+
+func TestCLIPathVersionAndReporterHelpers(t *testing.T) {
+	if got, err := absArgs([]string{"cases", "./case.yaml"}); err != nil || len(got) != 2 || !filepath.IsAbs(got[0]) || !filepath.IsAbs(got[1]) {
+		t.Fatalf("absArgs = %v, %v", got, err)
+	}
+	if got, err := absArgs(nil); err != nil || got != nil {
+		t.Fatalf("empty absArgs = %v, %v", got, err)
+	}
+
+	dir := t.TempDir()
+	t.Chdir(dir)
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	fs.String("config", "oats-config.yaml", "config")
+	if _, err := resolveConfigPath(fs); err == nil {
+		t.Fatal("resolveConfigPath should fail when no default config exists")
+	}
+
+	script := filepath.Join(dir, "gcx-version")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf 'gcx 0.4.3\\nbuild details\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if got := gcxVersion(script); got != "gcx 0.4.3" {
+		t.Fatalf("gcxVersion = %q", got)
+	}
+	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
+	if got := defaultCacheDir(); got != filepath.Join(dir, "state", "oats") {
+		t.Fatalf("defaultCacheDir = %q", got)
+	}
+
+	inner := &recordingReporter{}
+	locked := &lockedReporter{inner: inner}
+	locked.Emit(report.Event{Type: report.EventRunStart})
+	if err := locked.Close(); err != nil || len(inner.events) != 1 {
+		t.Fatalf("lockedReporter = events:%v err:%v", inner.events, err)
+	}
+}
