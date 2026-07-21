@@ -11,9 +11,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mapfile -t packages < <(
-	GOFLAGS=-buildvcs=false go list ./... | grep -v '^github.com/grafana/oats/tests/e2e$'
-)
+packages_output="$(
+	GOFLAGS=-buildvcs=false go list ./... |
+		awk '$0 != "github.com/grafana/oats/tests/e2e"'
+)"
+if [[ -z "$packages_output" ]]; then
+	echo "no test packages found" >&2
+	exit 1
+fi
+mapfile -t packages <<<"$packages_output"
 
 GOFLAGS=-buildvcs=false go test -coverprofile="$profile" "${packages[@]}"
 
