@@ -56,7 +56,8 @@ func TestCLIConfigAndSmallHelpers(t *testing.T) {
 		t.Fatalf("parent resolveConfigPath = %q, %v", got, err)
 	}
 
-	if err := newVersionCmd().RunE(newVersionCmd(), nil); err != nil {
+	versionCmd := newVersionCmd()
+	if err := versionCmd.RunE(versionCmd, nil); err != nil {
 		t.Fatalf("version command: %v", err)
 	}
 	if cmd := newCacheCmd(); cmd == nil || len(cmd.Commands()) != 1 {
