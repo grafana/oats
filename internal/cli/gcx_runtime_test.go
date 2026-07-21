@@ -148,6 +148,85 @@ func TestResolveDefaultGCXAllowsNewerPathVersion(t *testing.T) {
 	}
 }
 
+func TestResolveGCXVersionUsesExactPathVersion(t *testing.T) {
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = "0.4.4"
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
+
+	gcxBin := fakeGCXOnPath(t, "0.4.4")
+	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyNever)
+	if err := fs.Set("gcx-version", "0.4.4"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := resolveGCX(fs, gcxBin)
+	if err != nil {
+		t.Fatalf("resolveGCX: %v", err)
+	}
+	if got != gcxBin {
+		t.Fatalf("resolveGCX = %q, want %q", got, gcxBin)
+	}
+}
+
+func TestResolveGCXVersionValidatesExplicitPath(t *testing.T) {
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = "0.4.3"
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
+
+	gcxBin := fakeGCXOnPath(t, "0.4.3")
+	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyNever)
+	if err := fs.Set("gcx", gcxBin); err != nil {
+		t.Fatal(err)
+	}
+	if err := fs.Set("gcx-version", "0.4.4"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveGCX(fs, gcxBin); err == nil {
+		t.Fatal("expected exact version mismatch")
+	}
+}
+
+func TestResolveGCXVersionMustMeetMinimum(t *testing.T) {
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = "0.4.4"
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
+
+	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyNever)
+	if err := fs.Set("gcx-version", "0.4.3"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveGCX(fs, "gcx"); err == nil {
+		t.Fatal("expected version below minimum error")
+	}
+}
+
+func TestResolveGCXVersionUsesCachedVersion(t *testing.T) {
+	cacheDir := t.TempDir()
+	target := filepath.Join(cacheDir, "tools", "gcx", "0.4.4", runtime.GOOS+"_"+runtime.GOARCH, "gcx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte("cached gcx"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", t.TempDir())
+
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = "0.4.4"
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
+
+	fs := gcxRuntimeFlags(cacheDir, gcxDownloadPolicyNever)
+	if err := fs.Set("gcx-version", "0.4.4"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := resolveGCX(fs, "gcx")
+	if err != nil {
+		t.Fatalf("resolveGCX: %v", err)
+	}
+	if got != target {
+		t.Fatalf("resolveGCX = %q, want cached %q", got, target)
+	}
+}
+
 func TestResolveDefaultGCXFallsBackForOlderPathVersion(t *testing.T) {
 	cacheDir := t.TempDir()
 	target := filepath.Join(cacheDir, "tools", "gcx", "0.4.3", runtime.GOOS+"_"+runtime.GOARCH, "gcx")
@@ -207,6 +286,7 @@ func TestResolveDefaultGCXExplicitPathOverridesMinimum(t *testing.T) {
 func gcxRuntimeFlags(cacheDir, downloadPolicy string) *pflag.FlagSet {
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
 	fs.String("gcx", "gcx", "")
+	fs.String("gcx-version", "", "")
 	fs.String("gcx-download", downloadPolicy, "")
 	fs.String("cache-dir", cacheDir, "")
 	return fs

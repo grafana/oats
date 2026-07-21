@@ -48,36 +48,90 @@ that verified release when the fallback policy is `auto`. Set
 CI environments; an absent or too-old PATH binary then causes an error. The
 default is `never` when mise is detected (mise on `PATH`, a mise environment
 variable, or an executable installed under mise), and `auto` otherwise. An
-explicit `--gcx <path>` bypasses the minimum-version check, while
-`--gcx-version` downloads and uses exactly the requested release.
-Only the minimum version is enforced: newer PATH versions are accepted rather
-than imposing a maximum that would force `oats` and `gcx` releases to stay in
-lockstep. The GCX output formats consumed by `oats` still need to be covered by
-the OATs parsers and tests as they evolve.
+explicit `--gcx <path>` bypasses the minimum-version check. `--gcx-version V`
+selects an exact version, reusing a matching PATH or cached binary before
+downloading it. If both `--gcx` and `--gcx-version` are supplied, the explicit
+binary must report exactly the requested version; it is never replaced by a
+download. The requested version must meet OATs' embedded minimum unless
+`--gcx` is used without `--gcx-version` as an explicit escape hatch.
+
+Only the minimum version is enforced for default PATH selection: newer PATH
+versions are accepted rather than imposing a maximum that would force `oats`
+and `gcx` releases to stay in lockstep. The GCX output formats consumed by
+`oats` still need to be covered by the OATs parsers and tests as they evolve.
+
+Let `M` be OATs' embedded minimum GCX version:
+
+| Selection                                     | Resolution                                                                                   |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Neither `--gcx` nor `--gcx-version`           | Use PATH GCX when its version is at least `M`; otherwise apply the download policy           |
+| `--gcx PATH`                                  | Use `PATH` directly; the minimum check is bypassed                                           |
+| `--gcx-version V`                             | Require `V >= M`; use an exact PATH match, then the cache, then download according to policy |
+| `--gcx PATH --gcx-version V`                  | Require `PATH` to report exactly `V` and `V >= M`; never download or replace it              |
+| `--gcx-version V` with `--gcx-download never` | Use an exact PATH/cache match or fail                                                        |
+
+The download policy is selected from `--gcx-download` (highest priority), then
+`OATS_GCX_DOWNLOAD`; when neither is set, mise detection defaults it to `never`
+and all other environments default it to `auto`.
+
+```mermaid
+flowchart TD
+    P{Explicit --gcx-download or OATS_GCX_DOWNLOAD?}
+    P -->|yes| Q[Use explicit policy]
+    P -->|no| M{mise detected?}
+    M -->|yes| N[Policy: never]
+    M -->|no| A[Policy: auto]
+
+    Q --> S{--gcx-version V?}
+    N --> S
+    A --> S
+
+    S -->|yes| V{V >= embedded minimum M?}
+    V -->|no| E[Error]
+    V -->|yes| X{--gcx also supplied?}
+    X -->|yes| Y{Explicit binary reports exactly V?}
+    Y -->|yes| U[Use explicit binary]
+    Y -->|no| E
+    X -->|no| Z{Exact V on PATH?}
+    Z -->|yes| U
+    Z -->|no| C{V cached?}
+    C -->|yes| K[Use cached V]
+    C -->|no| F{Policy: auto?}
+    F -->|yes| D[Download and cache V]
+    F -->|no| E
+
+    S -->|no| G{--gcx explicitly supplied?}
+    G -->|yes| U2[Use explicit binary; bypass M]
+    G -->|no| H{PATH GCX version >= M?}
+    H -->|yes| U3[Use PATH GCX]
+    H -->|no / missing / unknown| F2{Policy: auto?}
+    F2 -->|yes| D2[Download and cache minimum M]
+    F2 -->|no| E
+```
 
 Flags:
 
-| Flag                        | Environment variable              | Default                                                            | Meaning                                                                                            |
-| --------------------------- | --------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| `--config`                  | `OATS_CONFIG`                     | `oats-config.yaml`, searched from current working directory upward | config file to load                                                                                |
-| `--tags`                    | `OATS_TAGS`                       | all                                                                | comma-separated tags; a case runs if it matches any                                                |
-| `--parallel`                | `OATS_PARALLEL`                   | `1`                                                                | fixture groups to run concurrently when fixture isolation allows                                   |
-| `--fail-fast`               | `OATS_FAIL_FAST`                  | `false`                                                            | stop scheduling further cases after the first failure                                              |
-| `--timeout`                 | `OATS_TIMEOUT`                    | `30s`                                                              | per-assertion timeout — each assertion is retried until it passes or this elapses                  |
-| `--interval`                | `OATS_INTERVAL`                   | `500ms`                                                            | polling interval between assertion retries                                                         |
-| `--absent-timeout`          | `OATS_ABSENT_TIMEOUT`             | `10s`                                                              | window an `absent` assertion must stay empty to pass                                               |
-| `--seed-settle`             | `OATS_SEED_SETTLE`                | `2s`                                                               | wait after seeding before the first assertion                                                      |
-| `--no-cache`                | `OATS_NO_CACHE`                   | `false`                                                            | ignore the skip-when-unchanged cache for this run                                                  |
-| `--cache-dir`               | `OATS_CACHE_DIR`                  | platform user cache/state directory + `/oats`                      | directory for the skip-when-unchanged cache                                                        |
-| `--format`                  | `OATS_FORMAT`                     | `text`                                                             | output format: `text` or `ndjson`                                                                  |
-| `--gcx`                     | `OATS_GCX`                        | `gcx`                                                              | path to the gcx binary (`PATH`-resolved if a bare name)                                            |
-| `--gcx-version`             | `OATS_GCX_VERSION`                | —                                                                  | download and use this gcx release (for example, `0.4.3`)                                           |
-| `--gcx-download`            | `OATS_GCX_DOWNLOAD`               | `auto` (`never` when mise is detected)                             | fallback policy when the default gcx command is missing, too old, or unparsable: `auto` or `never` |
-| `--gcx-context`             | `OATS_GCX_CONTEXT`                | derived                                                            | gcx context to query (otherwise derived from the fixture endpoint)                                 |
-| `--container-runtime`       | `OATS_CONTAINER_RUNTIME`          | `auto`                                                             | Compose engine: prefer Podman, or explicitly use `docker` / `podman`                               |
-| `--app-host` / `--app-port` | `OATS_APP_HOST` / `OATS_APP_PORT` | `localhost` / `8080`                                               | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself             |
-| `--otlp-http`               | `OATS_OTLP_HTTP`                  | `http://localhost:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                                      |
-| `--verbose`                 | `OATS_VERBOSE`                    | `0`                                                                | increase verbosity (`1`–`3` are the useful levels)                                                 |
+| Flag                        | Environment variable              | Default                                                            | Meaning                                                                                    |
+| --------------------------- | --------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `--config`                  | `OATS_CONFIG`                     | `oats-config.yaml`, searched from current working directory upward | config file to load                                                                        |
+| `--tags`                    | `OATS_TAGS`                       | all                                                                | comma-separated tags; a case runs if it matches any                                        |
+| `--parallel`                | `OATS_PARALLEL`                   | `1`                                                                | fixture groups to run concurrently when fixture isolation allows                           |
+| `--fail-fast`               | `OATS_FAIL_FAST`                  | `false`                                                            | stop scheduling further cases after the first failure                                      |
+| `--timeout`                 | `OATS_TIMEOUT`                    | `30s`                                                              | per-assertion timeout — each assertion is retried until it passes or this elapses          |
+| `--interval`                | `OATS_INTERVAL`                   | `500ms`                                                            | polling interval between assertion retries                                                 |
+| `--absent-timeout`          | `OATS_ABSENT_TIMEOUT`             | `10s`                                                              | window an `absent` assertion must stay empty to pass                                       |
+| `--seed-settle`             | `OATS_SEED_SETTLE`                | `2s`                                                               | wait after seeding before the first assertion                                              |
+| `--no-cache`                | `OATS_NO_CACHE`                   | `false`                                                            | ignore the skip-when-unchanged cache for this run                                          |
+| `--cache-dir`               | `OATS_CACHE_DIR`                  | platform user cache/state directory + `/oats`                      | directory for the skip-when-unchanged cache                                                |
+| `--format`                  | `OATS_FORMAT`                     | `text`                                                             | output format: `text` or `ndjson`                                                          |
+| `--gcx`                     | `OATS_GCX`                        | `gcx`                                                              | path to the gcx binary (`PATH`-resolved if a bare name)                                    |
+| `--gcx-version`             | `OATS_GCX_VERSION`                | —                                                                  | require this exact gcx version, using PATH/cache before downloading (for example, `0.4.3`) |
+| `--gcx-download`            | `OATS_GCX_DOWNLOAD`               | `auto` (`never` when mise is detected)                             | download policy for missing/incompatible GCX: `auto` or `never`                            |
+| `--gcx-context`             | `OATS_GCX_CONTEXT`                | derived                                                            | gcx context to query (otherwise derived from the fixture endpoint)                         |
+| `--container-runtime`       | `OATS_CONTAINER_RUNTIME`          | `auto`                                                             | Compose engine: prefer Podman, or explicitly use `docker` / `podman`                       |
+| `--app-host` / `--app-port` | `OATS_APP_HOST` / `OATS_APP_PORT` | `localhost` / `8080`                                               | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself     |
+| `--otlp-http`               | `OATS_OTLP_HTTP`                  | `http://localhost:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                              |
+| `--verbose`                 | `OATS_VERBOSE`                    | `0`                                                                | increase verbosity (`1`–`3` are the useful levels)                                         |
 
 The deprecated hidden aliases `--list` and `--migrate` also accept
 `OATS_LIST` and `OATS_MIGRATE`. `oats list --config` uses `OATS_CONFIG`, and

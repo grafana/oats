@@ -65,14 +65,66 @@ func isMiseInstallPath(path string) bool {
 	return false
 }
 
-func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
-	policy, err := fs.GetString("gcx-download")
+func resolveGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
+	version, err := fs.GetString("gcx-version")
 	if err != nil {
 		return "", err
 	}
-	policy = strings.ToLower(strings.TrimSpace(policy))
-	if policy != gcxDownloadPolicyAuto && policy != gcxDownloadPolicyNever {
-		return "", fmt.Errorf("invalid --gcx-download %q (want %s or %s)", policy, gcxDownloadPolicyAuto, gcxDownloadPolicyNever)
+	if strings.TrimSpace(version) != "" {
+		return resolveRequestedGCX(fs, gcxBin, version)
+	}
+	return resolveDefaultGCX(fs, gcxBin)
+}
+
+func resolveRequestedGCX(fs *pflag.FlagSet, gcxBin, requested string) (string, error) {
+	version, err := normalizeGCXVersion(requested)
+	if err != nil {
+		return "", err
+	}
+	if MinimumGCXVersion != "" && !gcxVersionAtLeast(version, MinimumGCXVersion) {
+		return "", fmt.Errorf("--gcx-version %s is below oats minimum gcx version %s", version, MinimumGCXVersion)
+	}
+
+	if fs.Changed("gcx") {
+		if _, err := exec.LookPath(gcxBin); err != nil {
+			return "", fmt.Errorf("gcx binary %q was not found (set --gcx to its path)", gcxBin)
+		}
+		installedVersion := gcxVersion(gcxBin)
+		if !gcxVersionMatches(installedVersion, version) {
+			if installedVersion == "" {
+				return "", fmt.Errorf("gcx binary %q did not report a version; want exactly %s", gcxBin, version)
+			}
+			return "", fmt.Errorf("gcx binary %q is %s, want exactly %s", gcxBin, installedVersion, version)
+		}
+		return gcxBin, nil
+	}
+
+	if _, err := exec.LookPath(gcxBin); err == nil && gcxVersionMatches(gcxVersion(gcxBin), version) {
+		return gcxBin, nil
+	}
+
+	cacheDir, err := fs.GetString("cache-dir")
+	if err != nil {
+		return "", err
+	}
+	if cached, ok := cachedGCXPath(version, cacheDir); ok {
+		return cached, nil
+	}
+
+	policy, err := gcxDownloadPolicy(fs)
+	if err != nil {
+		return "", err
+	}
+	if policy == gcxDownloadPolicyNever {
+		return "", fmt.Errorf("gcx version %s was not found on PATH or in the cache (automatic download is disabled)", version)
+	}
+	return bootstrapGCX(version, cacheDir)
+}
+
+func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
+	policy, err := gcxDownloadPolicy(fs)
+	if err != nil {
+		return "", err
 	}
 
 	if _, err := exec.LookPath(gcxBin); err == nil {
@@ -127,6 +179,18 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 	return bootstrapGCX(MinimumGCXVersion, cacheDir)
 }
 
+func gcxDownloadPolicy(fs *pflag.FlagSet) (string, error) {
+	policy, err := fs.GetString("gcx-download")
+	if err != nil {
+		return "", err
+	}
+	policy = strings.ToLower(strings.TrimSpace(policy))
+	if policy != gcxDownloadPolicyAuto && policy != gcxDownloadPolicyNever {
+		return "", fmt.Errorf("invalid --gcx-download %q (want %s or %s)", policy, gcxDownloadPolicyAuto, gcxDownloadPolicyNever)
+	}
+	return policy, nil
+}
+
 var gcxVersionPattern = regexp.MustCompile(`(?:^|[^0-9A-Za-z])(v?[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)`)
 
 func parseGCXVersion(value string) (string, bool) {
@@ -135,6 +199,17 @@ func parseGCXVersion(value string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimPrefix(match[1], "v"), true
+}
+
+func normalizeGCXVersion(value string) (string, error) {
+	version := strings.TrimPrefix(strings.TrimSpace(value), "v")
+	if version == "" {
+		return "", fmt.Errorf("invalid gcx version %q", value)
+	}
+	if _, err := semver.NewSemver(version); err != nil {
+		return "", fmt.Errorf("invalid gcx version %q: %w", value, err)
+	}
+	return version, nil
 }
 
 func gcxVersionAtLeast(installed, minimum string) bool {
@@ -149,6 +224,26 @@ func gcxVersionAtLeast(installed, minimum string) bool {
 		return false
 	}
 	return got.GreaterThanOrEqual(want)
+}
+
+func gcxVersionMatches(installed, requested string) bool {
+	installedVersion, installedOK := parseGCXVersion(installed)
+	requestedVersion, requestedOK := parseGCXVersion(requested)
+	if !installedOK || !requestedOK {
+		return false
+	}
+	got, gotErr := semver.NewSemver(installedVersion)
+	want, wantErr := semver.NewSemver(requestedVersion)
+	if gotErr != nil || wantErr != nil {
+		return false
+	}
+	return got.Equal(want)
+}
+
+func cachedGCXPath(version, cacheDir string) (string, bool) {
+	target := gcxCachePath(version, cacheDir)
+	info, err := os.Stat(target)
+	return target, err == nil && !info.IsDir()
 }
 
 // bootstrapGCX downloads a verified gcx release into the user's cache and
@@ -167,12 +262,8 @@ func bootstrapGCX(version, cacheDir string) (string, error) {
 	archiveURL := fmt.Sprintf("%s/v%s/%s", gcxReleaseBaseURL, version, archiveName)
 	checksumURL := fmt.Sprintf("%s/v%s/gcx_%s_checksums.txt", gcxReleaseBaseURL, version, version)
 
-	installDir := filepath.Join(cacheDir, "tools", "gcx", version, runtime.GOOS+"_"+runtime.GOARCH)
-	executable := "gcx"
-	if runtime.GOOS == "windows" {
-		executable += ".exe"
-	}
-	target := filepath.Join(installDir, executable)
+	target := gcxCachePath(version, cacheDir)
+	installDir := filepath.Dir(target)
 	if info, statErr := os.Stat(target); statErr == nil && !info.IsDir() {
 		return target, nil
 	}
@@ -221,6 +312,14 @@ func bootstrapGCX(version, cacheDir string) (string, error) {
 		return "", fmt.Errorf("install gcx: %w", err)
 	}
 	return target, nil
+}
+
+func gcxCachePath(version, cacheDir string) string {
+	executable := "gcx"
+	if runtime.GOOS == "windows" {
+		executable += ".exe"
+	}
+	return filepath.Join(cacheDir, "tools", "gcx", version, runtime.GOOS+"_"+runtime.GOARCH, executable)
 }
 
 func gcxArchiveName(version, goos, goarch string) (string, error) {
