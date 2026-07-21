@@ -1,13 +1,20 @@
 ---
 name: Build and Test
 
-on: [pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
 permissions: {}
 
 jobs:
   build:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -21,3 +28,9 @@ jobs:
         run: mise run build
       - name: Run tests
         run: mise run test
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          fail_ci_if_error: true
+          files: coverage.out
+          use_oidc: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}

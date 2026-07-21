@@ -67,6 +67,11 @@ type Options struct {
 	// User-Agent headers. It is set by the CLI even when caching is disabled.
 	OatsVersion string
 
+	// GCXVersion is the version reported by the selected gcx binary. It is
+	// included in parser errors so unsupported output formats have actionable
+	// downgrade guidance.
+	GCXVersion string
+
 	// Timeout caps how long the runner waits for any one assertion to pass.
 	// Default 30s.
 	Timeout time.Duration

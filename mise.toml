@@ -1,7 +1,7 @@
 [tools]
 
 # Runtime used by the black-box examples.
-"aqua:grafana/gcx" = "0.4.3"
+"aqua:grafana/gcx" = "0.4.4"
 go = "1.26.5"
 goreleaser = "2.17.0"
 k3d = "5.9.0"
@@ -37,7 +37,7 @@ run = "flint run --fix"
 
 [tasks.test]
 description = "Run tests"
-run = 'GOFLAGS=-buildvcs=false go test $(GOFLAGS=-buildvcs=false go list ./... | grep -v "github.com/grafana/oats/tests/e2e")'
+run = 'GOFLAGS=-buildvcs=false go test -coverprofile=coverage.out $(GOFLAGS=-buildvcs=false go list ./... | grep -v "github.com/grafana/oats/tests/e2e")'
 
 [tasks.e2e-test]
 description = "Run e2e cases"

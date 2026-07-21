@@ -4,6 +4,7 @@
 **/*.test
 .idea/
 **/*.log
+coverage.out
 build/
 *.exe
 dist/

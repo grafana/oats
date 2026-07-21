@@ -20,7 +20,7 @@
 //
 //	--config       Path to oats-config.yaml (default: found from cwd upward)
 //	--gcx          Path to gcx binary (default "gcx" on PATH)
-//	--gcx-version  Download and use a specific gcx release
+//	--gcx-version  Require an exact gcx version (from PATH, cache, or download)
 //	--format       Output format: "text" (default) or "ndjson"
 //	--tags         Comma-separated tag any-match filter (on case tags)
 //	--fail-fast    Stop scheduling further cases after the first failure
@@ -379,24 +379,16 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 	if _, err := container.Parse(containerRuntime); err != nil {
 		return err
 	}
-	if version := flagStr(fs, "gcx-version"); version != "" {
-		if fs.Changed("gcx") {
-			return fmt.Errorf("--gcx and --gcx-version cannot be used together")
-		}
-		gcxBin, err = bootstrapGCX(version, flagStr(fs, "cache-dir"))
-		if err != nil {
-			return err
-		}
-	} else {
-		gcxBin, err = resolveDefaultGCX(fs, gcxBin)
-		if err != nil {
-			return err
-		}
+	gcxBin, err = resolveGCX(fs, gcxBin)
+	if err != nil {
+		return err
 	}
+	detectedGCXVersion := gcxVersion(gcxBin)
 
 	runStart := time.Now()
 	opts := runOptions{
 		gcxBin:             gcxBin,
+		gcxVersion:         detectedGCXVersion,
 		gcxContextOverride: flagStr(fs, "gcx-context"),
 		containerRuntime:   containerRuntime,
 		appHost:            flagStr(fs, "app-host"),
@@ -519,6 +511,7 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 
 type runOptions struct {
 	gcxBin             string
+	gcxVersion         string
 	gcxContextOverride string
 	containerRuntime   string
 	appHost            string
@@ -667,6 +660,7 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 	gcxExec := &engine.GCX{Binary: opts.gcxBin, Context: ep.GCXContext, Config: ep.GCXConfig, Env: ep.GCXEnv}
 	r := runner.New(gcxExec, rep, ep, runner.Options{
 		OatsVersion:     Version,
+		GCXVersion:      opts.gcxVersion,
 		Timeout:         opts.timeout,
 		Interval:        opts.interval,
 		AbsentTimeout:   opts.absentTimeout,
@@ -680,7 +674,7 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 		} else {
 			fixtureBytes, _ := json.Marshal(plan.Fixture)
 			r = r.WithCache(store, runner.CacheContext{
-				GCXVersion:   gcxVersion(opts.gcxBin),
+				GCXVersion:   opts.gcxVersion,
 				FixtureBytes: fixtureBytes,
 			})
 		}

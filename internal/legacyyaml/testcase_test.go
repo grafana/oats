@@ -1,10 +1,20 @@
 package legacyyaml
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/grafana/oats/model"
+	"github.com/grafana/oats/testhelpers/remote"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 )
@@ -180,5 +190,291 @@ func TestTestCasesAreValid(t *testing.T) {
 		model.ValidateInput(gomega.NewGomega(func(message string, callerSkip ...int) {
 			t.Error(message)
 		}), c.Definition.Input)
+	}
+}
+
+func TestLegacyQueryHelpers(t *testing.T) {
+	if got := replaceVariables("up{job=\"$job\",instance=\"$instance\"}"); got != `up{job=".*",instance=".*"}` {
+		t.Fatalf("replaceVariables = %q", got)
+	}
+
+	r := &Runner{testCase: &model.TestCase{MatrixTestCaseName: "linux"}}
+	for condition, want := range map[string]bool{
+		"":          true,
+		"linux":     true,
+		"windows":   false,
+		"linux|mac": true,
+	} {
+		if got := r.MatchesMatrixCondition(condition, "query"); got != want {
+			t.Errorf("MatchesMatrixCondition(%q) = %v, want %v", condition, got, want)
+		}
+	}
+	r.testCase.MatrixTestCaseName = ""
+	if !r.MatchesMatrixCondition("linux", "query") {
+		t.Fatal("matrix condition should be ignored outside a matrix case")
+	}
+}
+
+func TestLegacySignalAssertionsAgainstHTTP(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/loki/api/v1/query_range":
+			_, _ = fmt.Fprint(w, `{"status":"success","data":{"result":[{"stream":{"service":"api"},"values":[["1","ready"]]}]}}`)
+		case "/api/v1/query":
+			_, _ = fmt.Fprint(w, `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"job":"oats"},"value":[1,"2"]}]}}`)
+		case "/pyroscope/render":
+			_, _ = fmt.Fprint(w, `{"flamebearer":{"names":["main","worker"]}}`)
+		case "/api/search":
+			_, _ = fmt.Fprint(w, `{"traces":[]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(parsed.Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := &Runner{
+		endpoint: remote.NewEndpoint(parsed.Hostname(), remote.PortsConfig{
+			PrometheusHTTPPort: port,
+			LokiHTTPPort:       port,
+			TempoHTTPPort:      port,
+			PyroscopeHTTPPort:  port,
+		}, nil, nil, nil),
+		gomegaInst: gomega.NewGomega(func(message string, _ ...int) { t.Error(message) }),
+	}
+
+	AssertLoki(r, model.ExpectedLogs{LogQL: "{service=\"api\"}", Signal: model.ExpectedSignal{
+		NameEquals: "ready",
+		Count:      &model.ExpectedRange{Min: 1, Max: 1},
+		Attributes: map[string]string{"service": "api"},
+	}})
+	AssertProm(r, "$job", ">= 1")
+	AssertPyroscope(r, model.ExpectedProfiles{Query: "process_cpu", Flamebearers: model.Flamebearers{NameRegexp: "work"}})
+	AssertTempo(r, model.ExpectedTraces{TraceQL: "{ .service.name = \"missing\" }", Signal: model.ExpectedSignal{
+		Count: &model.ExpectedRange{Min: 0, Max: 0},
+	}})
+}
+
+func TestLegacyExecuteChecksRunsEverySignalType(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/loki/api/v1/query_range":
+			_, _ = fmt.Fprint(w, `{"status":"success","data":{"result":[{"stream":{"service":"api"},"values":[["1","ready"]]}]}}`)
+		case "/api/v1/query":
+			_, _ = fmt.Fprint(w, `{"status":"success","data":{"resultType":"vector","result":[{"metric":{"job":"oats"},"value":[1,"2"]}]}}`)
+		case "/pyroscope/render":
+			_, _ = fmt.Fprint(w, `{"flamebearer":{"names":["main","worker"]}}`)
+		case "/api/search":
+			_, _ = fmt.Fprint(w, `{"traces":[]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(parsed.Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := NewRunner(&model.TestCase{
+		Name: "all legacy signals",
+		PortConfig: &model.PortConfig{
+			PrometheusHTTPPort: port,
+			LokiHTTPPort:       port,
+			TempoHTTPPort:      port,
+			PyroscopeHttpPort:  port,
+		},
+		Definition: model.TestCaseDefinition{
+			Interval: time.Millisecond,
+			Expected: model.Expected{
+				Logs:     []model.ExpectedLogs{{LogQL: `{service="api"}`, Signal: model.ExpectedSignal{NameEquals: "ready", Count: &model.ExpectedRange{Min: 1, Max: 1}, Attributes: map[string]string{"service": "api"}}}},
+				Traces:   []model.ExpectedTraces{{TraceQL: `{ .service.name = "missing" }`, Signal: model.ExpectedSignal{Count: &model.ExpectedRange{Min: 0, Max: 0}}}},
+				Metrics:  []model.ExpectedMetrics{{PromQL: "up", Value: ">= 1"}},
+				Profiles: []model.ExpectedProfiles{{Query: "process_cpu", Flamebearers: model.Flamebearers{NameRegexp: "work"}}},
+			},
+		},
+	}, model.Settings{Timeout: 200 * time.Millisecond, PresentTimeout: 20 * time.Millisecond, AbsentTimeout: 20 * time.Millisecond})
+	r.endpoint = remote.NewEndpoint(parsed.Hostname(), remote.PortsConfig{
+		PrometheusHTTPPort: port,
+		LokiHTTPPort:       port,
+		TempoHTTPPort:      port,
+		PyroscopeHTTPPort:  port,
+	}, nil, nil, nil)
+	r.ExecuteChecks()
+}
+
+func TestAssertPyroscopeResponseRejectsMalformedJSON(t *testing.T) {
+	failed := false
+	r := &Runner{gomegaInst: gomega.NewGomega(func(string, ...int) { failed = true })}
+	assertPyroscopeResponse([]byte("not json"), model.ExpectedProfiles{}, r)
+	if !failed {
+		t.Fatal("malformed Pyroscope response did not fail")
+	}
+}
+
+func TestLegacyPublicHelpers(t *testing.T) {
+	def, err := LoadTestCaseDefinition("testdata/valid-tests/oats.yaml")
+	if err != nil || def == nil {
+		t.Fatalf("LoadTestCaseDefinition = %#v, %v", def, err)
+	}
+
+	dir := PrepareBuildDir("coverage-helper")
+	if !strings.HasSuffix(dir, "build/coverage-helper") {
+		t.Fatalf("PrepareBuildDir = %q", dir)
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLegacyRunnerPollingHelpers(t *testing.T) {
+	r := NewRunner(&model.TestCase{
+		Name: "polling helper",
+		Definition: model.TestCaseDefinition{
+			Interval: time.Millisecond,
+		},
+	}, model.Settings{
+		Timeout:        100 * time.Millisecond,
+		PresentTimeout: 10 * time.Millisecond,
+		AbsentTimeout:  10 * time.Millisecond,
+		LogLimit:       8,
+	})
+	r.deadline = time.Now().Add(time.Second)
+	r.eventually(func() {})
+	r.consistently(func() {})
+	r.assertSignal(model.ExpectedSignal{}, "query", func() {}, func() {})
+
+	r.Verbose = true
+	r.LogQueryResult("this message is deliberately longer than the limit")
+	r.gomegaInst = gomega.NewGomega(func(message string, _ ...int) { t.Error(message) })
+	r.assertCustomCheck(model.CustomCheck{Script: "true"})
+}
+
+func TestLegacyRunnerCallAsserterDrivesInputs(t *testing.T) {
+	var requests []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.Method+" "+r.URL.Path+" "+r.Header.Get("Accept"))
+		if r.URL.Path == "/created" {
+			w.WriteHeader(http.StatusCreated)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(parsed.Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := NewRunner(&model.TestCase{
+		Name:       "input requests",
+		PortConfig: &model.PortConfig{ApplicationPort: port},
+		Definition: model.TestCaseDefinition{Input: []model.Input{
+			{Path: "/health"},
+			{Scheme: "http", Host: parsed.Hostname(), Method: "post", Path: "/created", Headers: map[string]string{"Accept": "text/plain"}, Body: "payload", Status: "201"},
+		}},
+	}, model.Settings{Host: parsed.Hostname()})
+	failed := false
+	g := gomega.NewGomega(func(string, ...int) { failed = true })
+	r.callAsserter(g, newAssertCaller(r, time.Second), func() {})
+	if failed {
+		t.Fatal("callAsserter reported an unexpected request failure")
+	}
+	if len(requests) != 2 || requests[0] != "GET /health application/json" || requests[1] != "POST /created text/plain" {
+		t.Fatalf("requests = %#v", requests)
+	}
+}
+
+func TestLegacyRunnerExecuteChecksAndMatrixBranches(t *testing.T) {
+	r := NewRunner(&model.TestCase{
+		Name:               "matrix checks",
+		MatrixTestCaseName: "linux",
+		Definition: model.TestCaseDefinition{
+			Interval: time.Millisecond,
+			Expected: model.Expected{
+				Logs:         []model.ExpectedLogs{{LogQL: "ignored", Signal: model.ExpectedSignal{MatrixCondition: "windows"}}},
+				Traces:       []model.ExpectedTraces{{TraceQL: "ignored", Signal: model.ExpectedSignal{MatrixCondition: "windows"}}},
+				Metrics:      []model.ExpectedMetrics{{PromQL: "ignored", MatrixCondition: "windows"}},
+				Profiles:     []model.ExpectedProfiles{{Query: "ignored", MatrixCondition: "windows"}},
+				CustomChecks: []model.CustomCheck{{Script: "true"}},
+			},
+		},
+	}, model.Settings{Timeout: time.Second, PresentTimeout: 10 * time.Millisecond, AbsentTimeout: 10 * time.Millisecond})
+	r.ExecuteChecks()
+
+	if r.MatchesMatrixCondition("windows", "ignored") {
+		t.Fatal("non-matching matrix condition should be skipped")
+	}
+	if caller := newAssertCaller(NewRunner(&model.TestCase{Definition: model.TestCaseDefinition{}}, model.Settings{}), time.Second); caller.interval != model.DefaultTestCaseInterval {
+		t.Fatalf("default polling interval = %v, want %v", caller.interval, model.DefaultTestCaseInterval)
+	}
+}
+
+func TestPrepareBuildDirRemovesExistingDirectory(t *testing.T) {
+	first := PrepareBuildDir("coverage-existing")
+	if err := os.WriteFile(filepath.Join(first, "stale.txt"), []byte("stale"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	second := PrepareBuildDir("coverage-existing")
+	if first != second {
+		t.Fatalf("PrepareBuildDir paths differ: %q vs %q", first, second)
+	}
+	if _, err := os.Stat(filepath.Join(second, "stale.txt")); !os.IsNotExist(err) {
+		t.Fatalf("stale output still exists: %v", err)
+	}
+}
+
+func TestCreateDockerComposeFileWithFakeDocker(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a POSIX executable")
+	}
+
+	bin := t.TempDir()
+	docker := filepath.Join(bin, "docker")
+	if err := os.WriteFile(docker, []byte("#!/bin/sh\nprintf 'services: {}\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	outputDir := t.TempDir()
+	r := &Runner{
+		testCase: &model.TestCase{
+			OutputDir: outputDir,
+			PortConfig: &model.PortConfig{
+				ApplicationPort:    8080,
+				GrafanaHTTPPort:    3000,
+				PrometheusHTTPPort: 9090,
+				LokiHTTPPort:       3100,
+				TempoHTTPPort:      3200,
+				PyroscopeHttpPort:  4040,
+			},
+			Definition: model.TestCaseDefinition{DockerCompose: &model.DockerCompose{}},
+		},
+		Settings: model.Settings{LgtmVersion: "latest"},
+	}
+	gomega.RegisterTestingT(t)
+	path := CreateDockerComposeFile(r)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("generated compose file: %v", err)
+	}
+	if string(data) != "services: {}\n" {
+		t.Fatalf("generated compose = %q", data)
 	}
 }

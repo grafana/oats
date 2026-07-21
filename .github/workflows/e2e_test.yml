@@ -62,6 +62,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes podman podman-compose
+          echo "PODMAN_COMPOSE_PROVIDER=podman-compose" >> "$GITHUB_ENV"
       - name: Start rootless Podman service
         if: matrix.shard == 'compose-podman'
         run: |
@@ -170,6 +171,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes podman podman-compose
+          echo "PODMAN_COMPOSE_PROVIDER=podman-compose" >> "$GITHUB_ENV"
       - name: Start rootless Podman service
         run: |
           socket="$XDG_RUNTIME_DIR/podman/podman.sock"

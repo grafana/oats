@@ -10,6 +10,20 @@ import (
 	"github.com/grafana/oats/assert"
 )
 
+// gcxParseError marks failures caused by an unexpected or invalid gcx
+// response. The runner uses this marker to add remediation guidance without
+// mislabeling command-execution failures as parser failures.
+type gcxParseError struct {
+	err error
+}
+
+func (e *gcxParseError) Error() string { return e.err.Error() }
+func (e *gcxParseError) Unwrap() error { return e.err }
+
+func parseErrorf(format string, args ...any) error {
+	return &gcxParseError{err: fmt.Errorf(format, args...)}
+}
+
 // approxRowCount counts non-empty, non-banner output lines in gcx text mode.
 // It is intentionally approximate — gcx's row-counting story will mature as
 // we use it, and a future enhancement can swap this for a structured-output
@@ -65,7 +79,7 @@ func looksLikeGCXHeader(line string) bool {
 // at the fields we need so additions don't break us.
 func extractMetricRows(stdout string) ([]assert.Row, int, float64, error) {
 	if strings.TrimSpace(stdout) == "" {
-		return nil, 0, 0, fmt.Errorf("metric value parse: empty result")
+		return nil, 0, 0, parseErrorf("metric value parse: empty result")
 	}
 	var generic struct {
 		Data struct {
@@ -77,10 +91,10 @@ func extractMetricRows(stdout string) ([]assert.Row, int, float64, error) {
 		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &generic); err != nil {
-		return nil, 0, 0, fmt.Errorf("metric JSON parse: %w", err)
+		return nil, 0, 0, parseErrorf("metric JSON parse: %w", err)
 	}
 	if len(generic.Data.Result) == 0 {
-		return nil, 0, 0, fmt.Errorf("metric value parse: empty result")
+		return nil, 0, 0, parseErrorf("metric value parse: empty result")
 	}
 	rows := make([]assert.Row, 0, len(generic.Data.Result))
 	for _, item := range generic.Data.Result {
@@ -96,42 +110,134 @@ func extractMetricRows(stdout string) ([]assert.Row, int, float64, error) {
 		raw, ok = r.Values[len(r.Values)-1][1].(string)
 	}
 	if !ok {
-		return rows, len(generic.Data.Result), 0, fmt.Errorf("metric value parse: result point has no scalar value")
+		return rows, len(generic.Data.Result), 0, parseErrorf("metric value parse: result point has no scalar value")
 	}
 	var f float64
 	if _, err := fmt.Sscanf(raw, "%f", &f); err != nil {
-		return rows, len(generic.Data.Result), 0, fmt.Errorf("metric value parse: %q is not a number", raw)
+		return rows, len(generic.Data.Result), 0, parseErrorf("metric value parse: %q is not a number", raw)
 	}
 	return rows, len(generic.Data.Result), f, nil
+}
+
+func decodeGCXData(stdout, signal string, target any) error {
+	if strings.TrimSpace(stdout) == "" {
+		return parseErrorf("%s response is empty", signal)
+	}
+
+	var envelope struct {
+		Status string          `json:"status"`
+		Error  json.RawMessage `json:"error"`
+		Data   json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &envelope); err != nil {
+		return parseErrorf("%s JSON parse: %w", signal, err)
+	}
+	if envelope.Status != "" && envelope.Status != "success" {
+		detail := strings.TrimSpace(string(envelope.Error))
+		var message string
+		if json.Unmarshal(envelope.Error, &message) == nil {
+			detail = message
+		}
+		if detail == "" {
+			return parseErrorf("%s response reported status %q", signal, envelope.Status)
+		}
+		return parseErrorf("%s response reported status %q: %s", signal, envelope.Status, detail)
+	}
+	if missingJSON(envelope.Data) {
+		return parseErrorf("%s response has unsupported format: missing data", signal)
+	}
+	if err := json.Unmarshal(envelope.Data, target); err != nil {
+		return parseErrorf("%s response has unsupported format: data: %w", signal, err)
+	}
+	return nil
+}
+
+func missingJSON(raw json.RawMessage) bool {
+	trimmed := strings.TrimSpace(string(raw))
+	return trimmed == "" || trimmed == "null"
 }
 
 func extractLogRows(stdout string) ([]assert.Row, int, error) {
 	if strings.TrimSpace(stdout) == "" {
 		return nil, 0, nil
 	}
+
+	// gcx 0.4.4 represents each log value as an object so structured metadata
+	// and parsed labels can stay attached to the individual line. Keep accepting
+	// the earlier timestamp/line array shape as well for explicit older gcx
+	// binaries supplied through --gcx.
 	var generic struct {
-		Data struct {
-			Result []struct {
-				Stream map[string]any `json:"stream"`
-				Values [][]any        `json:"values"`
-			} `json:"result"`
-		} `json:"data"`
+		Result json.RawMessage `json:"result"`
 	}
-	if err := json.Unmarshal([]byte(stdout), &generic); err != nil {
-		return nil, 0, fmt.Errorf("log JSON parse: %w", err)
+	if err := decodeGCXData(stdout, "log", &generic); err != nil {
+		return nil, 0, err
+	}
+	if missingJSON(generic.Result) {
+		return nil, 0, parseErrorf("log response has unsupported format: data.result is missing")
+	}
+
+	var streams []struct {
+		Stream map[string]any  `json:"stream"`
+		Values json.RawMessage `json:"values"`
+	}
+	if err := json.Unmarshal(generic.Result, &streams); err != nil {
+		return nil, 0, parseErrorf("log response has unsupported format: data.result: %w", err)
 	}
 	var rows []assert.Row
-	for _, stream := range generic.Data.Result {
-		attrs := stringifyMap(stream.Stream)
-		for _, pair := range stream.Values {
-			body := ""
-			if len(pair) > 1 {
-				body = fmt.Sprint(pair[1])
+	for streamIndex, stream := range streams {
+		if missingJSON(stream.Values) {
+			return rows, len(rows), parseErrorf("log response has unsupported format: data.result[%d].values is missing", streamIndex)
+		}
+
+		var rawValues []json.RawMessage
+		if err := json.Unmarshal(stream.Values, &rawValues); err != nil {
+			return rows, len(rows), parseErrorf("log response has unsupported format: data.result[%d].values: %w", streamIndex, err)
+		}
+		for valueIndex, rawValue := range rawValues {
+			line, structuredMetadata, parsed, err := parseLogValue(rawValue)
+			if err != nil {
+				return rows, len(rows), parseErrorf("log response has unsupported format: data.result[%d].values[%d]: %w", streamIndex, valueIndex, err)
 			}
-			rows = append(rows, assert.Row{Name: body, Attributes: attrs})
+			attrs := stringifyMap(stream.Stream)
+			for k, v := range stringifyMapAny(structuredMetadata) {
+				attrs[k] = v
+			}
+			for k, v := range stringifyMapAny(parsed) {
+				attrs[k] = v
+			}
+			rows = append(rows, assert.Row{Name: line, Attributes: attrs})
 		}
 	}
 	return rows, len(rows), nil
+}
+
+func parseLogValue(raw json.RawMessage) (string, map[string]any, map[string]any, error) {
+	if strings.HasPrefix(strings.TrimSpace(string(raw)), "[") {
+		var pair []json.RawMessage
+		if err := json.Unmarshal(raw, &pair); err != nil {
+			return "", nil, nil, err
+		}
+		var line string
+		if len(pair) > 1 {
+			if err := json.Unmarshal(pair[1], &line); err != nil {
+				return "", nil, nil, fmt.Errorf("array value has non-string line: %w", err)
+			}
+		}
+		return line, nil, nil, nil
+	}
+
+	var entry struct {
+		Line               *string        `json:"line"`
+		StructuredMetadata map[string]any `json:"structuredMetadata"`
+		Parsed             map[string]any `json:"parsed"`
+	}
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		return "", nil, nil, err
+	}
+	if entry.Line == nil {
+		return "", nil, nil, fmt.Errorf("object value is missing line")
+	}
+	return *entry.Line, entry.StructuredMetadata, entry.Parsed, nil
 }
 
 func extractTraceRows(stdout string) ([]assert.Row, int, error) {
@@ -140,7 +246,7 @@ func extractTraceRows(stdout string) ([]assert.Row, int, error) {
 	}
 	var root any
 	if err := json.Unmarshal([]byte(stdout), &root); err != nil {
-		return nil, 0, fmt.Errorf("trace JSON parse: %w", err)
+		return nil, 0, parseErrorf("trace JSON parse: %w", err)
 	}
 	if rows, ok := extractOTLPTraceRows(root); ok {
 		return rows, len(rows), nil
@@ -163,7 +269,7 @@ func extractTraceIDs(stdout string) ([]string, int, error) {
 		} `json:"traces"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
-		return nil, 0, fmt.Errorf("trace JSON parse: %w", err)
+		return nil, 0, parseErrorf("trace JSON parse: %w", err)
 	}
 	ids := make([]string, 0, len(payload.Traces))
 	for _, tr := range payload.Traces {
@@ -180,7 +286,7 @@ func extractProfileRows(stdout string) ([]assert.Row, int, error) {
 	}
 	var root any
 	if err := json.Unmarshal([]byte(stdout), &root); err != nil {
-		return nil, 0, fmt.Errorf("profile JSON parse: %w", err)
+		return nil, 0, parseErrorf("profile JSON parse: %w", err)
 	}
 	if names := flamebearerNames(root); len(names) > 0 {
 		rows := make([]assert.Row, 0, len(names))

@@ -1,0 +1,26 @@
+#!/bin/sh
+
+if [ "${1:-}" = "--version" ]; then
+  printf '0.4.5\n'
+  exit 0
+fi
+
+# This deliberately changes the values container shape. The parser should
+# reject it with a useful unsupported-format error instead of treating the
+# query as empty.
+cat <<'EOF'
+{
+  "status": "success",
+  "data": {
+    "resultType": "streams",
+    "result": [
+      {
+        "stream": {},
+        "values": {
+          "items": [{"line": "seed-log-line"}]
+        }
+      }
+    ]
+  }
+}
+EOF
