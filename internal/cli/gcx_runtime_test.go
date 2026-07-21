@@ -132,6 +132,22 @@ func TestResolveDefaultGCXUsesSufficientPathVersion(t *testing.T) {
 	}
 }
 
+func TestResolveDefaultGCXAllowsNewerPathVersion(t *testing.T) {
+	oldVersion := MinimumGCXVersion
+	MinimumGCXVersion = "0.4.4"
+	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
+
+	gcxBin := fakeGCXOnPath(t, "0.5.0")
+	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyAuto)
+	got, err := resolveDefaultGCX(fs, gcxBin)
+	if err != nil {
+		t.Fatalf("resolveDefaultGCX: %v", err)
+	}
+	if got != gcxBin {
+		t.Fatalf("resolveDefaultGCX = %q, want %q", got, gcxBin)
+	}
+}
+
 func TestResolveDefaultGCXFallsBackForOlderPathVersion(t *testing.T) {
 	cacheDir := t.TempDir()
 	target := filepath.Join(cacheDir, "tools", "gcx", "0.4.3", runtime.GOOS+"_"+runtime.GOARCH, "gcx")

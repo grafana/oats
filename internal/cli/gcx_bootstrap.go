@@ -85,6 +85,9 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 
 		installedVersion := gcxVersion(gcxBin)
 		if gcxVersionAtLeast(installedVersion, MinimumGCXVersion) {
+			// Enforce only the minimum version. Rejecting newer gcx releases would
+			// unnecessarily require oats releases to stay in lockstep with gcx;
+			// output parsers should handle supported format changes instead.
 			return gcxBin, nil
 		}
 		if policy == gcxDownloadPolicyNever {
