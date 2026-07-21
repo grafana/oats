@@ -98,7 +98,7 @@ fixture safety gate allows it.
   selects a release; `--gcx-download never` (or `OATS_GCX_DOWNLOAD=never`) keeps
   CI and air-gapped runs from downloading.
 - The pin is read from `mise.toml` by `scripts/gcx-version.sh`. Local builds use
-  `.mise/tasks/build`; e2e tool setup uses `mise run build-local-tools`;
+  `mise run build`; e2e tool setup uses `mise run build-local-tools`;
   GoReleaser receives the same value through `GCX_VERSION` in the release
   workflow. Do not hard-code a second gcx version in a script or workflow.
 - `OATS_GHA_ANNOTATIONS` controls the optional GitHub Actions error annotations
