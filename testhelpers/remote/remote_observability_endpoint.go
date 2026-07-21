@@ -84,14 +84,13 @@ func (e *Endpoint) makeGetRequest(url string) ([]byte, error) {
 	if getErr != nil {
 		return nil, getErr
 	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("expected HTTP status 200, but got: %d", resp.StatusCode)
 	}
-
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
 
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
