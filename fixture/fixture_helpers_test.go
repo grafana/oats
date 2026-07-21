@@ -64,6 +64,10 @@ func TestComposeHelpers(t *testing.T) {
 	if !containsString(env, "OATS_COMPOSE_FILE_ARGS=-f '/cases/compose.yml'") {
 		t.Errorf("composeCheckEnv missing quoted file args in %#v", env)
 	}
+	mergedEnv := mergeEnvironment([]string{"COMPOSE_PROJECT_NAME=parent", "PATH=/bin"}, []string{"COMPOSE_PROJECT_NAME=child", "OATS_TEST=1"})
+	if len(mergedEnv) != 3 || !containsString(mergedEnv, "COMPOSE_PROJECT_NAME=child") || containsString(mergedEnv, "COMPOSE_PROJECT_NAME=parent") {
+		t.Errorf("mergeEnvironment = %#v", mergedEnv)
+	}
 
 	noFiles := composeCheckEnv(plan, Runtime{})
 	if len(noFiles) != 1 || noFiles[0] != "OATS_FIXTURE_TYPE=compose" {
@@ -180,9 +184,9 @@ esac
 	podman := filepath.Join(bin, "podman")
 	if err := os.WriteFile(podman, []byte(`#!/bin/sh
 case "$*" in
-ps\ -a*) printf 'stopped-container-lookup\n' >&2; exit 1 ;;
-ps\ *) printf 'container-id\n' ;;
-*port*) printf '3000/tcp -> 127.0.0.1:55432\n' ;;
+"ps --filter label=com.docker.compose.project=oats-test --filter label=com.docker.compose.service=lgtm --format {{.ID}}") printf 'container-id\n' ;;
+"port container-id 3000") printf '3000/tcp -> 127.0.0.1:55432\n' ;;
+*) printf 'unexpected podman args: %s\n' "$*" >&2; exit 1 ;;
 esac
 `), 0o700); err != nil {
 		t.Fatal(err)

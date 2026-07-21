@@ -331,7 +331,7 @@ func composePort(engine container.Engine, files []string, env []string, service,
 	}
 	args = append(args, "port", service, containerPort)
 	cmd := exec.Command(engine.Binary(), args...)
-	cmd.Env = append(cmd.Environ(), env...)
+	cmd.Env = mergeEnvironment(cmd.Environ(), env)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", composePortError(podmanErr, err)
@@ -353,6 +353,24 @@ func composePortError(podmanErr, composeErr error) error {
 	return fmt.Errorf("podman port lookup: %v; compose port lookup: %w", podmanErr, composeErr)
 }
 
+func mergeEnvironment(parent, override []string) []string {
+	merged := make([]string, 0, len(parent)+len(override))
+	index := make(map[string]int, len(parent)+len(override))
+	for _, entry := range append(append([]string(nil), parent...), override...) {
+		key := entry
+		if separator := strings.IndexByte(entry, '='); separator >= 0 {
+			key = entry[:separator]
+		}
+		if position, ok := index[key]; ok {
+			merged[position] = entry
+			continue
+		}
+		index[key] = len(merged)
+		merged = append(merged, entry)
+	}
+	return merged
+}
+
 func podmanPort(env []string, service, containerPort string) (string, error) {
 	project := ""
 	for i := len(env) - 1; i >= 0; i-- {
@@ -367,11 +385,11 @@ func podmanPort(env []string, service, containerPort string) (string, error) {
 		return "", fmt.Errorf("COMPOSE_PROJECT_NAME is required for Podman port lookup")
 	}
 
-	ps := exec.Command("podman", "ps",
+	ps := exec.Command(container.Podman.Binary(), "ps",
 		"--filter", "label=com.docker.compose.project="+project,
 		"--filter", "label=com.docker.compose.service="+service,
 		"--format", "{{.ID}}")
-	ps.Env = append(ps.Environ(), env...)
+	ps.Env = mergeEnvironment(ps.Environ(), env)
 	containers, err := ps.Output()
 	if err != nil {
 		return "", err
@@ -381,8 +399,8 @@ func podmanPort(env []string, service, containerPort string) (string, error) {
 		return "", fmt.Errorf("no Podman container found for project %q service %q", project, service)
 	}
 
-	port := exec.Command("podman", "port", containerID, containerPort)
-	port.Env = append(port.Environ(), env...)
+	port := exec.Command(container.Podman.Binary(), "port", containerID, containerPort)
+	port.Env = mergeEnvironment(port.Environ(), env)
 	out, err := port.Output()
 	if err != nil {
 		return "", err
