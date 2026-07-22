@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -81,18 +82,14 @@ func available(engine Engine) error {
 	// installed but its service socket is not running. Probe a harmless empty
 	// Compose project so auto mode can try the next engine before fixture
 	// startup.
-	probe, err := os.CreateTemp("", "oats-runtime-probe-*.compose.yml")
+	probeDir, err := os.MkdirTemp("", "oats-runtime-probe-")
 	if err != nil {
-		return fmt.Errorf("create compose probe: %w", err)
+		return fmt.Errorf("create compose probe directory: %w", err)
 	}
-	probePath := probe.Name()
-	defer func() { _ = os.Remove(probePath) }()
-	if _, err := probe.WriteString("services:\n  oats-runtime-probe:\n    image: scratch\n"); err != nil {
-		_ = probe.Close()
+	defer func() { _ = os.RemoveAll(probeDir) }()
+	probePath := filepath.Join(probeDir, "compose.yml")
+	if err := os.WriteFile(probePath, []byte("services:\n  oats-runtime-probe:\n    image: scratch\n"), 0o600); err != nil {
 		return fmt.Errorf("write compose probe: %w", err)
-	}
-	if err := probe.Close(); err != nil {
-		return fmt.Errorf("close compose probe: %w", err)
 	}
 
 	if output, err := runComposeProbe(engine, "-f", probePath, "ps"); err != nil {
@@ -108,7 +105,11 @@ func available(engine Engine) error {
 func runComposeProbe(engine Engine, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), composeProbeTimeout)
 	defer cancel()
-	return exec.CommandContext(ctx, engine.Binary(), append([]string{"compose"}, args...)...).CombinedOutput()
+	output, err := exec.CommandContext(ctx, engine.Binary(), append([]string{"compose"}, args...)...).CombinedOutput()
+	if err != nil && ctx.Err() == context.DeadlineExceeded {
+		return output, fmt.Errorf("compose probe timed out after %s: %w", composeProbeTimeout, ctx.Err())
+	}
+	return output, err
 }
 
 // Binary returns the executable used by the engine.
