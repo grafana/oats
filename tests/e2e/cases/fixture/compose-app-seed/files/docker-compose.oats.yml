@@ -3,7 +3,7 @@ services:
   # collector (added by `template: lgtm`). restart: always re-emits until LGTM
   # is ready, so the trace reliably lands regardless of startup ordering.
   telemetrygen:
-    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest@sha256:3e73b5498712c44843897a27c729d00dae78524794b40847fd1d6ab2703141a7
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest@sha256:fd38dc128b69e54b09be3f6c11be550edc8ca8bb77baa21d4ebe3ea110934513
     command:
       - traces
       - --otlp-endpoint
