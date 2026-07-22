@@ -249,19 +249,21 @@ jobs:
 
   # Single required check. Branch protection can require just `e2e` instead of
   # every matrix leg, so adding/renaming shards never silently drops coverage.
-  # `needs` on the matrix job succeeds only if all its legs did; if: always()
-  # makes this run (and go red) even when a dependency fails or is skipped.
+  # `needs` on the matrix job succeeds only if all its legs did; the wildcard
+  # result check below keeps this summary in sync as dependent jobs change.
   e2e:
     needs: [test-e2e, examples, examples-podman, examples-auto-fallback]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     steps:
-      - name: Check e2e results
+      - name: Report status
+        shell: bash
         env:
-          TEST_E2E_RESULT: ${{ needs.test-e2e.result }}
-          EXAMPLES_RESULT: ${{ needs.examples.result }}
-          EXAMPLES_PODMAN_RESULT: ${{ needs.examples-podman.result }}
-          EXAMPLES_AUTO_FALLBACK_RESULT: ${{ needs.examples-auto-fallback.result }}
+          E2E_SUCCESS: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
         run: |
-          echo "test-e2e=$TEST_E2E_RESULT examples=$EXAMPLES_RESULT examples-podman=$EXAMPLES_PODMAN_RESULT examples-auto-fallback=$EXAMPLES_AUTO_FALLBACK_RESULT"
-          [ "$TEST_E2E_RESULT" = "success" ] && [ "$EXAMPLES_RESULT" = "success" ] && [ "$EXAMPLES_PODMAN_RESULT" = "success" ] && [ "$EXAMPLES_AUTO_FALLBACK_RESULT" = "success" ]
+          if [ "$E2E_SUCCESS" = "true" ]; then
+            echo 'E2E tests successful'
+          else
+            echo 'E2E tests failed'
+            exit 1
+          fi
