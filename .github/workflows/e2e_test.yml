@@ -249,17 +249,18 @@ jobs:
 
   # Single required check. Branch protection can require just `e2e` instead of
   # every matrix leg, so adding/renaming shards never silently drops coverage.
-  # `needs` on the matrix job succeeds only if all its legs did; the wildcard
-  # result check below keeps this summary in sync as dependent jobs change.
+  # `always()` ensures this summary runs when a dependent job fails or is
+  # skipped; the wildcard result check below keeps it in sync as dependent
+  # jobs change.
   e2e:
     needs: [test-e2e, examples, examples-podman, examples-auto-fallback]
-    if: ${{ !cancelled() }}
+    if: ${{ always() }}
     runs-on: ubuntu-24.04
     steps:
       - name: Report status
         shell: bash
         env:
-          E2E_SUCCESS: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+          E2E_SUCCESS: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'skipped') }}
         run: |
           if [ "$E2E_SUCCESS" = "true" ]; then
             echo 'E2E tests successful'
