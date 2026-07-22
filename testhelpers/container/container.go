@@ -21,6 +21,8 @@ const (
 	Auto   Engine = "auto"
 	Docker Engine = "docker"
 	Podman Engine = "podman"
+
+	composeProbeTimeout = 5 * time.Second
 )
 
 // Parse validates a requested engine name. An empty value means Auto.
@@ -67,7 +69,11 @@ func available(engine Engine) error {
 	// may be an optional CLI plugin. Probe both during selection so an engine
 	// without a usable Compose implementation fails with an actionable error
 	// instead of failing later during fixture startup.
-	if err := exec.Command(engine.Binary(), "compose", "version").Run(); err != nil {
+	if output, err := runComposeProbe(engine, "version"); err != nil {
+		message := strings.TrimSpace(string(output))
+		if message != "" {
+			return fmt.Errorf("compose unavailable: %s: %w", message, err)
+		}
 		return fmt.Errorf("compose unavailable: %w", err)
 	}
 	// `compose version` only checks the client/provider. A provider can still
@@ -89,9 +95,7 @@ func available(engine Engine) error {
 		return fmt.Errorf("close compose probe: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if output, err := exec.CommandContext(ctx, engine.Binary(), "compose", "-f", probePath, "ps").CombinedOutput(); err != nil {
+	if output, err := runComposeProbe(engine, "-f", probePath, "ps"); err != nil {
 		message := strings.TrimSpace(string(output))
 		if message != "" {
 			return fmt.Errorf("container engine unavailable: %s: %w", message, err)
@@ -99,6 +103,12 @@ func available(engine Engine) error {
 		return fmt.Errorf("container engine unavailable: %w", err)
 	}
 	return nil
+}
+
+func runComposeProbe(engine Engine, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), composeProbeTimeout)
+	defer cancel()
+	return exec.CommandContext(ctx, engine.Binary(), append([]string{"compose"}, args...)...).CombinedOutput()
 }
 
 // Binary returns the executable used by the engine.
