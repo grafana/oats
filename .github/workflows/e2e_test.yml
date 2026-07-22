@@ -201,20 +201,70 @@ jobs:
           OATS_EXAMPLE_MODE: compose
         run: mise run example-test
 
-  # Single required check. Branch protection can require just `e2e` instead of
-  # every matrix leg, so adding/renaming shards never silently drops coverage.
-  # `needs` on the matrix job succeeds only if all its legs did; if: always()
-  # makes this run (and go red) even when a dependency fails or is skipped.
-  e2e:
-    needs: [test-e2e, examples, examples-podman]
-    if: always()
+  # Exercise auto selection when Podman is installed but its Compose provider
+  # cannot reach the engine. Docker remains healthy, so OATS must fall back to
+  # Docker after the Podman probe fails.
+  examples-auto-fallback:
+    needs: build-e2e-tools
     runs-on: ubuntu-24.04
     steps:
-      - name: Check e2e results
-        env:
-          TEST_E2E_RESULT: ${{ needs.test-e2e.result }}
-          EXAMPLES_RESULT: ${{ needs.examples.result }}
-          EXAMPLES_PODMAN_RESULT: ${{ needs.examples-podman.result }}
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
+        with:
+          version: v2026.7.7
+          sha256: 429f71e7e989908bf975aafac9066329c16e2d8fc7cd8e74fdf21dd6300ffe7c
+      - name: Install Podman Compose provider
         run: |
-          echo "test-e2e=$TEST_E2E_RESULT examples=$EXAMPLES_RESULT examples-podman=$EXAMPLES_PODMAN_RESULT"
-          [ "$TEST_E2E_RESULT" = "success" ] && [ "$EXAMPLES_RESULT" = "success" ] && [ "$EXAMPLES_PODMAN_RESULT" = "success" ]
+          sudo apt-get update
+          sudo apt-get install --yes docker-compose podman
+          mkdir -p "$RUNNER_TEMP/unavailable-podman-bin"
+          cat >"$RUNNER_TEMP/unavailable-podman-bin/podman" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          if [[ "${1:-}" == compose ]]; then
+            export DOCKER_HOST="unix://${RUNNER_TEMP}/unavailable-podman.sock"
+          fi
+          exec /usr/bin/podman "$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/unavailable-podman-bin/podman"
+          echo "$RUNNER_TEMP/unavailable-podman-bin" >>"$GITHUB_PATH"
+          echo "PODMAN_COMPOSE_PROVIDER=docker-compose" >>"$GITHUB_ENV"
+      - name: Download e2e tools
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e2e-tools
+          path: .e2e-tools/bin
+      - name: Restore e2e tool permissions
+        run: chmod +x .e2e-tools/bin/oats .e2e-tools/bin/gcx
+      - name: Run Compose examples with automatic fallback
+        env:
+          OATS_BIN: ${{ github.workspace }}/.e2e-tools/bin/oats
+          GCX_BIN: ${{ github.workspace }}/.e2e-tools/bin/gcx
+          OATS_CONTAINER_RUNTIME: auto
+          OATS_EXAMPLE_MODE: compose
+        run: mise run example-test
+
+  # Single required check. Branch protection can require just `e2e` instead of
+  # every matrix leg, so adding/renaming shards never silently drops coverage.
+  # `always()` ensures this summary runs when a dependent job fails or is
+  # skipped; the wildcard result check below keeps it in sync as dependent
+  # jobs change.
+  e2e:
+    needs: [test-e2e, examples, examples-podman, examples-auto-fallback]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Report status
+        shell: bash
+        env:
+          E2E_SUCCESS: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'skipped') }}
+        run: |
+          if [ "$E2E_SUCCESS" = "true" ]; then
+            echo 'E2E tests successful'
+          else
+            echo 'E2E tests failed'
+            exit 1
+          fi

@@ -110,3 +110,60 @@ func TestResolveAutoPrefersPodman(t *testing.T) {
 		t.Fatalf("Resolve(auto) = %q, want %q", got, Podman)
 	}
 }
+
+func TestResolveAutoFallsBackWhenPodmanEngineIsUnavailable(t *testing.T) {
+	dir := t.TempDir()
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses POSIX executables")
+	}
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte(`#!/bin/sh
+if [ "$1" = "compose" ] && [ "$2" = "version" ]; then
+  exit 0
+fi
+exit 1
+`), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	docker := filepath.Join(dir, "docker")
+	if err := os.WriteFile(docker, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	got, err := Resolve("auto")
+	if err != nil {
+		t.Fatalf("Resolve(auto): %v", err)
+	}
+	if got != Docker {
+		t.Fatalf("Resolve(auto) = %q, want %q", got, Docker)
+	}
+}
+
+func TestResolveAutoUsesPortableComposeProbe(t *testing.T) {
+	dir := t.TempDir()
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses POSIX executables")
+	}
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte(`#!/bin/sh
+if [ "$1" = "compose" ] && [ "$2" = "version" ]; then
+  exit 0
+fi
+if [ "$1" = "compose" ] && [ "$2" = "-f" ] && [ "$4" = "ps" ] && [ "$#" -eq 4 ]; then
+  exit 0
+fi
+exit 1
+`), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	got, err := Resolve("auto")
+	if err != nil {
+		t.Fatalf("Resolve(auto): %v", err)
+	}
+	if got != Podman {
+		t.Fatalf("Resolve(auto) = %q, want %q", got, Podman)
+	}
+}
