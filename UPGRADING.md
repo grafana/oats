@@ -5,7 +5,7 @@ The changelog is available in the [releases section](https://github.com/grafana/
 This file only contains upgrade notes for breaking changes that require you to
 modify your existing YAML test files.
 
-## Unreleased / next major
+## 0.8.0
 
 > [!WARNING]
 > **Breaking change:** the legacy root runner has been removed.

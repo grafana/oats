@@ -2,10 +2,15 @@
 
 ## [0.8.0](https://github.com/grafana/oats/compare/v0.7.0...v0.8.0) (2026-07-23)
 
+> [!WARNING]
+> This release replaces the legacy root runner and YAML format with the v3
+> configuration and case format. Existing test files require migration; see
+> the [migration notes](https://github.com/grafana/oats/blob/main/UPGRADING.md)
+> before upgrading.
 
 ### Features
 
-* integrate OATs v2 rewrite ([#401](https://github.com/grafana/oats/issues/401)) ([19f6cbb](https://github.com/grafana/oats/commit/19f6cbb6c43b48c6c5a20896f24b96c30c298aed))
+* introduce the v3 configuration and case model ([#401](https://github.com/grafana/oats/issues/401)) ([19f6cbb](https://github.com/grafana/oats/commit/19f6cbb6c43b48c6c5a20896f24b96c30c298aed))
 
 
 ### Bug Fixes
