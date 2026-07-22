@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/oats/model"
+	"github.com/grafana/oats/internal/legacyyaml/model"
 	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/kubernetes"
 	"github.com/grafana/oats/testhelpers/remote"

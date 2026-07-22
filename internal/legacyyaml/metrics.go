@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/oats/testhelpers/prometheus/responses"
+	"github.com/grafana/oats/internal/legacyyaml/prometheus/responses"
 	"github.com/onsi/gomega"
 )
 
