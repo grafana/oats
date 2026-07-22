@@ -4,9 +4,12 @@
 package container
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // Engine is a supported host container engine.
@@ -66,6 +69,34 @@ func available(engine Engine) error {
 	// instead of failing later during fixture startup.
 	if err := exec.Command(engine.Binary(), "compose", "version").Run(); err != nil {
 		return fmt.Errorf("compose unavailable: %w", err)
+	}
+	// `compose version` only checks the client/provider. A provider can still
+	// be unable to reach the engine API, which is common when Podman is
+	// installed but its service socket is not running. Probe a harmless empty
+	// Compose project so auto mode can try the next engine before fixture
+	// startup.
+	probe, err := os.CreateTemp("", "oats-runtime-probe-*.compose.yml")
+	if err != nil {
+		return fmt.Errorf("create compose probe: %w", err)
+	}
+	probePath := probe.Name()
+	defer func() { _ = os.Remove(probePath) }()
+	if _, err := probe.WriteString("services:\n  oats-runtime-probe:\n    image: scratch\n"); err != nil {
+		_ = probe.Close()
+		return fmt.Errorf("write compose probe: %w", err)
+	}
+	if err := probe.Close(); err != nil {
+		return fmt.Errorf("close compose probe: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if output, err := exec.CommandContext(ctx, engine.Binary(), "compose", "-f", probePath, "ps", "--all", "--quiet").CombinedOutput(); err != nil {
+		message := strings.TrimSpace(string(output))
+		if message != "" {
+			return fmt.Errorf("container engine unavailable: %s: %w", message, err)
+		}
+		return fmt.Errorf("container engine unavailable: %w", err)
 	}
 	return nil
 }
