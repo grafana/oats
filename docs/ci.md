@@ -21,8 +21,8 @@ which produces a pinned `mise.toml`:
 
 ```toml
 [tools]
-"aqua:grafana/oats" = "0.7.0"
-"aqua:grafana/gcx"  = "0.4.3"
+"aqua:grafana/oats" = "X.Y.Z"
+"aqua:grafana/gcx"  = "X.Y.Z"
 ```
 
 Pinning is what makes CI caching safe (see below): a pinned release is an
@@ -45,7 +45,7 @@ result cache.
 go install github.com/grafana/oats@latest
 ```
 
-`oats --gcx-version 0.4.3` can download and cache gcx itself for fixture-backed
+`oats --gcx-version X.Y.Z` can download and cache gcx itself for fixture-backed
 runs. Release and mise-built oats binaries also embed the repository's minimum
 gcx version. They use the default `gcx` command when it meets that minimum and
 can download the verified release when gcx is missing, too old, or unparsable.
