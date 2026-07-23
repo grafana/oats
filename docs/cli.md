@@ -101,6 +101,28 @@ Compose fixtures use the host container engine selected by
 falls back to Docker; selecting `podman` or `docker` explicitly never silently
 falls back. k3d fixtures currently require Docker.
 
+The builtin Compose fixture uses `docker.io/grafana/otel-lgtm:latest`. Select a
+different tag with `--lgtm-version 0.12.2` or
+`OATS_LGTM_VERSION=0.12.2`. To override the entire image reference instead,
+set `LGTM_IMAGE`, either in the process environment:
+
+```sh
+LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.12.2 oats
+```
+
+or on an individual fixture:
+
+```yaml
+fixture:
+  compose:
+    env:
+      - LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.12.2
+```
+
+An explicitly set `--lgtm-version` / `OATS_LGTM_VERSION` takes precedence over
+`LGTM_IMAGE`; a fixture `env` value takes precedence over the process
+environment.
+
 GCX is resolved according to the [GCX resolution](#gcx-resolution) policy.
 
 Flags:
@@ -122,6 +144,7 @@ Flags:
 | `--gcx-version`             | `OATS_GCX_VERSION`                | —                                                                  | require this exact gcx version, using PATH/cache before downloading (for example, `0.4.3`) |
 | `--gcx-download`            | `OATS_GCX_DOWNLOAD`               | `auto` (`never` when mise is detected)                             | download policy for missing/incompatible GCX: `auto` or `never`                            |
 | `--gcx-context`             | `OATS_GCX_CONTEXT`                | derived                                                            | gcx context to query (otherwise derived from the fixture endpoint)                         |
+| `--lgtm-version`            | `OATS_LGTM_VERSION`               | `latest`                                                           | grafana/otel-lgtm version used by the builtin Compose fixture                              |
 | `--container-runtime`       | `OATS_CONTAINER_RUNTIME`          | `auto`                                                             | Compose engine: prefer Podman, or explicitly use `docker` / `podman`                       |
 | `--app-host` / `--app-port` | `OATS_APP_HOST` / `OATS_APP_PORT` | `localhost` / `8080`                                               | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself     |
 | `--otlp-http`               | `OATS_OTLP_HTTP`                  | `http://localhost:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                              |

@@ -126,6 +126,21 @@ entirely (or drop the `fixture:` block altogether) to boot just the LGTM stack â
 handy for `inline-otlp` smoke tests. To skip the builtin stack, set
 `template: none` (then `file`/`files` are required).
 
+The builtin template uses `docker.io/grafana/otel-lgtm:latest`. Use
+`--lgtm-version <version>` (or `OATS_LGTM_VERSION`) to select another tag for
+the run. For a full image-reference override, including a registry mirror or
+digest, set `LGTM_IMAGE` in the shell or in the fixture's `env`:
+
+```yaml
+fixture:
+  compose:
+    env:
+      - LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.12.2
+```
+
+An explicitly set version flag takes precedence over `LGTM_IMAGE`; a fixture
+`env` value takes precedence over the process environment.
+
 ```yaml
 fixture:
   remote:

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,7 +31,7 @@ func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
 		t.Fatal("run command was not registered")
 	}
 
-	for _, name := range []string{"config", "gcx", "gcx-version", "gcx-download", "timeout", "parallel", "no-cache"} {
+	for _, name := range []string{"config", "gcx", "gcx-version", "gcx-download", "lgtm-version", "timeout", "parallel", "no-cache"} {
 		if root.Flags().Lookup(name) == nil {
 			t.Errorf("root command missing --%s", name)
 		}
@@ -40,6 +41,40 @@ func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
 	}
 	if !root.SilenceUsage || !root.SilenceErrors || !run.SilenceUsage || !run.SilenceErrors {
 		t.Fatal("runtime commands should suppress Cobra usage and duplicate errors")
+	}
+}
+
+func TestWithLGTMVersion(t *testing.T) {
+	original := &casefile.ComposeFixture{
+		Env: []string{"LGTM_IMAGE=example.invalid/custom:lgtm", "FOO=bar"},
+	}
+	plan := discovery.Plan{Fixture: casefile.FixtureConfig{Compose: original}}
+
+	got := withLGTMVersion(plan, "0.12.2")
+	if got.Fixture.Compose == original {
+		t.Fatal("withLGTMVersion mutated the discovered fixture")
+	}
+	want := []string{
+		"LGTM_IMAGE=example.invalid/custom:lgtm",
+		"FOO=bar",
+		"LGTM_IMAGE=docker.io/grafana/otel-lgtm:0.12.2",
+	}
+	if !slices.Equal(got.Fixture.Compose.Env, want) {
+		t.Fatalf("compose env = %v, want %v", got.Fixture.Compose.Env, want)
+	}
+	if len(original.Env) != 2 {
+		t.Fatalf("original compose env was mutated: %v", original.Env)
+	}
+
+	if unchanged := withLGTMVersion(plan, ""); unchanged.Fixture.Compose != original {
+		t.Fatal("empty version should leave the fixture unchanged")
+	}
+
+	none := discovery.Plan{Fixture: casefile.FixtureConfig{
+		Compose: &casefile.ComposeFixture{Template: "none", File: "compose.yml"},
+	}}
+	if got := withLGTMVersion(none, "0.12.2"); got.Fixture.Compose != none.Fixture.Compose {
+		t.Fatal("version override should not affect template=none fixtures")
 	}
 }
 

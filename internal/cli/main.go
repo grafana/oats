@@ -146,6 +146,7 @@ func addRunFlags(fs *pflag.FlagSet) {
 	fs.Duration("absent-timeout", 10*time.Second, "how long an absent assertion must stay absent")
 	fs.Duration("seed-settle", 2*time.Second, "post-seed wait before first assertion")
 	fs.String("gcx-context", "", "override the gcx --context value (otherwise derived from fixture endpoint)")
+	fs.String("lgtm-version", "latest", "version of docker.io/grafana/otel-lgtm used by the builtin Compose fixture")
 	fs.String("container-runtime", "auto", "container engine for Compose fixtures: auto | docker | podman")
 	fs.String("app-host", "localhost", "application host for driving case input requests")
 	fs.Int("app-port", 8080, "application port for driving case input requests")
@@ -403,6 +404,9 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		cacheTTLDays:       cfg.Cache.TTLDays,
 		failFast:           flagBool(fs, "fail-fast"),
 	}
+	if fs.Lookup("lgtm-version").Changed {
+		opts.lgtmVersion = flagStr(fs, "lgtm-version")
+	}
 	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, flagInt(fs, "parallel"))
 	if runErr != nil {
 		return runErr
@@ -514,6 +518,7 @@ type runOptions struct {
 	gcxVersion         string
 	gcxContextOverride string
 	containerRuntime   string
+	lgtmVersion        string
 	appHost            string
 	appPort            int
 	otlpHTTP           string
@@ -630,6 +635,7 @@ func runPlansParallel(parent context.Context, rep report.Reporter, plans []disco
 }
 
 func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts runOptions) groupResult {
+	plan = withLGTMVersion(plan, opts.lgtmVersion)
 	fixtureStart := emitFixtureStart(rep, plan)
 	fix, rt, err := fixture.StartWithOptions(ctx, plan, fixture.Options{ContainerRuntime: opts.containerRuntime})
 	if err != nil {
@@ -707,6 +713,22 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 		}
 	}
 	return groupResult{pass: groupPass, fail: groupFail}
+}
+
+// withLGTMVersion applies the legacy CLI override to the builtin LGTM Compose
+// fixture without mutating the discovered plan. An unset override preserves
+// LGTM_IMAGE values supplied by the environment or the case's fixture config.
+func withLGTMVersion(plan discovery.Plan, version string) discovery.Plan {
+	compose := plan.Fixture.Compose
+	if version == "" || compose == nil || compose.EffectiveTemplate() != "lgtm" {
+		return plan
+	}
+
+	composeCopy := *compose
+	composeCopy.Env = append(append([]string(nil), compose.Env...),
+		"LGTM_IMAGE=docker.io/grafana/otel-lgtm:"+version)
+	plan.Fixture.Compose = &composeCopy
+	return plan
 }
 
 func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {

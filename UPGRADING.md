@@ -24,6 +24,9 @@ removed. For one-off help migrating old cases, use:
 oats migrate path/to/legacy.yaml
 ```
 
+The `--lgtm-version` flag remains available for selecting the
+`grafana/otel-lgtm` image version used by the builtin Compose fixture.
+
 ### Case schema: version 2 → 3
 
 The case-yaml assertion shape changed with the gcx-driven runner, and the schema
