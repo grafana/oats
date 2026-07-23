@@ -716,11 +716,11 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 }
 
 // withLGTMVersion applies the legacy CLI override to the builtin LGTM Compose
-// fixture without mutating the discovered plan. An unset override preserves
-// LGTM_IMAGE values supplied by the environment or the case's fixture config.
+// fixture without mutating the discovered plan. A full LGTM_IMAGE reference
+// supplied by the environment or the case's fixture config takes precedence.
 func withLGTMVersion(plan discovery.Plan, version string) discovery.Plan {
 	compose := plan.Fixture.Compose
-	if version == "" || compose == nil || compose.EffectiveTemplate() != "lgtm" {
+	if version == "" || compose == nil || compose.EffectiveTemplate() != "lgtm" || hasLGTMImageOverride(compose.Env) {
 		return plan
 	}
 
@@ -729,6 +729,19 @@ func withLGTMVersion(plan discovery.Plan, version string) discovery.Plan {
 		"LGTM_IMAGE=docker.io/grafana/otel-lgtm:"+version)
 	plan.Fixture.Compose = &composeCopy
 	return plan
+}
+
+func hasLGTMImageOverride(env []string) bool {
+	// Compose fixture env entries override the process environment. Walk
+	// backwards so duplicate entries have the same last-value-wins behavior as
+	// the Compose command environment.
+	for i := len(env) - 1; i >= 0; i-- {
+		key, value, _ := strings.Cut(env[i], "=")
+		if key == "LGTM_IMAGE" {
+			return value != ""
+		}
+	}
+	return os.Getenv("LGTM_IMAGE") != ""
 }
 
 func emitFixtureStart(rep report.Reporter, plan discovery.Plan) time.Time {

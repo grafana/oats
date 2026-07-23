@@ -114,11 +114,11 @@ they need separate app deployments.
 Set exactly one of three nested blocks; the block you set selects how the stack
 is stood up (there is no separate `type` field):
 
-| Block     | Meaning                                                                                                                                                                           |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `remote`  | point at an already-running stack (`endpoint:` / a gcx context)                                                                                                                   |
-| `compose` | OATS boots a docker-compose stack; `template` defaults to `lgtm`, booting a builtin grafana/otel-lgtm alongside your `file`/`files`. Set `template: none` to bring your own stack |
-| `k3d`     | OATS boots a k3d (k3s-in-docker) cluster                                                                                                                                          |
+| Block     | Meaning                                                                                                                                                                                       |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `remote`  | point at an already-running stack (`endpoint:` / a gcx context)                                                                                                                               |
+| `compose` | OATS boots a docker-compose stack; `template` defaults to `lgtm`, booting a builtin `docker.io/grafana/otel-lgtm` alongside your `file`/`files`. Set `template: none` to bring your own stack |
+| `k3d`     | OATS boots a k3d (k3s-in-docker) cluster                                                                                                                                                      |
 
 A `compose` fixture with no `template` defaults to `template: lgtm`, so OATS
 boots the builtin LGTM stack next to your `file`/`files`. Omit `file`/`files`
@@ -138,8 +138,9 @@ fixture:
       - LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.12.2
 ```
 
-An explicitly set version flag takes precedence over `LGTM_IMAGE`; a fixture
-`env` value takes precedence over the process environment.
+`LGTM_IMAGE` takes precedence over the version flag because it specifies the
+complete image reference. A fixture `env` value takes precedence over the
+process environment.
 
 ```yaml
 fixture:

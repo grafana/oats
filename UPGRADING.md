@@ -25,7 +25,7 @@ oats migrate path/to/legacy.yaml
 ```
 
 The `--lgtm-version` flag remains available for selecting the
-`grafana/otel-lgtm` image version used by the builtin Compose fixture.
+`docker.io/grafana/otel-lgtm` image version used by the builtin Compose fixture.
 
 ### Case schema: version 2 → 3
 

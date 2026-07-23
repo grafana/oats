@@ -45,8 +45,9 @@ func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
 }
 
 func TestWithLGTMVersion(t *testing.T) {
+	t.Setenv("LGTM_IMAGE", "")
 	original := &casefile.ComposeFixture{
-		Env: []string{"LGTM_IMAGE=example.invalid/custom:lgtm", "FOO=bar"},
+		Env: []string{"FOO=bar"},
 	}
 	plan := discovery.Plan{Fixture: casefile.FixtureConfig{Compose: original}}
 
@@ -55,14 +56,13 @@ func TestWithLGTMVersion(t *testing.T) {
 		t.Fatal("withLGTMVersion mutated the discovered fixture")
 	}
 	want := []string{
-		"LGTM_IMAGE=example.invalid/custom:lgtm",
 		"FOO=bar",
 		"LGTM_IMAGE=docker.io/grafana/otel-lgtm:0.12.2",
 	}
 	if !slices.Equal(got.Fixture.Compose.Env, want) {
 		t.Fatalf("compose env = %v, want %v", got.Fixture.Compose.Env, want)
 	}
-	if len(original.Env) != 2 {
+	if len(original.Env) != 1 {
 		t.Fatalf("original compose env was mutated: %v", original.Env)
 	}
 
@@ -76,6 +76,37 @@ func TestWithLGTMVersion(t *testing.T) {
 	if got := withLGTMVersion(none, "0.12.2"); got.Fixture.Compose != none.Fixture.Compose {
 		t.Fatal("version override should not affect template=none fixtures")
 	}
+}
+
+func TestWithLGTMVersionPreservesFullImageOverride(t *testing.T) {
+	t.Run("fixture env", func(t *testing.T) {
+		compose := &casefile.ComposeFixture{
+			Env: []string{"LGTM_IMAGE=example.invalid/custom:lgtm"},
+		}
+		plan := discovery.Plan{Fixture: casefile.FixtureConfig{Compose: compose}}
+		if got := withLGTMVersion(plan, "0.12.2"); got.Fixture.Compose != compose {
+			t.Fatal("fixture LGTM_IMAGE should take precedence over the version")
+		}
+	})
+
+	t.Run("process env", func(t *testing.T) {
+		t.Setenv("LGTM_IMAGE", "example.invalid/custom:lgtm")
+		compose := &casefile.ComposeFixture{}
+		plan := discovery.Plan{Fixture: casefile.FixtureConfig{Compose: compose}}
+		if got := withLGTMVersion(plan, "0.12.2"); got.Fixture.Compose != compose {
+			t.Fatal("process LGTM_IMAGE should take precedence over the version")
+		}
+	})
+
+	t.Run("empty fixture env clears process override", func(t *testing.T) {
+		t.Setenv("LGTM_IMAGE", "example.invalid/custom:lgtm")
+		compose := &casefile.ComposeFixture{Env: []string{"LGTM_IMAGE="}}
+		plan := discovery.Plan{Fixture: casefile.FixtureConfig{Compose: compose}}
+		got := withLGTMVersion(plan, "0.12.2")
+		if got.Fixture.Compose == compose {
+			t.Fatal("empty fixture LGTM_IMAGE should allow the version override")
+		}
+	})
 }
 
 func TestRunActionRejectsMissingConfig(t *testing.T) {
@@ -144,6 +175,7 @@ expected:
 		"--timeout", "100ms",
 		"--interval", "1ms",
 		"--seed-settle", "1ns",
+		"--lgtm-version", "0.12.2",
 		"--no-cache",
 	})
 	if err := root.Execute(); err != nil {

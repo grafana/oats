@@ -119,9 +119,9 @@ fixture:
       - LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.12.2
 ```
 
-An explicitly set `--lgtm-version` / `OATS_LGTM_VERSION` takes precedence over
-`LGTM_IMAGE`; a fixture `env` value takes precedence over the process
-environment.
+`LGTM_IMAGE` takes precedence over `--lgtm-version` /
+`OATS_LGTM_VERSION`, because it specifies the complete image reference. A
+fixture `env` value takes precedence over the process environment.
 
 GCX is resolved according to the [GCX resolution](#gcx-resolution) policy.
 
@@ -144,7 +144,7 @@ Flags:
 | `--gcx-version`             | `OATS_GCX_VERSION`                | —                                                                  | require this exact gcx version, using PATH/cache before downloading (for example, `0.4.3`) |
 | `--gcx-download`            | `OATS_GCX_DOWNLOAD`               | `auto` (`never` when mise is detected)                             | download policy for missing/incompatible GCX: `auto` or `never`                            |
 | `--gcx-context`             | `OATS_GCX_CONTEXT`                | derived                                                            | gcx context to query (otherwise derived from the fixture endpoint)                         |
-| `--lgtm-version`            | `OATS_LGTM_VERSION`               | `latest`                                                           | grafana/otel-lgtm version used by the builtin Compose fixture                              |
+| `--lgtm-version`            | `OATS_LGTM_VERSION`               | `latest`                                                           | `docker.io/grafana/otel-lgtm` version used by the builtin Compose fixture                  |
 | `--container-runtime`       | `OATS_CONTAINER_RUNTIME`          | `auto`                                                             | Compose engine: prefer Podman, or explicitly use `docker` / `podman`                       |
 | `--app-host` / `--app-port` | `OATS_APP_HOST` / `OATS_APP_PORT` | `localhost` / `8080`                                               | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself     |
 | `--otlp-http`               | `OATS_OTLP_HTTP`                  | `http://localhost:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                              |
