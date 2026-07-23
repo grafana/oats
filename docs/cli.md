@@ -10,6 +10,18 @@ current directory and then each parent directory (like `git`), so you can run
 `oats` from anywhere inside a project. Pass `--config <path>` to use a specific
 file instead.
 
+For compatibility with directory-based invocations, if that search finds no
+config, `oats <project-dir>` loads `<project-dir>/oats-config.yaml`. A single
+positional config file works too. This means existing usage does not need to replace an
+existing invocation:
+
+```sh
+oats ./path/to/project
+```
+
+with `oats --config ./path/to/project/oats-config.yaml` when migrating the
+project.
+
 ## GCX resolution
 
 Release and mise-built `oats` binaries contain the minimum gcx version pinned
@@ -78,10 +90,13 @@ override the default.
 Run the cases. Bare `oats` is an implicit `run`; the explicit `run` subcommand is
 identical. With no positional args every case in the config runs; positional
 **paths** (files or directories) restrict the run to cases at or under them —
-they scope *which* cases run, they do not change where the config loads from.
+they normally scope *which* cases run. If config discovery from the current
+directory fails, a single positional argument instead selects the config as
+described above.
 
 ```sh
 oats                              # run every case
+oats ./tests/acceptance           # load ./tests/acceptance/oats-config.yaml
 oats payments/                    # only cases under payments/
 oats payments/checkout/           # only cases under payments/checkout/
 oats --tags traces                # filter by tag

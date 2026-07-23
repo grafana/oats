@@ -271,6 +271,102 @@ func TestCLIConfigAndSmallHelpers(t *testing.T) {
 	}
 }
 
+func TestResolveRunConfigPathFromPositionalArgument(t *testing.T) {
+	cwd := t.TempDir()
+	project := filepath.Join(t.TempDir(), "project")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(project, "oats-config.yaml")
+	if err := os.WriteFile(config, []byte("meta:\n  version: 3\ncases: []\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+
+	newFlags := func() *pflag.FlagSet {
+		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		fs.String("config", "oats-config.yaml", "config")
+		return fs
+	}
+
+	for name, arg := range map[string]string{
+		"directory": project,
+		"file":      config,
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, paths, err := resolveRunConfigPath(newFlags(), []string{arg})
+			if err != nil {
+				t.Fatalf("resolveRunConfigPath: %v", err)
+			}
+			if got != config {
+				t.Fatalf("config = %q, want %q", got, config)
+			}
+			if paths != nil {
+				t.Fatalf("paths = %v, want positional config argument to be consumed", paths)
+			}
+		})
+	}
+}
+
+func TestResolveRunConfigPathKeepsFiltersWhenConfigIsDiscovered(t *testing.T) {
+	dir := t.TempDir()
+	config := filepath.Join(dir, "oats-config.yaml")
+	if err := os.WriteFile(config, []byte("meta:\n  version: 3\ncases: []\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	fs.String("config", "oats-config.yaml", "config")
+	args := []string{"cases"}
+	got, paths, err := resolveRunConfigPath(fs, args)
+	if err != nil {
+		t.Fatalf("resolveRunConfigPath: %v", err)
+	}
+	if got != config {
+		t.Fatalf("config = %q, want %q", got, config)
+	}
+	if !slices.Equal(paths, args) {
+		t.Fatalf("paths = %v, want %v", paths, args)
+	}
+}
+
+func TestResolveRunConfigPathReportsInvalidPositionalArgument(t *testing.T) {
+	cwd := t.TempDir()
+	t.Chdir(cwd)
+
+	newFlags := func() *pflag.FlagSet {
+		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		fs.String("config", "oats-config.yaml", "config")
+		return fs
+	}
+
+	for name, arg := range map[string]string{
+		"missing path":             filepath.Join(cwd, "missing"),
+		"directory without config": t.TempDir(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, _, err := resolveRunConfigPath(newFlags(), []string{arg})
+			if err == nil {
+				t.Fatal("resolveRunConfigPath unexpectedly succeeded")
+			}
+			for _, want := range []string{"no oats-config.yaml found", "cannot use positional config path", arg} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not contain %q", err, want)
+				}
+			}
+		})
+	}
+
+	_, paths, err := resolveRunConfigPath(newFlags(), []string{"one", "two"})
+	if err == nil || !strings.Contains(err.Error(), "no oats-config.yaml found") {
+		t.Fatalf("multi-path error = %v, want config discovery error", err)
+	}
+	if !slices.Equal(paths, []string{"one", "two"}) {
+		t.Fatalf("paths = %v, want original positional paths", paths)
+	}
+}
+
 func TestCLIListMigrateAndCacheCommands(t *testing.T) {
 	dir := t.TempDir()
 	config := filepath.Join(dir, "oats-config.yaml")
