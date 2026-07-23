@@ -12,7 +12,7 @@ file instead.
 
 For compatibility with directory-based invocations, if that search finds no
 config, `oats <project-dir>` loads `<project-dir>/oats-config.yaml`. A single
-positional config file works too. This means CI does not need to replace an
+positional config file works too. This means existing usage does not need to replace an
 existing invocation:
 
 ```sh
@@ -96,7 +96,7 @@ described above.
 
 ```sh
 oats                              # run every case
-oats ./tests/acceptance            # load ./tests/acceptance/oats-config.yaml
+oats ./tests/acceptance           # load ./tests/acceptance/oats-config.yaml
 oats payments/                    # only cases under payments/
 oats payments/checkout/           # only cases under payments/checkout/
 oats --tags traces                # filter by tag
