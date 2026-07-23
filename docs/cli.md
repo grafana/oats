@@ -102,12 +102,12 @@ falls back to Docker; selecting `podman` or `docker` explicitly never silently
 falls back. k3d fixtures currently require Docker.
 
 The builtin Compose fixture uses `docker.io/grafana/otel-lgtm:latest`. Select a
-different tag with `--lgtm-version 0.12.2` or
-`OATS_LGTM_VERSION=0.12.2`. To override the entire image reference instead,
+different tag with `--lgtm-version 0.29.1` or
+`OATS_LGTM_VERSION=0.29.1`. To override the entire image reference instead,
 set `LGTM_IMAGE`, either in the process environment:
 
 ```sh
-LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.12.2 oats
+LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.29.1 oats
 ```
 
 or on an individual fixture:
@@ -116,7 +116,7 @@ or on an individual fixture:
 fixture:
   compose:
     env:
-      - LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.12.2
+      - LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.29.1
 ```
 
 `LGTM_IMAGE` takes precedence over `--lgtm-version` /

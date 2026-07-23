@@ -83,7 +83,7 @@ currently require Docker. The builtin Compose fixture uses the latest
 `docker.io/grafana/otel-lgtm` image by default; select another image version with
 `--lgtm-version <version>` (or `OATS_LGTM_VERSION`). To override the complete
 image reference, set `LGTM_IMAGE`, for example
-`LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.12.2`.
+`LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.29.1`.
 
 ## Getting started
 

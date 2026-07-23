@@ -135,7 +135,7 @@ digest, set `LGTM_IMAGE` in the shell or in the fixture's `env`:
 fixture:
   compose:
     env:
-      - LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.12.2
+      - LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.29.1
 ```
 
 `LGTM_IMAGE` takes precedence over the version flag because it specifies the
