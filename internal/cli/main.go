@@ -13,8 +13,10 @@
 //	oats version           print the version
 //
 // The config (oats-config.yaml) is found in the current directory or any parent
-// unless --config is given. Positional paths (e.g. `oats examples/`) restrict the
-// run to cases at or under them.
+// unless --config is given. When none is found, a single positional file is
+// treated as the config, or oats-config.yaml is inferred from a positional
+// directory. Otherwise positional paths restrict the run to cases at or under
+// them.
 //
 // Run flags (subset):
 //
@@ -96,8 +98,9 @@ func newRootCmd(exit *int) *cobra.Command {
 		Short: "OpenTelemetry Acceptance Tests — the gcx-driven runner",
 		Long: "OpenTelemetry Acceptance Tests — the gcx-driven runner.\n\n" +
 			"With no subcommand, oats runs the cases in oats-config.yaml (found in the\n" +
-			"current directory or any parent). Optional positional paths scope the run to\n" +
-			"cases at or under them, e.g. `oats examples/` or `oats examples/go/oats-case.yaml`.",
+			"current directory or any parent). If no config is found there, a single\n" +
+			"positional file or project directory selects it. Otherwise positional paths\n" +
+			"scope the run to cases at or under them.",
 		// Do not print full command usage for runtime failures such as failed
 		// assertions or unreachable backends. Those are not CLI syntax errors.
 		SilenceUsage: true,
@@ -176,8 +179,9 @@ func newRunCmd(verbose, exit *int) *cobra.Command {
 		Short: "Run the cases in oats-config.yaml (default when no subcommand is given)",
 		Long: "Run the cases declared by oats-config.yaml.\n\n" +
 			"The config is found in the current directory or any parent (override with\n" +
-			"--config). Optional positional paths scope the run to cases at or under those\n" +
-			"files/directories, e.g. `oats run examples/` runs only the cases under examples/.",
+			"--config). If none is found, pass its file or project directory as the single\n" +
+			"positional argument. Otherwise positional paths scope the run to cases at or\n" +
+			"under those files/directories.",
 		// Runtime failures should print the concise error/report, not usage.
 		SilenceUsage: true,
 		// Let Run() own error printing and exit-code mapping. Without this, Cobra
@@ -318,8 +322,9 @@ func migrateAction(path string) error {
 }
 
 // runAction is the shared implementation behind the implicit-run root and the
-// explicit `run` subcommand. Positional args are file/dir paths that scope which
-// cases run; the config is resolved from cwd (walking up), independent of them.
+// explicit `run` subcommand. Positional args normally scope which cases run.
+// When config discovery from cwd fails, a single positional arg instead selects
+// the config (with oats-config.yaml inferred when the arg is a directory).
 func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error {
 	fs := cmd.Flags()
 
@@ -331,7 +336,7 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		return migrateAction(migratePath)
 	}
 
-	configPath, err := resolveConfigPath(fs)
+	configPath, pathArgs, err := resolveRunConfigPath(fs, args)
 	if err != nil {
 		return err
 	}
@@ -340,7 +345,7 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		return err
 	}
 
-	paths, err := absArgs(args)
+	paths, err := absArgs(pathArgs)
 	if err != nil {
 		return err
 	}
@@ -839,6 +844,30 @@ func resolveConfigPath(fs *pflag.FlagSet) (string, error) {
 		}
 		dir = parent
 	}
+}
+
+// resolveRunConfigPath adds a compatibility fallback to normal config
+// discovery: when cwd and its parents have no config, a single positional
+// argument may name the config file or its containing project directory. The
+// consumed argument is not also used as a case-path filter.
+func resolveRunConfigPath(fs *pflag.FlagSet, args []string) (string, []string, error) {
+	configPath, discoveryErr := resolveConfigPath(fs)
+	if discoveryErr == nil || len(args) != 1 {
+		return configPath, args, discoveryErr
+	}
+
+	candidate := args[0]
+	info, err := os.Stat(candidate)
+	if err != nil {
+		return "", args, discoveryErr
+	}
+	if info.IsDir() {
+		candidate = filepath.Join(candidate, flagStr(fs, "config"))
+	}
+	if _, err := os.Stat(candidate); err != nil {
+		return "", args, discoveryErr
+	}
+	return candidate, nil, nil
 }
 
 // absArgs cleans positional path args to absolute paths (relative to cwd) for

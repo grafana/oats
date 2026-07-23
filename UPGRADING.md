@@ -27,6 +27,16 @@ oats migrate path/to/legacy.yaml
 The `--lgtm-version` flag remains available for selecting the
 `docker.io/grafana/otel-lgtm` image version used by the builtin Compose fixture.
 
+Existing commands that pass a project directory can keep doing so. After
+creating `oats-config.yaml` in that directory, OATS infers its name:
+
+```sh
+oats --lgtm-version="${LGTM_VERSION}" --timeout=5m ./tests/acceptance
+```
+
+An explicit `--config ./tests/acceptance/oats-config.yaml` is also supported,
+but is not required for this migration.
+
 ### Case schema: version 2 → 3
 
 The case-yaml assertion shape changed with the gcx-driven runner, and the schema
