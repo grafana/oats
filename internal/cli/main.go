@@ -859,13 +859,13 @@ func resolveRunConfigPath(fs *pflag.FlagSet, args []string) (string, []string, e
 	candidate := args[0]
 	info, err := os.Stat(candidate)
 	if err != nil {
-		return "", args, discoveryErr
+		return "", args, fmt.Errorf("%w; cannot use positional config path %q: %v", discoveryErr, candidate, err)
 	}
 	if info.IsDir() {
 		candidate = filepath.Join(candidate, flagStr(fs, "config"))
 	}
 	if _, err := os.Stat(candidate); err != nil {
-		return "", args, discoveryErr
+		return "", args, fmt.Errorf("%w; cannot use positional config path %q: %v", discoveryErr, candidate, err)
 	}
 	return candidate, nil, nil
 }

@@ -13,8 +13,14 @@ file instead.
 For compatibility with directory-based invocations, if that search finds no
 config, `oats <project-dir>` loads `<project-dir>/oats-config.yaml`. A single
 positional config file works too. This means CI does not need to replace an
-existing `oats ./path/to/project` command with `oats --config
-./path/to/project/oats-config.yaml` when migrating the project.
+existing invocation:
+
+```sh
+oats ./path/to/project
+```
+
+with `oats --config ./path/to/project/oats-config.yaml` when migrating the
+project.
 
 ## GCX resolution
 
