@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.8.0](https://github.com/grafana/oats/compare/v0.7.0...v0.8.0) (2026-07-23)
+
+> [!WARNING]
+> This release replaces the legacy root runner and YAML format with the v3
+> configuration and case format. Existing test files require migration; see
+> the [migration notes](https://github.com/grafana/oats/blob/main/UPGRADING.md)
+> before upgrading.
+
+### Features
+
+* introduce the v3 configuration and case model ([#401](https://github.com/grafana/oats/issues/401)) ([19f6cbb](https://github.com/grafana/oats/commit/19f6cbb6c43b48c6c5a20896f24b96c30c298aed))
+
+
+### Bug Fixes
+
+* **cli:** restore --lgtm-version flag ([#430](https://github.com/grafana/oats/issues/430)) ([6682d85](https://github.com/grafana/oats/commit/6682d85491e83e5ad3276c6d72ae863f47d0727f))
+* **cli:** restore positional config discovery ([#433](https://github.com/grafana/oats/issues/433)) ([3b4477a](https://github.com/grafana/oats/commit/3b4477ab15b842ffb0b7c71357412c5cacfbf7d6))
+* **deps:** update module github.com/onsi/gomega to v1.42.0 ([#336](https://github.com/grafana/oats/issues/336)) ([8b98649](https://github.com/grafana/oats/commit/8b9864958f15ed5e1101d407945209e3c9910aa3))
+* **deps:** update module github.com/onsi/gomega to v1.42.1 ([#353](https://github.com/grafana/oats/issues/353)) ([cb1fc89](https://github.com/grafana/oats/commit/cb1fc89ea691444a800d0e08ddfbeffad22c0bf8))
+* **deps:** update module github.com/spf13/pflag to v1.0.10 ([#408](https://github.com/grafana/oats/issues/408)) ([a4139f8](https://github.com/grafana/oats/commit/a4139f8222069611b8c7d434b76813c26c397b11))
+* **deps:** update module go.opentelemetry.io/collector/pdata to v1.60.0 ([#333](https://github.com/grafana/oats/issues/333)) ([daf4524](https://github.com/grafana/oats/commit/daf4524d6d9e0d5ce9b67cd7b7298a45e1d65c51))
+* **deps:** update module go.opentelemetry.io/collector/pdata to v1.61.0 ([#352](https://github.com/grafana/oats/issues/352)) ([0687620](https://github.com/grafana/oats/commit/0687620f5a9301622651ef8965412703abf43014))
+* **deps:** update module go.opentelemetry.io/collector/pdata to v1.62.0 ([#377](https://github.com/grafana/oats/issues/377)) ([3182f35](https://github.com/grafana/oats/commit/3182f357f4eb3d62a1474436c93bc334b6f52c20))
+* **deps:** update opentelemetry-go monorepo to v1.44.0 ([#323](https://github.com/grafana/oats/issues/323)) ([098e2b2](https://github.com/grafana/oats/commit/098e2b247f0fd953f90637e7b7830c06e60f93d3))
+* fall back when Compose engine is unreachable ([#428](https://github.com/grafana/oats/issues/428)) ([3d12ca6](https://github.com/grafana/oats/commit/3d12ca623d635b1aa0a661b7692cb017fbd7d061))
+* **migrate:** preserve source line endings ([#432](https://github.com/grafana/oats/issues/432)) ([892d9f3](https://github.com/grafana/oats/commit/892d9f3d51ca08c1263c37dca5c6d1ceba649059))
+* wait for lgtm deployment availability ([#337](https://github.com/grafana/oats/issues/337)) ([1f758f5](https://github.com/grafana/oats/commit/1f758f5d0639976cc584c89abbb76176e781b386))
+
 ## [0.7.0](https://github.com/grafana/oats/compare/v0.6.1...v0.7.0) (2026-05-28)
 
 
