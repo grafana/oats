@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,6 +118,25 @@ func TestConvertFile_RendersYAML(t *testing.T) {
 		if !strings.Contains(text, want) {
 			fatalf(t, "expected migrated yaml to contain %q:\n%s", want, text)
 		}
+	}
+}
+
+func TestConvertFile_PreservesCRLFLineEndings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.oats.yaml")
+	source := "oats-schema-version: 2\r\nexpected:\r\n  custom-checks:\r\n    - script: ./verify.sh\r\n"
+	if err := os.WriteFile(path, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, _, err := ConvertFile(path)
+	if err != nil {
+		t.Fatalf("ConvertFile: %v", err)
+	}
+	if bytes.Contains(bytes.ReplaceAll(out, []byte("\r\n"), nil), []byte("\n")) {
+		t.Fatalf("migrated YAML contains bare LF line endings:\n%q", out)
+	}
+	if !bytes.Contains(out, []byte("\r\n")) {
+		t.Fatalf("migrated YAML does not contain CRLF line endings:\n%q", out)
 	}
 }
 
@@ -477,6 +497,13 @@ expected:
 	if _, err := casefile.Load(minimalCase); err != nil {
 		fatalf(t, "minimal case should be v3 after migration: %v", err)
 	}
+	composeOut, err := os.ReadFile(composeCase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(composeOut, []byte("\r\n")) {
+		t.Fatal("LF source unexpectedly migrated with CRLF line endings")
+	}
 
 	// The generated config must list both cases as explicit relative paths.
 	configPath := filepath.Join(dir, "oats-config.yaml")
@@ -495,6 +522,39 @@ expected:
 		if cfg.Cases[i] != w {
 			fatalf(t, "expected sorted explicit case %q at %d, got %v", w, i, cfg.Cases)
 		}
+	}
+}
+
+func TestConvertTree_PreservesEachCaseLineEndings(t *testing.T) {
+	dir := t.TempDir()
+	crlfPath := filepath.Join(dir, "crlf.oats.yaml")
+	crlf := "oats-schema-version: 2\r\nexpected:\r\n  custom-checks:\r\n    - script: ./verify.sh\r\n"
+	if err := os.WriteFile(crlfPath, []byte(crlf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lfPath := filepath.Join(dir, "lf.oats.yaml")
+	lf := "oats-schema-version: 2\nexpected:\n  custom-checks:\n    - script: ./verify.sh\n"
+	if err := os.WriteFile(lfPath, []byte(lf), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := ConvertTree(dir); err != nil {
+		t.Fatalf("ConvertTree: %v", err)
+	}
+
+	crlfOut, err := os.ReadFile(crlfPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(bytes.ReplaceAll(crlfOut, []byte("\r\n"), nil), []byte("\n")) {
+		t.Fatalf("CRLF case contains bare LF line endings:\n%q", crlfOut)
+	}
+	lfOut, err := os.ReadFile(lfPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(lfOut, []byte("\r\n")) {
+		t.Fatalf("LF case contains CRLF line endings:\n%q", lfOut)
 	}
 }
 

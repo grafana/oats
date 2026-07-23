@@ -32,11 +32,25 @@ func marshalYAML(v any) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+// preserveLineEndings converts generated YAML to CRLF when the source file
+// uses CRLF. YAML encoders always emit LF, but an in-place migration should
+// not create a whole-file diff solely because of line endings.
+func preserveLineEndings(source, generated []byte) []byte {
+	if bytes.Contains(source, []byte("\r\n")) {
+		return bytes.ReplaceAll(generated, []byte("\n"), []byte("\r\n"))
+	}
+	return generated
+}
+
 // ConvertFile reads one legacy OATS yaml file and returns a best-effort
 // current-format case yaml plus any warnings about dropped or lossy fields.
 // The migrated case carries its own case-local fixture: block, so the output
 // is self-contained.
 func ConvertFile(path string) ([]byte, []string, error) {
+	source, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
 	def, err := legacyyaml.LoadTestCaseDefinition(path)
 	if err != nil {
 		return nil, nil, err
@@ -52,7 +66,7 @@ func ConvertFile(path string) ([]byte, []string, error) {
 	if err != nil {
 		return nil, warnings, err
 	}
-	return out, warnings, nil
+	return preserveLineEndings(source, out), warnings, nil
 }
 
 // TreeResult reports the outcome of a directory ("project") migration.
@@ -92,6 +106,10 @@ func ConvertTree(dir string) (*TreeResult, error) {
 		}
 		seen[tc.Path] = true
 
+		source, err := os.ReadFile(tc.Path)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", tc.Path, err)
+		}
 		c, warnings, err := ConvertDefinition(tc.Definition, deriveName(tc.Path))
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", tc.Path, err)
@@ -100,6 +118,7 @@ func ConvertTree(dir string) (*TreeResult, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", tc.Path, err)
 		}
+		out = preserveLineEndings(source, out)
 		if err := os.WriteFile(tc.Path, out, 0o644); err != nil {
 			return nil, fmt.Errorf("write %s: %w", tc.Path, err)
 		}
