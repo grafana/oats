@@ -79,7 +79,11 @@ exact release with `--gcx-version <version>`.
 For Compose fixtures, OATS prefers Podman when it is available and falls back
 to Docker. Use `--container-runtime docker` (or
 `OATS_CONTAINER_RUNTIME=docker`) to make the engine explicit. k3d fixtures
-currently require Docker.
+currently require Docker. The builtin Compose fixture uses the latest
+`docker.io/grafana/otel-lgtm` image by default; select another image version with
+`--lgtm-version <version>` (or `OATS_LGTM_VERSION`). To override the complete
+image reference, set `LGTM_IMAGE`, for example
+`LGTM_IMAGE=registry.example.com/mirror/otel-lgtm:0.29.1`.
 
 ## Getting started
 
