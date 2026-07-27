@@ -59,6 +59,31 @@ contexts:
 	}
 }
 
+func TestRemoteGrafanaURLFromV1Stack(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gcx.yaml")
+	if err := os.WriteFile(path, []byte(`version: 1
+current-context: local
+stacks:
+  local-stack:
+    grafana:
+      server: http://127.0.0.1:3000/
+contexts:
+  local:
+    stack: local-stack
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GCX_CONFIG", path)
+
+	got, err := remoteGrafanaURL("local")
+	if err != nil {
+		t.Fatalf("remoteGrafanaURL: %v", err)
+	}
+	if got != "http://127.0.0.1:3000" {
+		t.Fatalf("remoteGrafanaURL = %q", got)
+	}
+}
+
 func TestRemoteGrafanaURLRejectsMissingServerInExplicitConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "gcx.yaml")
 	if err := os.WriteFile(path, []byte("contexts:\n  remote: {}\n"), 0o600); err != nil {
