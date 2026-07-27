@@ -15,10 +15,16 @@ import (
 // rather than coupling OATS to gcx's internal config package.
 type gcxConfig struct {
 	CurrentContext string                `yaml:"current-context"`
+	Stacks         map[string]gcxStack   `yaml:"stacks"`
 	Contexts       map[string]gcxContext `yaml:"contexts"`
 }
 
 type gcxContext struct {
+	Grafana *gcxGrafana `yaml:"grafana"`
+	Stack   string      `yaml:"stack"`
+}
+
+type gcxStack struct {
 	Grafana *gcxGrafana `yaml:"grafana"`
 }
 
@@ -37,7 +43,10 @@ func remoteGrafanaURL(contextName string) (string, error) {
 		return "", nil
 	}
 
-	merged := gcxConfig{Contexts: make(map[string]gcxContext)}
+	merged := gcxConfig{
+		Stacks:   make(map[string]gcxStack),
+		Contexts: make(map[string]gcxContext),
+	}
 	for _, path := range paths {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -56,8 +65,16 @@ func remoteGrafanaURL(contextName string) (string, error) {
 		if cfg.CurrentContext != "" {
 			merged.CurrentContext = cfg.CurrentContext
 		}
+		for name, stack := range cfg.Stacks {
+			// gcx treats credential-bearing stack entries as atomic across
+			// configuration layers, so replace the complete entry.
+			merged.Stacks[name] = stack
+		}
 		for name, context := range cfg.Contexts {
 			current := merged.Contexts[name]
+			if context.Stack != "" {
+				current.Stack = context.Stack
+			}
 			if context.Grafana != nil && context.Grafana.Server != "" {
 				if current.Grafana == nil {
 					current.Grafana = &gcxGrafana{}
@@ -72,14 +89,21 @@ func remoteGrafanaURL(contextName string) (string, error) {
 		contextName = merged.CurrentContext
 	}
 	context, ok := merged.Contexts[contextName]
-	if !ok || context.Grafana == nil || strings.TrimSpace(context.Grafana.Server) == "" {
+	var grafana *gcxGrafana
+	if ok {
+		grafana = context.Grafana
+		if context.Stack != "" {
+			grafana = merged.Stacks[context.Stack].Grafana
+		}
+	}
+	if grafana == nil || strings.TrimSpace(grafana.Server) == "" {
 		if explicit {
 			return "", fmt.Errorf("gcx context %q has no grafana.server", contextName)
 		}
 		return "", nil
 	}
 
-	server := strings.TrimRight(strings.TrimSpace(context.Grafana.Server), "/")
+	server := strings.TrimRight(strings.TrimSpace(grafana.Server), "/")
 	u, err := url.Parse(server)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return "", fmt.Errorf("gcx context %q has invalid grafana.server %q", contextName, server)
