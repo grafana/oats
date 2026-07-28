@@ -37,7 +37,7 @@ jobs:
     needs: release-please
     runs-on: ubuntu-24.04
     env:
-      # Keep artifact releases isolated from unrelated mise tools and caches.
+      # Artifact releases pair a focused tool allowlist with cache: false.
       MISE_ENABLE_TOOLS: go,goreleaser
     permissions:
       attestations: write
@@ -74,7 +74,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     env:
-      # Keep artifact releases isolated from unrelated mise tools and caches.
+      # Artifact releases pair a focused tool allowlist with cache: false.
       MISE_ENABLE_TOOLS: go,goreleaser
     permissions:
       attestations: write
