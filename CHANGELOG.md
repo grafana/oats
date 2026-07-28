@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0](https://github.com/grafana/oats/compare/v0.8.0...v0.9.0) (2026-07-28)
+
+
+### Features
+
+* support one-shot Compose inputs ([#451](https://github.com/grafana/oats/issues/451)) ([c43e6cb](https://github.com/grafana/oats/commit/c43e6cb6964d486c8a27df9f2d43b821f5a1ac62))
+
+
+### Bug Fixes
+
+* **deps:** update module go.opentelemetry.io/collector/pdata to v1.63.0 ([#438](https://github.com/grafana/oats/issues/438)) ([6f3524a](https://github.com/grafana/oats/commit/6f3524a215886baf03e78e2493d235d1fb8ac131))
+
 ## [0.8.0](https://github.com/grafana/oats/compare/v0.7.0...v0.8.0) (2026-07-23)
 
 > [!WARNING]
