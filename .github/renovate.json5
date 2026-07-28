@@ -11,5 +11,13 @@
   // **/examples/** (and tests, vendor, …). Disable it so example deps
   // (examples/python Dockerfile, requirements.txt) get tracked/updated.
   ignorePresets: [":ignoreModulesAndTests"],
+  packageRules: [
+    {
+      description: "Release OATs when the bundled gcx version changes",
+      matchDatasources: ["aqua"],
+      matchPackageNames: ["grafana/gcx"],
+      semanticCommitType: "fix",
+    },
+  ],
   automerge: true,
 }
