@@ -130,7 +130,10 @@ func (c *Compose) Run(ctx context.Context, service string, argv []string) error 
 	if err := c.runComposeContext(ctx, "build", service); err != nil {
 		return fmt.Errorf("failed to build compose service %q: %w", service, err)
 	}
-	args := append([]string{"run", "--rm", service}, argv...)
+	// The fixture is already running. Avoid Compose recreating dependencies
+	// before the one-shot command, which can reset application readiness and
+	// disrupt instrumentation attached to the existing containers.
+	args := append([]string{"run", "--rm", "--no-deps", service}, argv...)
 	if err := c.runComposeContext(ctx, args...); err != nil {
 		return fmt.Errorf("failed to run compose service %q: %w", service, err)
 	}

@@ -85,7 +85,7 @@ esac
 		"network prune -f --filter until=5m",
 		"-f base.yml -f override.yml up --build --detach --force-recreate",
 		"-f base.yml -f override.yml build app",
-		"-f base.yml -f override.yml run --rm app mise run hello world",
+		"-f base.yml -f override.yml run --rm --no-deps app mise run hello world",
 		"arg=<hello world>",
 		"-f base.yml -f override.yml logs",
 		"-f base.yml -f override.yml stop",
