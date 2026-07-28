@@ -235,6 +235,25 @@ input:
     status: "201"         # expected status; defaults to 200
 ```
 
+HTTP inputs run once by default. Opt an input into bounded retries when it is
+safe to repeat, for example to tolerate an application readiness race:
+
+```yaml
+input:
+  - path: /health/readiness
+    retry: {}             # inherit the CLI --timeout and --interval
+  - path: /version
+    retry:
+      timeout: 1m
+      interval: 2s
+```
+
+Every failed request attempt is retried, including transport errors and
+unexpected HTTP statuses. The complete request, including its body, is sent
+again, so leave `retry` unset for non-idempotent or otherwise unsafe
+side-effecting inputs. `retry` applies only to HTTP inputs; Compose inputs remain
+one-shot.
+
 A Compose input runs a service as a one-shot container in the active Compose
 project:
 

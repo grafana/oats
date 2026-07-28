@@ -134,6 +134,10 @@ expected:
 no `template: lgtm` needed), drives `/rolldice` once, and retries each telemetry
 query until its assertion passes or times out.
 
+HTTP inputs can opt into bounded retries for readiness races. Retries are
+disabled by default because every attempt repeats the request and its side
+effects; see the [input reference](docs/case-reference.md#inputs).
+
 One-shot CLIs and batch jobs can run directly as a service in the Compose
 fixture, without an HTTP shim:
 

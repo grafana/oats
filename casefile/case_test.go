@@ -17,6 +17,9 @@ seed:
   compose: docker-compose.app.yml
 input:
   - path: /rolldice?rolls=5
+    retry:
+      timeout: 10s
+      interval: 250ms
 expected:
   traces:
     - traceql: '{ span.http.route = "/rolldice" }'
@@ -40,6 +43,9 @@ expected:
 	}
 	if len(c.Input) != 1 || c.Input[0].Path != "/rolldice?rolls=5" {
 		t.Errorf("Input: %+v", c.Input)
+	}
+	if retry := c.Input[0].Retry; retry == nil || retry.Timeout != 10*time.Second || retry.Interval != 250*time.Millisecond {
+		t.Errorf("Input retry: %+v", retry)
 	}
 	if len(c.Expected.Traces) != 1 || c.Expected.Traces[0].TraceQL == "" {
 		t.Errorf("Expected.Traces: %+v", c.Expected.Traces)
@@ -90,6 +96,10 @@ func TestValidate_InputKind(t *testing.T) {
 		{name: "compose command", input: Input{Compose: &ComposeInput{Service: "app"}}, want: ".compose.command: required"},
 		{name: "empty argument", input: Input{Compose: &ComposeInput{Service: "app", Command: []string{"run", ""}}}, want: ".compose.command[1]"},
 		{name: "whitespace argument", input: Input{Compose: &ComposeInput{Service: "app", Command: []string{"run", " \t"}}}, want: ".compose.command[1]"},
+		{name: "retry without path", input: Input{Retry: &InputRetry{}}, want: ".path: required"},
+		{name: "retry Compose input", input: Input{Retry: &InputRetry{}, Compose: &ComposeInput{Service: "app", Command: []string{"run"}}}, want: "only supported for HTTP inputs"},
+		{name: "negative retry timeout", input: Input{Path: "/run", Retry: &InputRetry{Timeout: -1}}, want: ".retry.timeout: must be >= 0"},
+		{name: "negative retry interval", input: Input{Path: "/run", Retry: &InputRetry{Interval: -1}}, want: ".retry.interval: must be >= 0"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
