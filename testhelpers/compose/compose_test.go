@@ -24,6 +24,9 @@ func TestStackFilesWithRuntimeLifecycle(t *testing.T) {
 	command := filepath.Join(dir, "compose")
 	if err := os.WriteFile(command, []byte(`#!/bin/sh
 printf '%s\n' "$*" >> "$COMPOSE_TEST_ARGS"
+for arg in "$@"; do
+  printf 'arg=<%s>\n' "$arg" >> "$COMPOSE_TEST_ARGS"
+done
 case "$*" in
 *logs*)
   printf 'service ready\n'
@@ -83,6 +86,7 @@ esac
 		"-f base.yml -f override.yml up --build --detach --force-recreate",
 		"-f base.yml -f override.yml build app",
 		"-f base.yml -f override.yml run --rm app mise run hello world",
+		"arg=<hello world>",
 		"-f base.yml -f override.yml logs",
 		"-f base.yml -f override.yml stop",
 		"-f base.yml -f override.yml down",
