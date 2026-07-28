@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -42,6 +43,9 @@ esac
 	if err := c.Up(); err != nil {
 		t.Fatalf("Up: %v", err)
 	}
+	if err := c.Run(context.Background(), "app", []string{"mise", "run", "hello world"}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
 	var output strings.Builder
 	if err := c.LogsToConsumer(func(r io.ReadCloser, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -77,6 +81,8 @@ esac
 	for _, want := range []string{
 		"network prune -f --filter until=5m",
 		"-f base.yml -f override.yml up --build --detach --force-recreate",
+		"-f base.yml -f override.yml build app",
+		"-f base.yml -f override.yml run --rm app mise run hello world",
 		"-f base.yml -f override.yml logs",
 		"-f base.yml -f override.yml stop",
 		"-f base.yml -f override.yml down",

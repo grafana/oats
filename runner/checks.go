@@ -20,9 +20,6 @@ import (
 
 func (r *Runner) runComposeLogCheck(ctx context.Context, c *casefile.Case, msg string) bool {
 	run := func() []assert.Failure {
-		if err := r.driveInputs(c); err != nil {
-			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
-		}
 		ok, err := searchComposeLogs(ctx, r.endpoint.CustomCheckEnv, msg)
 		if err != nil {
 			return []assert.Failure{{Rule: "compose-logs", Detail: err.Error()}}
@@ -55,9 +52,6 @@ func (r *Runner) runCustomCheck(ctx context.Context, c *casefile.Case, chk *case
 		dir = filepath.Dir(c.SourcePath)
 	}
 	run := func() []assert.Failure {
-		if err := r.driveInputs(c); err != nil {
-			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
-		}
 		deadlineCtx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
 		defer cancel()
 

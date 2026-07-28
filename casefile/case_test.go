@@ -49,6 +49,64 @@ expected:
 	}
 }
 
+func TestParse_ComposeInput(t *testing.T) {
+	c, err := Parse([]byte(`
+name: one-shot cli emits telemetry
+fixture:
+  compose:
+    file: compose.yml
+input:
+  - compose:
+      service: app
+      command: [mise, run, hello]
+expected:
+  logs:
+    - logql: '{service_name="mise"}'
+      contains: hello
+`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(c.Input) != 1 || c.Input[0].Compose == nil {
+		t.Fatalf("Input: %+v", c.Input)
+	}
+	if got := c.Input[0].Compose; got.Service != "app" || strings.Join(got.Command, " ") != "mise run hello" {
+		t.Fatalf("Compose input: %+v", got)
+	}
+}
+
+func TestValidate_InputKind(t *testing.T) {
+	base := Case{Name: "input validation", Expected: Expected{Logs: []LogAssertion{{LogQL: "{}"}}}}
+	tests := []struct {
+		name  string
+		input Input
+		want  string
+	}{
+		{name: "empty", input: Input{}, want: "set exactly one"},
+		{name: "mixed", input: Input{Path: "/run", Compose: &ComposeInput{Service: "app", Command: []string{"run"}}}, want: "set exactly one"},
+		{name: "http path", input: Input{Method: "POST"}, want: ".path: required"},
+		{name: "compose service", input: Input{Compose: &ComposeInput{Command: []string{"run"}}}, want: ".compose.service: required"},
+		{name: "compose command", input: Input{Compose: &ComposeInput{Service: "app"}}, want: ".compose.command: required"},
+		{name: "empty argument", input: Input{Compose: &ComposeInput{Service: "app", Command: []string{"run", ""}}}, want: ".compose.command[1]"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := base
+			c.Input = []Input{tc.input}
+			if err := c.Validate(); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Validate error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+
+	remote := base
+	remote.Fixture = &FixtureConfig{Remote: &RemoteFixture{Endpoint: "http://example.test:4318"}}
+	remote.Input = []Input{{Compose: &ComposeInput{Service: "app", Command: []string{"run"}}}}
+	if err := remote.Validate(); err == nil || !strings.Contains(err.Error(), "requires a Compose fixture") {
+		t.Fatalf("remote Compose input error = %v", err)
+	}
+}
+
 func TestParse_InlineOTLPSeed(t *testing.T) {
 	src := []byte(`
 name: gcx returns seeded trace

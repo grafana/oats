@@ -1,0 +1,16 @@
+name: compose-command-input
+tags: [fixture, compose, input]
+
+execution:
+  mode: serial
+
+run:
+  args:
+    - --timeout
+    - 90s
+    - --interval
+    - 3s
+
+expect:
+  stdout_contains:
+    - PASS 1/1

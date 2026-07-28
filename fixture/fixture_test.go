@@ -107,7 +107,7 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 	}
 
 	sourceDir := t.TempDir()
-	fix, _, err := Start(context.Background(), discovery.Plan{
+	fix, rt, err := Start(context.Background(), discovery.Plan{
 		Name: "smoke",
 		Fixture: casefile.FixtureConfig{
 			Compose: &casefile.ComposeFixture{
@@ -134,6 +134,15 @@ func TestStart_ComposeLifecycle(t *testing.T) {
 	}
 	if gotEngine != container.Docker {
 		t.Fatalf("container engine: got %q want %q", gotEngine, container.Docker)
+	}
+	if rt.RunCompose == nil {
+		t.Fatal("compose runtime is missing command runner")
+	}
+	if err := rt.RunCompose(context.Background(), "app", []string{"mise", "run", "hello"}); err != nil {
+		t.Fatalf("RunCompose: %v", err)
+	}
+	if fake.runCalls != 1 || fake.runService != "app" || strings.Join(fake.runCommand, " ") != "mise run hello" {
+		t.Fatalf("compose command not forwarded: %+v", fake)
 	}
 	if err := fix.Close(); err != nil {
 		t.Fatalf("fixture close: %v", err)
@@ -598,7 +607,7 @@ expected:
 // app_port are set (so OATS can publish + discover an ephemeral app port) is the
 // suite safe; otherwise it would share a fixed app port with its peers.
 func TestSupportsParallel_AppSeedRequiresAppService(t *testing.T) {
-	appCase := &casefile.Case{Seed: casefile.Seed{Type: "app"}}
+	appCase := &casefile.Case{Seed: casefile.Seed{Type: "app"}, Input: []casefile.Input{{Path: "/run"}}}
 
 	// app seed, no app_service → not parallel-safe.
 	noService := discovery.Plan{
@@ -616,6 +625,20 @@ func TestSupportsParallel_AppSeedRequiresAppService(t *testing.T) {
 	}
 	if safe, reason := SupportsParallel(withService); !safe {
 		t.Fatalf("app-seed with app_service+app_port should be parallel-safe: %s", reason)
+	}
+
+	// A Compose command runs inside its fixture's isolated project and needs no
+	// published app port.
+	commandCase := &casefile.Case{
+		Seed:  casefile.Seed{Type: "app"},
+		Input: []casefile.Input{{Compose: &casefile.ComposeInput{Service: "app", Command: []string{"run"}}}},
+	}
+	commandPlan := discovery.Plan{
+		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}},
+		Cases:   []*casefile.Case{commandCase},
+	}
+	if safe, reason := SupportsParallel(commandPlan); !safe {
+		t.Fatalf("compose command should be parallel-safe: %s", reason)
 	}
 }
 
@@ -648,6 +671,9 @@ func writeFile(t *testing.T, dir, rel, body string) {
 type fakeHandle struct {
 	upCalls    int
 	closeCalls int
+	runCalls   int
+	runService string
+	runCommand []string
 	upErr      error
 	closeErr   error
 }
@@ -660,6 +686,13 @@ func (f *fakeHandle) Up() error {
 func (f *fakeHandle) Close() error {
 	f.closeCalls++
 	return f.closeErr
+}
+
+func (f *fakeHandle) Run(_ context.Context, service string, command []string) error {
+	f.runCalls++
+	f.runService = service
+	f.runCommand = append([]string(nil), command...)
+	return nil
 }
 
 func equalStrings(got, want []string) bool {

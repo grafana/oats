@@ -26,15 +26,19 @@ import (
 )
 
 func TestResolveEndpoint_ComposeDefaults(t *testing.T) {
+	runCompose := func(context.Context, string, []string) error { return nil }
 	ep, err := resolveEndpoint(discovery.Plan{
 		Name:    "smoke",
 		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}},
-	}, fixture.Runtime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318"}, "", "localhost", 8080, "http://localhost:4318")
+	}, fixture.Runtime{GCXConfig: "/tmp/gcx.yaml", OTLPHTTP: "http://127.0.0.1:4318", RunCompose: runCompose}, "", "localhost", 8080, "http://localhost:4318")
 	if err != nil {
 		t.Fatalf("resolveEndpoint: %v", err)
 	}
 	if ep.GCXContext != "" || ep.GCXConfig != "/tmp/gcx.yaml" || ep.AppHost != "localhost" || ep.AppPort != 8080 || ep.OTLPHTTP != "http://127.0.0.1:4318" {
 		t.Fatalf("unexpected endpoint: %+v", ep)
+	}
+	if ep.RunCompose == nil {
+		t.Fatal("compose command runner was not forwarded")
 	}
 }
 

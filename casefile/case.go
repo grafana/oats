@@ -181,17 +181,26 @@ type SeedMetric struct {
 	Value   int64  `yaml:"value"`
 }
 
-// Input drives the application under test so telemetry is emitted before
-// assertions run. It keeps the HTTP request shape unchanged from the legacy
-// format (schema version 2).
+// Input drives the application under test once, before assertions begin.
+// HTTP inputs keep the request shape from the legacy format (schema version 2);
+// Compose inputs run a one-shot command in a service from the case's fixture.
 type Input struct {
 	Scheme  string            `yaml:"scheme,omitempty"`
 	Host    string            `yaml:"host,omitempty"`
 	Method  string            `yaml:"method,omitempty"`
-	Path    string            `yaml:"path"`
+	Path    string            `yaml:"path,omitempty"`
 	Headers map[string]string `yaml:"headers,omitempty"`
 	Body    string            `yaml:"body,omitempty"`
 	Status  string            `yaml:"status,omitempty"`
+	Compose *ComposeInput     `yaml:"compose,omitempty"`
+}
+
+// ComposeInput runs a service as a one-shot Compose command. Command is passed
+// as an argv list, without a shell; use ["sh", "-c", "..."] when shell syntax
+// is intentionally required.
+type ComposeInput struct {
+	Service string   `yaml:"service"`
+	Command []string `yaml:"command"`
 }
 
 // Expected groups per-signal assertion blocks. A case may omit any signal it
@@ -446,8 +455,29 @@ func (c *Case) Validate() error {
 		return fmt.Errorf("expected: at least one assertion required (signal or custom-check)")
 	}
 	for i, in := range c.Input {
-		if in.Path == "" {
+		hasHTTP := in.Path != "" || in.Scheme != "" || in.Host != "" || in.Method != "" || len(in.Headers) > 0 || in.Body != "" || in.Status != ""
+		hasCompose := in.Compose != nil
+		if hasHTTP == hasCompose {
+			return fmt.Errorf("input[%d]: set exactly one of path or compose", i)
+		}
+		if hasHTTP && in.Path == "" {
 			return fmt.Errorf("input[%d].path: required, non-empty", i)
+		}
+		if hasCompose {
+			if c.Fixture != nil && c.Fixture.Kind() != "" && c.Fixture.Kind() != "compose" {
+				return fmt.Errorf("input[%d].compose: requires a Compose fixture", i)
+			}
+			if strings.TrimSpace(in.Compose.Service) == "" {
+				return fmt.Errorf("input[%d].compose.service: required, non-empty", i)
+			}
+			if len(in.Compose.Command) == 0 {
+				return fmt.Errorf("input[%d].compose.command: required, non-empty", i)
+			}
+			for j, arg := range in.Compose.Command {
+				if arg == "" {
+					return fmt.Errorf("input[%d].compose.command[%d]: must be non-empty", i, j)
+				}
+			}
 		}
 	}
 	for i := range c.Expected.Traces {
