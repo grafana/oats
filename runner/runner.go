@@ -500,12 +500,13 @@ func (r *Runner) doInput(ctx context.Context, in casefile.Input) error {
 	if interval == 0 {
 		interval = r.opts.Interval
 	}
-	inputCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	deadline := time.Now().Add(timeout)
 	var lastErr error
-	result := wait.Until[error](inputCtx, wait.Options{Timeout: timeout, Interval: interval}, func() []error {
-		if err := requests.DoHTTPRequestWithContext(inputCtx, url, method, headers, in.Body, status); err != nil {
-			if inputCtx.Err() == nil || lastErr == nil {
+	result := wait.Until[error](ctx, wait.Options{Timeout: timeout, Interval: interval}, func() []error {
+		attemptCtx, cancel := context.WithDeadline(ctx, deadline)
+		defer cancel()
+		if err := requests.DoHTTPRequestWithContext(attemptCtx, url, method, headers, in.Body, status); err != nil {
+			if attemptCtx.Err() == nil || lastErr == nil {
 				lastErr = err
 			}
 			return []error{err}
@@ -518,5 +519,5 @@ func (r *Runner) doInput(ctx context.Context, in casefile.Input) error {
 	if lastErr != nil {
 		return fmt.Errorf("retry exhausted after %d attempts: %w", result.Iterations, lastErr)
 	}
-	return fmt.Errorf("retry stopped after %d attempts: %w", result.Iterations, inputCtx.Err())
+	return fmt.Errorf("retry stopped after %d attempts: %w", result.Iterations, ctx.Err())
 }
