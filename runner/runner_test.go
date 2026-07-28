@@ -376,6 +376,31 @@ expected:
 	}
 }
 
+func TestRunCase_ComposeInputFailure(t *testing.T) {
+	r, buf := newRunner(t, &stubExec{}, Options{Timeout: 100 * time.Millisecond})
+	r.endpoint.RunCompose = func(_ context.Context, _ string, _ []string) error {
+		return errors.New("command failed")
+	}
+	c := mustParse(t, `
+name: failing one-shot cli
+input:
+  - compose:
+      service: app
+      command: ["false"]
+expected:
+  logs:
+    - logql: '{}'
+`)
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	if r.RunCase(context.Background(), c) {
+		t.Fatal("expected case to fail")
+	}
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+	if !strings.Contains(buf.String(), "input: command failed") {
+		t.Fatalf("expected input failure output, got:\n%s", buf.String())
+	}
+}
+
 func TestRunCase_InlineOTLPSeedRequiresEndpoint(t *testing.T) {
 	c := mustParse(t, `
 name: inline seed

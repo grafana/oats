@@ -455,7 +455,7 @@ func (c *Case) Validate() error {
 		return fmt.Errorf("expected: at least one assertion required (signal or custom-check)")
 	}
 	for i, in := range c.Input {
-		hasHTTP := in.Path != "" || in.Scheme != "" || in.Host != "" || in.Method != "" || len(in.Headers) > 0 || in.Body != "" || in.Status != ""
+		hasHTTP := in.Path != "" || in.Scheme != "" || in.Host != "" || in.Method != "" || in.Headers != nil || in.Body != "" || in.Status != ""
 		hasCompose := in.Compose != nil
 		if hasHTTP == hasCompose {
 			return fmt.Errorf("input[%d]: set exactly one of path or compose", i)
@@ -474,7 +474,7 @@ func (c *Case) Validate() error {
 				return fmt.Errorf("input[%d].compose.command: required, non-empty", i)
 			}
 			for j, arg := range in.Compose.Command {
-				if arg == "" {
+				if strings.TrimSpace(arg) == "" {
 					return fmt.Errorf("input[%d].compose.command[%d]: must be non-empty", i, j)
 				}
 			}

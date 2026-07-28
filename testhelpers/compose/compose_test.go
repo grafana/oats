@@ -97,6 +97,37 @@ esac
 	}
 }
 
+func TestRunReportsBuildAndCommandFailures(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a POSIX executable")
+	}
+
+	for _, tc := range []struct {
+		name string
+		fail string
+		want string
+	}{
+		{name: "build", fail: "build", want: `failed to build compose service "app"`},
+		{name: "run", fail: "run", want: `failed to run compose service "app"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			command := filepath.Join(t.TempDir(), "compose")
+			script := "#!/bin/sh\ncase \"$*\" in\n  *" + tc.fail + "*) exit 1 ;;\nesac\n"
+			if err := os.WriteFile(command, []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			c, err := StackFilesWithRuntime([]string{"compose.yml"}, nil, container.Docker)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.Command = command
+			if err := c.Run(context.Background(), "app", []string{"true"}); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Run error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestComposeValidationAndEnvironmentMerge(t *testing.T) {
 	if _, err := StackFilesWithRuntime(nil, nil, container.Docker); err == nil {
 		t.Fatal("expected missing compose file error")

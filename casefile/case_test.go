@@ -85,9 +85,11 @@ func TestValidate_InputKind(t *testing.T) {
 		{name: "empty", input: Input{}, want: "set exactly one"},
 		{name: "mixed", input: Input{Path: "/run", Compose: &ComposeInput{Service: "app", Command: []string{"run"}}}, want: "set exactly one"},
 		{name: "http path", input: Input{Method: "POST"}, want: ".path: required"},
+		{name: "empty headers imply http", input: Input{Headers: map[string]string{}}, want: ".path: required"},
 		{name: "compose service", input: Input{Compose: &ComposeInput{Command: []string{"run"}}}, want: ".compose.service: required"},
 		{name: "compose command", input: Input{Compose: &ComposeInput{Service: "app"}}, want: ".compose.command: required"},
 		{name: "empty argument", input: Input{Compose: &ComposeInput{Service: "app", Command: []string{"run", ""}}}, want: ".compose.command[1]"},
+		{name: "whitespace argument", input: Input{Compose: &ComposeInput{Service: "app", Command: []string{"run", " \t"}}}, want: ".compose.command[1]"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
