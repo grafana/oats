@@ -14,7 +14,7 @@
   packageRules: [
     {
       description: "Release OATs when the bundled gcx version changes",
-      matchDatasources: ["aqua"],
+      matchDatasources: ["github-tags"],
       matchPackageNames: ["grafana/gcx"],
       semanticCommitType: "fix",
     },
