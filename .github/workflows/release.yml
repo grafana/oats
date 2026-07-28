@@ -36,6 +36,9 @@ jobs:
     if: github.event_name == 'push' && needs.release-please.outputs.release_created == 'true'
     needs: release-please
     runs-on: ubuntu-24.04
+    env:
+      # Artifact releases pair a focused tool allowlist with cache: false.
+      MISE_ENABLE_TOOLS: go,goreleaser
     permissions:
       attestations: write
       contents: write
@@ -52,6 +55,7 @@ jobs:
         with:
           version: v2026.7.13
           sha256: 47878bc295922c5f7ba4b7054cc372ce6ae730a1f12b0753c1cda2f04376eee2
+          cache: false
       - name: Run GoReleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,6 +73,9 @@ jobs:
   publish-existing-tag:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
+    env:
+      # Artifact releases pair a focused tool allowlist with cache: false.
+      MISE_ENABLE_TOOLS: go,goreleaser
     permissions:
       attestations: write
       contents: write
@@ -96,6 +103,7 @@ jobs:
         with:
           version: v2026.7.13
           sha256: 47878bc295922c5f7ba4b7054cc372ce6ae730a1f12b0753c1cda2f04376eee2
+          cache: false
       - name: Run GoReleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
