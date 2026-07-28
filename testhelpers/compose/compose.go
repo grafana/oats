@@ -145,7 +145,9 @@ func (c *Compose) runComposeContext(ctx context.Context, args ...string) error {
 	cmdArgs = append(cmdArgs, args...)
 	cmd := exec.CommandContext(ctx, c.Command, cmdArgs...)
 	cmd.Env = c.Env
-	cmd.Stdout = os.Stdout
+	// Keep command output off stdout: the CLI reserves stdout for reporter
+	// records, which must remain valid NDJSON in machine-readable mode.
+	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
 	return cmd.Run()
