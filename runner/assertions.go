@@ -27,9 +27,6 @@ func (r *Runner) runTrace(ctx context.Context, c *casefile.Case, a *casefile.Tra
 
 func (r *Runner) runTraceStructured(ctx context.Context, c *casefile.Case, a *casefile.TraceAssertion) bool {
 	run := func() []assert.Failure {
-		if err := r.driveInputs(c); err != nil {
-			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
-		}
 		searchArgs := signalcmd.Traces(*a, 0)
 		searchCmd := signalcmd.Render(searchArgs)
 		execCtx, cancel := context.WithTimeout(ctx, r.opts.Timeout)

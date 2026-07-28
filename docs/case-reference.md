@@ -217,6 +217,51 @@ seed:
 > Assert profiles against an app-backed fixture that produces them (e.g. an eBPF
 > profiler or a pyroscope-instrumented app).
 
+## Inputs
+
+Inputs drive an app-backed fixture **once per case**, before OATS starts polling
+the observability backend. Assertion retries repeat only the `gcx` query; they do
+not repeat side effects or produce duplicate telemetry.
+
+An HTTP input sends a request to the fixture's application endpoint:
+
+```yaml
+input:
+  - path: /rolldice       # required; method defaults to GET
+    method: POST
+    headers:
+      Content-Type: application/json
+    body: '{"rolls": 5}'
+    status: "201"         # expected status; defaults to 200
+```
+
+A Compose input runs a service as a one-shot container in the active Compose
+project:
+
+```yaml
+input:
+  - compose:
+      service: app
+      command: [mise, run, hello]
+```
+
+`command` is an argument list and does not implicitly use a shell. Use
+`[sh, -c, "first-command && second-command"]` when shell evaluation is
+intentional. OATS runs `compose build SERVICE` followed by
+`compose run --rm SERVICE ...`, so the command inherits the service's image,
+environment, volumes, and fixture network.
+Compose inputs are not supported by `remote` or `k3d` fixtures.
+
+Keep a command-only service out of the fixture's initial `compose up` by placing
+it behind a profile. Explicitly running the service still activates it:
+
+```yaml
+services:
+  app:
+    build: .
+    profiles: [oats-input]
+```
+
 ## Assertions
 
 Every signal block under `expected` shares one assertion vocabulary, plus a
@@ -339,8 +384,9 @@ echo "custom check ok"
   publish **no fixed host ports**. An app-seed compose group qualifies when its
   app binds an *ephemeral* host port (`127.0.0.1::<port>`) and the fixture sets
   `app_service` + `app_port` so OATS can discover the published port; an app-seed
-  group without `app_service`, or any compose file that binds a fixed host port,
-  runs serially. k3d groups always run serially.
+  group with HTTP inputs but without `app_service`, or any compose file that
+  binds a fixed host port, runs serially. Compose-command inputs need no
+  published app port. k3d groups always run serially.
 - **Memory, not CPU, is the limit for compose parallelism.** Each parallel
   `template = "lgtm"` group boots its *own* LGTM stack — a unique compose project
   with dynamically allocated host ports — so groups can neither collide on ports

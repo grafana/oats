@@ -73,6 +73,9 @@ func startCompose(plan discovery.Plan, engine container.Engine) (Handle, Runtime
 		ComposeProject:   project,
 		ContainerRuntime: string(engine),
 	}
+	if commandHandle, ok := stack.(composeCommandHandle); ok {
+		rt.RunCompose = commandHandle.Run
+	}
 	// When the fixture manages the app (app_service + app_port), resolve the host
 	// port docker published for it. This lets the app bind an ephemeral host port
 	// (127.0.0.1::<port>) instead of a fixed one, which is what makes app-seed

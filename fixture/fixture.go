@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/testhelpers/compose"
 	"github.com/grafana/oats/testhelpers/container"
@@ -70,6 +71,7 @@ type Runtime struct {
 	ParallelSafe     bool
 	ParallelDisabled string
 	ContainerRuntime string
+	RunCompose       func(context.Context, string, []string) error
 }
 
 // Handle is a booted fixture that can be torn down.
@@ -80,6 +82,10 @@ type Handle interface {
 type startableHandle interface {
 	Handle
 	Up() error
+}
+
+type composeCommandHandle interface {
+	Run(context.Context, string, []string) error
 }
 
 // Start boots the fixture declared by the plan and returns a Handle for
@@ -158,9 +164,9 @@ func SupportsParallel(plan discovery.Plan) (bool, string) {
 			// App seeds are parallel-safe only when OATS can give the app an
 			// ephemeral host port instead of a shared fixed one — which requires
 			// fixture.app_service (+ app_port) so the published port can be
-			// discovered. Without it the app falls back to the fixed --app-port
-			// and parallel suites would collide.
-			if c.Seed.EffectiveType() == "app" && !plan.Fixture.HasManagedApp() {
+			// discovered. Compose-command inputs run inside their isolated
+			// project and do not need a host port.
+			if c.Seed.EffectiveType() == "app" && hasHTTPInput(c) && !plan.Fixture.HasManagedApp() {
 				return false, "compose app-seed suites need fixture.app_service and app_port so OATS can publish an ephemeral app port; otherwise they share a fixed app port"
 			}
 		}
@@ -177,6 +183,15 @@ func SupportsParallel(plan discovery.Plan) (bool, string) {
 	default:
 		return false, "fixture type is not parallel-safe"
 	}
+}
+
+func hasHTTPInput(c *casefile.Case) bool {
+	for _, input := range c.Input {
+		if input.Compose == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func startFixture(fix Handle) error {

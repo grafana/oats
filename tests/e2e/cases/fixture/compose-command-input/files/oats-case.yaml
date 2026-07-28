@@ -1,0 +1,23 @@
+name: compose command input runs once
+fixture:
+  compose:
+    template: lgtm
+    file: docker-compose.oats.yml
+input:
+  - compose:
+      service: telemetrygen
+      command:
+        - traces
+        - --otlp-endpoint
+        - lgtm:4317
+        - --otlp-insecure
+        - --service
+        - oats-command-input-e2e
+        - --traces
+        - "1"
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "oats-command-input-e2e" }'
+      match_spans:
+        - name: lets-go
+      count: == 1

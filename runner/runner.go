@@ -58,6 +58,10 @@ type Endpoint struct {
 	// It carries fixture-specific helpers like COMPOSE_FILE and stable local
 	// endpoint URLs.
 	CustomCheckEnv []string
+
+	// RunCompose executes a one-shot command in a service belonging to the
+	// active Compose fixture. It is nil for remote and k3d fixtures.
+	RunCompose func(context.Context, string, []string) error
 }
 
 // Options configures the polling cadence and per-case deadline. Sensible
@@ -205,9 +209,20 @@ func (r *Runner) RunCase(ctx context.Context, c *casefile.Case) bool {
 		}
 	}
 
-	// Seed.
+	// Seed and drive inputs exactly once. Assertions poll only the observability
+	// backend; repeating side-effecting inputs during each poll makes counts
+	// nondeterministic and is especially surprising for one-shot commands.
 	if err := r.seedCase(ctx, c); err != nil {
 		r.failCase(c, "seed: "+err.Error(), "")
+		r.reporter.Emit(report.Event{
+			Type:       report.EventCaseFail,
+			Case:       c.Name,
+			DurationMs: time.Since(caseStart).Milliseconds(),
+		})
+		return false
+	}
+	if err := r.driveInputs(ctx, c); err != nil {
+		r.failCase(c, "input: "+err.Error(), "")
 		r.reporter.Emit(report.Event{
 			Type:       report.EventCaseFail,
 			Case:       c.Name,
@@ -280,8 +295,7 @@ func (r *Runner) RunCase(ctx context.Context, c *casefile.Case) bool {
 func (r *Runner) seedCase(ctx context.Context, c *casefile.Case) error {
 	switch c.Seed.EffectiveType() {
 	case "app":
-		// External fixture is responsible for booting the app. Runner
-		// assumes the app is already emitting; nothing to do here.
+		// The fixture boots the app; RunCase drives its declared inputs next.
 		return nil
 	case "inline-otlp":
 		if r.seeder.OTLPEndpoint == "" {
@@ -349,9 +363,6 @@ func (r *Runner) pollAssert(
 	cmdStr := signalcmd.Render(args)
 
 	run := func() []assert.Failure {
-		if err := r.driveInputs(c); err != nil {
-			return []assert.Failure{{Rule: "input", Detail: err.Error()}}
-		}
 		execCtx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
 		defer cancel()
 		res, err := r.exec.Execute(execCtx, args...)
@@ -424,16 +435,24 @@ func (r *Runner) failCase(c *casefile.Case, msg, cmd string) {
 	})
 }
 
-func (r *Runner) driveInputs(c *casefile.Case) error {
+func (r *Runner) driveInputs(ctx context.Context, c *casefile.Case) error {
 	for _, in := range c.Input {
-		if err := r.doInput(in); err != nil {
+		if err := r.doInput(ctx, in); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *Runner) doInput(in casefile.Input) error {
+func (r *Runner) doInput(ctx context.Context, in casefile.Input) error {
+	if in.Compose != nil {
+		if r.endpoint.RunCompose == nil {
+			return fmt.Errorf("compose input requires a Compose fixture")
+		}
+		inputCtx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
+		defer cancel()
+		return r.endpoint.RunCompose(inputCtx, in.Compose.Service, in.Compose.Command)
+	}
 	if in.Path == "" {
 		return nil
 	}

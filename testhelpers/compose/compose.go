@@ -123,6 +123,36 @@ func (c *Compose) Stop() error {
 	return c.runDocker(newCommand("stop"))
 }
 
+// Run executes a service as a one-shot container in the Compose project.
+// The service is built on demand, which lets callers keep command-only
+// services behind a profile so they are not started with the fixture.
+func (c *Compose) Run(ctx context.Context, service string, argv []string) error {
+	if err := c.runComposeContext(ctx, "build", service); err != nil {
+		return fmt.Errorf("failed to build compose service %q: %w", service, err)
+	}
+	// The fixture is already running. Avoid Compose recreating dependencies
+	// before the one-shot command, which can reset application readiness and
+	// disrupt instrumentation attached to the existing containers.
+	args := append([]string{"run", "--rm", "--no-deps", service}, argv...)
+	if err := c.runComposeContext(ctx, args...); err != nil {
+		return fmt.Errorf("failed to run compose service %q: %w", service, err)
+	}
+	return nil
+}
+
+func (c *Compose) runComposeContext(ctx context.Context, args ...string) error {
+	cmdArgs := append([]string(nil), c.DefaultArgs...)
+	cmdArgs = append(cmdArgs, args...)
+	cmd := exec.CommandContext(ctx, c.Command, cmdArgs...)
+	cmd.Env = c.Env
+	// Keep command output off stdout: the CLI reserves stdout for reporter
+	// records, which must remain valid NDJSON in machine-readable mode.
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	slog.Info("Running", "command", cmd.String(), "compose_files", c.Paths)
+	return cmd.Run()
+}
+
 func (c *Compose) Remove() error {
 	// `down` is supported by both Docker Compose and podman-compose. The
 	// latter does not implement Compose's `rm` command.

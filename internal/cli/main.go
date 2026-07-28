@@ -491,6 +491,7 @@ func resolveEndpoint(plan discovery.Plan, rt fixture.Runtime, gcxContextOverride
 			ep.OTLPHTTP = rt.OTLPHTTP
 		}
 		ep.CustomCheckEnv = append(ep.CustomCheckEnv, rt.CustomCheckEnv...)
+		ep.RunCompose = rt.RunCompose
 	case "k3d":
 		if rt.GCXConfig != "" {
 			ep.GCXConfig = rt.GCXConfig

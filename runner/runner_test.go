@@ -307,8 +307,97 @@ expected:
 	if !ok {
 		t.Fatalf("expected case to pass")
 	}
-	if hits == 0 {
-		t.Fatalf("expected at least one input request")
+	if hits != 1 {
+		t.Fatalf("expected exactly one input request, got %d", hits)
+	}
+}
+
+func TestRunCase_DrivesInputOnlyOnceWhileAssertionsPoll(t *testing.T) {
+	var hits int
+	app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer app.Close()
+	host, port := splitHostPort(t, app.Listener.Addr().String())
+
+	exec := &stubExec{stdout: ""}
+	r, _ := newRunner(t, exec, Options{Timeout: 20 * time.Millisecond, Interval: time.Millisecond, SeedSettleDelay: 1})
+	r.endpoint.AppHost = host
+	r.endpoint.AppPort = port
+	c := mustParse(t, `
+name: missing trace polls
+input:
+  - path: /run
+expected:
+  traces:
+    - traceql: '{}'
+      contains: ["never-found"]
+`)
+
+	if r.RunCase(context.Background(), c) {
+		t.Fatal("expected assertion to fail")
+	}
+	if len(exec.captured) < 2 {
+		t.Fatalf("expected assertion polling, got %d query calls", len(exec.captured))
+	}
+	if hits != 1 {
+		t.Fatalf("expected input once while assertion polled, got %d requests", hits)
+	}
+}
+
+func TestRunCase_ComposeInput(t *testing.T) {
+	exec := &stubExec{stdout: "hello"}
+	r, _ := newRunner(t, exec, Options{Timeout: 100 * time.Millisecond, SeedSettleDelay: 1})
+	var calls int
+	r.endpoint.RunCompose = func(_ context.Context, service string, command []string) error {
+		calls++
+		if service != "app" || strings.Join(command, " ") != "mise run hello" {
+			t.Fatalf("compose input = service %q command %#v", service, command)
+		}
+		return nil
+	}
+	c := mustParse(t, `
+name: one-shot cli
+input:
+  - compose:
+      service: app
+      command: [mise, run, hello]
+expected:
+  logs:
+    - logql: '{}'
+      contains: hello
+`)
+	if !r.RunCase(context.Background(), c) {
+		t.Fatal("expected case to pass")
+	}
+	if calls != 1 {
+		t.Fatalf("expected one Compose command, got %d", calls)
+	}
+}
+
+func TestRunCase_ComposeInputFailure(t *testing.T) {
+	r, buf := newRunner(t, &stubExec{}, Options{Timeout: 100 * time.Millisecond})
+	r.endpoint.RunCompose = func(_ context.Context, _ string, _ []string) error {
+		return errors.New("command failed")
+	}
+	c := mustParse(t, `
+name: failing one-shot cli
+input:
+  - compose:
+      service: app
+      command: ["false"]
+expected:
+  logs:
+    - logql: '{}'
+`)
+	r.reporter.Emit(report.Event{Type: report.EventRunStart})
+	if r.RunCase(context.Background(), c) {
+		t.Fatal("expected case to fail")
+	}
+	r.reporter.Emit(report.Event{Type: report.EventRunEnd})
+	if !strings.Contains(buf.String(), "input: command failed") {
+		t.Fatalf("expected input failure output, got:\n%s", buf.String())
 	}
 }
 
@@ -950,17 +1039,20 @@ expected:
 
 func TestDoInputValidation(t *testing.T) {
 	r, _ := newRunner(t, &stubExec{}, Options{Timeout: time.Millisecond})
-	if err := r.doInput(casefile.Input{Path: "/health"}); err == nil || !strings.Contains(err.Error(), "application endpoint") {
+	if err := r.doInput(context.Background(), casefile.Input{Path: "/health"}); err == nil || !strings.Contains(err.Error(), "application endpoint") {
 		t.Fatalf("missing endpoint error = %v", err)
 	}
-	if err := r.doInput(casefile.Input{}); err != nil {
+	if err := r.doInput(context.Background(), casefile.Input{}); err != nil {
 		t.Fatalf("empty input should be ignored: %v", err)
+	}
+	if err := r.doInput(context.Background(), casefile.Input{Compose: &casefile.ComposeInput{Service: "app", Command: []string{"run"}}}); err == nil || !strings.Contains(err.Error(), "requires a Compose fixture") {
+		t.Fatalf("missing Compose fixture error = %v", err)
 	}
 
 	invalidStatus, _ := newRunner(t, &stubExec{}, Options{Timeout: time.Millisecond})
 	invalidStatus.endpoint.AppHost = "127.0.0.1"
 	invalidStatus.endpoint.AppPort = 1
-	if err := invalidStatus.doInput(casefile.Input{Path: "/health", Status: "created"}); err == nil || !strings.Contains(err.Error(), "not an integer") {
+	if err := invalidStatus.doInput(context.Background(), casefile.Input{Path: "/health", Status: "created"}); err == nil || !strings.Contains(err.Error(), "not an integer") {
 		t.Fatalf("invalid status error = %v", err)
 	}
 }

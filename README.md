@@ -131,8 +131,18 @@ expected:
 ```
 
 `oats` boots the app next to a throwaway Grafana LGTM stack (the default fixture —
-no `template: lgtm` needed), drives `/rolldice`, and retries each assertion until
-it passes or times out.
+no `template: lgtm` needed), drives `/rolldice` once, and retries each telemetry
+query until its assertion passes or times out.
+
+One-shot CLIs and batch jobs can run directly as a service in the Compose
+fixture, without an HTTP shim:
+
+```yaml
+input:
+  - compose:
+      service: app
+      command: [mise, run, hello]
+```
 
 No app of your own yet? A case can seed telemetry directly with
 `seed: {type: inline-otlp}` and skip the app entirely — see

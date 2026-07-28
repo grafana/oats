@@ -134,6 +134,11 @@
         "ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen"
       ]
     },
+    "tests/e2e/cases/fixture/compose-command-input/files/docker-compose.oats.yml": {
+      "docker-compose": [
+        "ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen"
+      ]
+    },
     "tests/e2e/cases/fixture/compose-logs-fail/files/docker-compose.oats.yml": {
       "docker-compose": [
         "alpine"

@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -23,6 +24,9 @@ func TestStackFilesWithRuntimeLifecycle(t *testing.T) {
 	command := filepath.Join(dir, "compose")
 	if err := os.WriteFile(command, []byte(`#!/bin/sh
 printf '%s\n' "$*" >> "$COMPOSE_TEST_ARGS"
+for arg in "$@"; do
+  printf 'arg=<%s>\n' "$arg" >> "$COMPOSE_TEST_ARGS"
+done
 case "$*" in
 *logs*)
   printf 'service ready\n'
@@ -41,6 +45,9 @@ esac
 
 	if err := c.Up(); err != nil {
 		t.Fatalf("Up: %v", err)
+	}
+	if err := c.Run(context.Background(), "app", []string{"mise", "run", "hello world"}); err != nil {
+		t.Fatalf("Run: %v", err)
 	}
 	var output strings.Builder
 	if err := c.LogsToConsumer(func(r io.ReadCloser, wg *sync.WaitGroup) {
@@ -77,6 +84,9 @@ esac
 	for _, want := range []string{
 		"network prune -f --filter until=5m",
 		"-f base.yml -f override.yml up --build --detach --force-recreate",
+		"-f base.yml -f override.yml build app",
+		"-f base.yml -f override.yml run --rm --no-deps app mise run hello world",
+		"arg=<hello world>",
 		"-f base.yml -f override.yml logs",
 		"-f base.yml -f override.yml stop",
 		"-f base.yml -f override.yml down",
@@ -84,6 +94,37 @@ esac
 		if !strings.Contains(string(data), want) {
 			t.Errorf("command log %q missing %q", data, want)
 		}
+	}
+}
+
+func TestRunReportsBuildAndCommandFailures(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a POSIX executable")
+	}
+
+	for _, tc := range []struct {
+		name string
+		fail string
+		want string
+	}{
+		{name: "build", fail: "build", want: `failed to build compose service "app"`},
+		{name: "run", fail: "run", want: `failed to run compose service "app"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			command := filepath.Join(t.TempDir(), "compose")
+			script := "#!/bin/sh\ncase \"$*\" in\n  *" + tc.fail + "*) exit 1 ;;\nesac\n"
+			if err := os.WriteFile(command, []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			c, err := StackFilesWithRuntime([]string{"compose.yml"}, nil, container.Docker)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.Command = command
+			if err := c.Run(context.Background(), "app", []string{"true"}); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Run error = %v, want %q", err, tc.want)
+			}
+		})
 	}
 }
 
