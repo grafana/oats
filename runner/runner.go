@@ -486,5 +486,37 @@ func (r *Runner) doInput(ctx context.Context, in casefile.Input) error {
 		headers["Accept"] = "application/json"
 	}
 	url := fmt.Sprintf("%s://%s:%d%s", scheme, host, r.endpoint.AppPort, in.Path)
-	return requests.DoHTTPRequestWithTimeout(url, method, headers, in.Body, status, r.opts.Timeout)
+	if in.Retry == nil {
+		inputCtx, cancel := context.WithTimeout(ctx, r.opts.Timeout)
+		defer cancel()
+		return requests.DoHTTPRequestWithContext(inputCtx, url, method, headers, in.Body, status)
+	}
+
+	timeout := in.Retry.Timeout
+	if timeout == 0 {
+		timeout = r.opts.Timeout
+	}
+	interval := in.Retry.Interval
+	if interval == 0 {
+		interval = r.opts.Interval
+	}
+	inputCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	var lastErr error
+	result := wait.Until[error](inputCtx, wait.Options{Timeout: timeout, Interval: interval}, func() []error {
+		if err := requests.DoHTTPRequestWithContext(inputCtx, url, method, headers, in.Body, status); err != nil {
+			if inputCtx.Err() == nil || lastErr == nil {
+				lastErr = err
+			}
+			return []error{err}
+		}
+		return nil
+	})
+	if result.OK {
+		return nil
+	}
+	if lastErr != nil {
+		return fmt.Errorf("retry exhausted after %d attempts: %w", result.Iterations, lastErr)
+	}
+	return fmt.Errorf("retry stopped after %d attempts: %w", result.Iterations, inputCtx.Err())
 }

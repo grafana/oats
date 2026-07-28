@@ -53,6 +53,12 @@ func DoHTTPRequestWithTimeout(url string, method string, headers map[string]stri
 	return doHTTPRequest(ctx, url, method, headers, payload, statusCode)
 }
 
+// DoHTTPRequestWithContext drives an application request until it completes or
+// the supplied context is cancelled.
+func DoHTTPRequestWithContext(ctx context.Context, url string, method string, headers map[string]string, payload string, statusCode int) error {
+	return doHTTPRequest(ctx, url, method, headers, payload, statusCode)
+}
+
 func doHTTPRequest(ctx context.Context, url string, method string, headers map[string]string, payload string, statusCode int) error {
 	var body io.Reader = nil
 

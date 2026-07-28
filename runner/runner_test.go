@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1055,6 +1056,83 @@ func TestDoInputValidation(t *testing.T) {
 	if err := invalidStatus.doInput(context.Background(), casefile.Input{Path: "/health", Status: "created"}); err == nil || !strings.Contains(err.Error(), "not an integer") {
 		t.Fatalf("invalid status error = %v", err)
 	}
+}
+
+func TestDoInputDoesNotRetryByDefault(t *testing.T) {
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{Timeout: 100 * time.Millisecond, Interval: time.Millisecond})
+	setInputEndpoint(t, r, server.URL)
+	err := r.doInput(context.Background(), casefile.Input{Path: "/ready"})
+	if err == nil || !strings.Contains(err.Error(), "got: 503") {
+		t.Fatalf("doInput error = %v, want status mismatch", err)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Fatalf("request count = %d, want 1", got)
+	}
+}
+
+func TestDoInputRetrySucceeds(t *testing.T) {
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if hits.Add(1) < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{Timeout: 100 * time.Millisecond, Interval: time.Millisecond})
+	setInputEndpoint(t, r, server.URL)
+	err := r.doInput(context.Background(), casefile.Input{Path: "/ready", Retry: &casefile.InputRetry{}})
+	if err != nil {
+		t.Fatalf("doInput: %v", err)
+	}
+	if got := hits.Load(); got != 3 {
+		t.Fatalf("request count = %d, want 3", got)
+	}
+}
+
+func TestDoInputRetryExhausted(t *testing.T) {
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{})
+	setInputEndpoint(t, r, server.URL)
+	err := r.doInput(context.Background(), casefile.Input{
+		Path:  "/ready",
+		Retry: &casefile.InputRetry{Timeout: 50 * time.Millisecond, Interval: time.Millisecond},
+	})
+	if err == nil || !strings.Contains(err.Error(), "retry exhausted") || !strings.Contains(err.Error(), "got: 503") {
+		t.Fatalf("doInput error = %v, want exhausted status mismatch", err)
+	}
+	if got := hits.Load(); got < 2 {
+		t.Fatalf("request count = %d, want at least 2", got)
+	}
+}
+
+func setInputEndpoint(t *testing.T, r *Runner, serverURL string) {
+	t.Helper()
+	host, portText, err := net.SplitHostPort(strings.TrimPrefix(serverURL, "http://"))
+	if err != nil {
+		t.Fatalf("SplitHostPort: %v", err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatalf("Atoi: %v", err)
+	}
+	r.endpoint.AppHost = host
+	r.endpoint.AppPort = port
 }
 
 func TestSeedCaseRejectsUnknownType(t *testing.T) {

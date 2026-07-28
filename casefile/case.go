@@ -192,7 +192,15 @@ type Input struct {
 	Headers map[string]string `yaml:"headers,omitempty"`
 	Body    string            `yaml:"body,omitempty"`
 	Status  string            `yaml:"status,omitempty"`
+	Retry   *InputRetry       `yaml:"retry,omitempty"`
 	Compose *ComposeInput     `yaml:"compose,omitempty"`
+}
+
+// InputRetry opts an HTTP input into bounded retries. Zero values inherit the
+// runner's timeout and interval.
+type InputRetry struct {
+	Timeout  time.Duration `yaml:"timeout,omitempty"`
+	Interval time.Duration `yaml:"interval,omitempty"`
 }
 
 // ComposeInput runs a service as a one-shot Compose command. Command is passed
@@ -455,13 +463,24 @@ func (c *Case) Validate() error {
 		return fmt.Errorf("expected: at least one assertion required (signal or custom-check)")
 	}
 	for i, in := range c.Input {
-		hasHTTP := in.Path != "" || in.Scheme != "" || in.Host != "" || in.Method != "" || in.Headers != nil || in.Body != "" || in.Status != ""
+		hasHTTP := in.Path != "" || in.Scheme != "" || in.Host != "" || in.Method != "" || in.Headers != nil || in.Body != "" || in.Status != "" || in.Retry != nil
 		hasCompose := in.Compose != nil
+		if hasCompose && in.Retry != nil {
+			return fmt.Errorf("input[%d].retry: only supported for HTTP inputs", i)
+		}
 		if hasHTTP == hasCompose {
 			return fmt.Errorf("input[%d]: set exactly one of path or compose", i)
 		}
 		if hasHTTP && in.Path == "" {
 			return fmt.Errorf("input[%d].path: required, non-empty", i)
+		}
+		if in.Retry != nil {
+			if in.Retry.Timeout < 0 {
+				return fmt.Errorf("input[%d].retry.timeout: must be >= 0", i)
+			}
+			if in.Retry.Interval < 0 {
+				return fmt.Errorf("input[%d].retry.interval: must be >= 0", i)
+			}
 		}
 		if hasCompose {
 			if c.Fixture != nil && c.Fixture.Kind() != "" && c.Fixture.Kind() != "compose" {
