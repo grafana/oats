@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/grafana/oats/compare/v0.9.0...v0.10.0) (2026-07-28)
+
+
+### Features
+
+* add opt-in HTTP input retries ([#453](https://github.com/grafana/oats/issues/453)) ([82a973d](https://github.com/grafana/oats/commit/82a973d528a9dab8b8ac69091db53e41b92cf8b6))
+
+
+### Bug Fixes
+
+* **release:** ensure gcx updates trigger releases ([#454](https://github.com/grafana/oats/issues/454)) ([8e52488](https://github.com/grafana/oats/commit/8e52488956da7273f36937a8cbdfe97918e67278))
+
 ## [0.9.0](https://github.com/grafana/oats/compare/v0.8.0...v0.9.0) (2026-07-28)
 
 
