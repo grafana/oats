@@ -20,4 +20,5 @@
     },
   ],
   automerge: true,
+  schedule: ["* 5-21 * * MON-FRI"],
 }
