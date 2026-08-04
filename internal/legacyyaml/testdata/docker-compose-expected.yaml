@@ -11,7 +11,7 @@ services:
     volumes:
       - ./configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
   mongodb:
-    image: mongo:7-jammy@sha256:4b28ec57099ae8c1059b22b5e14e664f5b12ebb50b978a69339a824fab4963be
+    image: mongo:7-jammy@sha256:04582c3a144d088f841c446abfc19f79adcefa8bd00ad4a7fb18e27b9585c5d6
     logging:
       driver: json-file
       options:
