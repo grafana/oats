@@ -7,7 +7,7 @@ networks: # see https://stackoverflow.com/questions/43720339/docker-error-could-
         - subnet: 172.16.57.0/24
 services:
   grafana:
-    image: grafana/grafana:13.1.1@sha256:7cb8c64c4d57a57e734073f3cc94620adb24a0acb929bd80ba9f14017e3a975b
+    image: grafana/grafana:13.1.2@sha256:d177053ab62253815f130d81504f77063baf5fd4ca93299d6048453bd31e047a
     network_mode: host
     volumes:
       - ./configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
