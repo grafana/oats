@@ -5,7 +5,7 @@
     // Track `# renovate:`-annotated ENV pins in Dockerfiles (opentelemetry-distro).
     "customManagers:dockerfileVersions",
     "helpers:pinGitHubActionDigestsToSemver",
-    "github>grafana/flint#v0.22.10",
+    "github>grafana/flint#v0.22.11",
   ],
   // config:best-practices pulls in :ignoreModulesAndTests, which ignores
   // **/examples/** (and tests, vendor, ...). Disable it so example deps

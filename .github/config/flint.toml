@@ -6,4 +6,4 @@ exclude = [
 ]
 
 [checks.renovate-deps]
-exclude_managers = ["github-actions", "github-runners", "gomod"]
+exclude_managers = ["github-runners", "gomod"]
