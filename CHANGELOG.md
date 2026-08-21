@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.1](https://github.com/grafana/oats/compare/v0.10.0...v0.10.1) (2026-08-21)
+
+
+### Bug Fixes
+
+* **deps:** update dependency aqua:grafana/gcx to v1.1.0 ([#492](https://github.com/grafana/oats/issues/492)) ([0289ed4](https://github.com/grafana/oats/commit/0289ed488ca0f7ce91df8477155f9782fcc7a89c))
+* **deps:** update module github.com/stretchr/testify to v1.12.0 ([#493](https://github.com/grafana/oats/issues/493)) ([8b36bd3](https://github.com/grafana/oats/commit/8b36bd3a613c635240cd8408b6e6b02bae3eff8e))
+* **deps:** update module github.com/stretchr/testify to v1.12.1 ([#496](https://github.com/grafana/oats/issues/496)) ([e435961](https://github.com/grafana/oats/commit/e4359616e2d80b0bbbefb701ee1341dbc74da8fb))
+* **deps:** update module go.opentelemetry.io/collector/pdata to v1.64.0 ([#475](https://github.com/grafana/oats/issues/475)) ([c4913db](https://github.com/grafana/oats/commit/c4913db6c0906a079a1d047e84cf37f0aa2407c1))
+* **deps:** update module go.opentelemetry.io/collector/pdata to v1.65.0 ([#498](https://github.com/grafana/oats/issues/498)) ([4eb136f](https://github.com/grafana/oats/commit/4eb136f0f1a85f5b76af187e68b739b35083d48d))
+* **deps:** update module go.yaml.in/yaml/v3 to v3.0.5 ([#456](https://github.com/grafana/oats/issues/456)) ([75336de](https://github.com/grafana/oats/commit/75336de68e09255045ab15f344e45d32421e02a5))
+* **deps:** update opentelemetry-go monorepo to v1.45.0 ([#473](https://github.com/grafana/oats/issues/473)) ([1d6d9bd](https://github.com/grafana/oats/commit/1d6d9bd40e7890817f0a5d8e7167bd81d259c99f))
+
 ## [0.10.0](https://github.com/grafana/oats/compare/v0.9.0...v0.10.0) (2026-07-28)
 
 
