@@ -7,23 +7,47 @@
       ]
     },
     ".github/workflows/build.yml": {
-      "regex": [
-        "mise"
+      "github-actions": [
+        "actions/checkout",
+        "codecov/codecov-action",
+        "jdx/mise",
+        "jdx/mise-action",
+        "ubuntu"
       ]
     },
     ".github/workflows/e2e_test.yml": {
-      "regex": [
-        "mise"
+      "github-actions": [
+        "actions/cache",
+        "actions/checkout",
+        "actions/download-artifact",
+        "actions/upload-artifact",
+        "jdx/mise",
+        "jdx/mise-action",
+        "ubuntu"
       ]
     },
     ".github/workflows/lint.yml": {
-      "regex": [
-        "mise"
+      "github-actions": [
+        "actions/checkout",
+        "jdx/mise",
+        "jdx/mise-action",
+        "ubuntu"
+      ]
+    },
+    ".github/workflows/pr-title.yml": {
+      "github-actions": [
+        "grafana/shared-workflows",
+        "ubuntu"
       ]
     },
     ".github/workflows/release.yml": {
-      "regex": [
-        "mise"
+      "github-actions": [
+        "actions/attest-build-provenance",
+        "actions/checkout",
+        "googleapis/release-please-action",
+        "jdx/mise",
+        "jdx/mise-action",
+        "ubuntu"
       ]
     },
     "examples/fixtures/compose/rolldice/Dockerfile": {
@@ -173,6 +197,45 @@
       "docker-compose": [
         "docker.io/grafana/otel-lgtm"
       ]
+    }
+  },
+  "actionMeta": {
+    "actions/attest-build-provenance": {
+      "packageName": "actions/attest-build-provenance",
+      "refKind": "version-tag"
+    },
+    "actions/cache": {
+      "packageName": "actions/cache",
+      "refKind": "version-tag"
+    },
+    "actions/checkout": {
+      "packageName": "actions/checkout",
+      "refKind": "version-tag"
+    },
+    "actions/download-artifact": {
+      "packageName": "actions/download-artifact",
+      "refKind": "version-tag"
+    },
+    "actions/upload-artifact": {
+      "packageName": "actions/upload-artifact",
+      "refKind": "version-tag"
+    },
+    "codecov/codecov-action": {
+      "packageName": "codecov/codecov-action",
+      "refKind": "version-tag"
+    },
+    "googleapis/release-please-action": {
+      "packageName": "googleapis/release-please-action",
+      "refKind": "version-tag"
+    },
+    "grafana/shared-workflows/actions/lint-pr-title": {
+      "packageName": "grafana/shared-workflows",
+      "refKind": "version-tag",
+      "compatibility": "lint-pr-title"
+    },
+    "jdx/mise-action": {
+      "packageName": "jdx/mise-action",
+      "refKind": "version-tag"
     }
   }
 }
