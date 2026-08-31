@@ -5,7 +5,7 @@
 go = "1.27.0"
 goreleaser = "2.18.0"
 k3d = "5.9.0"
-kubectl = "1.36.4"
+kubectl = "1.37.0"
 node = "24.19.0"
 
 # Linters
