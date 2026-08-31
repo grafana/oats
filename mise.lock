@@ -365,6 +365,7 @@ provenance = "github-attestations"
 checksum = "sha256:41cdf49b653784b03a08013dd99e382cd5d463049e915c2d818eaed182ae6197"
 url = "https://github.com/goreleaser/goreleaser/releases/download/v2.18.0/goreleaser_Linux_x86_64.tar.gz"
 url_api = "https://api.github.com/repos/goreleaser/goreleaser/releases/assets/526873785"
+provenance = "github-attestations"
 
 [tools.goreleaser."platforms.linux-x64-musl"]
 checksum = "sha256:41cdf49b653784b03a08013dd99e382cd5d463049e915c2d818eaed182ae6197"
