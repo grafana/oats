@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/hashicorp/go-version v1.9.0
-	github.com/onsi/gomega v1.42.1
+	github.com/onsi/gomega v1.43.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
