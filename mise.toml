@@ -10,7 +10,7 @@ node = "24.21.0"
 
 # Linters
 actionlint = "1.7.12"
-"aqua:grafana/flint" = "0.22.11"
+"aqua:grafana/flint" = "0.22.12"
 "aqua:owenlamont/ryl" = "0.22.0"
 biome = "2.5.13"
 editorconfig-checker = "4.0.1"
