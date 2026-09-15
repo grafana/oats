@@ -107,3 +107,4 @@ Key flags: `--config`, `--tags`, `--timeout`, `--interval`, `--absent-timeout`,
 - Lint on PRs (`mise run lint`), build on PRs (`mise run build`), tests on PRs (`mise run test`)
 - E2E tests in a separate workflow
 - Linting via flint
+- Security issues should be reported via [Grafana's security issue reporting page](https://grafana.com/legal/report-a-security-issue/) and not directly in this repository.
