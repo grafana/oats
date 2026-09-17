@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -152,6 +154,7 @@ func TestUsageOutputDoesNotRunCases(t *testing.T) {
 		want string
 	}{
 		{[]string{"--help"}, "OpenTelemetry Acceptance Tests"},
+		{[]string{"-h"}, "OpenTelemetry Acceptance Tests"},
 		{[]string{"run", "--help"}, "Run cases"},
 		{[]string{"help", "migrate"}, "Usage: oats migrate"},
 		{[]string{"help", "cache", "clear"}, "Usage: oats cache clear"},
@@ -172,5 +175,122 @@ func TestUsageOutputDoesNotRunCases(t *testing.T) {
 				t.Fatalf("exit=%d output=%q, want %q", exit, out.String(), tc.want)
 			}
 		})
+	}
+}
+
+// Verify every run flag's CLI and environment wiring against application values,
+// including options that are normally only exercised by fixture execution.
+func TestUsageAllRunOptionSources(t *testing.T) {
+	flags := []struct{ name, value string }{
+		{"config", "custom/config.yaml"},
+		{"gcx", "/opt/gcx"},
+		{"gcx-version", "0.4.4"},
+		{"gcx-download", "never"},
+		{"format", "ndjson"},
+		{"tags", "smoke,fast"},
+		{"timeout", "1m"},
+		{"interval", "250ms"},
+		{"absent-timeout", "5s"},
+		{"seed-settle", "3s"},
+		{"gcx-context", "staging"},
+		{"lgtm-version", "0.12.2"},
+		{"container-runtime", "podman"},
+		{"app-host", "app.example"},
+		{"app-port", "8081"},
+		{"otlp-http", "http://collector:4318"},
+		{"parallel", "3"},
+		{"fail-fast", "true"},
+		{"no-cache", "true"},
+		{"cache-dir", "custom/cache"},
+		{"list", "true"},
+		{"migrate", "legacy.yaml"},
+	}
+	want := &usagespec.RunCmd{
+		Config: "custom/config.yaml", Gcx: "/opt/gcx", GcxVersion: "0.4.4",
+		GcxDownload: "never", Format: "ndjson", Tags: "smoke,fast",
+		Timeout: "1m", Interval: "250ms", AbsentTimeout: "5s", SeedSettle: "3s",
+		GcxContext: "staging", LgtmVersion: "0.12.2", ContainerRuntime: "podman",
+		AppHost: "app.example", AppPort: "8081", OtlpHttp: "http://collector:4318",
+		Parallel: "3", FailFast: true, NoCache: true, CacheDir: "custom/cache",
+		List: true, Migrate: "legacy.yaml",
+	}
+	for _, source := range []string{"environment", "CLI overrides environment"} {
+		t.Run(source, func(t *testing.T) {
+			var args []string
+			for _, flag := range flags {
+				value := flag.value
+				if source == "CLI overrides environment" {
+					value = "overridden"
+					args = append(args, "--"+flag.name+"="+flag.value)
+				}
+				t.Setenv("OATS_"+strings.ToUpper(strings.ReplaceAll(flag.name, "-", "_")), value)
+			}
+			line, err := parseCommand(args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(line.Run, want) {
+				t.Fatalf("run options = %+v, want %+v", line.Run, want)
+			}
+			if line.run.timeout != time.Minute || line.run.interval != 250*time.Millisecond ||
+				line.run.absentTimeout != 5*time.Second || line.run.seedSettle != 3*time.Second ||
+				line.run.appPort != 8081 || line.run.parallel != 3 {
+				t.Fatalf("typed options = %+v", line.run)
+			}
+		})
+	}
+}
+
+func TestUsageBooleanLastOccurrenceWins(t *testing.T) {
+	for _, name := range []string{"fail-fast", "no-cache", "list"} {
+		t.Run(name, func(t *testing.T) {
+			for _, value := range []bool{false, true} {
+				args := []string{"--" + name, "--" + name + "=false"}
+				if value {
+					args = append(args, "--"+name)
+				}
+				line, err := parseCommand(args)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got := map[string]bool{
+					"fail-fast": line.Run.FailFast, "no-cache": line.Run.NoCache, "list": line.Run.List,
+				}[name]
+				if got != value {
+					t.Fatalf("%v: got %v, want %v", args, got, value)
+				}
+			}
+		})
+	}
+}
+
+func TestUsageSubcommandEnvironment(t *testing.T) {
+	t.Setenv("OATS_CONFIG", "env/config.yaml")
+	t.Setenv("OATS_CACHE_DIR", "env/cache")
+	line, err := parseCommand([]string{"list"})
+	if err != nil || line.List.Config != "env/config.yaml" {
+		t.Fatalf("list environment: %+v, %v", line, err)
+	}
+	line, err = parseCommand([]string{"cache", "clear"})
+	if err != nil || line.Cache.Clear.CacheDir != "env/cache" {
+		t.Fatalf("cache environment: %+v, %v", line, err)
+	}
+	line, err = parseCommand([]string{"cache", "clear", "--cache-dir", "cli/cache"})
+	if err != nil || line.Cache.Clear.CacheDir != "cli/cache" {
+		t.Fatalf("cache CLI precedence: %+v, %v", line, err)
+	}
+}
+
+func TestUsageExecutionErrors(t *testing.T) {
+	var out bytes.Buffer
+	if err := execute([]string{"--timeout=invalid"}, new(int), &out); err == nil {
+		t.Fatal("invalid duration should propagate through execute")
+	}
+	path := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(path, []byte("file"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := execute([]string{"cache", "clear", "--cache-dir", path}, new(int), &out); err == nil {
+		t.Fatal("cache directory creation error should propagate through execute")
 	}
 }

@@ -22,4 +22,7 @@ while IFS= read -r pkg; do
 	[[ -n "$pkg" ]] && packages+=("$pkg")
 done <<< "$package_list"
 
-GOFLAGS=-buildvcs=false go test -coverprofile="$profile" "${packages[@]}"
+# Tests in one package exercise helpers in another (notably the generated CLI).
+# Instrument the same project packages we test so those calls count as coverage.
+readonly cover_packages="$(IFS=,; echo "${packages[*]}")"
+GOFLAGS=-buildvcs=false go test -coverpkg="$cover_packages" -coverprofile="$profile" "${packages[@]}"

@@ -66,8 +66,10 @@ fixture groups run concurrently. Cases sharing a fixture group run serially.
 Scope queries to the telemetry under test. Traces use TraceQL, logs LogQL,
 metrics PromQL, and profiles Pyroscope selectors. Prefer assertions on the
 observable contract over unstable IDs or exact timing. Consult the
-[case reference](https://github.com/grafana/oats/blob/main/docs/case-reference.md)
-at the installed release tag for additional assertion and fixture syntax.
+[development case reference](https://github.com/grafana/oats/blob/main/docs/case-reference.md)
+for additional assertion and fixture syntax. That link follows `main`, not the
+installed release. For version-matched guidance, run `oats version` and select
+the corresponding release tag in GitHub before using the reference.
 
 ## Run and diagnose
 
