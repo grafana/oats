@@ -7,6 +7,8 @@ goreleaser = "2.18.1"
 k3d = "5.9.0"
 kubectl = "1.37.0"
 node = "24.21.0"
+# Keep the generator aligned with the usage/go commit in go.mod.
+usage = "6.9.1"
 
 # Linters
 actionlint = "1.7.12"
@@ -43,4 +45,4 @@ run = "go test -v -buildvcs=false ./tests/e2e -run TestCases"
 
 [tasks.check]
 description = "Run all checks"
-depends = ["lint", "test"]
+depends = ["lint", "test", "check-cli"]

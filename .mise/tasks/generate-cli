@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Regenerate the Go CLI tables from the Usage spec"
+set -euo pipefail
+go generate ./internal/cli/usagespec
+gofmt -w internal/cli/usagespec/tables.go

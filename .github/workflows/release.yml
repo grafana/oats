@@ -33,62 +33,33 @@ jobs:
           manifest-file: .release-please-manifest.json
 
   goreleaser:
-    if: github.event_name == 'push' && needs.release-please.outputs.release_created == 'true'
+    # A status function allows manual runs when release-please is skipped,
+    # while cancellation and failed automatic releases must not publish.
+    if: >-
+      ${{ !cancelled() && (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && needs.release-please.result == 'success' &&
+         needs.release-please.outputs.release_created == 'true')
+      ) }}
     needs: release-please
     runs-on: ubuntu-24.04
     env:
       # Artifact releases pair a focused tool allowlist with cache: false.
       MISE_ENABLE_TOOLS: go,goreleaser
-    permissions:
-      attestations: write
-      contents: write
-      id-token: write
-    steps:
-      - name: Check out
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          ref: refs/tags/${{ needs.release-please.outputs.tag_name }}
-          persist-credentials: false
-      - name: Setup mise
-        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        with:
-          version: v2026.9.5
-          sha256: 32f644d8c291bb182f702c6d2b0dda9f8b01441e940d74d328aad5f08446b2fd
-          cache: false
-      - name: Run GoReleaser
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: GCX_VERSION="$(bash scripts/gcx-version.sh)" goreleaser release --clean
-      - name: Attest release assets
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-checksums: ./dist/checksums.txt
-      - name: Publish release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-        run: gh release edit "$TAG_NAME" --draft=false
-
-  publish-existing-tag:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04
-    env:
-      # Artifact releases pair a focused tool allowlist with cache: false.
-      MISE_ENABLE_TOOLS: go,goreleaser
+      TAG_NAME: ${{ inputs.tag_name || needs.release-please.outputs.tag_name }}
     permissions:
       attestations: write
       contents: write
       id-token: write
     steps:
       - name: Verify workflow ref matches requested tag
+        if: github.event_name == 'workflow_dispatch'
         env:
-          EXPECTED_TAG: ${{ github.event.inputs.tag_name }}
           WORKFLOW_REF: ${{ github.ref_name }}
           WORKFLOW_REF_TYPE: ${{ github.ref_type }}
         run: |
-          if [ "$WORKFLOW_REF_TYPE" != "tag" ] || [ "$WORKFLOW_REF" != "$EXPECTED_TAG" ]; then
-            echo "workflow_dispatch must be run from tag '$EXPECTED_TAG'" >&2
+          if [ -z "$TAG_NAME" ] || [ "$WORKFLOW_REF_TYPE" != "tag" ] || [ "$WORKFLOW_REF" != "$TAG_NAME" ]; then
+            echo "workflow_dispatch must be run from tag '$TAG_NAME'" >&2
             echo "to produce attestations for the requested source revision" >&2
             exit 1
           fi
@@ -96,7 +67,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: refs/tags/${{ github.event.inputs.tag_name }}
+          ref: refs/tags/${{ env.TAG_NAME }}
           persist-credentials: false
       - name: Setup mise
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
@@ -112,8 +83,17 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-checksums: ./dist/checksums.txt
+      - name: Publish signed Packslip manifest
+        uses: jdx/packslip@74c75db7d611b36dd5a157999ec16cf823ccf80c # v1.2.0
+        with:
+          tag: ${{ env.TAG_NAME }}
+          artifacts: dist/oats_*.tar.gz dist/oats_*.zip
+          bin: oats
+          attest: link
+          resources: |
+            cli-spec/usage=archive:share/oats/oats.usage.kdl
+            skill/oats=archive:share/oats/skills/oats
       - name: Publish release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ github.event.inputs.tag_name }}
         run: gh release edit "$TAG_NAME" --draft=false

@@ -1,0 +1,70 @@
+// Source of truth for parsing, help, completion, and release CLI metadata.
+name "oats"
+bin "oats"
+unknown_flags "error"
+flag "-V --version" action="version" help="Print the oats version"
+about "OpenTelemetry Acceptance Tests — the gcx-driven runner"
+default_subcommand "run"
+default_subcommand_flags #true
+flag "-v --verbose" global=#true count=#true env="OATS_VERBOSE" \
+    help="increase verbosity (-v, -vv, -vvv)"
+// Explicit actions work with the pinned generator; see jdx/usage#1437.
+flag "-h --help" action="help" global=#true help="Print help"
+
+flagset "run-options" {
+    flag "--config <file>" env="OATS_CONFIG" help="path to oats-config.yaml"
+    flag "--gcx <value>" env="OATS_GCX" help="path to gcx binary (PATH-resolved if a bare name)"
+    flag "--gcx-version <value>" env="OATS_GCX_VERSION" help="download and use this gcx release"
+    flag "--gcx-download <value>" env="OATS_GCX_DOWNLOAD" \
+        help="gcx fallback download policy (auto; never under mise)"
+    flag "--format <value>" env="OATS_FORMAT" help="output format: text | ndjson" default="text"
+    flag "--tags <value>" env="OATS_TAGS" help="comma-separated tag any-match"
+    flag "--timeout <duration>" env="OATS_TIMEOUT" help="per-assertion timeout" default="30s"
+    flag "--interval <duration>" env="OATS_INTERVAL" help="polling interval" default="500ms"
+    flag "--absent-timeout <duration>" env="OATS_ABSENT_TIMEOUT" \
+        help="how long an absent assertion must stay absent" default="10s"
+    flag "--seed-settle <duration>" env="OATS_SEED_SETTLE" help="post-seed wait before first assertion" \
+        default="2s"
+    flag "--gcx-context <value>" env="OATS_GCX_CONTEXT" \
+        help="override the gcx --context value (otherwise derived from fixture endpoint)"
+    flag "--lgtm-version <value>" env="OATS_LGTM_VERSION" \
+        help="version of docker.io/grafana/otel-lgtm used by the builtin Compose fixture"
+    flag "--container-runtime <value>" env="OATS_CONTAINER_RUNTIME" \
+        help="container engine for Compose fixtures: auto | docker | podman" default="auto"
+    flag "--app-host <value>" env="OATS_APP_HOST" help="application host for driving case input requests" \
+        default="localhost"
+    flag "--app-port <number>" env="OATS_APP_PORT" help="application port for driving case input requests" \
+        default="8080"
+    flag "--otlp-http <value>" env="OATS_OTLP_HTTP" help="OTLP/HTTP base URL for inline-otlp seed mode" \
+        default="http://127.0.0.1:4318"
+    flag "--parallel <number>" env="OATS_PARALLEL" \
+        help="number of fixture groups to run in parallel when fixture isolation allows it" default="1"
+    flag "--fail-fast" bool_value=#true env="OATS_FAIL_FAST" \
+        help="stop scheduling further cases after the first case failure"
+    flag "--no-cache" bool_value=#true env="OATS_NO_CACHE" help="disable the skip-when-unchanged cache for this run"
+    flag "--cache-dir <dir>" env="OATS_CACHE_DIR" help="cache directory (defaults to the user state directory)"
+    flag "--list" bool_value=#true env="OATS_LIST" help="deprecated: use `oats list`" hide=#true
+    flag "--migrate <value>" env="OATS_MIGRATE" help="deprecated: use `oats migrate <file>`" hide=#true
+}
+cmd "run" help="Run cases (also the default without a subcommand)" {
+    use "run-options"
+    arg "[paths]..." help="case paths, or a config/project path when no config is discovered"
+}
+cmd "list" help="Print the run plan without execution" {
+    flag "--config <file>" env="OATS_CONFIG" help="path to oats-config.yaml"
+}
+cmd "migrate" help="Convert a legacy file to stdout, or migrate a directory in place" {
+    arg "<path>" help="legacy YAML file or directory"
+}
+cmd "cache" help="Manage the skip-when-unchanged cache" {
+    cmd "clear" help="Delete all cached results" {
+        flag "--cache-dir <dir>" env="OATS_CACHE_DIR" help="cache directory (defaults to the user state directory)"
+    }
+}
+cmd "version" help="Print the oats version"
+cmd "usage" help="Print the Usage specification"
+cmd "completion" help="Generate shell completions" {
+    arg "<shell>" help="shell to configure" {
+        choices "bash" "zsh" "fish" "powershell" "nu"
+    }
+}

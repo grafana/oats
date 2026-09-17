@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -14,33 +15,19 @@ import (
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/report"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
-	root := newRootCmd(new(int))
-	var run *cobra.Command
-	for _, command := range root.Commands() {
-		if command.Name() == "run" {
-			run = command
-			break
-		}
+	root, err := parseCommand(nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if run == nil {
-		t.Fatal("run command was not registered")
+	run, err := parseCommand([]string{"run"})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	for _, name := range []string{"config", "gcx", "gcx-version", "gcx-download", "lgtm-version", "timeout", "parallel", "no-cache"} {
-		if root.Flags().Lookup(name) == nil {
-			t.Errorf("root command missing --%s", name)
-		}
-		if run.Flags().Lookup(name) == nil {
-			t.Errorf("run command missing --%s", name)
-		}
-	}
-	if !root.SilenceUsage || !root.SilenceErrors || !run.SilenceUsage || !run.SilenceErrors {
-		t.Fatal("runtime commands should suppress Cobra usage and duplicate errors")
+	if !reflect.DeepEqual(root.run, run.run) {
+		t.Fatalf("implicit/explicit run defaults differ: %#v, %#v", root.run, run.run)
 	}
 }
 
@@ -110,10 +97,9 @@ func TestWithLGTMVersionPreservesFullImageOverride(t *testing.T) {
 }
 
 func TestRunActionRejectsMissingConfig(t *testing.T) {
-	root := newRootCmd(new(int))
-	root.SetArgs([]string{"--config", filepath.Join(t.TempDir(), "missing.yaml")})
+	args := []string{"--config", filepath.Join(t.TempDir(), "missing.yaml")}
 
-	err := root.Execute()
+	err := execute(args, new(int), io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "discovery load") {
 		t.Fatalf("Execute error = %v, want discovery load error", err)
 	}
@@ -137,9 +123,8 @@ expected:
         - name: smoke
 `)
 
-	root := newRootCmd(new(int))
-	root.SetArgs([]string{"--config", config, filepath.Join(dir, "not-selected")})
-	err := root.Execute()
+	args := []string{"--config", config, filepath.Join(dir, "not-selected")}
+	err := execute(args, new(int), io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "no cases matched the given path(s)") {
 		t.Fatalf("Execute error = %v, want path-filter error", err)
 	}
@@ -168,8 +153,7 @@ expected:
 `)
 
 	exit := 0
-	root := newRootCmd(&exit)
-	root.SetArgs([]string{
+	args := []string{
 		"--config", config,
 		"--gcx", fakeGCXPath(t),
 		"--timeout", "100ms",
@@ -177,8 +161,8 @@ expected:
 		"--seed-settle", "1ns",
 		"--lgtm-version", "0.12.2",
 		"--no-cache",
-	})
-	if err := root.Execute(); err != nil {
+	}
+	if err := execute(args, &exit, io.Discard); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
 	if exit != 1 {
@@ -239,12 +223,8 @@ func TestCLIConfigAndSmallHelpers(t *testing.T) {
 		t.Fatal("contains returned an unexpected result")
 	}
 
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	fs.String("config", "oats-config.yaml", "config")
-	if err := fs.Set("config", "/explicit/config.yaml"); err != nil {
-		t.Fatal(err)
-	}
-	if got, err := resolveConfigPath(fs); err != nil || got != "/explicit/config.yaml" {
+	config := "/explicit/config.yaml"
+	if got, err := resolveConfigPath(config); err != nil || got != "/explicit/config.yaml" {
 		t.Fatalf("explicit resolveConfigPath = %q, %v", got, err)
 	}
 
@@ -256,18 +236,16 @@ func TestCLIConfigAndSmallHelpers(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(filepath.Join(dir, "nested"))
-	fs = pflag.NewFlagSet("test", pflag.ContinueOnError)
-	fs.String("config", "oats-config.yaml", "config")
-	if got, err := resolveConfigPath(fs); err != nil || got != filepath.Join(dir, "oats-config.yaml") {
+	config = ""
+	if got, err := resolveConfigPath(config); err != nil || got != filepath.Join(dir, "oats-config.yaml") {
 		t.Fatalf("parent resolveConfigPath = %q, %v", got, err)
 	}
 
-	versionCmd := newVersionCmd()
-	if err := versionCmd.RunE(versionCmd, nil); err != nil {
-		t.Fatalf("version command: %v", err)
+	if err := execute([]string{"version"}, new(int), io.Discard); err != nil {
+		t.Fatal(err)
 	}
-	if cmd := newCacheCmd(); cmd == nil || len(cmd.Commands()) != 1 {
-		t.Fatal("cache command was not constructed with clear subcommand")
+	if err := execute([]string{"cache"}, new(int), io.Discard); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -283,18 +261,12 @@ func TestResolveRunConfigPathFromPositionalArgument(t *testing.T) {
 	}
 	t.Chdir(cwd)
 
-	newFlags := func() *pflag.FlagSet {
-		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-		fs.String("config", "oats-config.yaml", "config")
-		return fs
-	}
-
 	for name, arg := range map[string]string{
 		"directory": project,
 		"file":      config,
 	} {
 		t.Run(name, func(t *testing.T) {
-			got, paths, err := resolveRunConfigPath(newFlags(), []string{arg})
+			got, paths, err := resolveRunConfigPath("", []string{arg})
 			if err != nil {
 				t.Fatalf("resolveRunConfigPath: %v", err)
 			}
@@ -316,10 +288,8 @@ func TestResolveRunConfigPathKeepsFiltersWhenConfigIsDiscovered(t *testing.T) {
 	}
 	t.Chdir(dir)
 
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	fs.String("config", "oats-config.yaml", "config")
 	args := []string{"cases"}
-	got, paths, err := resolveRunConfigPath(fs, args)
+	got, paths, err := resolveRunConfigPath("", args)
 	if err != nil {
 		t.Fatalf("resolveRunConfigPath: %v", err)
 	}
@@ -335,18 +305,12 @@ func TestResolveRunConfigPathReportsInvalidPositionalArgument(t *testing.T) {
 	cwd := t.TempDir()
 	t.Chdir(cwd)
 
-	newFlags := func() *pflag.FlagSet {
-		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-		fs.String("config", "oats-config.yaml", "config")
-		return fs
-	}
-
 	for name, arg := range map[string]string{
 		"missing path":             filepath.Join(cwd, "missing"),
 		"directory without config": t.TempDir(),
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := resolveRunConfigPath(newFlags(), []string{arg})
+			_, _, err := resolveRunConfigPath("", []string{arg})
 			if err == nil {
 				t.Fatal("resolveRunConfigPath unexpectedly succeeded")
 			}
@@ -358,7 +322,7 @@ func TestResolveRunConfigPathReportsInvalidPositionalArgument(t *testing.T) {
 		})
 	}
 
-	_, paths, err := resolveRunConfigPath(newFlags(), []string{"one", "two"})
+	_, paths, err := resolveRunConfigPath("", []string{"one", "two"})
 	if err == nil || !strings.Contains(err.Error(), "no oats-config.yaml found") {
 		t.Fatalf("multi-path error = %v, want config discovery error", err)
 	}
@@ -385,9 +349,8 @@ expected:
         - name: smoke
 `)
 
-	list := newListCmd()
-	list.SetArgs([]string{"--config", config})
-	if err := list.Execute(); err != nil {
+	listArgs := []string{"list", "--config", config}
+	if err := execute(listArgs, new(int), io.Discard); err != nil {
 		t.Fatalf("list command: %v", err)
 	}
 
@@ -397,9 +360,8 @@ expected:
   custom-checks:
     - script: true
 `)
-	migrateCmd := newMigrateCmd()
-	migrateCmd.SetArgs([]string{legacy})
-	if err := migrateCmd.Execute(); err != nil {
+	migrateArgs := []string{"migrate", legacy}
+	if err := execute(migrateArgs, new(int), io.Discard); err != nil {
 		t.Fatalf("migrate file command: %v", err)
 	}
 
@@ -412,9 +374,8 @@ expected:
   custom-checks:
     - script: true
 `)
-	migrateCmd = newMigrateCmd()
-	migrateCmd.SetArgs([]string{migrateDir})
-	if err := migrateCmd.Execute(); err != nil {
+	migrateArgs = []string{"migrate", migrateDir}
+	if err := execute(migrateArgs, new(int), io.Discard); err != nil {
 		t.Fatalf("migrate directory command: %v", err)
 	}
 
@@ -426,9 +387,8 @@ expected:
 	if err := store.Record(cache.Key{CaseYAML: []byte("case")}); err != nil {
 		t.Fatal(err)
 	}
-	cacheCmd := newCacheCmd()
-	cacheCmd.SetArgs([]string{"clear", "--cache-dir", cacheDir})
-	if err := cacheCmd.Execute(); err != nil {
+	cacheArgs := []string{"cache", "clear", "--cache-dir", cacheDir}
+	if err := execute(cacheArgs, new(int), io.Discard); err != nil {
 		t.Fatalf("cache clear command: %v", err)
 	}
 }
@@ -449,9 +409,8 @@ expected:
     - traceql: '{}'
 `)
 
-	root := newRootCmd(new(int))
-	root.SetArgs([]string{"--config", config, "--list"})
-	if err := root.Execute(); err != nil {
+	args := []string{"--config", config, "--list"}
+	if err := execute(args, new(int), io.Discard); err != nil {
 		t.Fatalf("deprecated --list: %v", err)
 	}
 
@@ -461,9 +420,8 @@ expected:
   custom-checks:
     - script: true
 `)
-	root = newRootCmd(new(int))
-	root.SetArgs([]string{"--migrate", legacy})
-	if err := root.Execute(); err != nil {
+	args = []string{"--migrate", legacy}
+	if err := execute(args, new(int), io.Discard); err != nil {
 		t.Fatalf("deprecated --migrate: %v", err)
 	}
 }
@@ -485,15 +443,13 @@ expected:
     - traceql: '{}'
 `)
 
-	root := newRootCmd(new(int))
-	root.SetArgs([]string{"--config", config, "--tags", "missing"})
-	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "no cases matched the filter") {
+	args := []string{"--config", config, "--tags", "missing"}
+	if err := execute(args, new(int), io.Discard); err == nil || !strings.Contains(err.Error(), "no cases matched the filter") {
 		t.Fatalf("filter error = %v", err)
 	}
 
-	root = newRootCmd(new(int))
-	root.SetArgs([]string{"--config", config, "--container-runtime", "invalid"})
-	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "unsupported container runtime") {
+	args = []string{"--config", config, "--container-runtime", "invalid"}
+	if err := execute(args, new(int), io.Discard); err == nil || !strings.Contains(err.Error(), "unsupported container runtime") {
 		t.Fatalf("runtime error = %v", err)
 	}
 }
@@ -549,9 +505,7 @@ func TestCLIPathVersionAndReporterHelpers(t *testing.T) {
 
 	dir := t.TempDir()
 	t.Chdir(dir)
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	fs.String("config", "oats-config.yaml", "config")
-	if _, err := resolveConfigPath(fs); err == nil {
+	if _, err := resolveConfigPath(""); err == nil {
 		t.Fatal("resolveConfigPath should fail when no default config exists")
 	}
 
