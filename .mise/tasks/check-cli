@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#MISE description="Validate the Usage spec and check generated CLI tables"
+set -euo pipefail
+usage lint internal/cli/usagespec/oats.usage.kdl
+output="$(mktemp)"
+trap 'rm -f "$output"' EXIT
+usage generate go -f internal/cli/usagespec/oats.usage.kdl -p usagespec -o "$output"
+gofmt -w "$output"
+diff -u internal/cli/usagespec/tables.go "$output"
