@@ -52,6 +52,7 @@
     },
     "examples/fixtures/compose/rolldice/Dockerfile": {
       "dockerfile": [
+        "build-base",
         "python"
       ],
       "regex": [
@@ -71,6 +72,7 @@
     },
     "examples/fixtures/k3d/rolldice/Dockerfile": {
       "dockerfile": [
+        "build-base",
         "python"
       ],
       "regex": [
@@ -90,6 +92,7 @@
     },
     "examples/python/Dockerfile": {
       "dockerfile": [
+        "build-base",
         "python"
       ],
       "regex": [
