@@ -368,21 +368,8 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		}
 		return fmt.Errorf("no cases matched the filter")
 	}
-	if flagBool(fs, "pause-on-failure") {
-		if flagStr(fs, "format") != "text" {
-			return fmt.Errorf("--pause-on-failure requires --format=text")
-		}
-		if flagInt(fs, "parallel") != 1 {
-			return fmt.Errorf("--pause-on-failure requires --parallel=1")
-		}
-		if !isInteractiveStdin() {
-			return fmt.Errorf("--pause-on-failure requires an interactive terminal")
-		}
-		for _, plan := range plans {
-			if plan.Fixture.Kind() != "compose" {
-				return fmt.Errorf("--pause-on-failure supports only managed Compose fixtures (plan %q is %s)", plan.Name, plan.Fixture.Kind())
-			}
-		}
+	if err := validatePauseOnFailure(fs, plans, isInteractiveStdin()); err != nil {
+		return err
 	}
 
 	rep := newReporter(os.Stdout, flagStr(fs, "format"), verbosityFromInt(verbose))
@@ -792,6 +779,27 @@ func pauseOnFailure(ctx context.Context, plan discovery.Plan, c *casefile.Case, 
 func isInteractiveStdin() bool {
 	info, err := os.Stdin.Stat()
 	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
+
+func validatePauseOnFailure(fs *pflag.FlagSet, plans []discovery.Plan, interactive bool) error {
+	if !flagBool(fs, "pause-on-failure") {
+		return nil
+	}
+	if flagStr(fs, "format") != "text" {
+		return fmt.Errorf("--pause-on-failure requires --format=text")
+	}
+	if flagInt(fs, "parallel") != 1 {
+		return fmt.Errorf("--pause-on-failure requires --parallel=1")
+	}
+	if !interactive {
+		return fmt.Errorf("--pause-on-failure requires an interactive terminal")
+	}
+	for _, plan := range plans {
+		if plan.Fixture.Kind() != "compose" {
+			return fmt.Errorf("--pause-on-failure supports only managed Compose fixtures (plan %q is %s)", plan.Name, plan.Fixture.Kind())
+		}
+	}
+	return nil
 }
 
 // withLGTMVersion applies the legacy CLI override to the builtin LGTM Compose

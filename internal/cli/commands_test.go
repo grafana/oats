@@ -85,6 +85,54 @@ func TestPauseOnFailureStopsOnCancellation(t *testing.T) {
 	}
 }
 
+func TestValidatePauseOnFailure(t *testing.T) {
+	compose := discovery.Plan{Name: "compose", Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}}}
+	remote := discovery.Plan{Name: "remote", Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://example"}}}
+	tests := []struct {
+		name        string
+		format      string
+		parallel    string
+		interactive bool
+		plans       []discovery.Plan
+		want        string
+	}{
+		{name: "disabled"},
+		{name: "format", format: "ndjson", parallel: "1", interactive: true, plans: []discovery.Plan{compose}, want: "requires --format=text"},
+		{name: "parallel", format: "text", parallel: "2", interactive: true, plans: []discovery.Plan{compose}, want: "requires --parallel=1"},
+		{name: "noninteractive", format: "text", parallel: "1", interactive: false, plans: []discovery.Plan{compose}, want: "interactive terminal"},
+		{name: "fixture", format: "text", parallel: "1", interactive: true, plans: []discovery.Plan{remote}, want: "supports only managed Compose"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+			addRunFlags(flags)
+			if tt.format != "" {
+				_ = flags.Set("format", tt.format)
+			}
+			if tt.parallel != "" {
+				_ = flags.Set("parallel", tt.parallel)
+			}
+			if tt.name != "disabled" {
+				_ = flags.Set("pause-on-failure", "true")
+			}
+			err := validatePauseOnFailure(flags, tt.plans, tt.interactive)
+			if tt.want == "" {
+				if err != nil {
+					t.Fatalf("validatePauseOnFailure() error = %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("validatePauseOnFailure() error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsInteractiveStdin(t *testing.T) {
+	_ = isInteractiveStdin()
+}
+
 func TestWithLGTMVersion(t *testing.T) {
 	t.Setenv("LGTM_IMAGE", "")
 	original := &casefile.ComposeFixture{
