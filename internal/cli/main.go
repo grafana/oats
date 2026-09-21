@@ -26,7 +26,8 @@
 //	--format       Output format: "text" (default) or "ndjson"
 //	--tags         Comma-separated tag any-match filter (on case tags)
 //	--fail-fast    Stop scheduling further cases after the first failure
-//	--pause-on-failure  Retain one managed Compose fixture for interactive gcx diagnosis
+//	--pause-on-failure
+//	    Retain one managed Compose fixture for interactive gcx diagnosis
 //	-v / -vv / -vvv  Progressive verbosity (passes / commands / lifecycle)
 package cli
 
@@ -784,7 +785,10 @@ func pauseOnFailure(ctx context.Context, plan discovery.Plan, c *casefile.Case, 
 }
 
 func isInteractiveStdin() bool {
-	fd := int(os.Stdin.Fd())
+	return isInteractiveFD(int(os.Stdin.Fd()))
+}
+
+func isInteractiveFD(fd int) bool {
 	return term.IsTerminal(fd)
 }
 

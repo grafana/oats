@@ -196,6 +196,17 @@ func TestIsInteractiveStdin(t *testing.T) {
 	_ = isInteractiveStdin()
 }
 
+func TestIsInteractiveFDRejectsNonTerminal(t *testing.T) {
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatalf("open %s: %v", os.DevNull, err)
+	}
+	defer func() { _ = devNull.Close() }()
+	if isInteractiveFD(int(devNull.Fd())) {
+		t.Fatal("non-terminal file descriptor was detected as interactive")
+	}
+}
+
 func TestWithLGTMVersion(t *testing.T) {
 	t.Setenv("LGTM_IMAGE", "")
 	original := &casefile.ComposeFixture{
