@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -85,6 +86,39 @@ func TestPauseOnFailureStopsOnCancellation(t *testing.T) {
 	}
 }
 
+type pauseErrorReader struct{}
+
+func (pauseErrorReader) Read([]byte) (int, error) { return 0, fmt.Errorf("input failed") }
+
+func TestPauseOnFailureDefaultStreamsAndInputError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := pauseOnFailure(ctx, discovery.Plan{Name: "local"}, &casefile.Case{Name: "failed"}, runner.Endpoint{}, runOptions{}); err != nil {
+		t.Fatalf("pauseOnFailure defaults: %v", err)
+	}
+	if err := pauseOnFailure(context.Background(), discovery.Plan{Name: "local"}, &casefile.Case{Name: "failed"}, runner.Endpoint{}, runOptions{pauseInput: pauseErrorReader{}, pauseOutput: io.Discard}); err != nil {
+		t.Fatalf("pauseOnFailure input error: %v", err)
+	}
+}
+
+func TestRunPlanPausesAfterFailure(t *testing.T) {
+	plan := discovery.Plan{
+		Name:    "remote-pause",
+		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}},
+		Cases:   []*casefile.Case{{Name: "failed"}},
+	}
+	rep := report.NewTextReporter(io.Discard, report.VerboseDefault)
+	res := runPlan(context.Background(), rep, plan, runOptions{
+		pauseOnFailure: true,
+		pauseInput:     strings.NewReader("\n"),
+		pauseOutput:    io.Discard,
+		runCase:        func(context.Context, *casefile.Case) bool { return false },
+	})
+	if res.pass != 0 || res.fail != 1 || res.err != nil {
+		t.Fatalf("runPlan pause result = %+v", res)
+	}
+}
+
 func TestValidatePauseOnFailure(t *testing.T) {
 	compose := discovery.Plan{Name: "compose", Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}}}
 	remote := discovery.Plan{Name: "remote", Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://example"}}}
@@ -101,6 +135,7 @@ func TestValidatePauseOnFailure(t *testing.T) {
 		{name: "parallel", format: "text", parallel: "2", interactive: true, plans: []discovery.Plan{compose}, want: "requires --parallel=1"},
 		{name: "noninteractive", format: "text", parallel: "1", interactive: false, plans: []discovery.Plan{compose}, want: "interactive terminal"},
 		{name: "fixture", format: "text", parallel: "1", interactive: true, plans: []discovery.Plan{remote}, want: "supports only managed Compose"},
+		{name: "valid", format: "TEXT", parallel: "1", interactive: true, plans: []discovery.Plan{compose}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -578,6 +613,12 @@ expected:
 	root.SetArgs([]string{"--config", config, "--tags", "missing"})
 	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "no cases matched the filter") {
 		t.Fatalf("filter error = %v", err)
+	}
+
+	root = newRootCmd(new(int))
+	root.SetArgs([]string{"--config", config, "--pause-on-failure", "--format", "ndjson"})
+	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "requires --format=text") {
+		t.Fatalf("pause validation error = %v", err)
 	}
 
 	root = newRootCmd(new(int))

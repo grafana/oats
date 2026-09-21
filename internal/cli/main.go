@@ -549,6 +549,7 @@ type runOptions struct {
 	pauseOnFailure     bool
 	pauseInput         io.Reader
 	pauseOutput        io.Writer
+	runCase            func(context.Context, *casefile.Case) bool
 }
 
 func runPlans(ctx context.Context, rep report.Reporter, plans []discovery.Plan, opts runOptions, parallel int) (int, int, error) {
@@ -706,18 +707,20 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 	}
 
 	var groupPass, groupFail int
+	runCase := r.RunCase
+	if opts.runCase != nil {
+		runCase = opts.runCase
+	}
 	for _, c := range plan.Cases {
 		if ctx.Err() != nil {
 			break
 		}
-		if r.RunCase(ctx, c) {
+		if runCase(ctx, c) {
 			groupPass++
 		} else {
 			groupFail++
 			if opts.pauseOnFailure {
-				if err := pauseOnFailure(ctx, plan, c, ep, opts); err != nil {
-					return groupResult{pass: groupPass, fail: groupFail, err: err}
-				}
+				_ = pauseOnFailure(ctx, plan, c, ep, opts)
 				break
 			}
 			if opts.failFast {
