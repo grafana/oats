@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -9,11 +10,13 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/grafana/oats/cache"
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/report"
+	"github.com/grafana/oats/runner"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -31,7 +34,7 @@ func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
 		t.Fatal("run command was not registered")
 	}
 
-	for _, name := range []string{"config", "gcx", "gcx-version", "gcx-download", "lgtm-version", "timeout", "parallel", "no-cache"} {
+	for _, name := range []string{"config", "gcx", "gcx-version", "gcx-download", "lgtm-version", "timeout", "parallel", "no-cache", "pause-on-failure"} {
 		if root.Flags().Lookup(name) == nil {
 			t.Errorf("root command missing --%s", name)
 		}
@@ -41,6 +44,44 @@ func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
 	}
 	if !root.SilenceUsage || !root.SilenceErrors || !run.SilenceUsage || !run.SilenceErrors {
 		t.Fatal("runtime commands should suppress Cobra usage and duplicate errors")
+	}
+}
+
+func TestPauseOnFailurePrintsRedactedCoordinatesAndResumes(t *testing.T) {
+	var output bytes.Buffer
+	err := pauseOnFailure(
+		context.Background(),
+		discovery.Plan{Name: "local-lgtm", Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}}},
+		&casefile.Case{Name: "missing trace"},
+		runner.Endpoint{GCXConfig: "/tmp/oats-gcx-secret.yaml", GCXContext: "local"},
+		runOptions{pauseInput: strings.NewReader("\n"), pauseOutput: &output},
+	)
+	if err != nil {
+		t.Fatalf("pauseOnFailure: %v", err)
+	}
+	text := output.String()
+	for _, want := range []string{"missing trace", "local-lgtm", "/tmp/oats-gcx-secret.yaml", "--context local"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("pause output missing %q: %q", want, text)
+		}
+	}
+	for _, forbidden := range []string{"password", "admin", "secret-value"} {
+		if strings.Contains(strings.ToLower(text), forbidden) {
+			t.Errorf("pause output leaked %q: %q", forbidden, text)
+		}
+	}
+}
+
+func TestPauseOnFailureStopsOnCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	start := time.Now()
+	err := pauseOnFailure(ctx, discovery.Plan{Name: "local"}, &casefile.Case{Name: "failed"}, runner.Endpoint{}, runOptions{pauseInput: strings.NewReader("")})
+	if err != nil {
+		t.Fatalf("pauseOnFailure cancellation: %v", err)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatal("pauseOnFailure did not honor cancellation promptly")
 	}
 }
 

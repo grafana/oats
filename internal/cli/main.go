@@ -26,13 +26,16 @@
 //	--format       Output format: "text" (default) or "ndjson"
 //	--tags         Comma-separated tag any-match filter (on case tags)
 //	--fail-fast    Stop scheduling further cases after the first failure
+//	--pause-on-failure  Retain one managed Compose fixture for interactive gcx diagnosis
 //	-v / -vv / -vvv  Progressive verbosity (passes / commands / lifecycle)
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -43,6 +46,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/grafana/oats/casefile"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -156,6 +160,7 @@ func addRunFlags(fs *pflag.FlagSet) {
 	fs.String("otlp-http", defaultOTLPHTTP(), "OTLP/HTTP base URL for inline-otlp seed mode")
 	fs.Int("parallel", 1, "number of fixture groups to run in parallel when fixture isolation allows it")
 	fs.Bool("fail-fast", false, "stop scheduling further cases after the first case failure")
+	fs.Bool("pause-on-failure", false, "retain one managed Compose fixture after the first failure for interactive gcx diagnosis")
 	fs.Bool("no-cache", false, "disable the skip-when-unchanged cache for this run")
 	fs.String("cache-dir", defaultCacheDir(), "directory for the skip-when-unchanged cache")
 
@@ -363,6 +368,22 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		}
 		return fmt.Errorf("no cases matched the filter")
 	}
+	if flagBool(fs, "pause-on-failure") {
+		if flagStr(fs, "format") != "text" {
+			return fmt.Errorf("--pause-on-failure requires --format=text")
+		}
+		if flagInt(fs, "parallel") != 1 {
+			return fmt.Errorf("--pause-on-failure requires --parallel=1")
+		}
+		if !isInteractiveStdin() {
+			return fmt.Errorf("--pause-on-failure requires an interactive terminal")
+		}
+		for _, plan := range plans {
+			if plan.Fixture.Kind() != "compose" {
+				return fmt.Errorf("--pause-on-failure supports only managed Compose fixtures (plan %q is %s)", plan.Name, plan.Fixture.Kind())
+			}
+		}
+	}
 
 	rep := newReporter(os.Stdout, flagStr(fs, "format"), verbosityFromInt(verbose))
 	defer func() { _ = rep.Close() }()
@@ -408,6 +429,7 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		cacheDir:           flagStr(fs, "cache-dir"),
 		cacheTTLDays:       cfg.Cache.TTLDays,
 		failFast:           flagBool(fs, "fail-fast"),
+		pauseOnFailure:     flagBool(fs, "pause-on-failure"),
 	}
 	if fs.Lookup("lgtm-version").Changed {
 		opts.lgtmVersion = flagStr(fs, "lgtm-version")
@@ -536,6 +558,9 @@ type runOptions struct {
 	cacheDir           string
 	cacheTTLDays       int
 	failFast           bool
+	pauseOnFailure     bool
+	pauseInput         io.Reader
+	pauseOutput        io.Writer
 }
 
 func runPlans(ctx context.Context, rep report.Reporter, plans []discovery.Plan, opts runOptions, parallel int) (int, int, error) {
@@ -701,6 +726,12 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 			groupPass++
 		} else {
 			groupFail++
+			if opts.pauseOnFailure {
+				if err := pauseOnFailure(ctx, plan, c, ep, opts); err != nil {
+					return groupResult{pass: groupPass, fail: groupFail, err: err}
+				}
+				break
+			}
 			if opts.failFast {
 				break
 			}
@@ -719,6 +750,48 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 		}
 	}
 	return groupResult{pass: groupPass, fail: groupFail}
+}
+
+func pauseOnFailure(ctx context.Context, plan discovery.Plan, c *casefile.Case, ep runner.Endpoint, opts runOptions) error {
+	input := opts.pauseInput
+	if input == nil {
+		input = os.Stdin
+	}
+	output := opts.pauseOutput
+	if output == nil {
+		output = os.Stderr
+	}
+	write := func(format string, args ...any) { _, _ = fmt.Fprintf(output, format, args...) }
+	write("\nOATS case failed: %s (%s)\n", c.Name, plan.Name)
+	write("The managed fixture is retained for read-only gcx diagnosis.\n")
+	if ep.GCXConfig != "" {
+		write("Use --config %s", ep.GCXConfig)
+		if ep.GCXContext != "" {
+			write(" --context %s", ep.GCXContext)
+		}
+		write("\n")
+	}
+	write("Do not share the config contents or credentials.\n")
+	write("Press Enter to clean up and exit (Ctrl-C also cleans up):\n")
+	read := make(chan error, 1)
+	go func() {
+		_, err := bufio.NewReader(input).ReadString('\n')
+		read <- err
+	}()
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-read:
+		if err != nil && err != io.EOF {
+			write("Pause input ended (%v); continuing with cleanup.\n", err)
+		}
+		return nil
+	}
+}
+
+func isInteractiveStdin() bool {
+	info, err := os.Stdin.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
 
 // withLGTMVersion applies the legacy CLI override to the builtin LGTM Compose
