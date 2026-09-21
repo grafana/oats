@@ -119,6 +119,34 @@ func TestRunPlanPausesAfterFailure(t *testing.T) {
 	}
 }
 
+func TestRunPlansPauseStopsAfterFirstFailedPlan(t *testing.T) {
+	plans := []discovery.Plan{
+		{
+			Name:    "first",
+			Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}},
+			Cases:   []*casefile.Case{{Name: "first failure"}},
+		},
+		{
+			Name:    "second",
+			Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}},
+			Cases:   []*casefile.Case{{Name: "second failure"}},
+		},
+	}
+	rep := report.NewTextReporter(io.Discard, report.VerboseDefault)
+	pass, fail, err := runPlans(context.Background(), rep, plans, runOptions{
+		pauseOnFailure: true,
+		pauseInput:     strings.NewReader("\n"),
+		pauseOutput:    io.Discard,
+		runCase:        func(context.Context, *casefile.Case) bool { return false },
+	}, 1)
+	if err != nil {
+		t.Fatalf("runPlans pause: %v", err)
+	}
+	if pass != 0 || fail != 1 {
+		t.Fatalf("runPlans pause result = pass %d, fail %d; want pass 0, fail 1", pass, fail)
+	}
+}
+
 func TestValidatePauseOnFailure(t *testing.T) {
 	compose := discovery.Plan{Name: "compose", Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}}}
 	remote := discovery.Plan{Name: "remote", Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://example"}}}

@@ -593,6 +593,9 @@ func runPlansSequential(ctx context.Context, rep report.Reporter, plans []discov
 		if opts.failFast && totalFail > 0 {
 			break
 		}
+		if opts.pauseOnFailure && totalFail > 0 {
+			break
+		}
 	}
 	return totalPass, totalFail, nil
 }
