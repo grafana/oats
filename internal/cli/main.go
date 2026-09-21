@@ -49,6 +49,7 @@ import (
 	"github.com/grafana/oats/casefile"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"golang.org/x/term"
 
 	"github.com/grafana/oats/cache"
 	"github.com/grafana/oats/discovery"
@@ -777,15 +778,15 @@ func pauseOnFailure(ctx context.Context, plan discovery.Plan, c *casefile.Case, 
 }
 
 func isInteractiveStdin() bool {
-	info, err := os.Stdin.Stat()
-	return err == nil && info.Mode()&os.ModeCharDevice != 0
+	fd := int(os.Stdin.Fd())
+	return term.IsTerminal(fd)
 }
 
 func validatePauseOnFailure(fs *pflag.FlagSet, plans []discovery.Plan, interactive bool) error {
 	if !flagBool(fs, "pause-on-failure") {
 		return nil
 	}
-	if flagStr(fs, "format") != "text" {
+	if strings.ToLower(flagStr(fs, "format")) != "text" {
 		return fmt.Errorf("--pause-on-failure requires --format=text")
 	}
 	if flagInt(fs, "parallel") != 1 {
