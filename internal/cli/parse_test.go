@@ -74,6 +74,30 @@ func TestUsageEnvironmentResolution(t *testing.T) {
 	}
 }
 
+func TestUsageImplicitRunSelectionUsesGeneratedParser(t *testing.T) {
+	t.Setenv("OATS_TIMEOUT", "2s")
+	t.Setenv("OATS_VERBOSE", "")
+	for _, tc := range []struct {
+		name      string
+		args      []string
+		verbosity int
+	}{
+		{name: "empty", args: nil},
+		{name: "one verbose", args: []string{"-v"}, verbosity: 1},
+		{name: "two verbose", args: []string{"-vv"}, verbosity: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			line, err := usagespec.Parse(tc.args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if line.Run == nil || line.Run.Timeout != 2*time.Second || line.Verbose != tc.verbosity {
+				t.Fatalf("args=%v run=%+v verbosity=%d", tc.args, line.Run, line.Verbose)
+			}
+		})
+	}
+}
+
 func TestUsageOptionalOverrides(t *testing.T) {
 	for _, env := range []string{"OATS_CONFIG", "OATS_GCX", "OATS_LGTM_VERSION"} {
 		t.Setenv(env, "")
@@ -182,6 +206,21 @@ func TestUsageOutputDoesNotRunCases(t *testing.T) {
 // TestUsageTypedAndHelpRegressions protects Usage-native help routing and typed
 // value validation at OATS' application boundary.
 func TestUsageTypedAndHelpRegressions(t *testing.T) {
+	t.Run("separator does not select implicit run", func(t *testing.T) {
+		for _, args := range [][]string{{"--"}, {"-v", "--"}} {
+			line, err := parseCommand(args)
+			if err != nil {
+				t.Fatalf("args=%v err=%v", args, err)
+			}
+			if line.Run != nil {
+				t.Fatalf("args=%v unexpectedly selected run: %+v", args, line.Run)
+			}
+			var out bytes.Buffer
+			if err := execute(args, new(int), &out); err == nil {
+				t.Fatalf("args=%v unexpectedly executed without a command", args)
+			}
+		}
+	})
 	t.Run("separator keeps help positional", func(t *testing.T) {
 		line, err := parseCommand([]string{"run", "--", "--help"})
 		if err != nil {

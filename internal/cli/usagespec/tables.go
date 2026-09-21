@@ -66,10 +66,11 @@ var Root = &argv.Command{
 		{Key: FlagVersion, Name: "version", Longs: []string{"version"}, Shorts: []byte{'V'}, Action: argv.ActionVersion},
 		{Key: FlagVerbose, Name: "verbose", Longs: []string{"verbose"}, Shorts: []byte{'v'}, Global: true},
 	},
-	Subcommands:            []*argv.Command{cmdRun, cmdList, cmdMigrate, cmdCache, cmdVersion, cmdUsage, cmdCompletion},
-	UnknownFlags:           argv.UnknownFlagsError,
-	DefaultSubcommandFlags: true,
-	DefaultSubcommand:      cmdRun,
+	Subcommands:              []*argv.Command{cmdRun, cmdList, cmdMigrate, cmdCache, cmdVersion, cmdUsage, cmdCompletion},
+	UnknownFlags:             argv.UnknownFlagsError,
+	DefaultSubcommandFlags:   true,
+	DefaultSubcommandOnEmpty: true,
+	DefaultSubcommand:        cmdRun,
 }
 
 // run

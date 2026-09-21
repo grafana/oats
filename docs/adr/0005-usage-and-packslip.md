@@ -62,10 +62,11 @@ see [the CLI reference](../cli.md) for the intentional differences. Runtime-
 dependent defaults remain in Go. The OATS_VERBOSE fallback remains temporary
 while shared count-env semantics are discussed upstream.
 
-Default-command routing remains an OATS adapter. Discussion
-[#1442](https://github.com/jdx/usage/discussions/1442) tracks an explicit
-upstream opt-in for empty invocations; OATS preserves its current adapter
-until that contract is accepted.
+Default-command routing uses Usage's `default_subcommand_on_empty` opt-in for
+empty and global-only invocations, adopted from upstream
+[jdx/usage#1458](https://github.com/jdx/usage/pull/1458) in the v6.11.0 runtime
+and generator. The generated parser selects `run`; OATS retains
+only its OATS-specific verbosity environment handling in `parse.go`.
 
 Packslip 1.2 defaults Linux artifacts to `gnu`. It cannot omit only libc through
 its generator, so musl consumers must still download the libc-independent Linux

@@ -221,6 +221,11 @@ Use `oats run --help` for run options. Run-specific flags also select implicit
 run, so `oats --timeout 1m` works. Put an explicit subcommand before its options;
 `oats --timeout 1m run` treats `run` as a case path.
 
+An empty invocation or global-only flags (`oats`, `oats -v`) select implicit
+`run`. A syntactic separator suppresses only that empty/global-only selection:
+`oats --` and `oats -v --` report that no command was selected. Use
+`oats run -- -case.yaml` when passing a dash-prefixed path to the runner.
+
 Unknown flags remain errors; use `--` before a path that begins with a dash.
 Attach flag values that start with a dash: `--timeout=-1s`. Bare boolean flags
 mean true without consuming a following path; explicit CLI boolean values are

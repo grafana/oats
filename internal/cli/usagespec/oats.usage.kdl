@@ -6,6 +6,7 @@ flag "-V --version" action="version" help="Print the oats version"
 about "OpenTelemetry Acceptance Tests — the gcx-driven runner"
 default_subcommand "run"
 default_subcommand_flags #true
+default_subcommand_on_empty #true
 flag "-v --verbose" global=#true count=#true env="OATS_VERBOSE" \
     help="increase verbosity (-v, -vv, -vvv)"
 flagset "run-options" {

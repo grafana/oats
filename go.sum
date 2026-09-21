@@ -22,8 +22,8 @@ github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 h1:/Tnpcb2E0Pz/tN9s3bfEY2Q8ePC
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0/go.mod h1:zOBXOsUaBSjKgmH4OGzV1esUpR3oUSCPYVd2cUBjKYY=
 github.com/hashicorp/go-version v1.9.0 h1:CeOIz6k+LoN3qX9Z0tyQrPtiB1DFYRPfCIBtaXPSCnA=
 github.com/hashicorp/go-version v1.9.0/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
-github.com/jdx/usage/go v0.0.0-20260919132546-d5f56ecc6034 h1:JXEntbYrZyIYNSP6EJN0/FQnE9dk5nd1o9bQgC2bc0o=
-github.com/jdx/usage/go v0.0.0-20260919132546-d5f56ecc6034/go.mod h1:6krOWcHoNree9OR5cJ5goIrRPLq3bga/5f6SlH8K35E=
+github.com/jdx/usage/go v0.0.0-20260921161043-0676af068487 h1:NN9UzsRWBaFK1SPDxOkDHBMwh5tofDiuD/CoNOjjWQY=
+github.com/jdx/usage/go v0.0.0-20260921161043-0676af068487/go.mod h1:6krOWcHoNree9OR5cJ5goIrRPLq3bga/5f6SlH8K35E=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=

@@ -28,16 +28,6 @@ func parseCommand(args []string) (*usagespec.Cli, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Usage keeps an empty invocation (or only global flags) on the parent.
-	// OATs runs tests in that case; parse the same options in the run scope so
-	// defaults and environment resolution still belong to the generated parser.
-	if cli.Run == nil && cli.List == nil && cli.Migrate == nil && cli.Cache == nil &&
-		cli.VersionCmd == nil && cli.Usage == nil && cli.Completion == nil {
-		cli, err = usagespec.Parse(append([]string{"run"}, args...))
-		if err != nil {
-			return nil, err
-		}
-	}
 	if cli.Run != nil {
 		cli.Verbose, err = verbosityFromEnv(cli.Verbose)
 	}

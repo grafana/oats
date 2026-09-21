@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/hashicorp/go-version v1.9.0
-	github.com/jdx/usage/go v0.0.0-20260919132546-d5f56ecc6034
+	github.com/jdx/usage/go v0.0.0-20260921161043-0676af068487
 	github.com/onsi/gomega v1.43.1
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/collector/pdata v1.67.0
