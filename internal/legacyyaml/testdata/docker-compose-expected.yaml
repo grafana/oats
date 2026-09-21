@@ -6,12 +6,12 @@ networks:
         - subnet: 172.16.57.0/24
 services:
   grafana:
-    image: grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+    image: grafana/grafana:13.2.2@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0
     network_mode: host
     volumes:
       - ./configs/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/grafana-datasources.yaml
   mongodb:
-    image: mongo:7-jammy@sha256:52ba5332636758f2375228827d5cf7460e25c02063ba19c243e5d262cf4e7924
+    image: mongo:7-jammy@sha256:84c4a18b60a0e73d1577112b0a600b46cab477c64cfe0ff36d0647bbca055bd0
     logging:
       driver: json-file
       options:

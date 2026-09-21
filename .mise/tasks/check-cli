@@ -4,6 +4,5 @@ set -euo pipefail
 usage lint internal/cli/usagespec/oats.usage.kdl
 output="$(mktemp)"
 trap 'rm -f "$output"' EXIT
-usage generate go -f internal/cli/usagespec/oats.usage.kdl -p usagespec -o "$output"
-gofmt -w "$output"
+mise run generate-cli -- "$output"
 diff -u internal/cli/usagespec/tables.go "$output"

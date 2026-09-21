@@ -9,7 +9,11 @@
 
 package usagespec
 
-import "github.com/jdx/usage/go/argv"
+import (
+	"time"
+
+	"github.com/jdx/usage/go/argv"
+)
 
 // Keys identify a table entry without a string comparison: switch on the Key an
 // event carries rather than on its Name, which is there for diagnostics.
@@ -17,42 +21,41 @@ const (
 	CmdRoot                 uint64 = 1
 	FlagVersion             uint64 = 2
 	FlagVerbose             uint64 = 3
-	FlagHelp                uint64 = 4
-	CmdRun                  uint64 = 5
-	FlagRunConfig           uint64 = 6
-	FlagRunGcx              uint64 = 7
-	FlagRunGcxVersion       uint64 = 8
-	FlagRunGcxDownload      uint64 = 9
-	FlagRunFormat           uint64 = 10
-	FlagRunTags             uint64 = 11
-	FlagRunTimeout          uint64 = 12
-	FlagRunInterval         uint64 = 13
-	FlagRunAbsentTimeout    uint64 = 14
-	FlagRunSeedSettle       uint64 = 15
-	FlagRunGcxContext       uint64 = 16
-	FlagRunLgtmVersion      uint64 = 17
-	FlagRunContainerRuntime uint64 = 18
-	FlagRunAppHost          uint64 = 19
-	FlagRunAppPort          uint64 = 20
-	FlagRunOtlpHttp         uint64 = 21
-	FlagRunParallel         uint64 = 22
-	FlagRunFailFast         uint64 = 23
-	FlagRunNoCache          uint64 = 24
-	FlagRunCacheDir         uint64 = 25
-	FlagRunList             uint64 = 26
-	FlagRunMigrate          uint64 = 27
-	ArgRunPaths             uint64 = 28
-	CmdList                 uint64 = 29
-	FlagListConfig          uint64 = 30
-	CmdMigrate              uint64 = 31
-	ArgMigratePath          uint64 = 32
-	CmdCache                uint64 = 33
-	CmdCacheClear           uint64 = 34
-	FlagCacheClearCacheDir  uint64 = 35
-	CmdVersion              uint64 = 36
-	CmdUsage                uint64 = 37
-	CmdCompletion           uint64 = 38
-	ArgCompletionShell      uint64 = 39
+	CmdRun                  uint64 = 4
+	FlagRunConfig           uint64 = 5
+	FlagRunGcx              uint64 = 6
+	FlagRunGcxVersion       uint64 = 7
+	FlagRunGcxDownload      uint64 = 8
+	FlagRunFormat           uint64 = 9
+	FlagRunTags             uint64 = 10
+	FlagRunTimeout          uint64 = 11
+	FlagRunInterval         uint64 = 12
+	FlagRunAbsentTimeout    uint64 = 13
+	FlagRunSeedSettle       uint64 = 14
+	FlagRunGcxContext       uint64 = 15
+	FlagRunLgtmVersion      uint64 = 16
+	FlagRunContainerRuntime uint64 = 17
+	FlagRunAppHost          uint64 = 18
+	FlagRunAppPort          uint64 = 19
+	FlagRunOtlpHttp         uint64 = 20
+	FlagRunParallel         uint64 = 21
+	FlagRunFailFast         uint64 = 22
+	FlagRunNoCache          uint64 = 23
+	FlagRunCacheDir         uint64 = 24
+	FlagRunList             uint64 = 25
+	FlagRunMigrate          uint64 = 26
+	ArgRunPaths             uint64 = 27
+	CmdList                 uint64 = 28
+	FlagListConfig          uint64 = 29
+	CmdMigrate              uint64 = 30
+	ArgMigratePath          uint64 = 31
+	CmdCache                uint64 = 32
+	CmdCacheClear           uint64 = 33
+	FlagCacheClearCacheDir  uint64 = 34
+	CmdVersion              uint64 = 35
+	CmdUsage                uint64 = 36
+	CmdCompletion           uint64 = 37
+	ArgCompletionShell      uint64 = 38
 )
 
 // Root is the command tree for `oats`. Pass it to argv.New.
@@ -62,7 +65,6 @@ var Root = &argv.Command{
 	Flags: []*argv.Flag{
 		{Key: FlagVersion, Name: "version", Longs: []string{"version"}, Shorts: []byte{'V'}, Action: argv.ActionVersion},
 		{Key: FlagVerbose, Name: "verbose", Longs: []string{"verbose"}, Shorts: []byte{'v'}, Global: true},
-		{Key: FlagHelp, Name: "help", Longs: []string{"help"}, Shorts: []byte{'h'}, Action: argv.ActionHelp, Global: true},
 	},
 	Subcommands:            []*argv.Command{cmdRun, cmdList, cmdMigrate, cmdCache, cmdVersion, cmdUsage, cmdCompletion},
 	UnknownFlags:           argv.UnknownFlagsError,
@@ -177,7 +179,6 @@ var Meta = argv.Metadata{
 	{},
 	{Key: FlagVersion, Name: "version", Flag: true, RequiresIfBoolean: true, Spelling: "--version"},
 	{Key: FlagVerbose, Name: "verbose", Flag: true, RequiresIfBoolean: true, Spelling: "--verbose", Env: "OATS_VERBOSE"},
-	{Key: FlagHelp, Name: "help", Flag: true, RequiresIfBoolean: true, Spelling: "--help"},
 	{},
 	{Key: FlagRunConfig, Name: "config", Flag: true, Spelling: "--config", ValueName: "file", Env: "OATS_CONFIG"},
 	{Key: FlagRunGcx, Name: "gcx", Flag: true, Spelling: "--gcx", ValueName: "value", Env: "OATS_GCX"},
@@ -224,7 +225,6 @@ var HelpText = argv.HelpTable{
 	{Key: CmdRoot},
 	{Key: FlagVersion, Short: "Print the oats version", Long: "Print the oats version"},
 	{Key: FlagVerbose, Short: "increase verbosity (-v, -vv, -vvv)", Long: "increase verbosity (-v, -vv, -vvv)", Env: "OATS_VERBOSE"},
-	{Key: FlagHelp, Short: "Print help", Long: "Print help"},
 	{Key: CmdRun, Short: "Run cases (also the default without a subcommand)"},
 	{Key: FlagRunConfig, ValueName: "file", ValueDemanded: true, Short: "path to oats-config.yaml", Long: "path to oats-config.yaml", Env: "OATS_CONFIG"},
 	{Key: FlagRunGcx, ValueName: "value", ValueDemanded: true, Short: "path to gcx binary (PATH-resolved if a bare name)", Long: "path to gcx binary (PATH-resolved if a bare name)", Env: "OATS_GCX"},
@@ -270,7 +270,6 @@ var HelpMeta = argv.HelpSpec{Name: "oats", Bin: "oats", About: "OpenTelemetry Ac
 type Cli struct {
 	Version    bool           // FlagVersion
 	Verbose    int            // FlagVerbose
-	Help       bool           // FlagHelp
 	Run        *RunCmd        // CmdRun
 	List       *ListCmd       // CmdList
 	Migrate    *MigrateCmd    // CmdMigrate
@@ -282,29 +281,29 @@ type Cli struct {
 
 // RunCmd is `run`.
 type RunCmd struct {
-	Config           string   // FlagRunConfig
-	Gcx              string   // FlagRunGcx
-	GcxVersion       string   // FlagRunGcxVersion
-	GcxDownload      string   // FlagRunGcxDownload
-	Format           string   // FlagRunFormat
-	Tags             string   // FlagRunTags
-	Timeout          string   // FlagRunTimeout
-	Interval         string   // FlagRunInterval
-	AbsentTimeout    string   // FlagRunAbsentTimeout
-	SeedSettle       string   // FlagRunSeedSettle
-	GcxContext       string   // FlagRunGcxContext
-	LgtmVersion      string   // FlagRunLgtmVersion
-	ContainerRuntime string   // FlagRunContainerRuntime
-	AppHost          string   // FlagRunAppHost
-	AppPort          string   // FlagRunAppPort
-	OtlpHttp         string   // FlagRunOtlpHttp
-	Parallel         string   // FlagRunParallel
-	FailFast         bool     // FlagRunFailFast
-	NoCache          bool     // FlagRunNoCache
-	CacheDir         string   // FlagRunCacheDir
-	List             bool     // FlagRunList
-	Migrate          string   // FlagRunMigrate
-	Paths            []string // ArgRunPaths
+	Config           string        // FlagRunConfig
+	Gcx              string        // FlagRunGcx
+	GcxVersion       string        // FlagRunGcxVersion
+	GcxDownload      string        // FlagRunGcxDownload
+	Format           string        // FlagRunFormat
+	Tags             string        // FlagRunTags
+	Timeout          time.Duration // FlagRunTimeout
+	Interval         time.Duration // FlagRunInterval
+	AbsentTimeout    time.Duration // FlagRunAbsentTimeout
+	SeedSettle       time.Duration // FlagRunSeedSettle
+	GcxContext       string        // FlagRunGcxContext
+	LgtmVersion      string        // FlagRunLgtmVersion
+	ContainerRuntime string        // FlagRunContainerRuntime
+	AppHost          string        // FlagRunAppHost
+	AppPort          int           // FlagRunAppPort
+	OtlpHttp         string        // FlagRunOtlpHttp
+	Parallel         int           // FlagRunParallel
+	FailFast         bool          // FlagRunFailFast
+	NoCache          bool          // FlagRunNoCache
+	CacheDir         string        // FlagRunCacheDir
+	List             bool          // FlagRunList
+	Migrate          string        // FlagRunMigrate
+	Paths            []string      // ArgRunPaths
 }
 
 // ListCmd is `list`.
@@ -397,6 +396,13 @@ func Parse(args []string) (*Cli, error) {
 				out.Completion = cmdCompletionV
 			}
 		case argv.KindFlag:
+			// The event parser leaves synthetic help/version requests to its caller.
+			switch ev.Flag {
+			case argv.HelpShort, argv.HelpLong:
+				return nil, &argv.Error{Code: argv.CodeHelp, Cmd: p.Command(), Long: ev.Flag == argv.HelpLong}
+			case argv.VersionShort, argv.VersionLong:
+				return nil, &argv.Error{Code: argv.CodeVersion, Cmd: p.Command(), Long: ev.Flag == argv.VersionLong}
+			}
 			seen[ev.Flag.Key]++
 			if ev.Flag.BoolValue {
 				// Boolean binding is last-one-wins. Replace an earlier attached value even
@@ -418,8 +424,6 @@ func Parse(args []string) (*Cli, error) {
 				out.Version = !ev.Negated
 			case FlagVerbose:
 				out.Verbose++
-			case FlagHelp:
-				out.Help = !ev.Negated
 			case FlagRunConfig:
 				cmdRunV.Config = ev.Value
 			case FlagRunGcx:
@@ -432,14 +436,6 @@ func Parse(args []string) (*Cli, error) {
 				cmdRunV.Format = ev.Value
 			case FlagRunTags:
 				cmdRunV.Tags = ev.Value
-			case FlagRunTimeout:
-				cmdRunV.Timeout = ev.Value
-			case FlagRunInterval:
-				cmdRunV.Interval = ev.Value
-			case FlagRunAbsentTimeout:
-				cmdRunV.AbsentTimeout = ev.Value
-			case FlagRunSeedSettle:
-				cmdRunV.SeedSettle = ev.Value
 			case FlagRunGcxContext:
 				cmdRunV.GcxContext = ev.Value
 			case FlagRunLgtmVersion:
@@ -448,12 +444,8 @@ func Parse(args []string) (*Cli, error) {
 				cmdRunV.ContainerRuntime = ev.Value
 			case FlagRunAppHost:
 				cmdRunV.AppHost = ev.Value
-			case FlagRunAppPort:
-				cmdRunV.AppPort = ev.Value
 			case FlagRunOtlpHttp:
 				cmdRunV.OtlpHttp = ev.Value
-			case FlagRunParallel:
-				cmdRunV.Parallel = ev.Value
 			case FlagRunFailFast:
 				if ev.HasValue {
 					cmdRunV.FailFast = (ev.Value == "true") != ev.Negated
@@ -552,12 +544,6 @@ func Parse(args []string) (*Cli, error) {
 				} else {
 					out.Version = values[0] == "true"
 				}
-			case FlagHelp:
-				if source == argv.FromEnv {
-					out.Help = argv.EnvTruth(values[0])
-				} else {
-					out.Help = values[0] == "true"
-				}
 			case FlagRunConfig:
 				cmdRunV.Config = values[len(values)-1]
 			case FlagRunGcx:
@@ -570,14 +556,6 @@ func Parse(args []string) (*Cli, error) {
 				cmdRunV.Format = values[len(values)-1]
 			case FlagRunTags:
 				cmdRunV.Tags = values[len(values)-1]
-			case FlagRunTimeout:
-				cmdRunV.Timeout = values[len(values)-1]
-			case FlagRunInterval:
-				cmdRunV.Interval = values[len(values)-1]
-			case FlagRunAbsentTimeout:
-				cmdRunV.AbsentTimeout = values[len(values)-1]
-			case FlagRunSeedSettle:
-				cmdRunV.SeedSettle = values[len(values)-1]
 			case FlagRunGcxContext:
 				cmdRunV.GcxContext = values[len(values)-1]
 			case FlagRunLgtmVersion:
@@ -586,12 +564,8 @@ func Parse(args []string) (*Cli, error) {
 				cmdRunV.ContainerRuntime = values[len(values)-1]
 			case FlagRunAppHost:
 				cmdRunV.AppHost = values[len(values)-1]
-			case FlagRunAppPort:
-				cmdRunV.AppPort = values[len(values)-1]
 			case FlagRunOtlpHttp:
 				cmdRunV.OtlpHttp = values[len(values)-1]
-			case FlagRunParallel:
-				cmdRunV.Parallel = values[len(values)-1]
 			case FlagRunFailFast:
 				if source == argv.FromEnv {
 					cmdRunV.FailFast = argv.EnvTruth(values[0])
@@ -631,6 +605,48 @@ func Parse(args []string) (*Cli, error) {
 		return sources[k]
 	}, nil, func(k uint64) bool { return requirements[k] }); err != nil {
 		return nil, err
+	}
+	if values := filled[FlagRunTimeout]; len(values) > 0 {
+		value, err := argv.Duration("--timeout", values[len(values)-1])
+		if err != nil {
+			return nil, err
+		}
+		cmdRunV.Timeout = value
+	}
+	if values := filled[FlagRunInterval]; len(values) > 0 {
+		value, err := argv.Duration("--interval", values[len(values)-1])
+		if err != nil {
+			return nil, err
+		}
+		cmdRunV.Interval = value
+	}
+	if values := filled[FlagRunAbsentTimeout]; len(values) > 0 {
+		value, err := argv.Duration("--absent-timeout", values[len(values)-1])
+		if err != nil {
+			return nil, err
+		}
+		cmdRunV.AbsentTimeout = value
+	}
+	if values := filled[FlagRunSeedSettle]; len(values) > 0 {
+		value, err := argv.Duration("--seed-settle", values[len(values)-1])
+		if err != nil {
+			return nil, err
+		}
+		cmdRunV.SeedSettle = value
+	}
+	if values := filled[FlagRunAppPort]; len(values) > 0 {
+		value, err := argv.NativeInt("--app-port", values[len(values)-1])
+		if err != nil {
+			return nil, err
+		}
+		cmdRunV.AppPort = value
+	}
+	if values := filled[FlagRunParallel]; len(values) > 0 {
+		value, err := argv.NativeInt("--parallel", values[len(values)-1])
+		if err != nil {
+			return nil, err
+		}
+		cmdRunV.Parallel = value
 	}
 	return out, nil
 }

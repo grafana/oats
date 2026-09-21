@@ -149,7 +149,7 @@ its matching Go runtime commit in `go.mod` together when upgrading, and rerun
 the CLI contract tests (implicit run, flags, environment precedence, errors,
 and exit codes). Review runtime changes as well as generated diffs: identical
 tables do not imply identical behavior with a new runtime. OATS calls the
-generated `Parse` function and converts its result to application options;
+generated `Parse` function and uses its typed result directly in application options;
 there is no Cobra/pflag compatibility layer. Optional config/GCX/LGTM overrides
 have no spec defaults; application defaults are applied after parsing.
 

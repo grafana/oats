@@ -3,7 +3,7 @@ package usagespec
 
 import _ "embed"
 
-//go:generate usage generate go -f oats.usage.kdl -o tables.go -p usagespec
+//go:generate mise run generate-cli -- internal/cli/usagespec/tables.go
 
 // Spec is the same source used to generate the parser and shipped with releases.
 //

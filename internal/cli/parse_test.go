@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/oats/internal/cli/usagespec"
+	"github.com/jdx/usage/go/argv"
 )
 
 func TestUsageRunContract(t *testing.T) {
@@ -19,8 +20,8 @@ func TestUsageRunContract(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if line.Verbose != 3 || line.run.timeout != 2*time.Second || line.run.NoCache || line.run.parallel != 2 {
-			t.Fatalf("incorrect run options: %+v; verbosity %d", line.run, line.Verbose)
+		if line.Verbose != 3 || line.Run.Timeout != 2*time.Second || line.Run.NoCache || line.Run.Parallel != 2 {
+			t.Fatalf("incorrect run options: %+v; verbosity %d", line.Run, line.Verbose)
 		}
 		if strings.Join(line.Run.Paths, ",") != "cases/one,--literal-path" {
 			t.Fatalf("paths = %v", line.Run.Paths)
@@ -33,8 +34,8 @@ func TestUsageInheritedVerbosityAndAttachedNegativeDuration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if line.run.timeout != -time.Second || line.Verbose != 3 {
-		t.Fatalf("timeout=%s verbosity=%d", line.run.timeout, line.Verbose)
+	if line.Run.Timeout != -time.Second || line.Verbose != 3 {
+		t.Fatalf("timeout=%s verbosity=%d", line.Run.Timeout, line.Verbose)
 	}
 }
 
@@ -47,10 +48,10 @@ func TestUsageEnvironmentAndExplicitDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if line.Verbose != 1 || line.run.NoCache || line.run.timeout != 30*time.Second {
+	if line.Verbose != 1 || line.Run.NoCache || line.Run.Timeout != 30*time.Second {
 		t.Fatal("CLI must override environment")
 	}
-	if line.run.Gcx != "gcx" || line.run.Config != "" || line.run.LgtmVersion != "" {
+	if line.Run.Gcx != "gcx" || line.Run.Config != "" || line.Run.LgtmVersion != "" {
 		t.Fatal("explicit gcx must be retained; config/LGTM defaults must remain unset")
 	}
 	if _, err := parseCommand(nil); err == nil || !strings.Contains(err.Error(), "timeout") {
@@ -67,9 +68,9 @@ func TestUsageEnvironmentResolution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if line.run.timeout != 2*time.Second || line.run.Gcx != "/opt/tools/gcx" ||
-		line.run.GcxDownload != "never" || !line.run.NoCache || line.run.GcxVersion != "0.4.3" {
-		t.Fatalf("environment resolution: %+v", line.run)
+	if line.Run.Timeout != 2*time.Second || line.Run.Gcx != "/opt/tools/gcx" ||
+		line.Run.GcxDownload != "never" || !line.Run.NoCache || line.Run.GcxVersion != "0.4.3" {
+		t.Fatalf("environment resolution: %+v", line.Run)
 	}
 }
 
@@ -178,6 +179,50 @@ func TestUsageOutputDoesNotRunCases(t *testing.T) {
 	}
 }
 
+// TestUsageTypedAndHelpRegressions protects Usage-native help routing and typed
+// value validation at OATS' application boundary.
+func TestUsageTypedAndHelpRegressions(t *testing.T) {
+	t.Run("separator keeps help positional", func(t *testing.T) {
+		line, err := parseCommand([]string{"run", "--", "--help"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(line.Run.Paths) != 1 || line.Run.Paths[0] != "--help" {
+			t.Fatalf("paths=%v", line.Run.Paths)
+		}
+	})
+	t.Run("unknown before help is an error", func(t *testing.T) {
+		var out bytes.Buffer
+		if err := execute([]string{"--unknown", "--help"}, new(int), &out); err == nil || strings.Contains(out.String(), "Usage:") {
+			t.Fatalf("err=%v output=%q", err, out.String())
+		}
+	})
+	t.Run("help bypasses invalid environment", func(t *testing.T) {
+		t.Setenv("OATS_TIMEOUT", "invalid")
+		t.Setenv("OATS_PARALLEL", "invalid")
+		t.Setenv("OATS_VERBOSE", "invalid")
+		for _, args := range [][]string{{"--help"}, {"-h"}, {"run", "--help"}, {"list", "--help"}, {"migrate", "--help"}, {"cache", "clear", "--help"}} {
+			var out bytes.Buffer
+			if err := execute(args, new(int), &out); err != nil || !strings.Contains(out.String(), "Usage:") {
+				t.Fatalf("args=%v err=%v output=%q", args, err, out.String())
+			}
+		}
+	})
+	t.Run("typed overflow and override", func(t *testing.T) {
+		for _, args := range [][]string{{"run", "--parallel", "999999999999999999999999"}, {"run", "--app-port", "999999999999999999999999"}, {"run", "--timeout", "999999999999999999999999999999999999999999s"}} {
+			if _, err := parseCommand(args); err == nil {
+				t.Fatalf("args=%v accepted overflow", args)
+			} else if parseErr, ok := err.(*argv.Error); !ok || parseErr.Code != argv.CodeInvalidValue {
+				t.Fatalf("args=%v error=%T %v", args, err, err)
+			}
+		}
+		t.Setenv("OATS_PARALLEL", "invalid")
+		if line, err := parseCommand([]string{"run", "--parallel", "2"}); err != nil || line.Run.Parallel != 2 {
+			t.Fatalf("override line=%v err=%v", line, err)
+		}
+	})
+}
+
 // Verify every run flag's CLI and environment wiring against application values,
 // including options that are normally only exercised by fixture execution.
 func TestUsageAllRunOptionSources(t *testing.T) {
@@ -208,10 +253,10 @@ func TestUsageAllRunOptionSources(t *testing.T) {
 	want := &usagespec.RunCmd{
 		Config: "custom/config.yaml", Gcx: "/opt/gcx", GcxVersion: "0.4.4",
 		GcxDownload: "never", Format: "ndjson", Tags: "smoke,fast",
-		Timeout: "1m", Interval: "250ms", AbsentTimeout: "5s", SeedSettle: "3s",
+		Timeout: time.Minute, Interval: 250 * time.Millisecond, AbsentTimeout: 5 * time.Second, SeedSettle: 3 * time.Second,
 		GcxContext: "staging", LgtmVersion: "0.12.2", ContainerRuntime: "podman",
-		AppHost: "app.example", AppPort: "8081", OtlpHttp: "http://collector:4318",
-		Parallel: "3", FailFast: true, NoCache: true, CacheDir: "custom/cache",
+		AppHost: "app.example", AppPort: 8081, OtlpHttp: "http://collector:4318",
+		Parallel: 3, FailFast: true, NoCache: true, CacheDir: "custom/cache",
 		List: true, Migrate: "legacy.yaml",
 	}
 	for _, source := range []string{"environment", "CLI overrides environment"} {
@@ -232,10 +277,10 @@ func TestUsageAllRunOptionSources(t *testing.T) {
 			if !reflect.DeepEqual(line.Run, want) {
 				t.Fatalf("run options = %+v, want %+v", line.Run, want)
 			}
-			if line.run.timeout != time.Minute || line.run.interval != 250*time.Millisecond ||
-				line.run.absentTimeout != 5*time.Second || line.run.seedSettle != 3*time.Second ||
-				line.run.appPort != 8081 || line.run.parallel != 3 {
-				t.Fatalf("typed options = %+v", line.run)
+			if line.Run.Timeout != time.Minute || line.Run.Interval != 250*time.Millisecond ||
+				line.Run.AbsentTimeout != 5*time.Second || line.Run.SeedSettle != 3*time.Second ||
+				line.Run.AppPort != 8081 || line.Run.Parallel != 3 {
+				t.Fatalf("typed options = %+v", line.Run)
 			}
 		})
 	}

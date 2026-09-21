@@ -47,6 +47,7 @@ import (
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/fixture"
+	"github.com/grafana/oats/internal/cli/usagespec"
 	"github.com/grafana/oats/internal/legacyyaml/migrate"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
@@ -124,7 +125,7 @@ func migrateAction(path string) error {
 // explicit `run` subcommand. Positional args normally scope which cases run.
 // When config discovery from cwd fails, a single positional arg instead selects
 // the config (with oats-config.yaml inferred when the arg is a directory).
-func runAction(cli *runCLIOptions, verbose int, exit *int) error {
+func runAction(cli *usagespec.RunCmd, verbose int, exit *int) error {
 	// Honor the deprecated --list / --migrate flags.
 	if cli.List {
 		return listAction(cli.Config)
@@ -198,19 +199,19 @@ func runAction(cli *runCLIOptions, verbose int, exit *int) error {
 		gcxContextOverride: cli.GcxContext,
 		containerRuntime:   containerRuntime,
 		appHost:            cli.AppHost,
-		appPort:            cli.appPort,
+		appPort:            cli.AppPort,
 		otlpHTTP:           cli.OtlpHttp,
-		timeout:            cli.timeout,
-		interval:           cli.interval,
-		absentTimeout:      cli.absentTimeout,
-		seedSettle:         cli.seedSettle,
+		timeout:            cli.Timeout,
+		interval:           cli.Interval,
+		absentTimeout:      cli.AbsentTimeout,
+		seedSettle:         cli.SeedSettle,
 		noCache:            cli.NoCache,
 		cacheDir:           cacheDirectory(cli.CacheDir),
 		cacheTTLDays:       cfg.Cache.TTLDays,
 		failFast:           cli.FailFast,
 	}
 	opts.lgtmVersion = cli.LgtmVersion
-	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, cli.parallel)
+	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, cli.Parallel)
 	if runErr != nil {
 		return runErr
 	}

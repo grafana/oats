@@ -26,8 +26,8 @@ func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(root.run, run.run) {
-		t.Fatalf("implicit/explicit run defaults differ: %#v, %#v", root.run, run.run)
+	if !reflect.DeepEqual(root.Run, run.Run) {
+		t.Fatalf("implicit/explicit run defaults differ: %#v, %#v", root.Run, run.Run)
 	}
 }
 

@@ -8,9 +8,6 @@ default_subcommand "run"
 default_subcommand_flags #true
 flag "-v --verbose" global=#true count=#true env="OATS_VERBOSE" \
     help="increase verbosity (-v, -vv, -vvv)"
-// Explicit actions work with the pinned generator; see jdx/usage#1437.
-flag "-h --help" action="help" global=#true help="Print help"
-
 flagset "run-options" {
     flag "--config <file>" env="OATS_CONFIG" help="path to oats-config.yaml"
     flag "--gcx <value>" env="OATS_GCX" help="path to gcx binary (PATH-resolved if a bare name)"
