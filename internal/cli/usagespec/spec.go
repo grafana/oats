@@ -3,7 +3,7 @@ package usagespec
 
 import _ "embed"
 
-//go:generate mise run generate-cli -- internal/cli/usagespec/tables.go
+//go:generate mise run generate-cli -- "$PWD/tables.go"
 
 // Spec is the same source used to generate the parser and shipped with releases.
 //

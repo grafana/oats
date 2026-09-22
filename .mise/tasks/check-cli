@@ -2,12 +2,15 @@
 #MISE description="Validate the Usage spec and check generated CLI tables"
 set -euo pipefail
 root="${MISE_PROJECT_ROOT:?MISE_PROJECT_ROOT must be set by mise}"
-usage lint internal/cli/usagespec/oats.usage.kdl
 output="$(mktemp)"
 relative_dir="$(mktemp -d "$root/internal/cli/usagespec/.generate-test.XXXXXX")"
 trap 'rm -f "$output" "$relative_dir/generated.go"; rmdir "$relative_dir"' EXIT
-mise run generate-cli -- "$output"
-diff -u internal/cli/usagespec/tables.go "$output"
+(
+	cd "$root"
+	usage lint internal/cli/usagespec/oats.usage.kdl
+	mise run generate-cli -- "$output"
+	diff -u internal/cli/usagespec/tables.go "$output"
+)
 
 # Exercise the generator from the package directory with a caller-relative
 # output path. The spec remains project-root-relative while the requested
@@ -19,5 +22,8 @@ diff -u internal/cli/usagespec/tables.go "$output"
 diff -u "$root/internal/cli/usagespec/tables.go" "$relative_dir/generated.go"
 
 # Exercise the package's default output through the go:generate directive.
-go generate ./internal/cli/usagespec
+(
+	cd "$root"
+	go generate ./internal/cli/usagespec
+)
 git -C "$root" diff --exit-code -- internal/cli/usagespec/tables.go
