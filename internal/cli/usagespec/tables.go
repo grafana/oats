@@ -40,22 +40,23 @@ const (
 	FlagRunOtlpHttp         uint64 = 20
 	FlagRunParallel         uint64 = 21
 	FlagRunFailFast         uint64 = 22
-	FlagRunNoCache          uint64 = 23
-	FlagRunCacheDir         uint64 = 24
-	FlagRunList             uint64 = 25
-	FlagRunMigrate          uint64 = 26
-	ArgRunPaths             uint64 = 27
-	CmdList                 uint64 = 28
-	FlagListConfig          uint64 = 29
-	CmdMigrate              uint64 = 30
-	ArgMigratePath          uint64 = 31
-	CmdCache                uint64 = 32
-	CmdCacheClear           uint64 = 33
-	FlagCacheClearCacheDir  uint64 = 34
-	CmdVersion              uint64 = 35
-	CmdUsage                uint64 = 36
-	CmdCompletion           uint64 = 37
-	ArgCompletionShell      uint64 = 38
+	FlagRunPauseOnFailure   uint64 = 23
+	FlagRunNoCache          uint64 = 24
+	FlagRunCacheDir         uint64 = 25
+	FlagRunList             uint64 = 26
+	FlagRunMigrate          uint64 = 27
+	ArgRunPaths             uint64 = 28
+	CmdList                 uint64 = 29
+	FlagListConfig          uint64 = 30
+	CmdMigrate              uint64 = 31
+	ArgMigratePath          uint64 = 32
+	CmdCache                uint64 = 33
+	CmdCacheClear           uint64 = 34
+	FlagCacheClearCacheDir  uint64 = 35
+	CmdVersion              uint64 = 36
+	CmdUsage                uint64 = 37
+	CmdCompletion           uint64 = 38
+	ArgCompletionShell      uint64 = 39
 )
 
 // Root is the command tree for `oats`. Pass it to argv.New.
@@ -96,6 +97,7 @@ var cmdRun = &argv.Command{
 		{Key: FlagRunOtlpHttp, Name: "otlp-http", Longs: []string{"otlp-http"}, TakesValue: true},
 		{Key: FlagRunParallel, Name: "parallel", Longs: []string{"parallel"}, TakesValue: true},
 		{Key: FlagRunFailFast, Name: "fail-fast", Longs: []string{"fail-fast"}, BoolValue: true},
+		{Key: FlagRunPauseOnFailure, Name: "pause-on-failure", Longs: []string{"pause-on-failure"}, BoolValue: true},
 		{Key: FlagRunNoCache, Name: "no-cache", Longs: []string{"no-cache"}, BoolValue: true},
 		{Key: FlagRunCacheDir, Name: "cache-dir", Longs: []string{"cache-dir"}, TakesValue: true},
 		{Key: FlagRunList, Name: "list", Longs: []string{"list"}, BoolValue: true},
@@ -199,6 +201,7 @@ var Meta = argv.Metadata{
 	{Key: FlagRunOtlpHttp, Name: "otlp-http", Flag: true, Spelling: "--otlp-http", ValueName: "value", Default: []string{"http://127.0.0.1:4318"}, Env: "OATS_OTLP_HTTP"},
 	{Key: FlagRunParallel, Name: "parallel", Flag: true, Spelling: "--parallel", ValueName: "number", Default: []string{"1"}, Env: "OATS_PARALLEL"},
 	{Key: FlagRunFailFast, Name: "fail-fast", Flag: true, RequiresIfBoolean: true, Spelling: "--fail-fast", Env: "OATS_FAIL_FAST"},
+	{Key: FlagRunPauseOnFailure, Name: "pause-on-failure", Flag: true, RequiresIfBoolean: true, Spelling: "--pause-on-failure", Env: "OATS_PAUSE_ON_FAILURE"},
 	{Key: FlagRunNoCache, Name: "no-cache", Flag: true, RequiresIfBoolean: true, Spelling: "--no-cache", Env: "OATS_NO_CACHE"},
 	{Key: FlagRunCacheDir, Name: "cache-dir", Flag: true, Spelling: "--cache-dir", ValueName: "dir", Env: "OATS_CACHE_DIR"},
 	{Key: FlagRunList, Name: "list", Flag: true, RequiresIfBoolean: true, Spelling: "--list", Env: "OATS_LIST"},
@@ -245,6 +248,7 @@ var HelpText = argv.HelpTable{
 	{Key: FlagRunOtlpHttp, ValueName: "value", ValueDemanded: true, Short: "OTLP/HTTP base URL for inline-otlp seed mode", Long: "OTLP/HTTP base URL for inline-otlp seed mode", Env: "OATS_OTLP_HTTP", Default: []string{"http://127.0.0.1:4318"}},
 	{Key: FlagRunParallel, ValueName: "number", ValueDemanded: true, Short: "number of fixture groups to run in parallel when fixture isolation allows it", Long: "number of fixture groups to run in parallel when fixture isolation allows it", Env: "OATS_PARALLEL", Default: []string{"1"}},
 	{Key: FlagRunFailFast, Short: "stop scheduling further cases after the first case failure", Long: "stop scheduling further cases after the first case failure", Env: "OATS_FAIL_FAST"},
+	{Key: FlagRunPauseOnFailure, Short: "retain one managed Compose fixture after the first failure for interactive gcx diagnosis", Long: "retain one managed Compose fixture after the first failure for interactive gcx diagnosis", Env: "OATS_PAUSE_ON_FAILURE"},
 	{Key: FlagRunNoCache, Short: "disable the skip-when-unchanged cache for this run", Long: "disable the skip-when-unchanged cache for this run", Env: "OATS_NO_CACHE"},
 	{Key: FlagRunCacheDir, ValueName: "dir", ValueDemanded: true, Short: "cache directory (defaults to the user state directory)", Long: "cache directory (defaults to the user state directory)", Env: "OATS_CACHE_DIR"},
 	{Key: FlagRunList, Hide: true, Short: "deprecated: use `oats list`", Long: "deprecated: use `oats list`", Env: "OATS_LIST"},
@@ -300,6 +304,7 @@ type RunCmd struct {
 	OtlpHttp         string        // FlagRunOtlpHttp
 	Parallel         int           // FlagRunParallel
 	FailFast         bool          // FlagRunFailFast
+	PauseOnFailure   bool          // FlagRunPauseOnFailure
 	NoCache          bool          // FlagRunNoCache
 	CacheDir         string        // FlagRunCacheDir
 	List             bool          // FlagRunList
@@ -453,6 +458,12 @@ func Parse(args []string) (*Cli, error) {
 				} else {
 					cmdRunV.FailFast = !ev.Negated
 				}
+			case FlagRunPauseOnFailure:
+				if ev.HasValue {
+					cmdRunV.PauseOnFailure = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdRunV.PauseOnFailure = !ev.Negated
+				}
 			case FlagRunNoCache:
 				if ev.HasValue {
 					cmdRunV.NoCache = (ev.Value == "true") != ev.Negated
@@ -572,6 +583,12 @@ func Parse(args []string) (*Cli, error) {
 					cmdRunV.FailFast = argv.EnvTruth(values[0])
 				} else {
 					cmdRunV.FailFast = values[0] == "true"
+				}
+			case FlagRunPauseOnFailure:
+				if source == argv.FromEnv {
+					cmdRunV.PauseOnFailure = argv.EnvTruth(values[0])
+				} else {
+					cmdRunV.PauseOnFailure = values[0] == "true"
 				}
 			case FlagRunNoCache:
 				if source == argv.FromEnv {

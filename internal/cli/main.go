@@ -26,13 +26,17 @@
 //	--format       Output format: "text" (default) or "ndjson"
 //	--tags         Comma-separated tag any-match filter (on case tags)
 //	--fail-fast    Stop scheduling further cases after the first failure
+//	--pause-on-failure
+//	    Retain one managed Compose fixture for interactive gcx diagnosis
 //	-v / -vv / -vvv  Progressive verbosity (passes / commands / lifecycle)
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -44,6 +48,7 @@ import (
 	"time"
 
 	"github.com/grafana/oats/cache"
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/fixture"
@@ -52,6 +57,7 @@ import (
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
 	"github.com/grafana/oats/testhelpers/container"
+	"golang.org/x/term"
 )
 
 // Version is the oats CLI version. Release builds can override this with
@@ -161,6 +167,9 @@ func runAction(cli *usagespec.RunCmd, verbose int, exit *int) error {
 		}
 		return fmt.Errorf("no cases matched the filter")
 	}
+	if err := validatePauseOnFailure(cli, plans, isInteractiveStdin()); err != nil {
+		return err
+	}
 
 	rep := newReporter(os.Stdout, cli.Format, verbosityFromInt(verbose))
 	defer func() { _ = rep.Close() }()
@@ -209,6 +218,7 @@ func runAction(cli *usagespec.RunCmd, verbose int, exit *int) error {
 		cacheDir:           cacheDirectory(cli.CacheDir),
 		cacheTTLDays:       cfg.Cache.TTLDays,
 		failFast:           cli.FailFast,
+		pauseOnFailure:     cli.PauseOnFailure,
 	}
 	opts.lgtmVersion = cli.LgtmVersion
 	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, cli.Parallel)
@@ -327,6 +337,10 @@ type runOptions struct {
 	cacheDir           string
 	cacheTTLDays       int
 	failFast           bool
+	pauseOnFailure     bool
+	pauseInput         io.Reader
+	pauseOutput        io.Writer
+	runCase            func(context.Context, *casefile.Case) bool
 }
 
 func runPlans(ctx context.Context, rep report.Reporter, plans []discovery.Plan, opts runOptions, parallel int) (int, int, error) {
@@ -368,6 +382,9 @@ func runPlansSequential(ctx context.Context, rep report.Reporter, plans []discov
 			return totalPass, totalFail, res.err
 		}
 		if opts.failFast && totalFail > 0 {
+			break
+		}
+		if opts.pauseOnFailure && totalFail > 0 {
 			break
 		}
 	}
@@ -484,14 +501,22 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 	}
 
 	var groupPass, groupFail int
+	runCase := r.RunCase
+	if opts.runCase != nil {
+		runCase = opts.runCase
+	}
 	for _, c := range plan.Cases {
 		if ctx.Err() != nil {
 			break
 		}
-		if r.RunCase(ctx, c) {
+		if runCase(ctx, c) {
 			groupPass++
 		} else {
 			groupFail++
+			if opts.pauseOnFailure {
+				_ = pauseOnFailure(ctx, plan, c, ep, opts)
+				break
+			}
 			if opts.failFast {
 				break
 			}
@@ -512,9 +537,72 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 	return groupResult{pass: groupPass, fail: groupFail}
 }
 
-// withLGTMVersion applies the legacy CLI override to the builtin LGTM Compose
-// fixture without mutating the discovered plan. A full LGTM_IMAGE reference
-// supplied by the environment or the case's fixture config takes precedence.
+func pauseOnFailure(ctx context.Context, plan discovery.Plan, c *casefile.Case, ep runner.Endpoint, opts runOptions) error {
+	input := opts.pauseInput
+	if input == nil {
+		input = os.Stdin
+	}
+	output := opts.pauseOutput
+	if output == nil {
+		output = os.Stderr
+	}
+	write := func(format string, args ...any) { _, _ = fmt.Fprintf(output, format, args...) }
+	write("\nOATS case failed: %s (%s)\n", c.Name, plan.Name)
+	write("The managed fixture is retained for read-only gcx diagnosis.\n")
+	if ep.GCXConfig != "" {
+		write("Use --config %s", ep.GCXConfig)
+		if ep.GCXContext != "" {
+			write(" --context %s", ep.GCXContext)
+		}
+		write("\n")
+	}
+	write("Do not share the config contents or credentials.\n")
+	write("Press Enter to clean up and exit (Ctrl-C also cleans up):\n")
+	read := make(chan error, 1)
+	go func() {
+		_, err := bufio.NewReader(input).ReadString('\n')
+		read <- err
+	}()
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-read:
+		if err != nil && err != io.EOF {
+			write("Pause input ended (%v); continuing with cleanup.\n", err)
+		}
+		return nil
+	}
+}
+
+func isInteractiveStdin() bool {
+	return isInteractiveFD(int(os.Stdin.Fd()))
+}
+
+func isInteractiveFD(fd int) bool {
+	return term.IsTerminal(fd)
+}
+
+func validatePauseOnFailure(cli *usagespec.RunCmd, plans []discovery.Plan, interactive bool) error {
+	if !cli.PauseOnFailure {
+		return nil
+	}
+	if strings.ToLower(cli.Format) != "text" {
+		return fmt.Errorf("--pause-on-failure requires --format=text")
+	}
+	if cli.Parallel != 1 {
+		return fmt.Errorf("--pause-on-failure requires --parallel=1")
+	}
+	if !interactive {
+		return fmt.Errorf("--pause-on-failure requires an interactive terminal")
+	}
+	for _, plan := range plans {
+		if plan.Fixture.Kind() != "compose" {
+			return fmt.Errorf("--pause-on-failure supports only managed Compose fixtures (plan %q is %s)", plan.Name, plan.Fixture.Kind())
+		}
+	}
+	return nil
+}
+
 func withLGTMVersion(plan discovery.Plan, version string) discovery.Plan {
 	compose := plan.Fixture.Compose
 	if version == "" || compose == nil || compose.EffectiveTemplate() != "lgtm" || hasLGTMImageOverride(compose.Env) {

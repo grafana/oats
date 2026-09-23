@@ -7,6 +7,7 @@ require (
 	github.com/jdx/usage/go v0.0.0-20260921161043-0676af068487
 	github.com/onsi/gomega v1.43.1
 	github.com/stretchr/testify v1.12.1
+	golang.org/x/term v0.46.0
 	go.opentelemetry.io/collector/pdata v1.67.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.46.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.46.0

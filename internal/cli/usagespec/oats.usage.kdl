@@ -39,6 +39,8 @@ flagset "run-options" {
         help="number of fixture groups to run in parallel when fixture isolation allows it" default="1"
     flag "--fail-fast" bool_value=#true env="OATS_FAIL_FAST" \
         help="stop scheduling further cases after the first case failure"
+    flag "--pause-on-failure" bool_value=#true env="OATS_PAUSE_ON_FAILURE" \
+        help="retain one managed Compose fixture after the first failure for interactive gcx diagnosis"
     flag "--no-cache" bool_value=#true env="OATS_NO_CACHE" help="disable the skip-when-unchanged cache for this run"
     flag "--cache-dir <dir>" env="OATS_CACHE_DIR" help="cache directory (defaults to the user state directory)"
     flag "--list" bool_value=#true env="OATS_LIST" help="deprecated: use `oats list`" hide=#true
