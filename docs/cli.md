@@ -106,6 +106,15 @@ oats --parallel 4                 # run parallel-safe suites concurrently
 A run boots each derived fixture group, seeds it, then polls every assertion
 until it passes or `--timeout` elapses. Exit code is non-zero if any case fails.
 
+For interactive diagnosis of a failed managed Compose case, use
+`--pause-on-failure` with `--parallel 1`. OATS retains the fixture and private
+gcx configuration after the first failed case, prints the case and gcx context
+without credentials, and waits for Enter or Ctrl-C before performing normal
+cleanup. This mode requires text output and an interactive terminal; it is not
+available for remote, k3d, parallel, or NDJSON runs. The run still exits
+non-zero after cleanup. Use the retained context for read-only gcx diagnosis;
+do not share the config contents.
+
 Every flag has an environment-variable equivalent: uppercase the flag name,
 replace hyphens with underscores, and prefix it with `OATS_`. Command-line
 flags take precedence over environment variables. For example,
@@ -148,6 +157,7 @@ Flags:
 | `--tags`                    | `OATS_TAGS`                       | all                                                                | comma-separated tags; a case runs if it matches any                                        |
 | `--parallel`                | `OATS_PARALLEL`                   | `1`                                                                | fixture groups to run concurrently when fixture isolation allows                           |
 | `--fail-fast`               | `OATS_FAIL_FAST`                  | `false`                                                            | stop scheduling further cases after the first failure                                      |
+| `--pause-on-failure`        | `OATS_PAUSE_ON_FAILURE`           | `false`                                                            | retain one managed Compose fixture for interactive gcx diagnosis after the first failure   |
 | `--timeout`                 | `OATS_TIMEOUT`                    | `30s`                                                              | per-assertion timeout — each assertion is retried until it passes or this elapses          |
 | `--interval`                | `OATS_INTERVAL`                   | `500ms`                                                            | polling interval between assertion retries                                                 |
 | `--absent-timeout`          | `OATS_ABSENT_TIMEOUT`             | `10s`                                                              | window an `absent` assertion must stay empty to pass                                       |

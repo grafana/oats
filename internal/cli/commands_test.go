@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -9,11 +11,13 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/grafana/oats/cache"
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/report"
+	"github.com/grafana/oats/runner"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -31,7 +35,7 @@ func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
 		t.Fatal("run command was not registered")
 	}
 
-	for _, name := range []string{"config", "gcx", "gcx-version", "gcx-download", "lgtm-version", "timeout", "parallel", "no-cache"} {
+	for _, name := range []string{"config", "gcx", "gcx-version", "gcx-download", "lgtm-version", "timeout", "parallel", "no-cache", "pause-on-failure"} {
 		if root.Flags().Lookup(name) == nil {
 			t.Errorf("root command missing --%s", name)
 		}
@@ -41,6 +45,165 @@ func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
 	}
 	if !root.SilenceUsage || !root.SilenceErrors || !run.SilenceUsage || !run.SilenceErrors {
 		t.Fatal("runtime commands should suppress Cobra usage and duplicate errors")
+	}
+}
+
+func TestPauseOnFailurePrintsRedactedCoordinatesAndResumes(t *testing.T) {
+	var output bytes.Buffer
+	err := pauseOnFailure(
+		context.Background(),
+		discovery.Plan{Name: "local-lgtm", Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{Template: "lgtm"}}},
+		&casefile.Case{Name: "missing trace"},
+		runner.Endpoint{GCXConfig: "/tmp/oats-gcx-secret.yaml", GCXContext: "local"},
+		runOptions{pauseInput: strings.NewReader("\n"), pauseOutput: &output},
+	)
+	if err != nil {
+		t.Fatalf("pauseOnFailure: %v", err)
+	}
+	text := output.String()
+	for _, want := range []string{"missing trace", "local-lgtm", "/tmp/oats-gcx-secret.yaml", "--context local"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("pause output missing %q: %q", want, text)
+		}
+	}
+	for _, forbidden := range []string{"password", "admin", "secret-value"} {
+		if strings.Contains(strings.ToLower(text), forbidden) {
+			t.Errorf("pause output leaked %q: %q", forbidden, text)
+		}
+	}
+}
+
+func TestPauseOnFailureStopsOnCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	start := time.Now()
+	err := pauseOnFailure(ctx, discovery.Plan{Name: "local"}, &casefile.Case{Name: "failed"}, runner.Endpoint{}, runOptions{pauseInput: strings.NewReader("")})
+	if err != nil {
+		t.Fatalf("pauseOnFailure cancellation: %v", err)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatal("pauseOnFailure did not honor cancellation promptly")
+	}
+}
+
+type pauseErrorReader struct{}
+
+func (pauseErrorReader) Read([]byte) (int, error) { return 0, fmt.Errorf("input failed") }
+
+func TestPauseOnFailureDefaultStreamsAndInputError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := pauseOnFailure(ctx, discovery.Plan{Name: "local"}, &casefile.Case{Name: "failed"}, runner.Endpoint{}, runOptions{}); err != nil {
+		t.Fatalf("pauseOnFailure defaults: %v", err)
+	}
+	if err := pauseOnFailure(context.Background(), discovery.Plan{Name: "local"}, &casefile.Case{Name: "failed"}, runner.Endpoint{}, runOptions{pauseInput: pauseErrorReader{}, pauseOutput: io.Discard}); err != nil {
+		t.Fatalf("pauseOnFailure input error: %v", err)
+	}
+}
+
+func TestRunPlanPausesAfterFailure(t *testing.T) {
+	plan := discovery.Plan{
+		Name:    "remote-pause",
+		Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}},
+		Cases:   []*casefile.Case{{Name: "failed"}},
+	}
+	rep := report.NewTextReporter(io.Discard, report.VerboseDefault)
+	res := runPlan(context.Background(), rep, plan, runOptions{
+		pauseOnFailure: true,
+		pauseInput:     strings.NewReader("\n"),
+		pauseOutput:    io.Discard,
+		runCase:        func(context.Context, *casefile.Case) bool { return false },
+	})
+	if res.pass != 0 || res.fail != 1 || res.err != nil {
+		t.Fatalf("runPlan pause result = %+v", res)
+	}
+}
+
+func TestRunPlansPauseStopsAfterFirstFailedPlan(t *testing.T) {
+	plans := []discovery.Plan{
+		{
+			Name:    "first",
+			Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}},
+			Cases:   []*casefile.Case{{Name: "first failure"}},
+		},
+		{
+			Name:    "second",
+			Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost:4318"}},
+			Cases:   []*casefile.Case{{Name: "second failure"}},
+		},
+	}
+	rep := report.NewTextReporter(io.Discard, report.VerboseDefault)
+	pass, fail, err := runPlans(context.Background(), rep, plans, runOptions{
+		pauseOnFailure: true,
+		pauseInput:     strings.NewReader("\n"),
+		pauseOutput:    io.Discard,
+		runCase:        func(context.Context, *casefile.Case) bool { return false },
+	}, 1)
+	if err != nil {
+		t.Fatalf("runPlans pause: %v", err)
+	}
+	if pass != 0 || fail != 1 {
+		t.Fatalf("runPlans pause result = pass %d, fail %d; want pass 0, fail 1", pass, fail)
+	}
+}
+
+func TestValidatePauseOnFailure(t *testing.T) {
+	compose := discovery.Plan{Name: "compose", Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}}}
+	remote := discovery.Plan{Name: "remote", Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://example"}}}
+	tests := []struct {
+		name        string
+		format      string
+		parallel    string
+		interactive bool
+		plans       []discovery.Plan
+		want        string
+	}{
+		{name: "disabled"},
+		{name: "format", format: "ndjson", parallel: "1", interactive: true, plans: []discovery.Plan{compose}, want: "requires --format=text"},
+		{name: "parallel", format: "text", parallel: "2", interactive: true, plans: []discovery.Plan{compose}, want: "requires --parallel=1"},
+		{name: "noninteractive", format: "text", parallel: "1", interactive: false, plans: []discovery.Plan{compose}, want: "interactive terminal"},
+		{name: "fixture", format: "text", parallel: "1", interactive: true, plans: []discovery.Plan{remote}, want: "supports only managed Compose"},
+		{name: "valid", format: "TEXT", parallel: "1", interactive: true, plans: []discovery.Plan{compose}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
+			addRunFlags(flags)
+			if tt.format != "" {
+				_ = flags.Set("format", tt.format)
+			}
+			if tt.parallel != "" {
+				_ = flags.Set("parallel", tt.parallel)
+			}
+			if tt.name != "disabled" {
+				_ = flags.Set("pause-on-failure", "true")
+			}
+			err := validatePauseOnFailure(flags, tt.plans, tt.interactive)
+			if tt.want == "" {
+				if err != nil {
+					t.Fatalf("validatePauseOnFailure() error = %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("validatePauseOnFailure() error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsInteractiveStdin(t *testing.T) {
+	_ = isInteractiveStdin()
+}
+
+func TestIsInteractiveFDRejectsNonTerminal(t *testing.T) {
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatalf("open %s: %v", os.DevNull, err)
+	}
+	defer func() { _ = devNull.Close() }()
+	if isInteractiveFD(int(devNull.Fd())) {
+		t.Fatal("non-terminal file descriptor was detected as interactive")
 	}
 }
 
@@ -489,6 +652,12 @@ expected:
 	root.SetArgs([]string{"--config", config, "--tags", "missing"})
 	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "no cases matched the filter") {
 		t.Fatalf("filter error = %v", err)
+	}
+
+	root = newRootCmd(new(int))
+	root.SetArgs([]string{"--config", config, "--pause-on-failure", "--format", "ndjson"})
+	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "requires --format=text") {
+		t.Fatalf("pause validation error = %v", err)
 	}
 
 	root = newRootCmd(new(int))
