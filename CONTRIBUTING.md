@@ -79,7 +79,7 @@ flowchart LR
 | `seed/`                  | inline OTLP and application-input seeding                              | `seed/seed.go`                           |
 | `engine/` / `signalcmd/` | gcx invocation and signal-specific command construction                | `engine/gcx.go`                          |
 | `report/`                | text/NDJSON event stream and GitHub annotations                        | `report/event.go`                        |
-| `internal/cli/`          | Cobra commands, flags, env mapping, and orchestration                  | `internal/cli/main.go`                   |
+| `internal/cli/`          | Usage tables, flags, env mapping, and orchestration                    | `internal/cli/main.go`                   |
 | `internal/legacyyaml/`   | legacy schema parsing and v2→v3 migration only                         | `internal/legacyyaml/migrate/migrate.go` |
 | `tests/e2e/`             | black-box cases run against real stacks and tools                      | `tests/e2e/e2e_test.go`                  |
 
@@ -136,3 +136,23 @@ fixture safety gate allows it.
    relevant unit tests and lint before pushing; use signed commits and normal
    pushes, and avoid force-pushing review updates unless a true restack requires
    it.
+
+## CLI generation
+
+The CLI source of truth is `internal/cli/usagespec/oats.usage.kdl`. Run
+`mise run generate-cli` after editing it and commit the generated Go tables.
+`mise run check-cli` verifies that the tables are reproducible. Normal Go builds
+use the checked-in tables and do not need the Usage executable.
+
+Usage Go is a development preview. Keep the generator pin in `mise.toml` and
+its matching Go runtime commit in `go.mod` together when upgrading, and rerun
+the CLI contract tests (implicit run, flags, environment precedence, errors,
+and exit codes). Review runtime changes as well as generated diffs: identical
+tables do not imply identical behavior with a new runtime. OATS calls the
+generated `Parse` function and uses its typed result directly in application options;
+there is no Cobra/pflag compatibility layer. Optional config/GCX/LGTM overrides
+have no spec defaults; application defaults are applied after parsing.
+
+The experiment remains draft pending the upstream work tracked in
+[ADR 0005](docs/adr/0005-usage-and-packslip.md). Keep temporary adapters linked
+to their upstream replacement rather than expanding them.

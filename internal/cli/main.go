@@ -47,20 +47,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/grafana/oats/casefile"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"golang.org/x/term"
-
 	"github.com/grafana/oats/cache"
+	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/fixture"
+	"github.com/grafana/oats/internal/cli/usagespec"
 	"github.com/grafana/oats/internal/legacyyaml/migrate"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
-	"github.com/grafana/oats/testhelpers"
 	"github.com/grafana/oats/testhelpers/container"
+	"golang.org/x/term"
 )
 
 // Version is the oats CLI version. Release builds can override this with
@@ -82,206 +79,8 @@ func Main() {
 	os.Exit(Run())
 }
 
-// Run builds the cobra command tree and executes it. The exit code is
-// threaded through *exit so a run with failing cases returns 1 without cobra
-// treating it as a usage error.
-func Run() int {
-	var exit int
-	root := newRootCmd(&exit)
-	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		if exit == 0 {
-			exit = 2
-		}
-	}
-	return exit
-}
-
-func newRootCmd(exit *int) *cobra.Command {
-	var verbose int
-	root := &cobra.Command{
-		Use:   "oats [paths...]",
-		Short: "OpenTelemetry Acceptance Tests — the gcx-driven runner",
-		Long: "OpenTelemetry Acceptance Tests — the gcx-driven runner.\n\n" +
-			"With no subcommand, oats runs the cases in oats-config.yaml (found in the\n" +
-			"current directory or any parent). If no config is found there, a single\n" +
-			"positional file or project directory selects it. Otherwise positional paths\n" +
-			"scope the run to cases at or under them.",
-		// Do not print full command usage for runtime failures such as failed
-		// assertions or unreachable backends. Those are not CLI syntax errors.
-		SilenceUsage: true,
-		// Let Run() own error printing and exit-code mapping. Without this, Cobra
-		// prints returned errors too, producing duplicate "Error: ..." lines.
-		SilenceErrors: true,
-		// Bare `oats [paths...] [flags]` is an implicit `run`.
-		// Cobra otherwise treats the first path as an unknown subcommand when
-		// this command also has named subcommands.
-		Args: cobra.ArbitraryArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runAction(cmd, args, verbose, exit)
-		},
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			return applyEnvFlags(cmd.Flags())
-		},
-	}
-	root.PersistentFlags().CountVarP(&verbose, "verbose", "v", "increase verbosity (-v, -vv, -vvv)")
-	addRunFlags(root.Flags())
-
-	root.AddCommand(
-		newRunCmd(&verbose, exit),
-		newListCmd(),
-		newMigrateCmd(),
-		newCacheCmd(),
-		newVersionCmd(),
-	)
-	return root
-}
-
-// addRunFlags registers the flags shared by the implicit-run root and the
-// explicit `run` subcommand.
-func addRunFlags(fs *pflag.FlagSet) {
-	fs.String("config", "oats-config.yaml", "path to oats-config.yaml")
-	fs.String("gcx", "gcx", "path to gcx binary (PATH-resolved if a bare name)")
-	gcxVersionHelp := "download and use this gcx release"
-	if MinimumGCXVersion != "" {
-		gcxVersionHelp = fmt.Sprintf("%s (for example, %s)", gcxVersionHelp, MinimumGCXVersion)
-	}
-	fs.String("gcx-version", "", gcxVersionHelp)
-	fs.String("gcx-download", defaultGCXDownloadPolicy(), fmt.Sprintf("gcx fallback download policy: %s | %s", gcxDownloadPolicyAuto, gcxDownloadPolicyNever))
-	fs.String("format", "text", "output format: text | ndjson")
-	fs.String("tags", "", "comma-separated tag any-match")
-	fs.Duration("timeout", 30*time.Second, "per-assertion timeout")
-	fs.Duration("interval", 500*time.Millisecond, "polling interval")
-	fs.Duration("absent-timeout", 10*time.Second, "how long an absent assertion must stay absent")
-	fs.Duration("seed-settle", 2*time.Second, "post-seed wait before first assertion")
-	fs.String("gcx-context", "", "override the gcx --context value (otherwise derived from fixture endpoint)")
-	fs.String("lgtm-version", "latest", "version of docker.io/grafana/otel-lgtm used by the builtin Compose fixture")
-	fs.String("container-runtime", "auto", "container engine for Compose fixtures: auto | docker | podman")
-	fs.String("app-host", "localhost", "application host for driving case input requests")
-	fs.Int("app-port", 8080, "application port for driving case input requests")
-	fs.String("otlp-http", defaultOTLPHTTP(), "OTLP/HTTP base URL for inline-otlp seed mode")
-	fs.Int("parallel", 1, "number of fixture groups to run in parallel when fixture isolation allows it")
-	fs.Bool("fail-fast", false, "stop scheduling further cases after the first case failure")
-	fs.Bool("pause-on-failure", false, "retain one managed Compose fixture after the first failure for interactive gcx diagnosis")
-	fs.Bool("no-cache", false, "disable the skip-when-unchanged cache for this run")
-	fs.String("cache-dir", defaultCacheDir(), "directory for the skip-when-unchanged cache")
-
-	// Deprecated flag aliases, superseded by the `list` and `migrate`
-	// subcommands. Hidden but still honored so existing invocations keep working.
-	fs.Bool("list", false, "deprecated: use `oats list`")
-	fs.String("migrate", "", "deprecated: use `oats migrate <file>`")
-	mustMarkHidden(fs, "list")
-	mustMarkHidden(fs, "migrate")
-}
-
-func mustMarkHidden(fs *pflag.FlagSet, name string) {
-	if err := fs.MarkHidden(name); err != nil {
-		panic(err)
-	}
-}
-
-func newRunCmd(verbose, exit *int) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "run [paths...]",
-		Short: "Run the cases in oats-config.yaml (default when no subcommand is given)",
-		Long: "Run the cases declared by oats-config.yaml.\n\n" +
-			"The config is found in the current directory or any parent (override with\n" +
-			"--config). If none is found, pass its file or project directory as the single\n" +
-			"positional argument. Otherwise positional paths scope the run to cases at or\n" +
-			"under those files/directories.",
-		// Runtime failures should print the concise error/report, not usage.
-		SilenceUsage: true,
-		// Let Run() own error printing and exit-code mapping. Without this, Cobra
-		// prints returned errors too, producing duplicate "Error: ..." lines.
-		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runAction(cmd, args, *verbose, exit)
-		},
-	}
-	addRunFlags(cmd.Flags())
-	return cmd
-}
-
-func newListCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:           "list",
-		Short:         "Print the run plan and exit (no execution)",
-		SilenceUsage:  true,
-		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return listAction(cmd)
-		},
-	}
-	cmd.Flags().String("config", "oats-config.yaml", "path to oats-config.yaml")
-	return cmd
-}
-
-func newMigrateCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "migrate <legacy-yaml | dir>",
-		Short: "Convert legacy OATS yaml to the current shape",
-		Long: `Convert legacy OATS test cases to the current shape.
-
-File mode (argument is a file):
-  Convert one legacy yaml and print the self-contained v3 case (including its
-  fixture: block) to stdout. Warnings go to stderr.
-
-Directory mode (argument is a directory):
-  Migrate every legacy case found under the directory in place (each file is
-  overwritten with its v3 equivalent) and write an oats-config.yaml listing
-  them explicitly. A human summary and per-file warnings go to stderr; nothing
-  is written to stdout.`,
-		Args:          cobra.ExactArgs(1),
-		SilenceUsage:  true,
-		SilenceErrors: true,
-		RunE: func(_ *cobra.Command, args []string) error {
-			return migrateAction(args[0])
-		},
-	}
-	return cmd
-}
-
-func newCacheCmd() *cobra.Command {
-	cacheCmd := &cobra.Command{
-		Use:   "cache",
-		Short: "Manage the skip-when-unchanged cache",
-	}
-	clear := &cobra.Command{
-		Use:           "clear",
-		Short:         "Delete all cached results",
-		SilenceUsage:  true,
-		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			dir, _ := cmd.Flags().GetString("cache-dir")
-			store, err := cache.New(dir, 0, nil)
-			if err != nil {
-				return err
-			}
-			if err := store.Clear(); err != nil {
-				return err
-			}
-			fmt.Println("cache cleared:", dir)
-			return nil
-		},
-	}
-	clear.Flags().String("cache-dir", defaultCacheDir(), "cache directory to clear")
-	cacheCmd.AddCommand(clear)
-	return cacheCmd
-}
-
-func newVersionCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "version",
-		Short: "Print the oats version and exit",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			fmt.Println(Version)
-			return nil
-		},
-	}
-}
-
-func listAction(cmd *cobra.Command) error {
-	configPath, err := resolveConfigPath(cmd.Flags())
+func listAction(config string) error {
+	configPath, err := resolveConfigPath(config)
 	if err != nil {
 		return err
 	}
@@ -332,18 +131,16 @@ func migrateAction(path string) error {
 // explicit `run` subcommand. Positional args normally scope which cases run.
 // When config discovery from cwd fails, a single positional arg instead selects
 // the config (with oats-config.yaml inferred when the arg is a directory).
-func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error {
-	fs := cmd.Flags()
-
+func runAction(cli *usagespec.RunCmd, verbose int, exit *int) error {
 	// Honor the deprecated --list / --migrate flags.
-	if list, _ := fs.GetBool("list"); list {
-		return listAction(cmd)
+	if cli.List {
+		return listAction(cli.Config)
 	}
-	if migratePath, _ := fs.GetString("migrate"); migratePath != "" {
-		return migrateAction(migratePath)
+	if cli.Migrate != "" {
+		return migrateAction(cli.Migrate)
 	}
 
-	configPath, pathArgs, err := resolveRunConfigPath(fs, args)
+	configPath, pathArgs, err := resolveRunConfigPath(cli.Config, cli.Paths)
 	if err != nil {
 		return err
 	}
@@ -357,7 +154,7 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		return err
 	}
 	filter := discovery.Filter{
-		Tags:  splitCSV(flagStr(fs, "tags")),
+		Tags:  splitCSV(cli.Tags),
 		Paths: paths,
 	}
 	plans, err := cfg.PlanRun(filter)
@@ -370,11 +167,11 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		}
 		return fmt.Errorf("no cases matched the filter")
 	}
-	if err := validatePauseOnFailure(fs, plans, isInteractiveStdin()); err != nil {
+	if err := validatePauseOnFailure(cli, plans, isInteractiveStdin()); err != nil {
 		return err
 	}
 
-	rep := newReporter(os.Stdout, flagStr(fs, "format"), verbosityFromInt(verbose))
+	rep := newReporter(os.Stdout, cli.Format, verbosityFromInt(verbose))
 	defer func() { _ = rep.Close() }()
 	// Parallel fixture groups share one reporter. Serialize Emit/Close so text
 	// lines and ndjson records are written one event at a time.
@@ -390,12 +187,15 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 	ctx, cancel := signalAwareContext()
 	defer cancel()
 
-	gcxBin := flagStr(fs, "gcx")
-	containerRuntime := flagStr(fs, "container-runtime")
+	gcxBin := cli.Gcx
+	if gcxBin == "" {
+		gcxBin = "gcx"
+	}
+	containerRuntime := cli.ContainerRuntime
 	if _, err := container.Parse(containerRuntime); err != nil {
 		return err
 	}
-	gcxBin, err = resolveGCX(fs, gcxBin)
+	gcxBin, err = resolveGCX(gcxOptions{binary: cli.Gcx, version: cli.GcxVersion, download: cli.GcxDownload, cacheDir: cacheDirectory(cli.CacheDir)}, gcxBin)
 	if err != nil {
 		return err
 	}
@@ -405,25 +205,23 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 	opts := runOptions{
 		gcxBin:             gcxBin,
 		gcxVersion:         detectedGCXVersion,
-		gcxContextOverride: flagStr(fs, "gcx-context"),
+		gcxContextOverride: cli.GcxContext,
 		containerRuntime:   containerRuntime,
-		appHost:            flagStr(fs, "app-host"),
-		appPort:            flagInt(fs, "app-port"),
-		otlpHTTP:           flagStr(fs, "otlp-http"),
-		timeout:            flagDur(fs, "timeout"),
-		interval:           flagDur(fs, "interval"),
-		absentTimeout:      flagDur(fs, "absent-timeout"),
-		seedSettle:         flagDur(fs, "seed-settle"),
-		noCache:            flagBool(fs, "no-cache"),
-		cacheDir:           flagStr(fs, "cache-dir"),
+		appHost:            cli.AppHost,
+		appPort:            cli.AppPort,
+		otlpHTTP:           cli.OtlpHttp,
+		timeout:            cli.Timeout,
+		interval:           cli.Interval,
+		absentTimeout:      cli.AbsentTimeout,
+		seedSettle:         cli.SeedSettle,
+		noCache:            cli.NoCache,
+		cacheDir:           cacheDirectory(cli.CacheDir),
 		cacheTTLDays:       cfg.Cache.TTLDays,
-		failFast:           flagBool(fs, "fail-fast"),
-		pauseOnFailure:     flagBool(fs, "pause-on-failure"),
+		failFast:           cli.FailFast,
+		pauseOnFailure:     cli.PauseOnFailure,
 	}
-	if fs.Lookup("lgtm-version").Changed {
-		opts.lgtmVersion = flagStr(fs, "lgtm-version")
-	}
-	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, flagInt(fs, "parallel"))
+	opts.lgtmVersion = cli.LgtmVersion
+	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, cli.Parallel)
 	if runErr != nil {
 		return runErr
 	}
@@ -439,14 +237,6 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		*exit = 1
 	}
 	return nil
-}
-
-func flagStr(fs *pflag.FlagSet, name string) string { v, _ := fs.GetString(name); return v }
-func flagInt(fs *pflag.FlagSet, name string) int    { v, _ := fs.GetInt(name); return v }
-func flagBool(fs *pflag.FlagSet, name string) bool  { v, _ := fs.GetBool(name); return v }
-func flagDur(fs *pflag.FlagSet, name string) (d time.Duration) {
-	d, _ = fs.GetDuration(name)
-	return d
 }
 
 func newReporter(w *os.File, format string, v report.Verbosity) report.Reporter {
@@ -792,14 +582,14 @@ func isInteractiveFD(fd int) bool {
 	return term.IsTerminal(fd)
 }
 
-func validatePauseOnFailure(fs *pflag.FlagSet, plans []discovery.Plan, interactive bool) error {
-	if !flagBool(fs, "pause-on-failure") {
+func validatePauseOnFailure(cli *usagespec.RunCmd, plans []discovery.Plan, interactive bool) error {
+	if !cli.PauseOnFailure {
 		return nil
 	}
-	if strings.ToLower(flagStr(fs, "format")) != "text" {
+	if strings.ToLower(cli.Format) != "text" {
 		return fmt.Errorf("--pause-on-failure requires --format=text")
 	}
-	if flagInt(fs, "parallel") != 1 {
+	if cli.Parallel != 1 {
 		return fmt.Errorf("--pause-on-failure requires --parallel=1")
 	}
 	if !interactive {
@@ -813,9 +603,6 @@ func validatePauseOnFailure(fs *pflag.FlagSet, plans []discovery.Plan, interacti
 	return nil
 }
 
-// withLGTMVersion applies the legacy CLI override to the builtin LGTM Compose
-// fixture without mutating the discovered plan. A full LGTM_IMAGE reference
-// supplied by the environment or the case's fixture config takes precedence.
 func withLGTMVersion(plan discovery.Plan, version string) discovery.Plan {
 	compose := plan.Fixture.Compose
 	if version == "" || compose == nil || compose.EffectiveTemplate() != "lgtm" || hasLGTMImageOverride(compose.Env) {
@@ -882,10 +669,6 @@ func closeFixture(rep report.Reporter, plan discovery.Plan, fix fixture.Handle) 
 	return nil
 }
 
-func defaultOTLPHTTP() string {
-	return fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, testhelpers.OTLPHTTPPort)
-}
-
 func splitCSV(s string) []string {
 	if strings.TrimSpace(s) == "" {
 		return nil
@@ -917,11 +700,11 @@ func gcxVersion(bin string) string {
 // resolveConfigPath returns the oats-config.yaml to load. An explicit --config
 // is honored as-is; otherwise the default filename is searched for in the
 // current directory and each parent (so `oats` works from a subdirectory).
-func resolveConfigPath(fs *pflag.FlagSet) (string, error) {
-	name, _ := fs.GetString("config")
-	if fs.Changed("config") {
-		return name, nil
+func resolveConfigPath(config string) (string, error) {
+	if config != "" {
+		return config, nil
 	}
+	const name = "oats-config.yaml"
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -943,8 +726,8 @@ func resolveConfigPath(fs *pflag.FlagSet) (string, error) {
 // discovery: when cwd and its parents have no config, a single positional
 // argument may name the config file or its containing project directory. The
 // consumed argument is not also used as a case-path filter.
-func resolveRunConfigPath(fs *pflag.FlagSet, args []string) (string, []string, error) {
-	configPath, discoveryErr := resolveConfigPath(fs)
+func resolveRunConfigPath(config string, args []string) (string, []string, error) {
+	configPath, discoveryErr := resolveConfigPath(config)
 	if discoveryErr == nil || len(args) != 1 {
 		return configPath, args, discoveryErr
 	}
@@ -955,7 +738,7 @@ func resolveRunConfigPath(fs *pflag.FlagSet, args []string) (string, []string, e
 		return "", args, fmt.Errorf("%w; cannot use positional config path %q: %v", discoveryErr, candidate, err)
 	}
 	if info.IsDir() {
-		candidate = filepath.Join(candidate, flagStr(fs, "config"))
+		candidate = filepath.Join(candidate, "oats-config.yaml")
 	}
 	if _, err := os.Stat(candidate); err != nil {
 		return "", args, fmt.Errorf("%w; cannot use positional config path %q: %v", discoveryErr, candidate, err)

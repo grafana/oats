@@ -19,7 +19,6 @@ import (
 	"time"
 
 	semver "github.com/hashicorp/go-version"
-	"github.com/spf13/pflag"
 )
 
 var gcxReleaseBaseURL = "https://github.com/grafana/gcx/releases/download"
@@ -65,19 +64,20 @@ func isMiseInstallPath(path string) bool {
 	return false
 }
 
-func resolveGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
-	version, err := fs.GetString("gcx-version")
-	if err != nil {
-		return "", err
-	}
-	if strings.TrimSpace(version) != "" {
-		return resolveRequestedGCX(fs, gcxBin, version)
-	}
-	return resolveDefaultGCX(fs, gcxBin)
+type gcxOptions struct {
+	binary, version, download, cacheDir string
 }
 
-func resolveRequestedGCX(fs *pflag.FlagSet, gcxBin, requested string) (string, error) {
-	policy, err := gcxDownloadPolicy(fs)
+func resolveGCX(opts gcxOptions, gcxBin string) (string, error) {
+	version := opts.version
+	if strings.TrimSpace(version) != "" {
+		return resolveRequestedGCX(opts, gcxBin, version)
+	}
+	return resolveDefaultGCX(opts, gcxBin)
+}
+
+func resolveRequestedGCX(opts gcxOptions, gcxBin, requested string) (string, error) {
+	policy, err := gcxDownloadPolicy(opts)
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +89,7 @@ func resolveRequestedGCX(fs *pflag.FlagSet, gcxBin, requested string) (string, e
 		return "", fmt.Errorf("--gcx-version %s is below oats minimum gcx version %s", version, MinimumGCXVersion)
 	}
 
-	if fs.Changed("gcx") {
+	if opts.binary != "" {
 		if _, err := exec.LookPath(gcxBin); err != nil {
 			return "", fmt.Errorf("gcx binary %q was not found (set --gcx to its path)", gcxBin)
 		}
@@ -107,10 +107,7 @@ func resolveRequestedGCX(fs *pflag.FlagSet, gcxBin, requested string) (string, e
 		return gcxBin, nil
 	}
 
-	cacheDir, err := fs.GetString("cache-dir")
-	if err != nil {
-		return "", err
-	}
+	cacheDir := opts.cacheDir
 	if cached, ok := cachedGCXPath(version, cacheDir); ok {
 		return cached, nil
 	}
@@ -121,8 +118,8 @@ func resolveRequestedGCX(fs *pflag.FlagSet, gcxBin, requested string) (string, e
 	return bootstrapGCX(version, cacheDir)
 }
 
-func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
-	policy, err := gcxDownloadPolicy(fs)
+func resolveDefaultGCX(opts gcxOptions, gcxBin string) (string, error) {
+	policy, err := gcxDownloadPolicy(opts)
 	if err != nil {
 		return "", err
 	}
@@ -131,7 +128,7 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 		// An explicit --gcx is an intentional override, so do not second-guess
 		// its version. The embedded minimum protects only the implicit PATH lookup
 		// from accidentally selecting an older local installation.
-		if fs.Changed("gcx") || MinimumGCXVersion == "" {
+		if opts.binary != "" || MinimumGCXVersion == "" {
 			return gcxBin, nil
 		}
 
@@ -154,14 +151,11 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 		} else {
 			fmt.Fprintf(os.Stderr, "gcx on PATH is %s; downloading minimum gcx %s\n", installedVersion, MinimumGCXVersion)
 		}
-		cacheDir, err := fs.GetString("cache-dir")
-		if err != nil {
-			return "", err
-		}
+		cacheDir := opts.cacheDir
 		return bootstrapGCX(MinimumGCXVersion, cacheDir)
 	}
 
-	if fs.Changed("gcx") {
+	if opts.binary != "" {
 		return "", fmt.Errorf("gcx binary %q was not found (set --gcx to its path)", gcxBin)
 	}
 	if policy == gcxDownloadPolicyNever {
@@ -172,17 +166,14 @@ func resolveDefaultGCX(fs *pflag.FlagSet, gcxBin string) (string, error) {
 	}
 
 	fmt.Fprintf(os.Stderr, "gcx was not found on PATH; downloading minimum gcx %s\n", MinimumGCXVersion)
-	cacheDir, err := fs.GetString("cache-dir")
-	if err != nil {
-		return "", err
-	}
+	cacheDir := opts.cacheDir
 	return bootstrapGCX(MinimumGCXVersion, cacheDir)
 }
 
-func gcxDownloadPolicy(fs *pflag.FlagSet) (string, error) {
-	policy, err := fs.GetString("gcx-download")
-	if err != nil {
-		return "", err
+func gcxDownloadPolicy(opts gcxOptions) (string, error) {
+	policy := opts.download
+	if policy == "" {
+		policy = defaultGCXDownloadPolicy()
 	}
 	policy = strings.ToLower(strings.TrimSpace(policy))
 	if policy != gcxDownloadPolicyAuto && policy != gcxDownloadPolicyNever {

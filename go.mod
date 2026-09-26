@@ -4,9 +4,8 @@ go 1.26.5
 
 require (
 	github.com/hashicorp/go-version v1.9.0
+	github.com/jdx/usage/go v0.0.0-20260921161043-0676af068487
 	github.com/onsi/gomega v1.43.1
-	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/collector/pdata v1.67.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.46.0
@@ -17,6 +16,8 @@ require (
 	golang.org/x/term v0.46.0
 )
 
+require github.com/expr-lang/expr v1.17.8 // indirect
+
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -25,7 +26,6 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect

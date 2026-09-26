@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-
-	"github.com/spf13/pflag"
 )
 
 func TestDefaultGCXDownloadPolicy(t *testing.T) {
@@ -155,9 +153,7 @@ func TestResolveGCXVersionUsesExactPathVersion(t *testing.T) {
 
 	gcxBin := fakeGCXOnPath(t, "0.4.4")
 	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyNever)
-	if err := fs.Set("gcx-version", "0.4.4"); err != nil {
-		t.Fatal(err)
-	}
+	fs.version = "0.4.4"
 	got, err := resolveGCX(fs, gcxBin)
 	if err != nil {
 		t.Fatalf("resolveGCX: %v", err)
@@ -174,12 +170,8 @@ func TestResolveGCXVersionValidatesExplicitPath(t *testing.T) {
 
 	gcxBin := fakeGCXOnPath(t, "0.4.3")
 	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyNever)
-	if err := fs.Set("gcx", gcxBin); err != nil {
-		t.Fatal(err)
-	}
-	if err := fs.Set("gcx-version", "0.4.4"); err != nil {
-		t.Fatal(err)
-	}
+	fs.binary = gcxBin
+	fs.version = "0.4.4"
 	if _, err := resolveGCX(fs, gcxBin); err == nil {
 		t.Fatal("expected exact version mismatch")
 	}
@@ -191,9 +183,7 @@ func TestResolveGCXVersionMustMeetMinimum(t *testing.T) {
 	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
 
 	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyNever)
-	if err := fs.Set("gcx-version", "0.4.3"); err != nil {
-		t.Fatal(err)
-	}
+	fs.version = "0.4.3"
 	if _, err := resolveGCX(fs, "gcx"); err == nil {
 		t.Fatal("expected version below minimum error")
 	}
@@ -215,9 +205,7 @@ func TestResolveGCXVersionUsesCachedVersion(t *testing.T) {
 	t.Cleanup(func() { MinimumGCXVersion = oldVersion })
 
 	fs := gcxRuntimeFlags(cacheDir, gcxDownloadPolicyNever)
-	if err := fs.Set("gcx-version", "0.4.4"); err != nil {
-		t.Fatal(err)
-	}
+	fs.version = "0.4.4"
 	got, err := resolveGCX(fs, "gcx")
 	if err != nil {
 		t.Fatalf("resolveGCX: %v", err)
@@ -271,9 +259,7 @@ func TestResolveDefaultGCXExplicitPathOverridesMinimum(t *testing.T) {
 
 	gcxBin := fakeGCXOnPath(t, "0.4.2")
 	fs := gcxRuntimeFlags(t.TempDir(), gcxDownloadPolicyNever)
-	if err := fs.Set("gcx", gcxBin); err != nil {
-		t.Fatal(err)
-	}
+	fs.binary = gcxBin
 	got, err := resolveDefaultGCX(fs, gcxBin)
 	if err != nil {
 		t.Fatalf("resolveDefaultGCX: %v", err)
@@ -283,13 +269,8 @@ func TestResolveDefaultGCXExplicitPathOverridesMinimum(t *testing.T) {
 	}
 }
 
-func gcxRuntimeFlags(cacheDir, downloadPolicy string) *pflag.FlagSet {
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	fs.String("gcx", "gcx", "")
-	fs.String("gcx-version", "", "")
-	fs.String("gcx-download", downloadPolicy, "")
-	fs.String("cache-dir", cacheDir, "")
-	return fs
+func gcxRuntimeFlags(cacheDir, downloadPolicy string) gcxOptions {
+	return gcxOptions{cacheDir: cacheDir, download: downloadPolicy}
 }
 
 func fakeGCXOnPath(t *testing.T, version string) string {
