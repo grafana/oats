@@ -42,7 +42,7 @@
     },
     ".github/workflows/release.yml": {
       "github-actions": [
-        "actions/attest-build-provenance",
+        "actions/attest",
         "actions/checkout",
         "googleapis/release-please-action",
         "jdx/mise",
@@ -205,8 +205,8 @@
     }
   },
   "actionMeta": {
-    "actions/attest-build-provenance": {
-      "packageName": "actions/attest-build-provenance",
+    "actions/attest": {
+      "packageName": "actions/attest",
       "refKind": "version-tag"
     },
     "actions/cache": {
