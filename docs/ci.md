@@ -94,6 +94,14 @@ Annotations are enabled by default in GitHub Actions. Set
 output only. The setting affects text output; `--format ndjson` remains a
 machine-readable event stream without workflow commands.
 
+## Investigate a failed case locally
+
+Do not add `--pause-on-failure` to a CI job: it requires an interactive text
+terminal and a managed Compose fixture. Preserve the failed job, case, assertion,
+query, and tool versions, then reproduce only that case locally with the cache
+disabled. See the [failed-case troubleshooting guide](troubleshooting.md) for
+the supported fixture scope and gcx workflow.
+
 ## Result caching (optional)
 
 `oats` keeps a skip-when-unchanged cache under `--cache-dir`. A case is skipped
