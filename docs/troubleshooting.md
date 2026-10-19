@@ -44,12 +44,16 @@ Keep any relevant flags from the original run, especially `--gcx` or
 `--gcx-version`, `--timeout`, `--tags`, and `--lgtm-version`. The pause option
 requires an interactive terminal, text output, `--parallel=1`, and managed
 Compose fixtures. OATS checks these prerequisites before creating resources.
-It pauses after the first failed case in the fixture group; a startup failure or
-lost fixture follows the normal error and cleanup path instead.
+It pauses after the first failed case in the fixture group, including failures
+caused by a fixture that became unavailable during the case. A pause does not
+mean the fixture is still healthy.
 
 When a case fails, OATS keeps its managed Compose fixture and private gcx config
 alive, prints the failed case and the `--config` / `--context` selection, and
-waits for Enter or Ctrl-C. Do not close that OATS process or remove the fixture
+waits for Enter or Ctrl-C. Before querying, verify that the fixture is still
+healthy and reachable. If it is unavailable, do not query it; record that
+limitation and investigate the fixture failure from the available logs and
+evidence instead. Do not close that OATS process or remove a healthy fixture
 while investigating. The temporary config is private: do not share its contents
 or credentials. Open another terminal and use gcx with the exact config and
 context OATS printed. If the original run selected an explicit gcx binary or
