@@ -19,22 +19,22 @@ Releases are automated with `release-please` and GoReleaser.
 1. Merge changes into `main`.
 2. Wait for `release-please` to open or update the release PR.
 3. Review and squash-merge the release PR.
-4. The `Release` workflow will then:
-   - create a draft GitHub release and tag
-   - build binaries with GoReleaser
-   - upload release assets and `checksums.txt`
-   - create GitHub artifact attestations for the assets
-   - sign, verify, and upload `packslip.sigstore.json`
-   - publish the draft release
+4. After `release-please` creates a release, the `Release` workflow's
+   `goreleaser` job checks out the new tag, builds binaries, uploads release
+   assets and `checksums.txt`, creates GitHub artifact attestations, publishes
+   a signed Packslip manifest linked to those attestations, and publishes the
+   draft release.
 
 Linux release artifacts are built with `CGO_ENABLED=0`, so the Linux archives
 work on both glibc- and musl-based distributions.
 
 ## Republish an existing tag
 
-Use `workflow_dispatch` with an existing `tag_name` to rebuild assets and
-publish that draft release without running `release-please` again. Run the
-workflow from that same tag, or the workflow guard will fail before publishing.
+Use `workflow_dispatch` with an existing `tag_name` to run the separate
+`publish-existing-tag` job. It rebuilds assets, creates attestations, publishes
+a signed Packslip manifest linked to those attestations, and publishes that
+draft release without running `release-please` again. Run the workflow from
+that same tag, or the workflow guard will fail before publishing.
 
 The release is only immutable after publication, so the workflow intentionally
 uploads assets and attestations before publishing.
