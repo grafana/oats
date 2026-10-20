@@ -1,8 +1,10 @@
 # Troubleshoot a failed OATS case with gcx
 
-Use this guide when an OATS assertion fails and you need to determine whether
-the fixture, app action, query, assertion, or telemetry path caused it. This
-interactive workflow requires OATS v0.11.0 or later, which introduced
+OATS cases exercise an application and verify its behavior with assertions,
+often using telemetry queries. When an assertion fails, this guide helps you
+investigate whether the fixture, app action, query, assertion, or telemetry
+path explains the failure. The interactive workflow requires OATS v0.11.0 or
+later, which introduced
 `--pause-on-failure`, and a managed Compose fixture. It does not work in CI,
 noninteractive sessions, NDJSON output, parallel runs, or k3d/remote fixtures.
 See the [OATS releases](https://github.com/grafana/oats/releases) for an
@@ -82,14 +84,16 @@ Classify the evidence before changing anything:
   received it, and the destination stored it? State unavailable boundaries as
   unobserved; do not infer data loss from missing access.
 
-Suggested prompt:
+If you want a teammate to help investigate, share the relevant details and
+ask them to:
 
-> This OATS case failed: `<case>`. Here are the original command, assertion,
-> query, expected result, fixture details, time window, and failure output. Use
-> existing gcx skills to determine whether the fixture, app action, query,
-> assertion, or telemetry path explains the failure. Do not weaken the assertion
-> to make it pass. Ask before changing anything. If access is missing, say what
-> you could not observe rather than inferring data loss.
+> Help me understand why this OATS case failed: `<case>`. I’ll share the
+> original command, assertion, query, expected result, fixture details, time
+> window, and failure output. Please check whether the fixture, app action,
+> query, assertion, or telemetry path explains the failure. Don’t weaken the
+> assertion just to make it pass, and check with me before changing anything.
+> If you can’t access part of the system, tell me what you couldn’t observe
+> rather than guessing that data was lost.
 
 Propose the smallest repair supported by evidence and get approval before
 changing the app, Collector, fixture, query, or assertion. A passing ad hoc gcx
