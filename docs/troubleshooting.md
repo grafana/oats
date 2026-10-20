@@ -12,7 +12,7 @@ available version. OATS v0.11.0 uses gcx v1.4.0 as its default minimum; preserve
 any explicit `--gcx` or `--gcx-version` selection from the failing run.
 
 Follow the gcx-owned [diagnostic guide][diagnostics] for installation, existing
-skills, connection setup, evidence limits, and repair approval. This page covers
+skills, connection setup, evidence limits, and repair approval. This guide covers
 OATS-specific failure evidence and fixture lifecycle.
 
 ## Preserve the failed run's evidence
