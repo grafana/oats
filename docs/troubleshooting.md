@@ -84,8 +84,7 @@ Classify the evidence before changing anything:
   received it, and the destination stored it? State unavailable boundaries as
   unobserved; do not infer data loss from missing access.
 
-If you want a teammate to help investigate, share the relevant details and
-ask them to:
+Use this prompt with an agent:
 
 > Help me understand why this OATS case failed: `<case>`. I’ll share the
 > original command, assertion, query, expected result, fixture details, time
