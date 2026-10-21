@@ -14,6 +14,7 @@
   <a href="docs/cli.md">CLI</a> ·
   <a href="docs/case-reference.md">Test Case Syntax</a> ·
   <a href="docs/ci.md">CI</a> ·
+  <a href="docs/troubleshooting.md">Troubleshooting</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="UPGRADING.md">Upgrading</a>
 </p>
