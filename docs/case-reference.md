@@ -254,6 +254,24 @@ again, so leave `retry` unset for non-idempotent or otherwise unsafe
 side-effecting inputs. `retry` applies only to HTTP inputs; Compose inputs remain
 one-shot.
 
+Set `continue_after_success: true` to keep sending the request at the configured
+interval until `timeout` elapses, even after a successful response:
+
+```yaml
+input:
+  - path: /rolldice
+    retry:
+      timeout: 20s
+      interval: 1s
+      continue_after_success: true
+```
+
+At least one request must receive the expected status for the input to pass;
+later failed attempts are retried until the deadline. This intentionally repeats
+the full request and blocks subsequent inputs and telemetry assertions until the
+timeout, so use it only for safe, bounded traffic generation. If omitted or
+false, retries stop at the first successful response.
+
 A Compose input runs a service as a one-shot container in the active Compose
 project:
 

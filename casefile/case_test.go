@@ -20,6 +20,7 @@ input:
     retry:
       timeout: 10s
       interval: 250ms
+      continue_after_success: true
 expected:
   traces:
     - traceql: '{ span.http.route = "/rolldice" }'
@@ -44,7 +45,7 @@ expected:
 	if len(c.Input) != 1 || c.Input[0].Path != "/rolldice?rolls=5" {
 		t.Errorf("Input: %+v", c.Input)
 	}
-	if retry := c.Input[0].Retry; retry == nil || retry.Timeout != 10*time.Second || retry.Interval != 250*time.Millisecond {
+	if retry := c.Input[0].Retry; retry == nil || retry.Timeout != 10*time.Second || retry.Interval != 250*time.Millisecond || !retry.ContinueAfterSuccess {
 		t.Errorf("Input retry: %+v", retry)
 	}
 	if len(c.Expected.Traces) != 1 || c.Expected.Traces[0].TraceQL == "" {

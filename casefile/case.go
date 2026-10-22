@@ -199,8 +199,9 @@ type Input struct {
 // InputRetry opts an HTTP input into bounded retries. Zero values inherit the
 // runner's timeout and interval.
 type InputRetry struct {
-	Timeout  time.Duration `yaml:"timeout,omitempty"`
-	Interval time.Duration `yaml:"interval,omitempty"`
+	Timeout              time.Duration `yaml:"timeout,omitempty"`
+	Interval             time.Duration `yaml:"interval,omitempty"`
+	ContinueAfterSuccess bool          `yaml:"continue_after_success,omitempty"`
 }
 
 // ComposeInput runs a service as a one-shot Compose command. Command is passed

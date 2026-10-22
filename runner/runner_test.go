@@ -21,6 +21,7 @@ import (
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/engine"
 	"github.com/grafana/oats/report"
+	"github.com/onsi/gomega"
 )
 
 // stubExec is a deterministic Executor that returns the configured output
@@ -1118,6 +1119,148 @@ func TestDoInputRetryExhausted(t *testing.T) {
 	}
 	if got := hits.Load(); got < 2 {
 		t.Fatalf("request count = %d, want at least 2", got)
+	}
+}
+
+func TestDoInputRetryContinuesAfterSuccessUntilTimeout(t *testing.T) {
+	g := gomega.NewWithT(t)
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{Timeout: time.Second, Interval: 10 * time.Millisecond})
+	setInputEndpoint(t, r, server.URL)
+	err := r.doInput(context.Background(), casefile.Input{
+		Path:  "/rolldice",
+		Retry: &casefile.InputRetry{Timeout: 250 * time.Millisecond, Interval: 10 * time.Millisecond, ContinueAfterSuccess: true},
+	})
+	g.Expect(err).To(gomega.Succeed())
+	g.Expect(hits.Load()).To(gomega.BeNumerically(">", 1))
+}
+
+func TestDoInputRetryContinueAfterSuccessRequiresSuccessfulResponse(t *testing.T) {
+	g := gomega.NewWithT(t)
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{Timeout: time.Second, Interval: 10 * time.Millisecond})
+	setInputEndpoint(t, r, server.URL)
+	err := r.doInput(context.Background(), casefile.Input{
+		Path:  "/rolldice",
+		Retry: &casefile.InputRetry{Timeout: 200 * time.Millisecond, Interval: 10 * time.Millisecond, ContinueAfterSuccess: true},
+	})
+	g.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("retry exhausted")))
+	g.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("got: 503")))
+	g.Expect(hits.Load()).To(gomega.BeNumerically(">", 1))
+}
+
+func TestDoInputRetryContinueAfterSuccessReturnsSuccessAfterMixedResponses(t *testing.T) {
+	g := gomega.NewWithT(t)
+	var hits atomic.Int32
+	var failures atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if hits.Add(1) == 1 {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		failures.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{Timeout: time.Second, Interval: 10 * time.Millisecond})
+	setInputEndpoint(t, r, server.URL)
+	err := r.doInput(context.Background(), casefile.Input{
+		Path:  "/rolldice",
+		Retry: &casefile.InputRetry{Timeout: 200 * time.Millisecond, Interval: 10 * time.Millisecond, ContinueAfterSuccess: true},
+	})
+	g.Expect(err).To(gomega.Succeed())
+	g.Expect(hits.Load()).To(gomega.BeNumerically(">", 1))
+	g.Expect(failures.Load()).To(gomega.BeNumerically(">", 0))
+}
+
+func TestDoInputRetryContinueAfterSuccessCancellationFailsInFlight(t *testing.T) {
+	g := gomega.NewWithT(t)
+	var hits atomic.Int32
+	inFlight := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch hits.Add(1) {
+		case 1:
+			w.WriteHeader(http.StatusOK)
+		case 2:
+			close(inFlight)
+			<-r.Context().Done()
+		}
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{Timeout: time.Second, Interval: time.Millisecond})
+	setInputEndpoint(t, r, server.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		result <- r.doInput(ctx, casefile.Input{
+			Path:  "/rolldice",
+			Retry: &casefile.InputRetry{Timeout: time.Second, Interval: time.Millisecond, ContinueAfterSuccess: true},
+		})
+	}()
+	select {
+	case <-inFlight:
+	case <-time.After(time.Second):
+		t.Fatal("second request did not start")
+	}
+	cancel()
+	select {
+	case err := <-result:
+		g.Expect(err).To(gomega.MatchError(context.Canceled))
+	case <-time.After(time.Second):
+		t.Fatal("input did not stop after context cancellation")
+	}
+}
+
+func TestDoInputRetryContinueAfterSuccessCancelsInFlightRequestAtDeadline(t *testing.T) {
+	g := gomega.NewWithT(t)
+	started := make(chan struct{})
+	requestCanceled := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+		close(requestCanceled)
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{Timeout: time.Second, Interval: time.Millisecond})
+	setInputEndpoint(t, r, server.URL)
+	result := make(chan error, 1)
+	go func() {
+		result <- r.doInput(context.Background(), casefile.Input{
+			Path:  "/rolldice",
+			Retry: &casefile.InputRetry{Timeout: 200 * time.Millisecond, Interval: time.Millisecond, ContinueAfterSuccess: true},
+		})
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("request did not start")
+	}
+	select {
+	case <-requestCanceled:
+	case <-time.After(time.Second):
+		t.Fatal("request was not canceled at the retry deadline")
+	}
+	select {
+	case err := <-result:
+		g.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("retry exhausted")))
+	case <-time.After(time.Second):
+		t.Fatal("input did not return after retry deadline")
 	}
 }
 
