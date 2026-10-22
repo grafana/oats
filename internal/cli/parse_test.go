@@ -155,6 +155,89 @@ func TestUsageVerbosityEnvironment(t *testing.T) {
 	}
 }
 
+func TestUsageRejectsAttachedVerbosityCountValues(t *testing.T) {
+	for _, args := range [][]string{
+		{"--verbose=3"},
+		{"run", "--verbose=3"},
+		{"run", "cases/one", "--verbose=3"},
+		{"--verbose="},
+		{"--verbose=0"},
+		{"--verbose=invalid"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			if _, err := parseCommand(args); err == nil || !strings.Contains(err.Error(), "does not accept an attached value") {
+				t.Fatalf("expected clear attached-count error, got %v", err)
+			}
+		})
+	}
+	for _, args := range [][]string{{"-v=3"}, {"-vv=3"}} {
+		if _, err := parseCommand(args); err == nil {
+			t.Fatalf("short attached count must be rejected: %v", args)
+		}
+	}
+
+	t.Setenv("OATS_VERBOSE", "3")
+	fromEnv, err := parseCommand(nil)
+	if err != nil {
+		t.Fatalf("environment count: %v", err)
+	}
+	if fromEnv.Verbose != 3 {
+		t.Fatalf("environment count: verbosity=%d", fromEnv.Verbose)
+	}
+	fromCLI, err := parseCommand([]string{"run", "-v"})
+	if err != nil {
+		t.Fatalf("CLI count should replace the environment: %v", err)
+	}
+	if fromCLI.Verbose != 1 {
+		t.Fatalf("CLI count should replace the environment: verbosity=%d", fromCLI.Verbose)
+	}
+	repeated, err := parseCommand([]string{"-vvv"})
+	if err != nil {
+		t.Fatalf("repeated CLI count: %v", err)
+	}
+	if repeated.Verbose != 3 {
+		t.Fatalf("repeated CLI count: verbosity=%d", repeated.Verbose)
+	}
+
+	t.Setenv("OATS_VERBOSE", "0")
+	literal, err := parseCommand([]string{"--config=--verbose=3"})
+	if err != nil {
+		t.Fatalf("literal flag value: %v", err)
+	}
+	if literal.Run == nil || literal.Run.Config != "--verbose=3" || literal.Verbose != 0 {
+		t.Fatalf("literal flag value: cli=%+v", literal)
+	}
+	path, err := parseCommand([]string{"run", "--", "--verbose=3"})
+	if err != nil {
+		t.Fatalf("literal path after separator: %v", err)
+	}
+	if path.Run == nil || !reflect.DeepEqual(path.Run.Paths, []string{"--verbose=3"}) || path.Verbose != 0 {
+		t.Fatalf("literal path after separator: cli=%+v", path)
+	}
+	if _, err := parseCommand([]string{"--config", "--verbose=3"}); err == nil || strings.Contains(err.Error(), "does not accept an attached value") {
+		t.Fatalf("an option operand must not be diagnosed as an attached verbose count: %v", err)
+	}
+}
+
+func TestAttachedVerbosityDoesNotInterceptHelpOrCompletion(t *testing.T) {
+	var out bytes.Buffer
+	var exit int
+	if err := execute([]string{"--verbose=3", "--help"}, &exit, &out); err != nil {
+		t.Fatalf("help request: %v", err)
+	}
+	if !strings.Contains(out.String(), "Usage:") {
+		t.Fatalf("help output missing Usage header: %q", out.String())
+	}
+
+	out.Reset()
+	if err := execute([]string{"completion", "bash"}, &exit, &out); err != nil {
+		t.Fatalf("completion request: %v", err)
+	}
+	if !strings.Contains(out.String(), "complete -F") {
+		t.Fatalf("completion output missing bash completion function: %q", out.String()[:min(out.Len(), 200)])
+	}
+}
+
 func TestUsageRejectsInvalidArguments(t *testing.T) {
 	for _, args := range [][]string{
 		{"--unknown"}, {"--timeout"}, {"--timeout", "invalid"},

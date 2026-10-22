@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/jdx/usage/go/argv"
 
@@ -28,10 +29,29 @@ func parseCommand(args []string) (*usagespec.Cli, error) {
 	if err != nil {
 		return nil, err
 	}
+	if hasAttachedVerboseValue(args) {
+		return nil, fmt.Errorf("the --verbose count flag does not accept an attached value; use repeated -v flags or OATS_VERBOSE")
+	}
 	if cli.Run != nil {
 		cli.Verbose, err = verbosityFromEnv(cli.Verbose)
 	}
 	return cli, err
+}
+
+// hasAttachedVerboseValue rejects count assignments the Usage runtime silently
+// treats as a single occurrence. Parse runs first, so any matching token before
+// `--` is a flag rather than an option operand; the generated Usage parser
+// remains the source of truth for command parsing.
+func hasAttachedVerboseValue(args []string) bool {
+	for _, arg := range args {
+		if arg == "--" {
+			return false
+		}
+		if strings.HasPrefix(arg, "--verbose=") {
+			return true
+		}
+	}
+	return false
 }
 
 func execute(args []string, exit *int, out io.Writer) error {

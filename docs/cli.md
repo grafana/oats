@@ -244,9 +244,11 @@ mean true without consuming a following path; explicit CLI boolean values are
 
 Verbosity uses repeated flags (`-v`, `-vv`, `-vvv`) or a non-negative decimal
 `OATS_VERBOSE` value. A CLI count replaces the environment value. Explicit
-Cobra count assignments such as `--verbose=3` are not supported; the pinned
-upstream parser currently accepts but ignores their values, an outstanding
-pre-release limitation.
+Cobra-style count assignments such as `--verbose=3` and `-vv=3` are rejected;
+use repeated `-v` flags instead. The pinned upstream parser accepts attached
+count values but treats them as one occurrence, so OATS rejects that syntax
+until Usage defines shared behavior. Numeric environment count semantics remain
+an upstream discussion and temporary OATS adapter.
 
 Empty optional `--config`, `--gcx`, `--lgtm-version`, `--gcx-download`, and
 `--cache-dir` values clear the corresponding environment override and use

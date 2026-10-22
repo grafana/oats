@@ -40,7 +40,9 @@ rendering, help-topic routing, and typed generated fields are used directly.
 
 - Settle [shared count-env semantics](https://github.com/jdx/usage/discussions/1438).
   OATS temporarily converts only `OATS_VERBOSE`; CLI counts take precedence.
-  Also resolve attached count values before releasing the migration.
+  OATS rejects attached count assignments because the pinned parser silently
+  treats them as one occurrence. Keep that guard until Usage defines the shared
+  behavior; regenerate and rerun contract tests before releasing the migration.
 - Regenerate, rerun contract tests, and review intentional syntax changes before
   moving the OATS PR out of draft.
 
@@ -60,7 +62,8 @@ Help and parser-error wording change, and users must regenerate completion
 scripts. Native Usage grammar replaces Cobra-specific boolean/count spellings;
 see [the CLI reference](../cli.md) for the intentional differences. Runtime-
 dependent defaults remain in Go. The OATS_VERBOSE fallback remains temporary
-while shared count-env semantics are discussed upstream.
+while shared count-env semantics are discussed upstream. Attached count
+assignments are rejected by OATS until the upstream behavior is agreed.
 
 Default-command routing uses Usage's `default_subcommand_on_empty` opt-in for
 empty and global-only invocations, adopted from upstream
