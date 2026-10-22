@@ -1161,6 +1161,29 @@ func TestDoInputRetryContinueAfterSuccessRequiresSuccessfulResponse(t *testing.T
 	g.Expect(hits.Load()).To(gomega.BeNumerically(">", 1))
 }
 
+func TestDoInputRetryContinueAfterSuccessPreservesStatusWhenBodyDrainTimesOut(t *testing.T) {
+	g := gomega.NewWithT(t)
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{Timeout: time.Second, Interval: time.Millisecond})
+	setInputEndpoint(t, r, server.URL)
+	err := r.doInput(context.Background(), casefile.Input{
+		Path:   "/rolldice",
+		Status: "200",
+		Retry:  &casefile.InputRetry{Timeout: 200 * time.Millisecond, Interval: 10 * time.Millisecond, ContinueAfterSuccess: true},
+	})
+	g.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("retry exhausted")))
+	g.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("got: 503")))
+	g.Expect(hits.Load()).To(gomega.Equal(int32(1)))
+}
+
 func TestDoInputRetryContinueAfterSuccessReturnsSuccessAfterMixedResponses(t *testing.T) {
 	g := gomega.NewWithT(t)
 	var hits atomic.Int32

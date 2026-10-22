@@ -209,9 +209,10 @@ func (r *Runner) RunCase(ctx context.Context, c *casefile.Case) bool {
 		}
 	}
 
-	// Seed and drive inputs exactly once. Assertions poll only the observability
-	// backend; repeating side-effecting inputs during each poll makes counts
-	// nondeterministic and is especially surprising for one-shot commands.
+	// Seed the case and drive its inputs before asserting. HTTP inputs may repeat
+	// according to their retry policy; assertion retries only query the backend.
+	// Input retries are opt-in because repeating side-effecting requests can be
+	// surprising, especially for one-shot commands.
 	if err := r.seedCase(ctx, c); err != nil {
 		r.failCase(c, "seed: "+err.Error(), "")
 		r.reporter.Emit(report.Event{
@@ -528,7 +529,7 @@ func (r *Runner) doInput(ctx context.Context, in casefile.Input) error {
 // doInputUntilDeadline keeps sending an HTTP input until its retry deadline.
 // Unlike the default retry behavior, successful responses do not stop polling.
 func (r *Runner) doInputUntilDeadline(ctx context.Context, url, method string, headers map[string]string, body string, status int, deadline time.Time, interval time.Duration) error {
-	lastErr := context.DeadlineExceeded
+	var lastErr error
 	succeeded := false
 	attempts := 0
 	for {
@@ -546,9 +547,9 @@ func (r *Runner) doInputUntilDeadline(ctx context.Context, url, method string, h
 		if err == nil {
 			succeeded = true
 		} else {
-			// Keep the last meaningful request error if the final attempt only
-			// failed because its deadline expired.
-			if attemptErr == nil {
+			// Preserve the first meaningful request error even if draining the
+			// response body only completes when the attempt deadline expires.
+			if attemptErr == nil || lastErr == nil {
 				lastErr = err
 			}
 		}
@@ -576,6 +577,9 @@ func (r *Runner) doInputUntilDeadline(ctx context.Context, url, method string, h
 	}
 	if succeeded {
 		return nil
+	}
+	if lastErr == nil {
+		lastErr = context.DeadlineExceeded
 	}
 	return fmt.Errorf("retry exhausted after %d attempts: %w", attempts, lastErr)
 }

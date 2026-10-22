@@ -181,7 +181,8 @@ type SeedMetric struct {
 	Value   int64  `yaml:"value"`
 }
 
-// Input drives the application under test once, before assertions begin.
+// Input drives the application under test before assertions begin. HTTP inputs
+// run once unless their retry options opt into repeated requests.
 // HTTP inputs keep the request shape from the legacy format (schema version 2);
 // Compose inputs run a one-shot command in a service from the case's fixture.
 type Input struct {
