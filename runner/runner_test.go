@@ -1226,6 +1226,63 @@ func TestDoInputRetryContinueAfterSuccessCancellationFailsInFlight(t *testing.T)
 	}
 }
 
+func TestDoInputRetryContinueAfterSuccessStopsWhenAlreadyCanceled(t *testing.T) {
+	g := gomega.NewWithT(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{Timeout: time.Second, Interval: time.Millisecond})
+	setInputEndpoint(t, r, server.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := r.doInput(ctx, casefile.Input{
+		Path:  "/rolldice",
+		Retry: &casefile.InputRetry{Timeout: time.Second, Interval: time.Millisecond, ContinueAfterSuccess: true},
+	})
+	g.Expect(err).To(gomega.MatchError(context.Canceled))
+}
+
+func TestDoInputRetryContinueAfterSuccessCancellationDuringInterval(t *testing.T) {
+	g := gomega.NewWithT(t)
+	firstRequest := make(chan struct{}, 1)
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+		firstRequest <- struct{}{}
+	}))
+	defer server.Close()
+
+	r, _ := newRunner(t, &stubExec{}, Options{Timeout: time.Second, Interval: time.Second})
+	setInputEndpoint(t, r, server.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		result <- r.doInput(ctx, casefile.Input{
+			Path:  "/rolldice",
+			Retry: &casefile.InputRetry{Timeout: 2 * time.Second, Interval: time.Second, ContinueAfterSuccess: true},
+		})
+	}()
+	select {
+	case <-firstRequest:
+	case <-time.After(time.Second):
+		t.Fatal("first request did not complete")
+	}
+	// Let doInput enter its interval wait before cancellation.
+	time.Sleep(25 * time.Millisecond)
+	cancel()
+	select {
+	case err := <-result:
+		g.Expect(err).To(gomega.MatchError(context.Canceled))
+	case <-time.After(time.Second):
+		t.Fatal("input did not stop after cancellation during interval")
+	}
+	g.Expect(hits.Load()).To(gomega.Equal(int32(1)))
+}
+
 func TestDoInputRetryContinueAfterSuccessCancelsInFlightRequestAtDeadline(t *testing.T) {
 	g := gomega.NewWithT(t)
 	started := make(chan struct{})
