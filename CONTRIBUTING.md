@@ -139,20 +139,10 @@ fixture safety gate allows it.
 
 ## CLI generation
 
-The CLI source of truth is `internal/cli/usagespec/oats.usage.kdl`. Run
-`mise run generate-cli` after editing it and commit the generated Go tables.
-`mise run check-cli` verifies that the tables are reproducible. Normal Go builds
-use the checked-in tables and do not need the Usage executable.
+Edit `internal/cli/usagespec/oats.usage.kdl` to change the CLI definition. Then
+run `mise run generate-cli` and commit the generated Go tables;
+`mise run check-cli` verifies they are reproducible. The generated tables are
+checked in, so normal Go builds do not need the Usage executable.
 
-Usage Go is a development preview. Keep the generator pin in `mise.toml` and
-its matching Go runtime commit in `go.mod` together when upgrading, and rerun
-the CLI contract tests (implicit run, flags, environment precedence, errors,
-and exit codes). Review runtime changes as well as generated diffs: identical
-tables do not imply identical behavior with a new runtime. OATS calls the
-generated `Parse` function and uses its typed result directly in application options;
-there is no Cobra/pflag compatibility layer. Optional config/GCX/LGTM overrides
-have no spec defaults; application defaults are applied after parsing.
-
-The experiment remains draft pending the upstream work tracked in
-[ADR 0005](docs/adr/0005-usage-and-packslip.md). Keep temporary adapters linked
-to their upstream replacement rather than expanding them.
+For the design, upgrade considerations, and known limitations, see
+[ADR 0005](docs/adr/0005-usage-and-packslip.md).

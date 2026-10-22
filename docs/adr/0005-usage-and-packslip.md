@@ -50,7 +50,9 @@ rendering, help-topic routing, and typed generated fields are used directly.
   behavior. These compatibility constraints and their tests remain in place
   while upstream behavior is unsettled; they are nonblocking follow-up work, not
   merge gates. When upgrading Usage, regenerate, rerun contract tests, and
-  review intentional syntax changes.
+  review intentional syntax changes. Review runtime changes as well as
+  generated diffs: identical tables do not guarantee identical behavior. Keep
+  temporary adapters tied to the upstream behavior that will replace them.
 
 Packslip publication and the skill do not depend on these parser fixes.
 
