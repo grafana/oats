@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed experiment; draft integration, not ready to merge or release.
+Accepted. Release remains on hold until explicitly authorized.
 
 ## Context
 
@@ -30,6 +30,11 @@ same release commit, check reproducibility in CI, and test OATS' documented
 contract rather than every incidental Cobra spelling. No KDL parser or Usage
 executable is required at runtime.
 
+OATS intentionally adopts Usage Go early to exercise it in real-world
+acceptance testing and provide actionable feedback upstream. This decision
+accepts its current maturity and documented limitations rather than waiting for
+stabilization.
+
 ## Upstream adoption and remaining work
 
 The merged Usage work in [#1437](https://github.com/jdx/usage/pull/1437),
@@ -38,13 +43,14 @@ The merged Usage work in [#1437](https://github.com/jdx/usage/pull/1437),
 [#1441](https://github.com/jdx/usage/pull/1441) is adopted. Native request
 rendering, help-topic routing, and typed generated fields are used directly.
 
-- Settle [shared count-env semantics](https://github.com/jdx/usage/discussions/1438).
+- Continue the upstream discussion of [shared count-env semantics](https://github.com/jdx/usage/discussions/1438).
   OATS temporarily converts only `OATS_VERBOSE`; CLI counts take precedence.
   OATS rejects attached count assignments because the pinned parser silently
   treats them as one occurrence. Keep that guard until Usage defines the shared
-  behavior; regenerate and rerun contract tests before releasing the migration.
-- Regenerate, rerun contract tests, and review intentional syntax changes before
-  moving the OATS PR out of draft.
+  behavior. These compatibility constraints and their tests remain in place
+  while upstream behavior is unsettled; they are nonblocking follow-up work, not
+  merge gates. When upgrading Usage, regenerate, rerun contract tests, and
+  review intentional syntax changes.
 
 Packslip publication and the skill do not depend on these parser fixes.
 
