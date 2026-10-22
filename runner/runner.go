@@ -536,7 +536,7 @@ func (r *Runner) doInputUntilDeadline(ctx context.Context, url, method string, h
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("retry stopped after %d attempts: %w", attempts, err)
 		}
-		if attempts > 0 && !time.Now().Before(deadline) {
+		if attempts > 0 && time.Until(deadline) <= 0 {
 			break
 		}
 		attempts++
