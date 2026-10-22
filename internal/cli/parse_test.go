@@ -29,6 +29,26 @@ func TestUsageRunContract(t *testing.T) {
 	}
 }
 
+func TestBuildMinimumGCXVersionAppearsInHelp(t *testing.T) {
+	old := MinimumGCXVersion
+	MinimumGCXVersion = "9.8.7"
+	t.Cleanup(func() { MinimumGCXVersion = old })
+	for _, args := range [][]string{{"run", "--help"}, {"help", "run"}} {
+		var out bytes.Buffer
+		if err := execute(args, new(int), &out); err != nil {
+			t.Fatalf("execute(%v): %v", args, err)
+		}
+		if !strings.Contains(out.String(), "9.8.7") {
+			t.Errorf("help %v did not contain build minimum: %s", args, out.String())
+		}
+	}
+	for _, entry := range usagespec.HelpText {
+		if entry.Key == usagespec.FlagRunGcxVersion && strings.Contains(entry.Short, "9.8.7") {
+			t.Fatal("build-aware help mutated generated help table")
+		}
+	}
+}
+
 func TestUsageInheritedVerbosityAndAttachedNegativeDuration(t *testing.T) {
 	line, err := parseCommand([]string{"-v", "run", "--timeout=-1s", "-vv"})
 	if err != nil {

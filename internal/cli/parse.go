@@ -24,6 +24,23 @@ func Run() int {
 	return exit
 }
 
+// helpText returns a private copy so build-aware help never mutates generated
+// parser metadata shared by concurrent CLI invocations.
+func helpText() argv.HelpTable {
+	text := append(argv.HelpTable(nil), usagespec.HelpText...)
+	if MinimumGCXVersion == "" {
+		return text
+	}
+	for i := range text {
+		if text[i].Key == usagespec.FlagRunGcxVersion {
+			text[i].Short = fmt.Sprintf("download and use this gcx release (minimum supported by this build: %s)", MinimumGCXVersion)
+			text[i].Long = text[i].Short
+			break
+		}
+	}
+	return text
+}
+
 func parseCommand(args []string) (*usagespec.Cli, error) {
 	cli, err := usagespec.Parse(args)
 	if err != nil {
@@ -55,7 +72,8 @@ func hasAttachedVerboseValue(args []string) bool {
 }
 
 func execute(args []string, exit *int, out io.Writer) error {
-	if response, ok := argv.Respond(args, usagespec.Root, usagespec.HelpText, usagespec.Meta); ok {
+	help := helpText()
+	if response, ok := argv.Respond(args, usagespec.Root, help, usagespec.Meta); ok {
 		_, err := io.WriteString(out, response)
 		return err
 	}
@@ -63,7 +81,7 @@ func execute(args []string, exit *int, out io.Writer) error {
 	if e, ok := err.(*argv.Error); ok {
 		meta := usagespec.HelpMeta
 		meta.Version = Version
-		if response, handled := argv.RenderRequest(e, meta, usagespec.Root, args, usagespec.HelpText); handled {
+		if response, handled := argv.RenderRequest(e, meta, usagespec.Root, args, help); handled {
 			_, err := io.WriteString(out, response)
 			return err
 		}
@@ -73,17 +91,17 @@ func execute(args []string, exit *int, out io.Writer) error {
 	}
 	switch {
 	case line.Run != nil:
-		return runAction(line.Run, line.Verbose, exit)
+		return runAction(line.Run, line.Verbose, exit, out)
 	case line.List != nil:
-		return listAction(line.List.Config)
+		return listAction(line.List.Config, out)
 	case line.Migrate != nil:
-		return migrateAction(line.Migrate.Path)
+		return migrateAction(line.Migrate.Path, out)
 	case line.Cache != nil:
 		if line.Cache.Clear == nil {
 			position := argv.Walk(usagespec.Root, args)
 			meta := usagespec.HelpMeta
 			meta.Version = Version
-			response, _ := argv.RenderRequest(&argv.Error{Code: argv.CodeHelp, Cmd: position.Cmd, Long: true}, meta, usagespec.Root, args, usagespec.HelpText)
+			response, _ := argv.RenderRequest(&argv.Error{Code: argv.CodeHelp, Cmd: position.Cmd, Long: true}, meta, usagespec.Root, args, help)
 			_, err := io.WriteString(out, response)
 			return err
 		}

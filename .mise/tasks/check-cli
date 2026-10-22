@@ -22,8 +22,11 @@ trap 'rm -f "$output" "$relative_dir/generated.go"; rmdir "$relative_dir"' EXIT
 diff -u "$root/internal/cli/usagespec/tables.go" "$relative_dir/generated.go"
 
 # Exercise the package's default output through the go:generate directive.
+# Compare with the working tree, not the index: callers may have correctly
+# regenerated tables.go without staging it yet.
+cp "$root/internal/cli/usagespec/tables.go" "$output"
 (
 	cd "$root"
 	go generate ./internal/cli/usagespec
 )
-git -C "$root" diff --exit-code -- internal/cli/usagespec/tables.go
+diff -u "$output" "$root/internal/cli/usagespec/tables.go"

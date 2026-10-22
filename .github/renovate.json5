@@ -13,6 +13,13 @@
   ignorePresets: [":ignoreModulesAndTests"],
   packageRules: [
     {
+      description: "Group the Usage CLI generator and Go library updates",
+      matchManagers: ["mise", "gomod"],
+      matchPackageNames: ["jdx/usage", "github.com/jdx/usage/go"],
+      groupName: "Usage generator and runtime",
+      automerge: false,
+    },
+    {
       description: "Release OATs when the bundled gcx version changes",
       matchDatasources: ["github-tags"],
       matchPackageNames: ["grafana/gcx"],

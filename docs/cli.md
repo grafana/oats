@@ -172,8 +172,9 @@ Flags:
 | `--lgtm-version`            | `OATS_LGTM_VERSION`               | `latest`                                                           | `docker.io/grafana/otel-lgtm` version used by the builtin Compose fixture                  |
 | `--container-runtime`       | `OATS_CONTAINER_RUNTIME`          | `auto`                                                             | Compose engine: prefer Podman, or explicitly use `docker` / `podman`                       |
 | `--app-host` / `--app-port` | `OATS_APP_HOST` / `OATS_APP_PORT` | `localhost` / `8080`                                               | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself     |
-| `--otlp-http`               | `OATS_OTLP_HTTP`                  | `http://localhost:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                              |
+| `--otlp-http`               | `OATS_OTLP_HTTP`                  | `http://127.0.0.1:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                              |
 | `--verbose`                 | `OATS_VERBOSE`                    | `0`                                                                | increase verbosity (`1`–`3` are the useful levels)                                         |
+| `-V`, `--version`           | —                                 | —                                                                  | print the oats version and exit                                                            |
 
 The deprecated hidden aliases `--list` and `--migrate` also accept
 `OATS_LIST` and `OATS_MIGRATE`. `oats list --config` uses `OATS_CONFIG`, and

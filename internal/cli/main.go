@@ -79,7 +79,7 @@ func Main() {
 	os.Exit(Run())
 }
 
-func listAction(config string) error {
+func listAction(config string, out io.Writer) error {
 	configPath, err := resolveConfigPath(config)
 	if err != nil {
 		return err
@@ -92,11 +92,11 @@ func listAction(config string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Print(discovery.Summary(plans))
-	return nil
+	_, err = fmt.Fprint(out, discovery.Summary(plans))
+	return err
 }
 
-func migrateAction(path string) error {
+func migrateAction(path string, out io.Writer) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return err
@@ -116,28 +116,28 @@ func migrateAction(path string) error {
 		return nil
 	}
 
-	out, warnings, err := migrate.ConvertFile(path)
+	content, warnings, err := migrate.ConvertFile(path)
 	if err != nil {
 		return err
 	}
 	for _, w := range warnings {
 		fmt.Fprintln(os.Stderr, "migrate warning:", w)
 	}
-	fmt.Print(string(out))
-	return nil
+	_, err = fmt.Fprint(out, string(content))
+	return err
 }
 
 // runAction is the shared implementation behind the implicit-run root and the
 // explicit `run` subcommand. Positional args normally scope which cases run.
 // When config discovery from cwd fails, a single positional arg instead selects
 // the config (with oats-config.yaml inferred when the arg is a directory).
-func runAction(cli *usagespec.RunCmd, verbose int, exit *int) error {
+func runAction(cli *usagespec.RunCmd, verbose int, exit *int, out io.Writer) error {
 	// Honor the deprecated --list / --migrate flags.
 	if cli.List {
-		return listAction(cli.Config)
+		return listAction(cli.Config, out)
 	}
 	if cli.Migrate != "" {
-		return migrateAction(cli.Migrate)
+		return migrateAction(cli.Migrate, out)
 	}
 
 	configPath, pathArgs, err := resolveRunConfigPath(cli.Config, cli.Paths)
@@ -171,7 +171,7 @@ func runAction(cli *usagespec.RunCmd, verbose int, exit *int) error {
 		return err
 	}
 
-	rep := newReporter(os.Stdout, cli.Format, verbosityFromInt(verbose))
+	rep := newReporter(out, cli.Format, verbosityFromInt(verbose))
 	defer func() { _ = rep.Close() }()
 	// Parallel fixture groups share one reporter. Serialize Emit/Close so text
 	// lines and ndjson records are written one event at a time.
@@ -239,7 +239,7 @@ func runAction(cli *usagespec.RunCmd, verbose int, exit *int) error {
 	return nil
 }
 
-func newReporter(w *os.File, format string, v report.Verbosity) report.Reporter {
+func newReporter(w io.Writer, format string, v report.Verbosity) report.Reporter {
 	switch strings.ToLower(format) {
 	case "ndjson", "json":
 		return report.NewNDJSONReporter(w, v)
@@ -603,6 +603,9 @@ func validatePauseOnFailure(cli *usagespec.RunCmd, plans []discovery.Plan, inter
 	return nil
 }
 
+// withLGTMVersion applies the legacy CLI override to the builtin LGTM Compose
+// fixture without mutating the discovered plan. A full LGTM_IMAGE reference
+// supplied by the environment or the case's fixture config takes precedence.
 func withLGTMVersion(plan discovery.Plan, version string) discovery.Plan {
 	compose := plan.Fixture.Compose
 	if version == "" || compose == nil || compose.EffectiveTemplate() != "lgtm" || hasLGTMImageOverride(compose.Env) {

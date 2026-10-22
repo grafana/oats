@@ -20,6 +20,7 @@ import (
 	"github.com/grafana/oats/internal/cli/usagespec"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
+	"github.com/grafana/oats/testhelpers"
 )
 
 func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
@@ -35,6 +36,32 @@ func TestRootAndRunCommandsRegisterTheSameRunFlags(t *testing.T) {
 		t.Fatalf("implicit/explicit run defaults differ: %#v, %#v", root.Run, run.Run)
 	}
 }
+
+func TestDefaultOTLPHTTPMatchesFixtureEndpoint(t *testing.T) {
+	old, had := os.LookupEnv("OATS_OTLP_HTTP")
+	if err := os.Unsetenv("OATS_OTLP_HTTP"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if had {
+			_ = os.Setenv("OATS_OTLP_HTTP", old)
+		} else {
+			_ = os.Unsetenv("OATS_OTLP_HTTP")
+		}
+	})
+	cli, err := parseCommand(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf("http://%s:%d", testhelpers.LocalhostIPv4, testhelpers.OTLPHTTPPort)
+	if cli.Run.OtlpHttp != want {
+		t.Fatalf("default --otlp-http = %q, want %q", cli.Run.OtlpHttp, want)
+	}
+}
+
+type failingCLIWriter struct{}
+
+func (failingCLIWriter) Write([]byte) (int, error) { return 0, fmt.Errorf("writer failed") }
 
 func TestPauseOnFailurePrintsRedactedCoordinatesAndResumes(t *testing.T) {
 	var output bytes.Buffer
@@ -511,8 +538,15 @@ expected:
 `)
 
 	listArgs := []string{"list", "--config", config}
-	if err := execute(listArgs, new(int), io.Discard); err != nil {
+	var listOutput bytes.Buffer
+	if err := execute(listArgs, new(int), &listOutput); err != nil {
 		t.Fatalf("list command: %v", err)
+	}
+	if !strings.Contains(listOutput.String(), "smoke") {
+		t.Fatalf("list output was not routed to supplied writer: %q", listOutput.String())
+	}
+	if err := execute(listArgs, new(int), failingCLIWriter{}); err == nil || !strings.Contains(err.Error(), "writer failed") {
+		t.Fatalf("list writer error = %v, want propagated writer failure", err)
 	}
 
 	legacy := filepath.Join(dir, "legacy.oats.yaml")
@@ -522,8 +556,12 @@ expected:
     - script: true
 `)
 	migrateArgs := []string{"migrate", legacy}
-	if err := execute(migrateArgs, new(int), io.Discard); err != nil {
+	var migrateOutput bytes.Buffer
+	if err := execute(migrateArgs, new(int), &migrateOutput); err != nil {
 		t.Fatalf("migrate file command: %v", err)
+	}
+	if !strings.Contains(migrateOutput.String(), "expected:") {
+		t.Fatalf("migrate output was not routed to supplied writer: %q", migrateOutput.String())
 	}
 
 	migrateDir := filepath.Join(dir, "legacy-tree")
@@ -551,6 +589,36 @@ expected:
 	cacheArgs := []string{"cache", "clear", "--cache-dir", cacheDir}
 	if err := execute(cacheArgs, new(int), io.Discard); err != nil {
 		t.Fatalf("cache clear command: %v", err)
+	}
+}
+
+func TestExecuteRoutesRunOutputToSuppliedWriter(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake-gcx is a POSIX shell script")
+	}
+	dir := t.TempDir()
+	config := filepath.Join(dir, "oats-config.yaml")
+	writeFile(t, dir, "oats-config.yaml", `meta:
+  version: 3
+cases: ["case.yaml"]
+`)
+	writeFile(t, dir, "case.yaml", `name: routed output
+fixture:
+  remote:
+    endpoint: http://127.0.0.1:4318
+expected:
+  traces:
+    - traceql: '{}'
+      match_spans:
+        - name: seed-operation
+`)
+	var output bytes.Buffer
+	args := []string{"--config", config, "--gcx", fakeGCXPath(t), "--timeout", "100ms", "--interval", "10ms", "--no-cache"}
+	if err := execute(args, new(int), &output); err != nil {
+		t.Fatalf("execute run: %v", err)
+	}
+	if !strings.Contains(output.String(), "PASS 1/1") {
+		t.Fatalf("run output was not routed to supplied writer: %q", output.String())
 	}
 }
 
