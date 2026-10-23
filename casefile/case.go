@@ -181,7 +181,8 @@ type SeedMetric struct {
 	Value   int64  `yaml:"value"`
 }
 
-// Input drives the application under test once, before assertions begin.
+// Input drives the application under test before assertions begin. HTTP inputs
+// run once unless their retry options opt into repeated requests.
 // HTTP inputs keep the request shape from the legacy format (schema version 2);
 // Compose inputs run a one-shot command in a service from the case's fixture.
 type Input struct {
@@ -199,8 +200,9 @@ type Input struct {
 // InputRetry opts an HTTP input into bounded retries. Zero values inherit the
 // runner's timeout and interval.
 type InputRetry struct {
-	Timeout  time.Duration `yaml:"timeout,omitempty"`
-	Interval time.Duration `yaml:"interval,omitempty"`
+	Timeout              time.Duration `yaml:"timeout,omitempty"`
+	Interval             time.Duration `yaml:"interval,omitempty"`
+	ContinueAfterSuccess bool          `yaml:"continue_after_success,omitempty"`
 }
 
 // ComposeInput runs a service as a one-shot Compose command. Command is passed

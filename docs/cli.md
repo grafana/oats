@@ -113,7 +113,8 @@ without credentials, and waits for Enter or Ctrl-C before performing normal
 cleanup. This mode requires text output and an interactive terminal; it is not
 available for remote, k3d, parallel, or NDJSON runs. The run still exits
 non-zero after cleanup. Use the retained context for read-only gcx diagnosis;
-do not share the config contents.
+do not share the config contents. See the [failed-case troubleshooting
+guide](troubleshooting.md) for preserving evidence, diagnosis, and cleanup.
 
 Every flag has an environment-variable equivalent: uppercase the flag name,
 replace hyphens with underscores, and prefix it with `OATS_`. Command-line

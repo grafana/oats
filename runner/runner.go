@@ -209,9 +209,10 @@ func (r *Runner) RunCase(ctx context.Context, c *casefile.Case) bool {
 		}
 	}
 
-	// Seed and drive inputs exactly once. Assertions poll only the observability
-	// backend; repeating side-effecting inputs during each poll makes counts
-	// nondeterministic and is especially surprising for one-shot commands.
+	// Seed the case and drive its inputs before asserting. HTTP inputs may repeat
+	// according to their retry policy; assertion retries only query the backend.
+	// Input retries are opt-in because repeating side-effecting requests can be
+	// surprising, especially for one-shot commands.
 	if err := r.seedCase(ctx, c); err != nil {
 		r.failCase(c, "seed: "+err.Error(), "")
 		r.reporter.Emit(report.Event{
@@ -502,6 +503,9 @@ func (r *Runner) doInput(ctx context.Context, in casefile.Input) error {
 	}
 	deadline := time.Now().Add(timeout)
 	var lastErr error
+	if in.Retry.ContinueAfterSuccess {
+		return r.doInputUntilDeadline(ctx, url, method, headers, in.Body, status, deadline, interval)
+	}
 	result := wait.Until[error](ctx, wait.Options{Timeout: timeout, Interval: interval}, func() []error {
 		attemptCtx, cancel := context.WithDeadline(ctx, deadline)
 		defer cancel()
@@ -520,4 +524,62 @@ func (r *Runner) doInput(ctx context.Context, in casefile.Input) error {
 		return fmt.Errorf("retry exhausted after %d attempts: %w", result.Iterations, lastErr)
 	}
 	return fmt.Errorf("retry stopped after %d attempts: %w", result.Iterations, ctx.Err())
+}
+
+// doInputUntilDeadline keeps sending an HTTP input until its retry deadline.
+// Unlike the default retry behavior, successful responses do not stop polling.
+func (r *Runner) doInputUntilDeadline(ctx context.Context, url, method string, headers map[string]string, body string, status int, deadline time.Time, interval time.Duration) error {
+	var lastErr error
+	succeeded := false
+	attempts := 0
+	for {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("retry stopped after %d attempts: %w", attempts, err)
+		}
+		if attempts > 0 && time.Until(deadline) <= 0 {
+			break
+		}
+		attempts++
+		attemptCtx, cancel := context.WithDeadline(ctx, deadline)
+		err := requests.DoHTTPRequestWithContext(attemptCtx, url, method, headers, body, status)
+		attemptErr := attemptCtx.Err()
+		cancel()
+		if err == nil {
+			succeeded = true
+		} else {
+			// Preserve the first meaningful request error even if draining the
+			// response body only completes when the attempt deadline expires.
+			if attemptErr == nil || lastErr == nil {
+				lastErr = err
+			}
+		}
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("retry stopped after %d attempts: %w", attempts, err)
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			break
+		}
+		pause := interval
+		if remaining < pause {
+			pause = remaining
+		}
+		timer := time.NewTimer(pause)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+			return fmt.Errorf("retry stopped after %d attempts: %w", attempts, ctx.Err())
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("retry stopped after %d attempts: %w", attempts, err)
+	}
+	if succeeded {
+		return nil
+	}
+	if lastErr == nil {
+		lastErr = context.DeadlineExceeded
+	}
+	return fmt.Errorf("retry exhausted after %d attempts: %w", attempts, lastErr)
 }
