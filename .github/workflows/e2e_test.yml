@@ -6,7 +6,7 @@ permissions: {}
 
 jobs:
   build-e2e-tools:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,7 +36,7 @@ jobs:
 
   test-e2e:
     needs: build-e2e-tools
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -123,7 +123,7 @@ jobs:
   # while shortening the critical path by overlapping the Compose boot.
   examples:
     needs: build-e2e-tools
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -157,7 +157,7 @@ jobs:
   # Kubernetes-in-Docker workflow.
   examples-podman:
     needs: build-e2e-tools
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -206,7 +206,7 @@ jobs:
   # Docker after the Podman probe fails.
   examples-auto-fallback:
     needs: build-e2e-tools
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -255,7 +255,7 @@ jobs:
   e2e:
     needs: [test-e2e, examples, examples-podman, examples-auto-fallback]
     if: ${{ always() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Report status
         shell: bash
