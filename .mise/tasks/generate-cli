@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#MISE description="Regenerate the Go CLI tables from the Usage spec"
+set -euo pipefail
+root="${MISE_PROJECT_ROOT:?MISE_PROJECT_ROOT must be set by mise}"
+output="${1:-$root/internal/cli/usagespec/tables.go}"
+usage generate go \
+  -f "$root/internal/cli/usagespec/oats.usage.kdl" \
+  -o "$output" \
+  -p usagespec \
+  --field-type FlagRunTimeout=duration \
+  --field-type FlagRunInterval=duration \
+  --field-type FlagRunAbsentTimeout=duration \
+  --field-type FlagRunSeedSettle=duration \
+  --field-type FlagRunAppPort=int \
+  --field-type FlagRunParallel=int
+gofmt -w "$output"

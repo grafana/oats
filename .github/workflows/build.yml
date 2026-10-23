@@ -24,6 +24,8 @@ jobs:
         with:
           version: v2026.10.11
           sha256: f9612efcddda0ae55b62d3b6f82a6c860d5b54ebee0807d4f1a1d578055e1607
+      - name: Check generated CLI
+        run: mise run check-cli
       - name: Build
         run: mise run build
       - name: Run tests
