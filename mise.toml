@@ -1,7 +1,7 @@
 [tools]
 
 # Runtime used by the black-box examples.
-"aqua:grafana/gcx" = "1.6.0"
+"aqua:grafana/gcx" = "1.7.1"
 go = "1.27.3"
 goreleaser = "2.18.3"
 k3d = "5.9.0"
