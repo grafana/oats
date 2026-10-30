@@ -6,7 +6,7 @@ go = "1.27.3"
 goreleaser = "2.19.0"
 k3d = "5.9.0"
 kubectl = "1.37.1"
-node = "24.22.1"
+node = "24.22.2"
 
 # Linters
 actionlint = "1.7.12"
