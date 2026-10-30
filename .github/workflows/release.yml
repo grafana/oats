@@ -73,7 +73,7 @@ jobs:
           attest: link
           resources: |
             cli-spec/usage=archive:share/oats/oats.usage.kdl
-            skill/oats=archive:share/oats/skills/oats
+            skill/oats=archive:share/oats/skills/oats/SKILL.md
       - name: Publish release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -131,7 +131,7 @@ jobs:
           attest: link
           resources: |
             cli-spec/usage=archive:share/oats/oats.usage.kdl
-            skill/oats=archive:share/oats/skills/oats
+            skill/oats=archive:share/oats/skills/oats/SKILL.md
       - name: Publish release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
