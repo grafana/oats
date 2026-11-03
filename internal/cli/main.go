@@ -425,21 +425,25 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		opts.lgtmVersion = flagStr(fs, "lgtm-version")
 	}
 	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, flagInt(fs, "parallel"))
+	runErr = emitRunEnd(rep, totalPass, totalFail, time.Since(runStart), runErr)
 	if runErr != nil {
 		return runErr
 	}
-
-	rep.Emit(report.Event{
-		Type:       report.EventRunEnd,
-		Pass:       totalPass,
-		Fail:       totalFail,
-		DurationMs: time.Since(runStart).Milliseconds(),
-	})
 
 	if totalFail > 0 || ctx.Err() != nil {
 		*exit = 1
 	}
 	return nil
+}
+
+func emitRunEnd(rep report.Reporter, pass, fail int, duration time.Duration, runErr error) error {
+	rep.Emit(report.Event{
+		Type:       report.EventRunEnd,
+		Pass:       pass,
+		Fail:       fail,
+		DurationMs: duration.Milliseconds(),
+	})
+	return runErr
 }
 
 func flagStr(fs *pflag.FlagSet, name string) string { v, _ := fs.GetString(name); return v }
@@ -755,7 +759,7 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 			dir = "."
 		}
 		finalizeCtx, cancel := context.WithTimeout(context.Background(), finalizer.EffectiveTimeout())
-		finalizeErr = runner.RunFixtureFinalizer(finalizeCtx, dir, finalizer.Script, rt.CustomCheckEnv)
+		finalizeErr = runner.RunFixtureFinalizer(finalizeCtx, dir, finalizer.Script, ep.CustomCheckEnv)
 		cancel()
 		if finalizeErr != nil {
 			finalizeErr = fmt.Errorf("fixture finalizer: %w", finalizeErr)

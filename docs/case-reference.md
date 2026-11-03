@@ -114,6 +114,8 @@ as custom checks. A nonzero exit fails the fixture group and includes captured
 output; teardown is still attempted. Scripts run from the declaring case
 directory, and finalizer groups are directory-scoped. Its independent timeout
 defaults to `3m`; cancellation and inherited output pipes are bounded.
+Process-tree cleanup is supported on Linux, macOS, and Windows; on other
+platforms the finalizer is rejected rather than run without descendant cleanup.
 Finalizer groups bypass result-cache reads and writes so every run produces
 fresh telemetry. Startup, readiness, or endpoint setup failures skip the hook.
 

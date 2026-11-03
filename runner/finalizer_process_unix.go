@@ -9,9 +9,19 @@ import (
 	"syscall"
 )
 
-func prepareFinalizerProcess(cmd *exec.Cmd) error {
+func startFinalizerProcess(cmd *exec.Cmd) (func() error, func() error, error) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	return nil
+	stop := func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		return killFinalizerProcessTree(cmd.Process)
+	}
+	cmd.Cancel = stop
+	if err := cmd.Start(); err != nil {
+		return nil, nil, err
+	}
+	return stop, stop, nil
 }
 
 func killFinalizerProcessTree(process *os.Process) error {

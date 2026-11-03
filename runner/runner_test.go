@@ -37,6 +37,9 @@ type stubExec struct {
 }
 
 func TestRunFixtureFinalizer(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a POSIX shell script")
+	}
 	dir := t.TempDir()
 	script := filepath.Join(dir, "finalize.sh")
 	if err := os.WriteFile(script, []byte("#!/bin/sh\necho finalizer-output\nexit 7\n"), 0o700); err != nil {

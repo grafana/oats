@@ -9,10 +9,13 @@
     ".github/workflows/build.yml": {
       "github-actions": [
         "actions/checkout",
+        "actions/setup-go",
         "codecov/codecov-action",
+        "go",
         "jdx/mise",
         "jdx/mise-action",
-        "ubuntu"
+        "ubuntu",
+        "windows"
       ]
     },
     ".github/workflows/e2e_test.yml": {
@@ -217,6 +220,10 @@
     },
     "actions/download-artifact": {
       "packageName": "actions/download-artifact",
+      "refKind": "version-tag"
+    },
+    "actions/setup-go": {
+      "packageName": "actions/setup-go",
       "refKind": "version-tag"
     },
     "actions/upload-artifact": {

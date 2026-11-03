@@ -125,7 +125,7 @@ func TestRunPlanRunsFinalizerAfterCaseFailure(t *testing.T) {
 	dir := t.TempDir()
 	order := filepath.Join(dir, "order")
 	script := filepath.Join(dir, "finalize.sh")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\n[ \"$OATS_FIXTURE_TYPE\" = compose ] || exit 4\n[ \"$OATS_FINALIZER_TEST\" = present ] || exit 5\nprintf finalizer >> '"+order+"'\necho validation-output\nexit 7\n"), 0o700); err != nil {
+	if err := os.WriteFile(script, []byte("#!/bin/sh\n[ \"$OATS_FIXTURE_TYPE\" = compose ] || exit 4\n[ \"$OATS_FINALIZER_TEST\" = resolved ] || exit 5\nprintf finalizer >> '"+order+"'\necho validation-output\nexit 7\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	plan := discovery.Plan{
@@ -138,11 +138,11 @@ func TestRunPlanRunsFinalizerAfterCaseFailure(t *testing.T) {
 	res := runPlan(context.Background(), rep, plan, runOptions{
 		failFast: true,
 		startFixture: func(context.Context, discovery.Plan, fixture.Options) (fixture.Handle, fixture.Runtime, error) {
-			return finalizerTestHandle{orderPath: order, closed: &closed}, fixture.Runtime{CustomCheckEnv: []string{"OATS_FIXTURE_TYPE=compose", "OATS_FINALIZER_TEST=present"}}, nil
+			return finalizerTestHandle{orderPath: order, closed: &closed}, fixture.Runtime{CustomCheckEnv: []string{"OATS_FIXTURE_TYPE=compose", "OATS_FINALIZER_TEST=runtime"}}, nil
 		},
 		waitForReady: func(discovery.Plan, fixture.Runtime) error { return nil },
 		resolveEndpoint: func(discovery.Plan, fixture.Runtime, string, string, int, string) (runner.Endpoint, error) {
-			return runner.Endpoint{}, nil
+			return runner.Endpoint{CustomCheckEnv: []string{"OATS_FIXTURE_TYPE=compose", "OATS_FINALIZER_TEST=resolved"}}, nil
 		},
 		runCase: func(context.Context, *casefile.Case) bool {
 			if err := appendFinalizerOrder(order, "case"); err != nil {

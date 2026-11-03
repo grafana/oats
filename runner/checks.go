@@ -5,6 +5,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -127,29 +128,28 @@ func customCheckCommand(ctx context.Context, dir, script string, extraEnv []stri
 // RunFixtureFinalizer executes one host-side fixture finalizer script without
 // retrying it. WaitDelay bounds waiting for inherited pipes after cancellation.
 func RunFixtureFinalizer(ctx context.Context, dir, script string, extraEnv []string) error {
-	cmd, cleanup, err := customCheckCommand(ctx, dir, script, extraEnv)
+	cmd, cleanupScript, err := customCheckCommand(ctx, dir, script, extraEnv)
 	if err != nil {
 		return err
 	}
-	defer cleanup()
-	if err := prepareFinalizerProcess(cmd); err != nil {
-		return err
-	}
+	defer cleanupScript()
 	cmd.WaitDelay = fixtureFinalizerWaitDelay
-	cmd.Cancel = func() error {
-		if cmd.Process == nil {
-			return nil
-		}
-		return killFinalizerProcessTree(cmd.Process)
-	}
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
-	if err := cmd.Run(); err != nil {
-		if cmd.Process != nil {
-			_ = killFinalizerProcessTree(cmd.Process)
-		}
+	stop, cleanupProcess, err := startFinalizerProcess(cmd)
+	if err != nil {
+		return err
+	}
+	waitErr := cmd.Wait()
+	if waitErr != nil {
+		_ = stop()
+	}
+	if cleanupErr := cleanupProcess(); cleanupErr != nil {
+		waitErr = errors.Join(waitErr, cleanupErr)
+	}
+	if waitErr != nil {
 		output := trimOutput(out.String())
-		return &FixtureFinalizerError{Err: err, Output: output}
+		return &FixtureFinalizerError{Err: waitErr, Output: output}
 	}
 	return nil
 }

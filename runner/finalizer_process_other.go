@@ -3,10 +3,10 @@
 package runner
 
 import (
-	"os"
+	"errors"
 	"os/exec"
 )
 
-func prepareFinalizerProcess(*exec.Cmd) error { return nil }
-
-func killFinalizerProcessTree(process *os.Process) error { return process.Kill() }
+func startFinalizerProcess(*exec.Cmd) (func() error, func() error, error) {
+	return nil, nil, errors.New("fixture finalizer process-tree cleanup is unsupported on this platform")
+}
