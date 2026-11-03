@@ -37,9 +37,7 @@ type stubExec struct {
 }
 
 func TestRunFixtureFinalizer(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("uses a POSIX shell script")
-	}
+	skipUnlessUnixFinalizerTests(t)
 	dir := t.TempDir()
 	script := filepath.Join(dir, "finalize.sh")
 	if err := os.WriteFile(script, []byte("#!/bin/sh\necho finalizer-output\nexit 7\n"), 0o700); err != nil {
@@ -58,9 +56,7 @@ func TestRunFixtureFinalizer(t *testing.T) {
 }
 
 func TestRunFixtureFinalizerCancellationIsBounded(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("uses a POSIX shell script")
-	}
+	skipUnlessUnixFinalizerTests(t)
 	dir := t.TempDir()
 	script := filepath.Join(dir, "finalize.sh")
 	marker := filepath.Join(dir, "late-child-output")
@@ -83,9 +79,7 @@ func TestRunFixtureFinalizerCancellationIsBounded(t *testing.T) {
 }
 
 func TestRunFixtureFinalizerKillsChildrenHoldingOutput(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("uses a POSIX shell script")
-	}
+	skipUnlessUnixFinalizerTests(t)
 	for _, exitCode := range []int{0, 7} {
 		t.Run(fmt.Sprintf("exit-%d", exitCode), func(t *testing.T) {
 			dir := t.TempDir()
@@ -111,6 +105,13 @@ func TestRunFixtureFinalizerKillsChildrenHoldingOutput(t *testing.T) {
 				t.Fatalf("child holding output survived finalizer: stat error = %v", err)
 			}
 		})
+	}
+}
+
+func skipUnlessUnixFinalizerTests(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("uses POSIX scripts and process-group cleanup")
 	}
 }
 

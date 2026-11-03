@@ -122,6 +122,7 @@ func TestRunPlanPausesAfterFailure(t *testing.T) {
 }
 
 func TestRunPlanRunsFinalizerAfterCaseFailure(t *testing.T) {
+	skipUnlessFinalizerPlatform(t)
 	dir := t.TempDir()
 	order := filepath.Join(dir, "order")
 	script := filepath.Join(dir, "finalize.sh")
@@ -241,6 +242,7 @@ func TestRunPlanSkipsFinalizerWhenFixtureSetupFails(t *testing.T) {
 }
 
 func TestRunPlanFinalizerUsesDetachedContext(t *testing.T) {
+	skipUnlessFinalizerPlatform(t)
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "called")
 	script := filepath.Join(dir, "finalize.sh")
@@ -268,6 +270,7 @@ func TestRunPlanFinalizerUsesDetachedContext(t *testing.T) {
 }
 
 func TestRunPlanFinalizerDisablesCacheReadsAndWrites(t *testing.T) {
+	skipUnlessFinalizerPlatform(t)
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "called")
 	script := filepath.Join(dir, "finalize.sh")
@@ -317,6 +320,13 @@ func TestRunPlanFinalizerDisablesCacheReadsAndWrites(t *testing.T) {
 	}
 	if _, err := os.Stat(marker); err != nil {
 		t.Fatalf("finalizer did not run: %v", err)
+	}
+}
+
+func skipUnlessFinalizerPlatform(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("uses a POSIX finalizer script and process-group cleanup")
 	}
 }
 
