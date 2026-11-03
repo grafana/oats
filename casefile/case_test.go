@@ -563,4 +563,31 @@ func TestValidateErrorBranches(t *testing.T) {
 	if err := (FixtureConfig{Compose: &ComposeFixture{Template: "none"}}).Validate("fixture"); err == nil {
 		t.Fatal("template=none without files should fail")
 	}
+	for _, tc := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{"empty script", "  script: '  '\n", "finalize.script"},
+		{"zero timeout", "  script: ./check.sh\n  timeout: 0s\n", "finalize.timeout"},
+		{"negative timeout", "  script: ./check.sh\n  timeout: -1s\n", "finalize.timeout"},
+	} {
+		t.Run("finalizer "+tc.name, func(t *testing.T) {
+			var f FixtureConfig
+			err := yaml.Unmarshal([]byte("compose: {}\nfinalize:\n"+tc.body), &f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := f.Validate("fixture"); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Validate() = %v, want %q", err, tc.want)
+			}
+		})
+	}
+	var defaultTimeout FixtureConfig
+	if err := yaml.Unmarshal([]byte("compose: {}\nfinalize:\n  script: ./check.sh\n"), &defaultTimeout); err != nil {
+		t.Fatal(err)
+	}
+	if got := defaultTimeout.Finalize.EffectiveTimeout(); got != 3*time.Minute {
+		t.Fatalf("default timeout = %s", got)
+	}
 }

@@ -67,6 +67,16 @@ func (r *TextReporter) Emit(e Event) {
 		r.recordFailure(e)
 	case EventCaseFail:
 		r.fail++
+	case EventFixtureFinalizeFail:
+		var b strings.Builder
+		fmt.Fprintf(&b, "FIXTURE FAIL %s  %s\n", e.Group, e.Source)
+		if e.Message != "" {
+			fmt.Fprintf(&b, "  %s\n", e.Message)
+		}
+		if e.StdoutExcerpt != "" {
+			fmt.Fprintf(&b, "  output: %s\n", e.StdoutExcerpt)
+		}
+		r.write("\n%s", b.String())
 	case EventGCXExec:
 		if r.v >= VerboseCmd {
 			r.write("  $ %s\n", e.Cmd)

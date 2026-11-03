@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/grafana/oats/cache"
 	"github.com/grafana/oats/casefile"
 	"github.com/grafana/oats/discovery"
+	"github.com/grafana/oats/fixture"
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
 	"github.com/spf13/cobra"
@@ -116,6 +118,205 @@ func TestRunPlanPausesAfterFailure(t *testing.T) {
 	})
 	if res.pass != 0 || res.fail != 1 || res.err != nil {
 		t.Fatalf("runPlan pause result = %+v", res)
+	}
+}
+
+func TestRunPlanRunsFinalizerAfterCaseFailure(t *testing.T) {
+	dir := t.TempDir()
+	order := filepath.Join(dir, "order")
+	script := filepath.Join(dir, "finalize.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\n[ \"$OATS_FIXTURE_TYPE\" = compose ] || exit 4\n[ \"$OATS_FINALIZER_TEST\" = present ] || exit 5\nprintf finalizer >> '"+order+"'\necho validation-output\nexit 7\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	plan := discovery.Plan{
+		Name: "remote-finalize", FixtureSourceDir: dir,
+		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}, Finalize: &casefile.FixtureFinalizer{Script: "./finalize.sh"}},
+		Cases:   []*casefile.Case{{Name: "failed"}, {Name: "skipped"}},
+	}
+	closed := false
+	rep := &recordingReporter{}
+	res := runPlan(context.Background(), rep, plan, runOptions{
+		failFast: true,
+		startFixture: func(context.Context, discovery.Plan, fixture.Options) (fixture.Handle, fixture.Runtime, error) {
+			return finalizerTestHandle{orderPath: order, closed: &closed}, fixture.Runtime{CustomCheckEnv: []string{"OATS_FIXTURE_TYPE=compose", "OATS_FINALIZER_TEST=present"}}, nil
+		},
+		waitForReady: func(discovery.Plan, fixture.Runtime) error { return nil },
+		resolveEndpoint: func(discovery.Plan, fixture.Runtime, string, string, int, string) (runner.Endpoint, error) {
+			return runner.Endpoint{}, nil
+		},
+		runCase: func(context.Context, *casefile.Case) bool {
+			if err := appendFinalizerOrder(order, "case"); err != nil {
+				t.Fatal(err)
+			}
+			return false
+		},
+	})
+	if res.fail != 1 || res.err == nil || !strings.Contains(res.err.Error(), "exit status 7") {
+		t.Fatalf("runPlan = %+v, err = %v", res, res.err)
+	}
+	if !closed {
+		t.Fatal("fixture teardown was not attempted after finalizer failure")
+	}
+	if got, err := os.ReadFile(order); err != nil || string(got) != "casefinalizerteardown" {
+		t.Fatalf("execution order = %q, err %v", got, err)
+	}
+	var finalizerFailure *report.Event
+	for i := range rep.events {
+		if rep.events[i].Type == report.EventFixtureFinalizeFail {
+			finalizerFailure = &rep.events[i]
+			break
+		}
+	}
+	if finalizerFailure == nil || finalizerFailure.Group != plan.Name || finalizerFailure.Source != dir || finalizerFailure.StdoutExcerpt != "validation-output" {
+		t.Fatalf("missing structured finalizer failure event: %+v", rep.events)
+	}
+}
+
+type finalizerTestHandle struct {
+	orderPath string
+	closed    *bool
+}
+
+func (h finalizerTestHandle) Close() error {
+	*h.closed = true
+	return appendFinalizerOrder(h.orderPath, "teardown")
+}
+
+func appendFinalizerOrder(path, value string) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString(value); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
+}
+
+func TestRunPlanSkipsFinalizerWhenFixtureSetupFails(t *testing.T) {
+	for _, stage := range []string{"startup", "readiness", "endpoint"} {
+		t.Run(stage, func(t *testing.T) {
+			dir := t.TempDir()
+			marker := filepath.Join(dir, "called")
+			script := filepath.Join(dir, "finalize.sh")
+			if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf called > '"+marker+"'\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			plan := discovery.Plan{Name: "setup-failure", FixtureSourceDir: dir, Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}, Finalize: &casefile.FixtureFinalizer{Script: "./finalize.sh"}}}
+			fix := &fakeSuiteFixture{}
+			opts := runOptions{
+				startFixture: func(context.Context, discovery.Plan, fixture.Options) (fixture.Handle, fixture.Runtime, error) {
+					if stage == "startup" {
+						return nil, fixture.Runtime{}, fmt.Errorf("startup")
+					}
+					return fix, fixture.Runtime{}, nil
+				},
+				waitForReady: func(discovery.Plan, fixture.Runtime) error {
+					if stage == "readiness" {
+						return fmt.Errorf("readiness")
+					}
+					return nil
+				},
+				resolveEndpoint: func(discovery.Plan, fixture.Runtime, string, string, int, string) (runner.Endpoint, error) {
+					if stage == "endpoint" {
+						return runner.Endpoint{}, fmt.Errorf("endpoint")
+					}
+					return runner.Endpoint{}, nil
+				},
+			}
+			res := runPlan(context.Background(), &recordingReporter{}, plan, opts)
+			if res.err == nil {
+				t.Fatal("expected setup failure")
+			}
+			if _, err := os.Stat(marker); !os.IsNotExist(err) {
+				t.Fatalf("finalizer ran after %s failure", stage)
+			}
+			wantClose := stage != "startup"
+			if got := fix.closeCalls == 1; got != wantClose {
+				t.Fatalf("fixture close attempted = %v, want %v", got, wantClose)
+			}
+		})
+	}
+}
+
+func TestRunPlanFinalizerUsesDetachedContext(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "called")
+	script := filepath.Join(dir, "finalize.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf called > '"+marker+"'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	plan := discovery.Plan{Name: "cancelled", FixtureSourceDir: dir, Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost"}, Finalize: &casefile.FixtureFinalizer{Script: "./finalize.sh"}}}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	res := runPlan(ctx, &recordingReporter{}, plan, runOptions{
+		startFixture: func(context.Context, discovery.Plan, fixture.Options) (fixture.Handle, fixture.Runtime, error) {
+			return nil, fixture.Runtime{}, nil
+		},
+		waitForReady: func(discovery.Plan, fixture.Runtime) error { return nil },
+		resolveEndpoint: func(discovery.Plan, fixture.Runtime, string, string, int, string) (runner.Endpoint, error) {
+			return runner.Endpoint{}, nil
+		},
+	})
+	if res.err != nil {
+		t.Fatal(res.err)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("finalizer did not run after context cancellation: %v", err)
+	}
+}
+
+func TestRunPlanFinalizerDisablesCacheReadsAndWrites(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "called")
+	script := filepath.Join(dir, "finalize.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf called > '"+marker+"'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	plan := discovery.Plan{Name: "cached", FixtureSourceDir: dir, Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost"}, Finalize: &casefile.FixtureFinalizer{Script: "./finalize.sh"}}, Cases: []*casefile.Case{{Name: "cached"}, {Name: "fresh"}}}
+	fixtureBytes, err := json.Marshal(plan.Fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cacheDir := t.TempDir()
+	store, err := cache.New(cacheDir, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := func(name string) cache.Key {
+		return cache.Key{CaseYAML: []byte(fmt.Sprintf("case:%s\nsource:\n", name)), FixtureBytes: fixtureBytes, OatsVersion: Version}
+	}
+	if err := store.Record(key("cached")); err != nil {
+		t.Fatal(err)
+	}
+	rep := &recordingReporter{}
+	res := runPlan(context.Background(), rep, plan, runOptions{
+		cacheDir: cacheDir,
+		startFixture: func(context.Context, discovery.Plan, fixture.Options) (fixture.Handle, fixture.Runtime, error) {
+			return nil, fixture.Runtime{}, nil
+		},
+		waitForReady: func(discovery.Plan, fixture.Runtime) error { return nil },
+		resolveEndpoint: func(discovery.Plan, fixture.Runtime, string, string, int, string) (runner.Endpoint, error) {
+			return runner.Endpoint{}, nil
+		},
+	})
+	if res.err != nil {
+		t.Fatal(res.err)
+	}
+	for _, event := range rep.events {
+		if event.Type == report.EventCaseSkip {
+			t.Fatalf("finalizer group read cache: %+v", event)
+		}
+	}
+	if hit, _ := store.Lookup(key("fresh")); hit {
+		t.Fatal("finalizer group wrote a cache entry")
+	}
+	if hit, _ := store.Lookup(key("cached")); !hit {
+		t.Fatal("finalizer group should not delete existing cache entries")
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("finalizer did not run: %v", err)
 	}
 }
 

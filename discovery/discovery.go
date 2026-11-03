@@ -201,11 +201,9 @@ func (c *RootConfig) fixtureFor(tc *casefile.Case) (casefile.FixtureConfig, stri
 }
 
 // groupKey identifies the fixture-boot group a case belongs to. Cases with
-// deep-equal fixtures share one boot; a fixture that resolves files relative to
-// its directory (compose file/files, k3d manifests) additionally keys on that
-// directory, since the same relative path means different files in different
-// directories. A path-less fixture (remote, or a template-only compose) keys on
-// the fixture alone, so identical copies in different directories share one boot.
+// deep-equal fixtures share one boot; a fixture that resolves paths relative to
+// its directory (compose/k3d paths or a finalizer working directory) additionally
+// keys on that directory, since identical relative names can refer to different files.
 func groupKey(f casefile.FixtureConfig, dir string) string {
 	b, _ := json.Marshal(f)
 	key := string(b)

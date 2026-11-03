@@ -25,6 +25,17 @@ func TestTextReporter_SilentOnAllPass(t *testing.T) {
 	}
 }
 
+func TestTextReporter_ShowsFixtureFinalizerFailure(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventFixtureFinalizeFail, Group: "compose", Source: "/cases", Message: "exit status 1", StdoutExcerpt: "validation failed"})
+	for _, want := range []string{"FIXTURE FAIL compose", "/cases", "exit status 1", "validation failed"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("output missing %q:\n%s", want, buf.String())
+		}
+	}
+}
+
 func TestTextReporter_FailureBlockHasSourceAndCmd(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewTextReporter(&buf, VerboseDefault)
@@ -204,6 +215,19 @@ func TestNDJSONReporter_UsesFixtureGroupWireVocabulary(t *testing.T) {
 	}
 	if event["msg"] != "group is ready" {
 		t.Fatalf("message must retain the msg wire key: %#v", event)
+	}
+}
+
+func TestNDJSONReporter_EmitsFixtureFinalizerFailure(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewNDJSONReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventFixtureFinalizeFail, Group: "compose", Source: "/cases", Message: "exit status 1", StdoutExcerpt: "validation failed"})
+	var event map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
+		t.Fatal(err)
+	}
+	if event["event"] != "fixture.finalize.fail" || event["group"] != "compose" || event["source"] != "/cases" || event["stdout_excerpt"] != "validation failed" {
+		t.Fatalf("unexpected event: %#v", event)
 	}
 }
 

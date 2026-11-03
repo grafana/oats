@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -33,6 +34,81 @@ type stubExec struct {
 	exit     int
 	err      error
 	captured [][]string
+}
+
+func TestRunFixtureFinalizer(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "finalize.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\necho finalizer-output\nexit 7\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	err := RunFixtureFinalizer(context.Background(), dir, "./finalize.sh", []string{"OATS_FIXTURE_TYPE=compose"})
+	if err == nil || !strings.Contains(err.Error(), "finalizer-output") {
+		t.Fatalf("RunFixtureFinalizer error = %v", err)
+	}
+	if err := os.WriteFile(script, []byte("#!/bin/sh\necho success\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := RunFixtureFinalizer(context.Background(), dir, "./finalize.sh", nil); err != nil {
+		t.Fatalf("successful finalizer: %v", err)
+	}
+}
+
+func TestRunFixtureFinalizerCancellationIsBounded(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a POSIX shell script")
+	}
+	dir := t.TempDir()
+	script := filepath.Join(dir, "finalize.sh")
+	marker := filepath.Join(dir, "late-child-output")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\n(sleep 1; printf late > '"+marker+"') &\nwait\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	if err := RunFixtureFinalizer(ctx, dir, "./finalize.sh", nil); err == nil {
+		t.Fatal("expected cancellation error")
+	}
+	if elapsed := time.Since(started); elapsed > 3*time.Second {
+		t.Fatalf("finalizer cancellation took %s", elapsed)
+	}
+	time.Sleep(1200 * time.Millisecond)
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("cancelled finalizer child still ran: stat error = %v", err)
+	}
+}
+
+func TestRunFixtureFinalizerKillsChildrenHoldingOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a POSIX shell script")
+	}
+	for _, exitCode := range []int{0, 7} {
+		t.Run(fmt.Sprintf("exit-%d", exitCode), func(t *testing.T) {
+			dir := t.TempDir()
+			marker := filepath.Join(dir, "late-child-output")
+			script := filepath.Join(dir, "finalize.sh")
+			body := fmt.Sprintf("#!/bin/sh\n(sleep 0.5; printf late > '%s') &\nexit %d\n", marker, exitCode)
+			if err := os.WriteFile(script, []byte(body), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			started := time.Now()
+			err := RunFixtureFinalizer(context.Background(), dir, "./finalize.sh", nil)
+			if exitCode == 0 && err == nil {
+				t.Fatal("expected inherited output pipe failure")
+			}
+			if exitCode != 0 && (err == nil || !strings.Contains(err.Error(), "exit status 7")) {
+				t.Fatalf("finalizer error = %v", err)
+			}
+			if elapsed := time.Since(started); elapsed > time.Second {
+				t.Fatalf("finalizer pipe wait took %s", elapsed)
+			}
+			time.Sleep(700 * time.Millisecond)
+			if _, err := os.Stat(marker); !os.IsNotExist(err) {
+				t.Fatalf("child holding output survived finalizer: stat error = %v", err)
+			}
+		})
+	}
 }
 
 func (s *stubExec) Execute(_ context.Context, args ...string) (*engine.Result, error) {
