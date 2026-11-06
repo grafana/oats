@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/grafana/oats/compare/v0.11.0...v0.11.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **deps:** update module go.yaml.in/yaml/v3 to v3.0.6 ([#665](https://github.com/grafana/oats/issues/665)) ([79e7719](https://github.com/grafana/oats/commit/79e7719405ee030315c2600d88eed1985eace689))
+
 ## [0.11.0](https://github.com/grafana/oats/compare/v0.10.0...v0.11.0) (2026-11-06)
 
 
