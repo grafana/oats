@@ -111,7 +111,7 @@ An optional `finalize` hook runs a host-side command once per fixture group,
 after its cases and before teardown. It runs even when a case fails, including
 with `--fail-fast`; it is not retried. It receives the same fixture environment
 as custom checks. A nonzero exit fails the fixture group and includes captured
-output; teardown is still attempted. Scripts run from the declaring case
+output; teardown is still attempted. Commands run from the declaring case
 directory, and finalizer groups are directory-scoped. Its independent timeout
 defaults to `3m`; cancellation and inherited output pipes are bounded.
 Process-tree cleanup is supported on Linux, macOS, and Windows; on other
