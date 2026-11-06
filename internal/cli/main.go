@@ -759,7 +759,7 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 			dir = "."
 		}
 		finalizeCtx, cancel := context.WithTimeout(context.Background(), finalizer.EffectiveTimeout())
-		finalizeErr = runner.RunFixtureFinalizer(finalizeCtx, dir, finalizer.Script, ep.CustomCheckEnv)
+		finalizeErr = runner.RunFixtureFinalizer(finalizeCtx, dir, finalizer.Command, ep.CustomCheckEnv)
 		cancel()
 		if finalizeErr != nil {
 			finalizeErr = fmt.Errorf("fixture finalizer: %w", finalizeErr)

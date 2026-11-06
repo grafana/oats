@@ -75,9 +75,9 @@ type FixtureConfig struct {
 	Finalize *FixtureFinalizer `yaml:"finalize,omitempty"`
 }
 
-// FixtureFinalizer runs a host-side script once after the cases sharing a fixture.
+// FixtureFinalizer runs a host-side command once after the cases sharing a fixture.
 type FixtureFinalizer struct {
-	Script  string         `yaml:"script"`
+	Command string         `yaml:"command"`
 	Timeout *time.Duration `yaml:"timeout,omitempty"`
 }
 
@@ -570,8 +570,8 @@ func (f FixtureConfig) Validate(label string) error {
 		return fmt.Errorf("fixture %q: set exactly one of compose/k3d/remote", label)
 	}
 	if f.Finalize != nil {
-		if strings.TrimSpace(f.Finalize.Script) == "" {
-			return fmt.Errorf("fixture %q: finalize.script: required, non-empty", label)
+		if strings.TrimSpace(f.Finalize.Command) == "" {
+			return fmt.Errorf("fixture %q: finalize.command: required, non-empty", label)
 		}
 		if f.Finalize.Timeout != nil && *f.Finalize.Timeout <= 0 {
 			return fmt.Errorf("fixture %q: finalize.timeout: must be positive", label)

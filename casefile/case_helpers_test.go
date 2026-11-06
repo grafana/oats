@@ -51,12 +51,12 @@ func TestFixtureConfigHelpers(t *testing.T) {
 		},
 		{
 			name:     "relative finalizer",
-			fixture:  FixtureConfig{Remote: &RemoteFixture{Endpoint: "remote"}, Finalize: &FixtureFinalizer{Script: "./verify.sh"}},
+			fixture:  FixtureConfig{Remote: &RemoteFixture{Endpoint: "remote"}, Finalize: &FixtureFinalizer{Command: "./verify.sh"}},
 			wantKind: "remote", wantRelativePath: true,
 		},
 		{
 			name:     "pathless finalizer command",
-			fixture:  FixtureConfig{Remote: &RemoteFixture{Endpoint: "remote"}, Finalize: &FixtureFinalizer{Script: "verify"}},
+			fixture:  FixtureConfig{Remote: &RemoteFixture{Endpoint: "remote"}, Finalize: &FixtureFinalizer{Command: "verify"}},
 			wantKind: "remote", wantRelativePath: true,
 		},
 	}
@@ -74,7 +74,7 @@ func TestFixtureConfigHelpers(t *testing.T) {
 			}
 		})
 	}
-	absFinalizer := FixtureConfig{Remote: &RemoteFixture{Endpoint: "remote"}, Finalize: &FixtureFinalizer{Script: filepath.Join(t.TempDir(), "verify.sh")}}
+	absFinalizer := FixtureConfig{Remote: &RemoteFixture{Endpoint: "remote"}, Finalize: &FixtureFinalizer{Command: filepath.Join(t.TempDir(), "verify.sh")}}
 	if !absFinalizer.UsesRelativePaths() {
 		t.Fatal("fixture finalizer must scope grouping to its case directory even for an absolute script")
 	}

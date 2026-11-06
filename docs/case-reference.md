@@ -107,7 +107,7 @@ fixture once and runs the cases that share it against it (see [How cases are
 grouped](#how-cases-are-grouped)). For a `compose` fixture the builtin `lgtm`
 template supplies the backend and the case's `file:` supplies the app.
 
-An optional `finalize` hook runs a host-side script once per fixture group,
+An optional `finalize` hook runs a host-side command once per fixture group,
 after its cases and before teardown. It runs even when a case fails, including
 with `--fail-fast`; it is not retried. It receives the same fixture environment
 as custom checks. A nonzero exit fails the fixture group and includes captured
@@ -124,9 +124,11 @@ fixture:
   compose:
     file: compose.yaml
   finalize:
-    script: ./validate.sh
+    command: ./validate.sh
     timeout: 3m # optional; must be positive
 ```
+
+`command` uses the same executable/path or inline-script forms as [custom checks](#custom-checks); it is not shell-argument parsed.
 
 Because cases that share a fixture share one boot, they run against the same
 app and backend, stood up once. Give cases different fixture identities when

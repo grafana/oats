@@ -131,7 +131,7 @@ func TestRunPlanRunsFinalizerAfterCaseFailure(t *testing.T) {
 	}
 	plan := discovery.Plan{
 		Name: "remote-finalize", FixtureSourceDir: dir,
-		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}, Finalize: &casefile.FixtureFinalizer{Script: "./finalize.sh"}},
+		Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}, Finalize: &casefile.FixtureFinalizer{Command: "./finalize.sh"}},
 		Cases:   []*casefile.Case{{Name: "failed"}, {Name: "skipped"}},
 	}
 	closed := false
@@ -204,7 +204,7 @@ func TestRunPlanSkipsFinalizerWhenFixtureSetupFails(t *testing.T) {
 			if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf called > '"+marker+"'\n"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			plan := discovery.Plan{Name: "setup-failure", FixtureSourceDir: dir, Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}, Finalize: &casefile.FixtureFinalizer{Script: "./finalize.sh"}}}
+			plan := discovery.Plan{Name: "setup-failure", FixtureSourceDir: dir, Fixture: casefile.FixtureConfig{Compose: &casefile.ComposeFixture{}, Finalize: &casefile.FixtureFinalizer{Command: "./finalize.sh"}}}
 			fix := &fakeSuiteFixture{}
 			opts := runOptions{
 				startFixture: func(context.Context, discovery.Plan, fixture.Options) (fixture.Handle, fixture.Runtime, error) {
@@ -249,7 +249,7 @@ func TestRunPlanFinalizerUsesDetachedContext(t *testing.T) {
 	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf called > '"+marker+"'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	plan := discovery.Plan{Name: "cancelled", FixtureSourceDir: dir, Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost"}, Finalize: &casefile.FixtureFinalizer{Script: "./finalize.sh"}}}
+	plan := discovery.Plan{Name: "cancelled", FixtureSourceDir: dir, Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost"}, Finalize: &casefile.FixtureFinalizer{Command: "./finalize.sh"}}}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	res := runPlan(ctx, &recordingReporter{}, plan, runOptions{
@@ -277,7 +277,7 @@ func TestRunPlanFinalizerDisablesCacheReadsAndWrites(t *testing.T) {
 	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf called > '"+marker+"'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	plan := discovery.Plan{Name: "cached", FixtureSourceDir: dir, Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost"}, Finalize: &casefile.FixtureFinalizer{Script: "./finalize.sh"}}, Cases: []*casefile.Case{{Name: "cached"}, {Name: "fresh"}}}
+	plan := discovery.Plan{Name: "cached", FixtureSourceDir: dir, Fixture: casefile.FixtureConfig{Remote: &casefile.RemoteFixture{Endpoint: "http://localhost"}, Finalize: &casefile.FixtureFinalizer{Command: "./finalize.sh"}}, Cases: []*casefile.Case{{Name: "cached"}, {Name: "fresh"}}}
 	fixtureBytes, err := json.Marshal(plan.Fixture)
 	if err != nil {
 		t.Fatal(err)

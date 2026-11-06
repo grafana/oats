@@ -56,6 +56,27 @@ expected:
 	}
 }
 
+func TestParse_FixtureFinalizerCommand(t *testing.T) {
+	valid := []byte(`name: finalizer command
+fixture:
+  compose: {}
+  finalize:
+    command: ./validate.sh
+expected:
+  traces:
+    - traceql: '{}'
+      absent: true
+`)
+	if _, err := Parse(valid); err != nil {
+		t.Fatalf("Parse command finalizer: %v", err)
+	}
+
+	legacyField := strings.Replace(string(valid), "command:", "script:", 1)
+	if _, err := Parse([]byte(legacyField)); err == nil || !strings.Contains(err.Error(), "field script not found") {
+		t.Fatalf("Parse legacy finalizer field error = %v, want unknown script field", err)
+	}
+}
+
 func TestParse_ComposeInput(t *testing.T) {
 	c, err := Parse([]byte(`
 name: one-shot cli emits telemetry
@@ -568,9 +589,9 @@ func TestValidateErrorBranches(t *testing.T) {
 		body string
 		want string
 	}{
-		{"empty script", "  script: '  '\n", "finalize.script"},
-		{"zero timeout", "  script: ./check.sh\n  timeout: 0s\n", "finalize.timeout"},
-		{"negative timeout", "  script: ./check.sh\n  timeout: -1s\n", "finalize.timeout"},
+		{"empty command", "  command: '  '\n", "finalize.command"},
+		{"zero timeout", "  command: ./check.sh\n  timeout: 0s\n", "finalize.timeout"},
+		{"negative timeout", "  command: ./check.sh\n  timeout: -1s\n", "finalize.timeout"},
 	} {
 		t.Run("finalizer "+tc.name, func(t *testing.T) {
 			var f FixtureConfig
@@ -584,7 +605,7 @@ func TestValidateErrorBranches(t *testing.T) {
 		})
 	}
 	var defaultTimeout FixtureConfig
-	if err := yaml.Unmarshal([]byte("compose: {}\nfinalize:\n  script: ./check.sh\n"), &defaultTimeout); err != nil {
+	if err := yaml.Unmarshal([]byte("compose: {}\nfinalize:\n  command: ./check.sh\n"), &defaultTimeout); err != nil {
 		t.Fatal(err)
 	}
 	if got := defaultTimeout.Finalize.EffectiveTimeout(); got != 3*time.Minute {
