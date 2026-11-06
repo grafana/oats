@@ -107,6 +107,29 @@ fixture once and runs the cases that share it against it (see [How cases are
 grouped](#how-cases-are-grouped)). For a `compose` fixture the builtin `lgtm`
 template supplies the backend and the case's `file:` supplies the app.
 
+An optional `finalize` hook runs a host-side command once per fixture group,
+after its cases and before teardown. It runs even when a case fails, including
+with `--fail-fast`; it is not retried. It receives the same fixture environment
+as custom checks. A nonzero exit fails the fixture group and includes captured
+output; teardown is still attempted. Commands run from the declaring case
+directory, and finalizer groups are directory-scoped. Its independent timeout
+defaults to `3m`; cancellation and inherited output pipes are bounded.
+Process-tree cleanup is supported on Linux, macOS, and Windows; on other
+platforms the finalizer is rejected rather than run without descendant cleanup.
+Finalizer groups bypass result-cache reads and writes so every run produces
+fresh telemetry. Startup, readiness, or endpoint setup failures skip the hook.
+
+```yaml
+fixture:
+  compose:
+    file: compose.yaml
+  finalize:
+    command: ./validate.sh
+    timeout: 3m # optional; must be positive
+```
+
+`command` uses the same executable/path or inline-script forms as [custom checks](#custom-checks); it is not shell-argument parsed.
+
 Because cases that share a fixture share one boot, they run against the same
 app and backend, stood up once. Give cases different fixture identities when
 they need separate app deployments.

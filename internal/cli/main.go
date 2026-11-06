@@ -35,6 +35,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -424,21 +425,25 @@ func runAction(cmd *cobra.Command, args []string, verbose int, exit *int) error 
 		opts.lgtmVersion = flagStr(fs, "lgtm-version")
 	}
 	totalPass, totalFail, runErr := runPlans(ctx, rep, plans, opts, flagInt(fs, "parallel"))
+	runErr = emitRunEnd(rep, totalPass, totalFail, time.Since(runStart), runErr)
 	if runErr != nil {
 		return runErr
 	}
-
-	rep.Emit(report.Event{
-		Type:       report.EventRunEnd,
-		Pass:       totalPass,
-		Fail:       totalFail,
-		DurationMs: time.Since(runStart).Milliseconds(),
-	})
 
 	if totalFail > 0 || ctx.Err() != nil {
 		*exit = 1
 	}
 	return nil
+}
+
+func emitRunEnd(rep report.Reporter, pass, fail int, duration time.Duration, runErr error) error {
+	rep.Emit(report.Event{
+		Type:       report.EventRunEnd,
+		Pass:       pass,
+		Fail:       fail,
+		DurationMs: duration.Milliseconds(),
+	})
+	return runErr
 }
 
 func flagStr(fs *pflag.FlagSet, name string) string { v, _ := fs.GetString(name); return v }
@@ -551,6 +556,9 @@ type runOptions struct {
 	pauseInput         io.Reader
 	pauseOutput        io.Writer
 	runCase            func(context.Context, *casefile.Case) bool
+	startFixture       func(context.Context, discovery.Plan, fixture.Options) (fixture.Handle, fixture.Runtime, error)
+	waitForReady       func(discovery.Plan, fixture.Runtime) error
+	resolveEndpoint    func(discovery.Plan, fixture.Runtime, string, string, int, string) (runner.Endpoint, error)
 }
 
 func runPlans(ctx context.Context, rep report.Reporter, plans []discovery.Plan, opts runOptions, parallel int) (int, int, error) {
@@ -661,18 +669,30 @@ func runPlansParallel(parent context.Context, rep report.Reporter, plans []disco
 func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts runOptions) groupResult {
 	plan = withLGTMVersion(plan, opts.lgtmVersion)
 	fixtureStart := emitFixtureStart(rep, plan)
-	fix, rt, err := fixture.StartWithOptions(ctx, plan, fixture.Options{ContainerRuntime: opts.containerRuntime})
+	startFixture := opts.startFixture
+	if startFixture == nil {
+		startFixture = fixture.StartWithOptions
+	}
+	fix, rt, err := startFixture(ctx, plan, fixture.Options{ContainerRuntime: opts.containerRuntime})
 	if err != nil {
 		return groupResult{err: fmt.Errorf("fixture group %q: %w", plan.Name, err)}
 	}
-	if err := fixture.WaitForReady(plan, rt); err != nil {
+	waitForReady := opts.waitForReady
+	if waitForReady == nil {
+		waitForReady = fixture.WaitForReady
+	}
+	if err := waitForReady(plan, rt); err != nil {
 		if fix != nil {
 			_ = closeFixture(rep, plan, fix)
 		}
 		return groupResult{err: fmt.Errorf("fixture group %q: %w", plan.Name, err)}
 	}
 	emitFixtureReady(rep, plan, fixtureStart)
-	ep, err := resolveEndpoint(plan, rt, opts.gcxContextOverride, opts.appHost, opts.appPort, opts.otlpHTTP)
+	resolve := opts.resolveEndpoint
+	if resolve == nil {
+		resolve = resolveEndpoint
+	}
+	ep, err := resolve(plan, rt, opts.gcxContextOverride, opts.appHost, opts.appPort, opts.otlpHTTP)
 	if err != nil {
 		if fix != nil {
 			_ = closeFixture(rep, plan, fix)
@@ -696,7 +716,7 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 		AbsentTimeout:   opts.absentTimeout,
 		SeedSettleDelay: opts.seedSettle,
 	})
-	if !opts.noCache && opts.cacheDir != "" {
+	if plan.Fixture.Finalize == nil && !opts.noCache && opts.cacheDir != "" {
 		ttl := time.Duration(opts.cacheTTLDays) * 24 * time.Hour
 		store, cacheErr := cache.New(opts.cacheDir, ttl, nil)
 		if cacheErr != nil {
@@ -732,6 +752,30 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 			}
 		}
 	}
+	var finalizeErr error
+	if finalizer := plan.Fixture.Finalize; finalizer != nil {
+		dir := plan.FixtureSourceDir
+		if dir == "" {
+			dir = "."
+		}
+		finalizeCtx, cancel := context.WithTimeout(context.Background(), finalizer.EffectiveTimeout())
+		finalizeErr = runner.RunFixtureFinalizer(finalizeCtx, dir, finalizer.Command, ep.CustomCheckEnv)
+		cancel()
+		if finalizeErr != nil {
+			finalizeErr = fmt.Errorf("fixture finalizer: %w", finalizeErr)
+			event := report.Event{
+				Type: report.EventFixtureFinalizeFail, Group: plan.Name,
+				FixtureType: plan.Fixture.Kind(), Source: dir,
+				Message: finalizeErr.Error(),
+			}
+			var scriptErr *runner.FixtureFinalizerError
+			if errors.As(finalizeErr, &scriptErr) {
+				event.Message = scriptErr.Err.Error()
+				event.StdoutExcerpt = scriptErr.Output
+			}
+			rep.Emit(event)
+		}
+	}
 
 	rep.Emit(report.Event{
 		Type:  report.EventGroupEnd,
@@ -741,8 +785,11 @@ func runPlan(ctx context.Context, rep report.Reporter, plan discovery.Plan, opts
 	})
 	if fix != nil {
 		if closeErr := closeFixture(rep, plan, fix); closeErr != nil {
-			return groupResult{pass: groupPass, fail: groupFail, err: fmt.Errorf("fixture group %q: fixture shutdown: %w", plan.Name, closeErr)}
+			finalizeErr = errors.Join(finalizeErr, fmt.Errorf("fixture shutdown: %w", closeErr))
 		}
+	}
+	if finalizeErr != nil {
+		return groupResult{pass: groupPass, fail: groupFail, err: fmt.Errorf("fixture group %q: %w", plan.Name, finalizeErr)}
 	}
 	return groupResult{pass: groupPass, fail: groupFail}
 }

@@ -25,6 +25,65 @@ func TestTextReporter_SilentOnAllPass(t *testing.T) {
 	}
 }
 
+func TestTextReporter_ShowsFixtureFinalizerFailure(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventFixtureFinalizeFail, Group: "compose", Source: "/cases", Message: "exit status 1", StdoutExcerpt: "validation failed"})
+	for _, want := range []string{"FIXTURE FAIL compose", "/cases", "exit status 1", "validation failed"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("output missing %q:\n%s", want, buf.String())
+		}
+	}
+}
+
+func TestTextReporter_FinalizerFailureFailsRunSummary(t *testing.T) {
+	t.Run("all cases passed", func(t *testing.T) {
+		var buf bytes.Buffer
+		r := NewTextReporter(&buf, VerboseDefault)
+		r.Emit(Event{Type: EventRunStart})
+		r.Emit(Event{Type: EventCasePass, Case: "one"})
+		r.Emit(Event{Type: EventFixtureFinalizeFail, Group: "compose", Message: "exit status 1"})
+		r.Emit(Event{Type: EventRunEnd})
+
+		out := buf.String()
+		if !strings.Contains(out, "FAIL 1/1 (0 failed, 0 skipped, fixture finalizer failed)") {
+			t.Fatalf("summary should fail without counting an extra failed case:\n%s", out)
+		}
+	})
+
+	t.Run("case and finalizer failed", func(t *testing.T) {
+		var buf bytes.Buffer
+		r := NewTextReporter(&buf, VerboseDefault)
+		r.Emit(Event{Type: EventRunStart})
+		r.Emit(Event{Type: EventAssertFail, Case: "one", Message: "assertion failed"})
+		r.Emit(Event{Type: EventCaseFail, Case: "one"})
+		r.Emit(Event{Type: EventFixtureFinalizeFail, Group: "compose", Message: "exit status 1"})
+		r.Emit(Event{Type: EventRunEnd})
+
+		out := buf.String()
+		if !strings.Contains(out, "FAIL 0/1 (1 failed, 0 skipped, fixture finalizer failed)") {
+			t.Fatalf("summary should preserve case counts and include finalizer failure:\n%s", out)
+		}
+	})
+}
+
+func TestTextReporter_ResetsFixtureFinalizerFailureBetweenRuns(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewTextReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventRunStart})
+	r.Emit(Event{Type: EventFixtureFinalizeFail, Group: "compose", Message: "exit status 1"})
+	r.Emit(Event{Type: EventRunEnd})
+
+	buf.Reset()
+	r.Emit(Event{Type: EventRunStart})
+	r.Emit(Event{Type: EventCasePass, Case: "one"})
+	r.Emit(Event{Type: EventRunEnd})
+
+	if out := buf.String(); !strings.Contains(out, "PASS 1/1") || strings.Contains(out, "fixture finalizer failed") {
+		t.Fatalf("fixture failure leaked into the next run:\n%s", out)
+	}
+}
+
 func TestTextReporter_FailureBlockHasSourceAndCmd(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewTextReporter(&buf, VerboseDefault)
@@ -204,6 +263,19 @@ func TestNDJSONReporter_UsesFixtureGroupWireVocabulary(t *testing.T) {
 	}
 	if event["msg"] != "group is ready" {
 		t.Fatalf("message must retain the msg wire key: %#v", event)
+	}
+}
+
+func TestNDJSONReporter_EmitsFixtureFinalizerFailure(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewNDJSONReporter(&buf, VerboseDefault)
+	r.Emit(Event{Type: EventFixtureFinalizeFail, Group: "compose", Source: "/cases", Message: "exit status 1", StdoutExcerpt: "validation failed"})
+	var event map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
+		t.Fatal(err)
+	}
+	if event["event"] != "fixture.finalize.fail" || event["group"] != "compose" || event["source"] != "/cases" || event["stdout_excerpt"] != "validation failed" {
+		t.Fatalf("unexpected event: %#v", event)
 	}
 }
 
