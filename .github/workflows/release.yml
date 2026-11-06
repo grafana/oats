@@ -16,7 +16,7 @@ permissions: {}
 jobs:
   release-please:
     if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       issues: write
@@ -35,7 +35,7 @@ jobs:
   goreleaser:
     if: github.event_name == 'push' && needs.release-please.outputs.release_created == 'true'
     needs: release-please
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       # Artifact releases pair a focused tool allowlist with cache: false.
       MISE_ENABLE_TOOLS: go,goreleaser
@@ -72,7 +72,7 @@ jobs:
 
   publish-existing-tag:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       # Artifact releases pair a focused tool allowlist with cache: false.
       MISE_ENABLE_TOOLS: go,goreleaser
