@@ -22,6 +22,7 @@ type Compose struct {
 	DefaultArgs []string
 	Paths       []string
 	Env         []string
+	engine      container.Engine
 }
 
 var dockerPruneMutex sync.Mutex
@@ -90,6 +91,7 @@ func StackFilesWithRuntime(composeFiles []string, env []string, engine container
 		DefaultArgs: defaultArgs,
 		Paths:       composeFiles,
 		Env:         mergedEnv,
+		engine:      engine,
 	}, nil
 }
 
@@ -127,13 +129,28 @@ func (c *Compose) Stop() error {
 // The service is built on demand, which lets callers keep command-only
 // services behind a profile so they are not started with the fixture.
 func (c *Compose) Run(ctx context.Context, service string, argv []string) error {
-	if err := c.runComposeContext(ctx, "build", service); err != nil {
+	// A one-shot service may be hidden behind a Compose profile so fixture
+	// startup does not run it. Activate profiles only for these explicit
+	// service commands; this also works with Podman Compose providers that do
+	// not automatically activate a service's profile when it is named.
+	profileArgs := []string{"--profile", "*"}
+	if c.engine == container.Podman {
+		profiles, err := serviceProfiles(ctx, c.Paths, c.Env, service)
+		if err != nil {
+			return fmt.Errorf("failed to resolve compose profiles for service %q: %w", service, err)
+		}
+		profileArgs = nil
+		for _, profile := range profiles {
+			profileArgs = append(profileArgs, "--profile", profile)
+		}
+	}
+	if err := c.runComposeContext(ctx, append(profileArgs, "build", service)...); err != nil {
 		return fmt.Errorf("failed to build compose service %q: %w", service, err)
 	}
 	// The fixture is already running. Avoid Compose recreating dependencies
 	// before the one-shot command, which can reset application readiness and
 	// disrupt instrumentation attached to the existing containers.
-	args := append([]string{"run", "--rm", "--no-deps", service}, argv...)
+	args := append(append(profileArgs, "run", "--rm", "--no-deps", service), argv...)
 	if err := c.runComposeContext(ctx, args...); err != nil {
 		return fmt.Errorf("failed to run compose service %q: %w", service, err)
 	}
