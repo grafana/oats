@@ -22,6 +22,7 @@ type Compose struct {
 	DefaultArgs []string
 	Paths       []string
 	Env         []string
+	engine      container.Engine
 }
 
 var dockerPruneMutex sync.Mutex
@@ -90,6 +91,7 @@ func StackFilesWithRuntime(composeFiles []string, env []string, engine container
 		DefaultArgs: defaultArgs,
 		Paths:       composeFiles,
 		Env:         mergedEnv,
+		engine:      engine,
 	}, nil
 }
 
@@ -132,6 +134,16 @@ func (c *Compose) Run(ctx context.Context, service string, argv []string) error 
 	// service commands; this also works with Podman Compose providers that do
 	// not automatically activate a service's profile when it is named.
 	profileArgs := []string{"--profile", "*"}
+	if c.engine == container.Podman {
+		profiles, err := serviceProfiles(ctx, c.Paths, c.Env, service)
+		if err != nil {
+			return fmt.Errorf("failed to resolve compose profiles for service %q: %w", service, err)
+		}
+		profileArgs = nil
+		for _, profile := range profiles {
+			profileArgs = append(profileArgs, "--profile", profile)
+		}
+	}
 	if err := c.runComposeContext(ctx, append(profileArgs, "build", service)...); err != nil {
 		return fmt.Errorf("failed to build compose service %q: %w", service, err)
 	}
