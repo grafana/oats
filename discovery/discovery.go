@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/grafana/oats/casefile"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // RootConfig is the parsed oats-config.yaml file. Field names mirror the YAML keys
