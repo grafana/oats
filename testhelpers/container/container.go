@@ -5,6 +5,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -54,12 +55,15 @@ func Resolve(value string) (Engine, error) {
 		return requested, nil
 	}
 	// Try engines in preference order.
+	var failures []error
 	for _, candidate := range []Engine{Podman, Docker} {
-		if available(candidate) == nil {
-			return candidate, nil
+		if err := available(candidate); err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", candidate, err))
+			continue
 		}
+		return candidate, nil
 	}
-	return "", fmt.Errorf("no supported container runtime found on PATH (tried podman, docker)")
+	return "", fmt.Errorf("no supported container runtime found on PATH (tried podman, docker): %w", errors.Join(failures...))
 }
 
 func available(engine Engine) error {

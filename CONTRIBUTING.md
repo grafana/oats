@@ -79,7 +79,7 @@ flowchart LR
 | `seed/`                  | inline OTLP and application-input seeding                              | `seed/seed.go`                           |
 | `engine/` / `signalcmd/` | gcx invocation and signal-specific command construction                | `engine/gcx.go`                          |
 | `report/`                | text/NDJSON event stream and GitHub annotations                        | `report/event.go`                        |
-| `internal/cli/`          | Cobra commands, flags, env mapping, and orchestration                  | `internal/cli/main.go`                   |
+| `internal/cli/`          | Usage tables, flags, env mapping, and orchestration                    | `internal/cli/main.go`                   |
 | `internal/legacyyaml/`   | legacy schema parsing and v2→v3 migration only                         | `internal/legacyyaml/migrate/migrate.go` |
 | `tests/e2e/`             | black-box cases run against real stacks and tools                      | `tests/e2e/e2e_test.go`                  |
 
@@ -136,3 +136,13 @@ fixture safety gate allows it.
    relevant unit tests and lint before pushing; use signed commits and normal
    pushes, and avoid force-pushing review updates unless a true restack requires
    it.
+
+## CLI generation
+
+Edit `internal/cli/usagespec/oats.usage.kdl` to change the CLI definition. Then
+run `mise run generate-cli` and commit the generated Go tables;
+`mise run check-cli` verifies they are reproducible. The generated tables are
+checked in, so normal Go builds do not need the Usage executable.
+
+For the design, upgrade considerations, and known limitations, see
+[ADR 0005](docs/adr/0005-usage-and-packslip.md).

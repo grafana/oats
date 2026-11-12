@@ -50,6 +50,7 @@
         "googleapis/release-please-action",
         "jdx/mise",
         "jdx/mise-action",
+        "jdx/packslip",
         "ubuntu"
       ]
     },
@@ -150,7 +151,8 @@
         "shellcheck",
         "shfmt",
         "taplo",
-        "typos"
+        "typos",
+        "usage"
       ]
     },
     "tests/e2e/Dockerfile": {
@@ -245,6 +247,10 @@
     },
     "jdx/mise-action": {
       "packageName": "jdx/mise-action",
+      "refKind": "version-tag"
+    },
+    "jdx/packslip": {
+      "packageName": "jdx/packslip",
       "refKind": "version-tag"
     }
   }
