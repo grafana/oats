@@ -26,15 +26,16 @@ func (r *TextReporter) write(format string, args ...any) {
 // the same failure events that drive the human-readable blocks — no
 // duplicate accounting, no separate sink.
 type TextReporter struct {
-	w          io.Writer
-	v          Verbosity
-	ghaEnabled bool
-	runStart   time.Time
-	pass       int
-	fail       int
-	skip       int
-	failBlocks []string // buffered "FAIL ..." blocks, flushed at run.end
-	knownErrAt map[string]struct{}
+	w           io.Writer
+	v           Verbosity
+	ghaEnabled  bool
+	runStart    time.Time
+	pass        int
+	fail        int
+	skip        int
+	fixtureFail bool
+	failBlocks  []string // buffered "FAIL ..." blocks, flushed at run.end
+	knownErrAt  map[string]struct{}
 }
 
 func NewTextReporter(w io.Writer, v Verbosity) *TextReporter {
@@ -67,6 +68,17 @@ func (r *TextReporter) Emit(e Event) {
 		r.recordFailure(e)
 	case EventCaseFail:
 		r.fail++
+	case EventFixtureFinalizeFail:
+		r.fixtureFail = true
+		var b strings.Builder
+		fmt.Fprintf(&b, "FIXTURE FAIL %s  %s\n", e.Group, e.Source)
+		if e.Message != "" {
+			fmt.Fprintf(&b, "  %s\n", e.Message)
+		}
+		if e.StdoutExcerpt != "" {
+			fmt.Fprintf(&b, "  output: %s\n", e.StdoutExcerpt)
+		}
+		r.write("\n%s", b.String())
 	case EventGCXExec:
 		if r.v >= VerboseCmd {
 			r.write("  $ %s\n", e.Cmd)
@@ -84,6 +96,7 @@ func (r *TextReporter) resetRunState() {
 	r.pass = 0
 	r.fail = 0
 	r.skip = 0
+	r.fixtureFail = false
 	r.failBlocks = nil
 	r.knownErrAt = make(map[string]struct{})
 }
@@ -181,13 +194,17 @@ func (r *TextReporter) flushRunEnd(e Event) {
 	total := r.pass + r.fail + r.skip
 	duration := durationOr(e, time.Since(r.runStart))
 	switch {
-	case r.fail == 0 && r.skip == 0:
+	case r.fail == 0 && r.skip == 0 && !r.fixtureFail:
 		r.write("\nPASS %d/%d in %s\n", r.pass, total, duration)
-	case r.fail == 0:
+	case r.fail == 0 && !r.fixtureFail:
 		r.write("\nPASS %d/%d (%d skipped) in %s\n", r.pass, total, r.skip, duration)
 	default:
-		r.write("\nFAIL %d/%d (%d failed, %d skipped) in %s\n",
-			r.pass, total, r.fail, r.skip, duration)
+		fixtureFailure := ""
+		if r.fixtureFail {
+			fixtureFailure = ", fixture finalizer failed"
+		}
+		r.write("\nFAIL %d/%d (%d failed, %d skipped%s) in %s\n",
+			r.pass, total, r.fail, r.skip, fixtureFailure, duration)
 	}
 }
 

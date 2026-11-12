@@ -69,9 +69,23 @@ func (s Seed) EffectiveType() string {
 // Exactly one of the type-specific blocks is set; the block that is present
 // selects the fixture kind. It loads from a case yaml via yaml.v3.
 type FixtureConfig struct {
-	Compose *ComposeFixture `yaml:"compose,omitempty"`
-	K3D     *K3DFixture     `yaml:"k3d,omitempty"`
-	Remote  *RemoteFixture  `yaml:"remote,omitempty"`
+	Compose  *ComposeFixture   `yaml:"compose,omitempty"`
+	K3D      *K3DFixture       `yaml:"k3d,omitempty"`
+	Remote   *RemoteFixture    `yaml:"remote,omitempty"`
+	Finalize *FixtureFinalizer `yaml:"finalize,omitempty"`
+}
+
+// FixtureFinalizer runs a host-side command once after the cases sharing a fixture.
+type FixtureFinalizer struct {
+	Command string         `yaml:"command"`
+	Timeout *time.Duration `yaml:"timeout,omitempty"`
+}
+
+func (f FixtureFinalizer) EffectiveTimeout() time.Duration {
+	if f.Timeout == nil {
+		return 3 * time.Minute
+	}
+	return *f.Timeout
 }
 
 // ComposeFixture boots a docker-compose stack. template selects a built-in
@@ -141,13 +155,13 @@ func (f FixtureConfig) HasManagedApp() bool {
 	return f.Compose != nil && f.Compose.AppService != "" && f.Compose.AppPort > 0
 }
 
-// UsesRelativePaths reports whether the fixture references files/directories
-// resolved relative to the case's directory (compose file/files, k3d manifests
-// or build context). Such fixtures mean different things in different
-// directories, so cases sharing one only agree if they live in the same dir. A
-// remote fixture (or a template-only compose) references no paths, so identical
-// copies in different directories are genuinely the same fixture.
+// UsesRelativePaths reports whether the fixture or finalizer uses the case's
+// directory as its working/path-resolution context. Such fixtures mean
+// different things in different directories, so cases share only within one.
 func (f FixtureConfig) UsesRelativePaths() bool {
+	if f.Finalize != nil {
+		return true
+	}
 	if f.Compose != nil && (f.Compose.File != "" || len(f.Compose.Files) > 0) {
 		return true
 	}
@@ -554,6 +568,14 @@ func (f FixtureConfig) Validate(label string) error {
 	}
 	if set != 1 {
 		return fmt.Errorf("fixture %q: set exactly one of compose/k3d/remote", label)
+	}
+	if f.Finalize != nil {
+		if strings.TrimSpace(f.Finalize.Command) == "" {
+			return fmt.Errorf("fixture %q: finalize.command: required, non-empty", label)
+		}
+		if f.Finalize.Timeout != nil && *f.Finalize.Timeout <= 0 {
+			return fmt.Errorf("fixture %q: finalize.timeout: must be positive", label)
+		}
 	}
 	switch {
 	case f.Compose != nil:

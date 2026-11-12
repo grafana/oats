@@ -5,11 +5,13 @@ package runner
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/grafana/oats/assert"
 	"github.com/grafana/oats/casefile"
@@ -17,6 +19,8 @@ import (
 	"github.com/grafana/oats/testhelpers/container"
 	"github.com/grafana/oats/wait"
 )
+
+const fixtureFinalizerWaitDelay = 100 * time.Millisecond
 
 func (r *Runner) runComposeLogCheck(ctx context.Context, c *casefile.Case, msg string) bool {
 	run := func() []assert.Failure {
@@ -120,6 +124,50 @@ func customCheckCommand(ctx context.Context, dir, script string, extraEnv []stri
 	cmd.Env = append(cmd.Environ(), extraEnv...)
 	return cmd, cleanup, nil
 }
+
+// RunFixtureFinalizer executes one host-side fixture finalizer script without
+// retrying it. WaitDelay bounds waiting for inherited pipes after cancellation.
+func RunFixtureFinalizer(ctx context.Context, dir, script string, extraEnv []string) error {
+	cmd, cleanupScript, err := customCheckCommand(ctx, dir, script, extraEnv)
+	if err != nil {
+		return err
+	}
+	defer cleanupScript()
+	cmd.WaitDelay = fixtureFinalizerWaitDelay
+	var out bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &out
+	stop, cleanupProcess, err := startFinalizerProcess(cmd)
+	if err != nil {
+		return err
+	}
+	waitErr := cmd.Wait()
+	if waitErr != nil {
+		_ = stop()
+	}
+	if cleanupErr := cleanupProcess(); cleanupErr != nil {
+		waitErr = errors.Join(waitErr, cleanupErr)
+	}
+	if waitErr != nil {
+		output := trimOutput(out.String())
+		return &FixtureFinalizerError{Err: waitErr, Output: output}
+	}
+	return nil
+}
+
+// FixtureFinalizerError describes a failed one-shot finalizer command.
+type FixtureFinalizerError struct {
+	Err    error
+	Output string
+}
+
+func (e *FixtureFinalizerError) Error() string {
+	if e.Output == "" {
+		return e.Err.Error()
+	}
+	return e.Err.Error() + "\n" + e.Output
+}
+
+func (e *FixtureFinalizerError) Unwrap() error { return e.Err }
 
 func searchComposeLogs(ctx context.Context, extraEnv []string, needle string) (bool, error) {
 	if envValue(extraEnv, "OATS_FIXTURE_TYPE") != "compose" {

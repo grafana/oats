@@ -18,19 +18,20 @@ import "time"
 type EventType string
 
 const (
-	EventRunStart        EventType = "run.start"
-	EventRunEnd          EventType = "run.end"
-	EventGroupStart      EventType = "group.start"
-	EventGroupEnd        EventType = "group.end"
-	EventFixtureStart    EventType = "fixture.start"
-	EventFixtureReady    EventType = "fixture.ready"
-	EventFixtureTeardown EventType = "fixture.teardown"
-	EventCaseStart       EventType = "case.start"
-	EventCasePass        EventType = "case.pass"
-	EventCaseFail        EventType = "case.fail"
-	EventCaseSkip        EventType = "case.skip"
-	EventAssertFail      EventType = "assert.fail"
-	EventGCXExec         EventType = "gcx.exec"
+	EventRunStart            EventType = "run.start"
+	EventRunEnd              EventType = "run.end"
+	EventGroupStart          EventType = "group.start"
+	EventGroupEnd            EventType = "group.end"
+	EventFixtureStart        EventType = "fixture.start"
+	EventFixtureReady        EventType = "fixture.ready"
+	EventFixtureTeardown     EventType = "fixture.teardown"
+	EventFixtureFinalizeFail EventType = "fixture.finalize.fail"
+	EventCaseStart           EventType = "case.start"
+	EventCasePass            EventType = "case.pass"
+	EventCaseFail            EventType = "case.fail"
+	EventCaseSkip            EventType = "case.skip"
+	EventAssertFail          EventType = "assert.fail"
+	EventGCXExec             EventType = "gcx.exec"
 )
 
 // SchemaVersion travels with each run.start event. Consumers pin to a

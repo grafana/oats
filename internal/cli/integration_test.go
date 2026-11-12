@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -24,6 +25,22 @@ import (
 	"github.com/grafana/oats/report"
 	"github.com/grafana/oats/runner"
 )
+
+func TestEmitRunEndFlushesFailureBeforeReturningRunError(t *testing.T) {
+	var output bytes.Buffer
+	rep := report.NewTextReporter(&output, report.VerboseDefault)
+	rep.Emit(report.Event{Type: report.EventRunStart})
+	rep.Emit(report.Event{Type: report.EventAssertFail, Case: "failed-case", Message: "final case diagnosis"})
+	rep.Emit(report.Event{Type: report.EventCaseFail, Case: "failed-case"})
+	runErr := errors.New("fixture finalizer failed")
+
+	if err := emitRunEnd(rep, 0, 1, time.Second, runErr); !errors.Is(err, runErr) {
+		t.Fatalf("emitRunEnd error = %v, want %v", err, runErr)
+	}
+	if got := output.String(); !strings.Contains(got, "final case diagnosis") || !strings.Contains(got, "failed-case") {
+		t.Fatalf("run-end report did not flush the case failure: %s", got)
+	}
+}
 
 func TestResolveEndpoint_ComposeDefaults(t *testing.T) {
 	runCompose := func(context.Context, string, []string) error { return nil }

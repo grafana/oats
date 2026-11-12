@@ -16,7 +16,7 @@ permissions: {}
 jobs:
   release-please:
     if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       issues: write
@@ -35,7 +35,7 @@ jobs:
   goreleaser:
     if: github.event_name == 'push' && needs.release-please.outputs.release_created == 'true'
     needs: release-please
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       # Artifact releases pair a focused tool allowlist with cache: false.
       MISE_ENABLE_TOOLS: go,goreleaser
@@ -51,10 +51,10 @@ jobs:
           ref: refs/tags/${{ needs.release-please.outputs.tag_name }}
           persist-credentials: false
       - name: Setup mise
-        uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
-          version: v2026.10.11
-          sha256: f9612efcddda0ae55b62d3b6f82a6c860d5b54ebee0807d4f1a1d578055e1607
+          version: v2026.11.2
+          sha256: 62cad463c1413f05398ca339168a8f655120b6f0b0b8adce3bc6758bafaf0602
           cache: false
       - name: Run GoReleaser
         env:
@@ -82,7 +82,7 @@ jobs:
 
   publish-existing-tag:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       # Artifact releases pair a focused tool allowlist with cache: false.
       MISE_ENABLE_TOOLS: go,goreleaser
@@ -109,10 +109,10 @@ jobs:
           ref: refs/tags/${{ github.event.inputs.tag_name }}
           persist-credentials: false
       - name: Setup mise
-        uses: jdx/mise-action@fc42bcc7ddbf51124c30f95a877a0c5168a3bfde # v5.2.1
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
-          version: v2026.10.11
-          sha256: f9612efcddda0ae55b62d3b6f82a6c860d5b54ebee0807d4f1a1d578055e1607
+          version: v2026.11.2
+          sha256: 62cad463c1413f05398ca339168a8f655120b6f0b0b8adce3bc6758bafaf0602
           cache: false
       - name: Run GoReleaser
         env:

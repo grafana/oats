@@ -276,6 +276,25 @@ cases: ["*/oats-case.yaml"]
 	}
 }
 
+func TestPlanRun_SeparatesRelativeFinalizerAcrossDirs(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "oats-config.yaml", "meta:\n  version: 3\ncases: [\"*/oats-case.yaml\"]\n")
+	for _, subdir := range []string{"a", "b"} {
+		writeFile(t, dir, subdir+"/oats-case.yaml", "name: "+subdir+"\nfixture:\n  remote:\n    endpoint: http://localhost:4318\n  finalize:\n    command: ./validate.sh\nseed:\n  type: app\nexpected:\n  traces:\n    - traceql: '{}'\n      absent: true\n")
+	}
+	cfg, err := Load(filepath.Join(dir, "oats-config.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plans, err := cfg.PlanRun(Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plans) != 2 {
+		t.Fatalf("plans = %d, want 2", len(plans))
+	}
+}
+
 // TestPlanRun_SeparatesDirRelativeFixtureAcrossDirs verifies that cases with the
 // same dir-relative fixture (compose file) in different directories land in
 // separate plans: the relative file means different files per directory, so the
