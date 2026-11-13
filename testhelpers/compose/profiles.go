@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // serviceProfiles returns profiles for a service from the Compose source
