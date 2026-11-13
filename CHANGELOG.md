@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.11.1](https://github.com/grafana/oats/compare/v0.11.0...v0.11.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/spf13/pflag to v1.1.0 ([#676](https://github.com/grafana/oats/issues/676)) ([3e95a3f](https://github.com/grafana/oats/commit/3e95a3fa102f0f1d1e43a8ed826b0e243d66bbd6))
+* **deps:** update module go.opentelemetry.io/collector/pdata to v1.71.0 ([#679](https://github.com/grafana/oats/issues/679)) ([1a4be03](https://github.com/grafana/oats/commit/1a4be032aac136152c1816d0748b3173b6aef62c))
+* **deps:** update module go.yaml.in/yaml/v3 to v3.0.6 ([#665](https://github.com/grafana/oats/issues/665)) ([79e7719](https://github.com/grafana/oats/commit/79e7719405ee030315c2600d88eed1985eace689))
+* **deps:** update module golang.org/x/sys to v0.50.0 ([#680](https://github.com/grafana/oats/issues/680)) ([ca15bdb](https://github.com/grafana/oats/commit/ca15bdbadeda7764ad46ca9a7cccd9c16a092c0a))
+* **deps:** update module golang.org/x/term to v0.48.0 ([#681](https://github.com/grafana/oats/issues/681)) ([196b683](https://github.com/grafana/oats/commit/196b683b4823cf18aa867129b28ea36e94789d08))
+
 ## [0.11.0](https://github.com/grafana/oats/compare/v0.10.0...v0.11.0) (2026-11-06)
 
 
