@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/grafana/oats/internal/legacyyaml/model"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var yamlFileRegex = regexp.MustCompile(`\.ya?ml$`)
