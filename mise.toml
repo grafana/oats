@@ -2,7 +2,7 @@
 
 # Runtime used by the black-box examples.
 "aqua:grafana/gcx" = "1.7.1"
-go = "1.27.3"
+go = "1.27.4"
 goreleaser = "2.20.0"
 k3d = "5.9.0"
 kubectl = "1.37.2"
