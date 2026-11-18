@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Case is one entry point yaml file. Cases are independently runnable;

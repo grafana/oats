@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/grafana/oats/testhelpers/container"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 type caseFile struct {
