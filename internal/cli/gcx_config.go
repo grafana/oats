@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // The remote fixture is configured in gcx, not in the OATS case. Keep the

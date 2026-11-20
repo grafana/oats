@@ -13,7 +13,7 @@ import (
 	"github.com/grafana/oats/discovery"
 	"github.com/grafana/oats/internal/legacyyaml"
 	"github.com/grafana/oats/internal/legacyyaml/model"
-	goyaml "go.yaml.in/yaml/v3"
+	goyaml "go.yaml.in/yaml/v4"
 )
 
 // marshalYAML renders v as YAML with 2-space indentation, matching the repo's

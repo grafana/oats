@@ -95,7 +95,7 @@ Key flags: `-V`/`--version`, `--config`, `--tags`, `--timeout`, `--interval`,
 
 - Go 1.24+
 - Assertions: gomega
-- YAML parsing: `go.yaml.in/yaml/v3` with strict field validation
+- YAML parsing: `go.yaml.in/yaml/v4` with strict field validation
 - Logging: `log/slog`
 - Docker: `docker compose` (not legacy `docker-compose`)
 

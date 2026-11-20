@@ -85,7 +85,7 @@ func TestInputDefinitionsInvalidFiles(t *testing.T) {
 		{
 			name:     "malformed yaml",
 			filePath: "testdata/invalid-tests/malformed-yaml.yaml",
-			errorMsg: "failed to parse file \".*/legacyyaml/testdata/invalid-tests/malformed-yaml.yaml\": yaml: mapping values are not allowed in this context",
+			errorMsg: "failed to parse file \".*/legacyyaml/testdata/invalid-tests/malformed-yaml.yaml\": yaml: line 1: mapping values are not allowed in this context",
 		},
 		{
 			name:     "outdated file version",
@@ -103,8 +103,8 @@ func TestInputDefinitionsInvalidFiles(t *testing.T) {
 			name:     "unknown field",
 			filePath: "testdata/invalid-tests/unknown-field.yaml",
 			errorMsg: "error parsing test case definition .*/legacyyaml/testdata/invalid-tests/unknown-field.yaml - " +
-				"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - yaml: unmarshal errors:\n" +
-				".*line 5: field spans not found in type model.ExpectedTraces",
+				"see migration notes at https://github.com/grafana/oats/blob/main/UPGRADING.md - yaml: construct errors: " +
+				"line 5: field spans not found in type model.ExpectedTraces",
 		},
 	}
 
