@@ -84,10 +84,12 @@ oats list
 oats --config oats-config.yaml --timeout 1m
 ```
 
-Subcommands: `run` (default), `list`, `migrate`, `cache clear`, `version`.
+Subcommands: `run` (default), `list`, `migrate`, `cache clear`, `version`,
+`usage`, and `completion <shell>`.
 
-Key flags: `--config`, `--tags`, `--timeout`, `--interval`, `--absent-timeout`,
-`--parallel`, `--gcx`, `--gcx-version`, `--gcx-download`, `--gcx-context`
+Key flags: `-V`/`--version`, `--config`, `--tags`, `--timeout`, `--interval`,
+`--absent-timeout`, `--parallel`, `--gcx`, `--gcx-version`, `--gcx-download`,
+`--gcx-context`
 
 ## Code Conventions
 

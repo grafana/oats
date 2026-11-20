@@ -2,8 +2,30 @@
 
 The changelog is available in the [releases section](https://github.com/grafana/oats/releases).
 
-This file only contains upgrade notes for breaking changes that require you to
-modify your existing YAML test files.
+This file contains upgrade notes for breaking changes that require changes to
+your existing YAML test files, scripts, or CLI invocations.
+
+## Upcoming release
+
+The CLI now uses the experimental Usage parser. Review these invocation changes
+when upgrading:
+
+- Put an explicit subcommand before its options. For example, use
+  `oats list --config oats-config.yaml`; `oats --config oats-config.yaml list`
+  now selects the implicit `run` command and treats `list` as a case path.
+- Boolean environment variables accept only `1`, `true`, `True`, and `TRUE` as
+  true; all other values mean false. In particular, values such as
+  `OATS_NO_CACHE=t` that were previously accepted as true now mean false, while
+  values such as `OATS_FAIL_FAST=yes` that were previously rejected now mean
+  false. Use `true` or `false` explicitly. CLI boolean assignments likewise
+  require `--fail-fast=true` or `--fail-fast=false`; abbreviated values such as
+  `--fail-fast=1` are not accepted.
+- Verbosity counts use repeated flags (`-v`, `-vv`, `-vvv`) rather than numeric
+  assignments such as `--verbose=3` or `-vv=3`. `OATS_VERBOSE` can still be a
+  non-negative decimal count.
+- Regenerate installed shell completion scripts with
+  `oats completion <shell>`; the former Cobra-generated scripts are not
+  compatible with this CLI.
 
 ## 0.8.0
 

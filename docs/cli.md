@@ -173,8 +173,9 @@ Flags:
 | `--lgtm-version`            | `OATS_LGTM_VERSION`               | `latest`                                                           | `docker.io/grafana/otel-lgtm` version used by the builtin Compose fixture                  |
 | `--container-runtime`       | `OATS_CONTAINER_RUNTIME`          | `auto`                                                             | Compose engine: prefer Podman, or explicitly use `docker` / `podman`                       |
 | `--app-host` / `--app-port` | `OATS_APP_HOST` / `OATS_APP_PORT` | `localhost` / `8080`                                               | where to drive `input` requests when a fixture doesn't resolve the app endpoint itself     |
-| `--otlp-http`               | `OATS_OTLP_HTTP`                  | `http://localhost:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                              |
+| `--otlp-http`               | `OATS_OTLP_HTTP`                  | `http://127.0.0.1:4318`                                            | OTLP/HTTP base URL for the `inline-otlp` seed                                              |
 | `--verbose`                 | `OATS_VERBOSE`                    | `0`                                                                | increase verbosity (`1`–`3` are the useful levels)                                         |
+| `-V`, `--version`           | —                                 | —                                                                  | print the oats version and exit                                                            |
 
 The deprecated hidden aliases `--list` and `--migrate` also accept
 `OATS_LIST` and `OATS_MIGRATE`. `oats list --config` uses `OATS_CONFIG`, and
@@ -216,3 +217,42 @@ version)` are unchanged and previously passed; clear it to force a full run.
 ### `oats version`
 
 Print the oats version and exit.
+
+## CLI metadata and completions
+
+`oats usage` prints the machine-readable [Usage](https://usage.jdx.dev/) spec.
+`oats completion bash` generates a self-contained completion script; `zsh`,
+`fish`, `powershell`, and `nu` are also supported. Regenerate previously installed
+Cobra completion scripts when upgrading to this version.
+
+The CLI uses the experimental Usage Go parser. The supported contract includes
+the existing commands, implicit `run`, CLI-over-environment precedence, and
+exit codes. Help and parse-error wording may differ from Cobra.
+
+Use `oats run --help` for run options. Run-specific flags also select implicit
+run, so `oats --timeout 1m` works. Put an explicit subcommand before its options;
+`oats --timeout 1m run` treats `run` as a case path.
+
+An empty invocation or global-only flags (`oats`, `oats -v`) select implicit
+`run`. A syntactic separator suppresses only that empty/global-only selection:
+`oats --` and `oats -v --` report that no command was selected. Use
+`oats run -- -case.yaml` when passing a dash-prefixed path to the runner.
+
+Unknown flags remain errors; use `--` before a path that begins with a dash.
+Attach flag values that start with a dash: `--timeout=-1s`. Bare boolean flags
+mean true without consuming a following path; explicit CLI boolean values are
+`true` or `false`. Usage's boolean environment truth values are `1`, `true`,
+`True`, and `TRUE`; other strings mean false. Prefer `true`/`false` in CI.
+
+Verbosity uses repeated flags (`-v`, `-vv`, `-vvv`) or a non-negative decimal
+`OATS_VERBOSE` value. A CLI count replaces the environment value. Explicit
+Cobra-style count assignments such as `--verbose=3` and `-vv=3` are rejected;
+use repeated `-v` flags instead. The pinned upstream parser accepts attached
+count values but treats them as one occurrence, so OATS rejects that syntax
+until Usage defines shared behavior. Numeric environment count semantics remain
+an upstream discussion and temporary OATS adapter.
+
+Empty optional `--config`, `--gcx`, `--lgtm-version`, `--gcx-download`, and
+`--cache-dir` values clear the corresponding environment override and use
+application defaults. Nonempty explicit values remain overrides even when they
+equal the usual default (for example `--gcx=gcx`).

@@ -1,9 +1,12 @@
 package container
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -137,6 +140,92 @@ exit 1
 	}
 	if got != Docker {
 		t.Fatalf("Resolve(auto) = %q, want %q", got, Docker)
+	}
+}
+
+func TestResolveAutoReportsBothEngineFailures(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses POSIX executables")
+	}
+	dir := t.TempDir()
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte(`#!/bin/sh
+if [ "$1" = "compose" ] && [ "$2" = "version" ]; then
+  echo podman-provider-failed >&2
+  exit 1
+fi
+exit 0
+`), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	docker := filepath.Join(dir, "docker")
+	if err := os.WriteFile(docker, []byte(`#!/bin/sh
+if [ "$1" = "compose" ] && [ "$2" = "version" ]; then
+  exit 0
+fi
+echo docker-engine-failed >&2
+exit 1
+`), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	_, err := Resolve("auto")
+	if err == nil {
+		t.Fatal("Resolve(auto) unexpectedly succeeded")
+	}
+	message := err.Error()
+	if !strings.Contains(message, "no supported container runtime") {
+		t.Errorf("Resolve(auto) error %q does not retain generic prefix", message)
+	}
+	for _, reason := range []string{"podman: compose unavailable", "podman-provider-failed", "docker: container engine unavailable", "docker-engine-failed"} {
+		if !strings.Contains(message, reason) {
+			t.Errorf("Resolve(auto) error %q does not contain %q", message, reason)
+		}
+	}
+	if strings.Index(message, "podman: ") > strings.Index(message, "docker: ") {
+		t.Errorf("Resolve(auto) failures are not in preference order: %q", message)
+	}
+}
+
+func TestResolveAutoPreservesProbeTimeout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses POSIX executables")
+	}
+	dir := t.TempDir()
+	if _, err := os.Stat("/bin/sleep"); err != nil {
+		t.Skip("test requires /bin/sleep")
+	}
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte(`#!/bin/sh
+if [ "$1" = "compose" ] && [ "$2" = "version" ]; then
+  exec /bin/sleep 6
+fi
+exit 0
+`), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	docker := filepath.Join(dir, "docker")
+	if err := os.WriteFile(docker, []byte(`#!/bin/sh
+echo docker-provider-failed >&2
+exit 1
+`), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	_, err := Resolve("auto")
+	if err == nil {
+		t.Fatal("Resolve(auto) unexpectedly succeeded")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("Resolve(auto) error %v does not retain context deadline", err)
+	}
+	message := err.Error()
+	for _, reason := range []string{"podman: compose unavailable", "compose probe timed out after", "docker: compose unavailable", "docker-provider-failed"} {
+		if !strings.Contains(message, reason) {
+			t.Errorf("Resolve(auto) error %q does not contain %q", message, reason)
+		}
 	}
 }
 

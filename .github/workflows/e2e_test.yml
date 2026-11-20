@@ -220,6 +220,23 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes docker-compose podman
+      - name: Preflight Docker fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+
+          probe_dir=$(mktemp -d)
+          trap 'rm -rf "$probe_dir"' EXIT
+          cat >"$probe_dir/compose.yaml" <<'EOF'
+          services:
+            probe:
+              image: scratch
+          EOF
+          docker compose -f "$probe_dir/compose.yaml" ps
+      - name: Make Podman Compose provider unavailable
+        run: |
           mkdir -p "$RUNNER_TEMP/unavailable-podman-bin"
           cat >"$RUNNER_TEMP/unavailable-podman-bin/podman" <<'EOF'
           #!/usr/bin/env bash

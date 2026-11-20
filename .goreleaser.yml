@@ -25,6 +25,16 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - src: internal/cli/usagespec/oats.usage.kdl
+        dst: share/oats
+        strip_parent: true
+      - src: skills/oats/SKILL.md
+        dst: share/oats/skills/oats
+        strip_parent: true
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
 
