@@ -8,7 +8,7 @@ x-default-logging: &logging
 
 services:
   mongodb:
-    image: mongo:7-jammy@sha256:fb8e0773cddc25d3450171301e3fa0e7398c3e6b02afc3dc6e2780196b62726a
+    image: mongo:7-jammy@sha256:e0da75c955723fb6918111a60e3249079e5ea082c70038dcbc2f5fa32e29ab8c
     ports:
       - "27017:27017"
     volumes:
