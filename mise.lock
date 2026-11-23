@@ -147,6 +147,7 @@ provenance = "cosign"
 version = "0.29.0"
 backend = "aqua:owenlamont/ryl"
 specifiers = ["0.29.0"]
+unsupported_platforms = ["macos-x64"]
 
 [tools."aqua:owenlamont/ryl"."platforms.linux-arm64"]
 checksum = "sha256:46ec5176e24ddcfca8583daef642f5c22fddc93919dce63e59883941e4e72974"
